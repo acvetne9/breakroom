@@ -17,47 +17,68 @@ export const useBusinessesData = () => {
   useEffect(() => {
     const fetchBusinesses = async () => {
       try {
-        const response = await fetch(
-          `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=40.7831,-73.9712&radius=5000&type=restaurant&key=AIzaSyCkLj9I2chNXHkMTbBO0k-KkEmnc_jAqyQ`
-        );
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch businesses');
-        }
+        // Generate extensive mock data for NYC businesses since API has CORS issues
+        const generateBusinesses = () => {
+          const businesses: Business[] = [];
+          const nycAreas = [
+            { name: 'Manhattan', lat: 40.7831, lng: -73.9712 },
+            { name: 'Brooklyn', lat: 40.6782, lng: -73.9442 },
+            { name: 'Queens', lat: 40.7282, lng: -73.7949 },
+            { name: 'Bronx', lat: 40.8448, lng: -73.8648 },
+            { name: 'Staten Island', lat: 40.5795, lng: -74.1502 }
+          ];
+          
+          const businessTypes = ['Restaurant', 'Cafe', 'Bar', 'Deli', 'Bakery', 'Fast Food', 'Pizza Place', 'Grocery Store'];
+          const businessNames = [
+            'Joe\'s Coffee', 'Tony\'s Pizza', 'Brooklyn Bagels', 'Manhattan Deli', 'Queens Cafe',
+            'Bronx Bistro', 'Staten Island Eats', 'NYC Grill', 'Broadway Burgers', 'Central Park Cafe',
+            'Times Square Tacos', 'Village Vegan', 'Soho Sushi', 'Tribeca Treats', 'Chelsea Chicken',
+            'Midtown Meals', 'Lower East Side Lunch', 'Upper West Side Wraps', 'East Village Eats',
+            'Greenwich Gourmet', 'Chinatown Chow', 'Little Italy Lunch', 'Financial District Food'
+          ];
 
-        const data = await response.json();
-        
-        const businessesData: Business[] = data.results?.slice(0, 20).map((place: any, index: number) => ({
-          id: place.place_id || `business-${index}`,
-          name: place.name || 'Unknown Business',
-          position: {
-            lat: place.geometry?.location?.lat || 40.7831 + (Math.random() - 0.5) * 0.01,
-            lng: place.geometry?.location?.lng || -73.9712 + (Math.random() - 0.5) * 0.01
-          },
-          rating: place.rating || 4.0 + Math.random(),
-          salary: `$${(12 + Math.random() * 8).toFixed(1)}`,
-          stories: [
-            { 
-              id: `story-${index}-1`, 
-              text: 'Great place to work, flexible hours and supportive management team.', 
-              author: `Employee${Math.floor(Math.random() * 1000)}` 
-            },
-            { 
-              id: `story-${index}-2`, 
-              text: 'Good benefits and opportunities for growth within the company.', 
-              author: `Worker${Math.floor(Math.random() * 1000)}` 
+          nycAreas.forEach((area, areaIndex) => {
+            for (let i = 0; i < 50; i++) { // 50 businesses per area = 250 total
+              const businessIndex = areaIndex * 50 + i;
+              const randomName = businessNames[Math.floor(Math.random() * businessNames.length)];
+              const randomType = businessTypes[Math.floor(Math.random() * businessTypes.length)];
+              
+              businesses.push({
+                id: `business-${businessIndex}`,
+                name: `${randomName} ${area.name}`,
+                position: {
+                  lat: area.lat + (Math.random() - 0.5) * 0.02,
+                  lng: area.lng + (Math.random() - 0.5) * 0.02
+                },
+                rating: 3.5 + Math.random() * 1.5,
+                salary: `$${(12 + Math.random() * 8).toFixed(1)}`,
+                stories: [
+                  { 
+                    id: `story-${businessIndex}-1`, 
+                    text: 'Great place to work, flexible hours and supportive management team.', 
+                    author: `Employee${Math.floor(Math.random() * 1000)}` 
+                  },
+                  { 
+                    id: `story-${businessIndex}-2`, 
+                    text: 'Good benefits and opportunities for growth within the company.', 
+                    author: `Worker${Math.floor(Math.random() * 1000)}` 
+                  }
+                ],
+                roles: [
+                  { role: 'Server', salary: `$${(13 + Math.random() * 5).toFixed(1)}` },
+                  { role: 'Manager', salary: `$${(18 + Math.random() * 7).toFixed(1)}` }
+                ]
+              });
             }
-          ],
-          roles: [
-            { role: 'Server', salary: `$${(13 + Math.random() * 5).toFixed(1)}` },
-            { role: 'Manager', salary: `$${(18 + Math.random() * 7).toFixed(1)}` }
-          ]
-        })) || [];
+          });
+          
+          return businesses;
+        };
 
-        setBusinesses(businessesData);
+        setBusinesses(generateBusinesses());
       } catch (error) {
-        console.error('Error fetching businesses:', error);
-        // Fallback to mock data
+        console.error('Error generating businesses:', error);
+        // Minimal fallback
         setBusinesses([
           {
             id: '1',

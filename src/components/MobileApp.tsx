@@ -44,11 +44,20 @@ const MobileApp: React.FC = () => {
 
   const handleDragEnd = (event: any, info: PanInfo) => {
     const threshold = 100;
+    const dragStartX = event.clientX || event.touches?.[0]?.clientX || 0;
+    const screenWidth = window.innerWidth;
+    const edgeThreshold = 50; // Only allow swiping within 50px of screen edges
     
-    if (info.offset.x > threshold && currentSlide > 0) {
-      setCurrentSlide(currentSlide - 1);
-    } else if (info.offset.x < -threshold && currentSlide < 2) {
-      setCurrentSlide(currentSlide + 1);
+    // Only allow swiping if drag started near screen edges
+    const isNearLeftEdge = dragStartX < edgeThreshold;
+    const isNearRightEdge = dragStartX > screenWidth - edgeThreshold;
+    
+    if ((isNearLeftEdge || isNearRightEdge)) {
+      if (info.offset.x > threshold && currentSlide > 0) {
+        setCurrentSlide(currentSlide - 1);
+      } else if (info.offset.x < -threshold && currentSlide < 2) {
+        setCurrentSlide(currentSlide + 1);
+      }
     }
   };
 
