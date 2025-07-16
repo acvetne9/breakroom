@@ -31,9 +31,19 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
       try {
         await loader.load();
         
+        // NYC bounds
+        const nycBounds = new google.maps.LatLngBounds(
+          new google.maps.LatLng(40.4774, -74.2591), // Southwest corner (Staten Island)
+          new google.maps.LatLng(40.9176, -73.7004)  // Northeast corner (Bronx)
+        );
+        
         const mapInstance = new google.maps.Map(mapRef.current, {
-          center: { lat: 40.7831, lng: -73.9712 }, // NYC area
-          zoom: 14,
+          center: { lat: 40.7831, lng: -73.9712 }, // NYC center
+          zoom: 12,
+          restriction: {
+            latLngBounds: nycBounds,
+            strictBounds: false
+          },
           styles: [
             {
               featureType: 'poi',

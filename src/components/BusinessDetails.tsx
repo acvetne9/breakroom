@@ -20,9 +20,21 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({ business, onClose }) 
     }
   };
 
-  const handleCompassClick = () => {
+  const handleCompassClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
     // TODO: Link to external business jobs page
     window.open(`https://example.com/jobs/${business.id}`, '_blank');
+  };
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Check if click is on stories or compass - if so, don't close
+    const target = e.target as HTMLElement;
+    const isStoryClick = target.closest('.story-item');
+    const isCompassClick = target.closest('.compass-button');
+    
+    if (!isStoryClick && !isCompassClick) {
+      onClose();
+    }
   };
 
   return (
@@ -30,7 +42,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({ business, onClose }) 
       className="fixed inset-0 z-40 flex items-center justify-center"
       onClick={handleBackgroundClick}
     >
-      <div className="app-card p-6 overflow-y-auto">
+      <div className="app-card p-6 overflow-y-auto" onClick={handleCardClick}>
         <div className="flex justify-between items-start mb-6">
           <div>
             <h2 className="text-xl font-medium text-app-black">{business.name}</h2>
@@ -42,7 +54,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({ business, onClose }) 
           </div>
           <button 
             onClick={handleCompassClick}
-            className="p-2 hover:bg-gray-100 rounded-lg"
+            className="compass-button p-2 hover:bg-gray-100 rounded-lg"
           >
             <Compass className="w-6 h-6 text-app-gray-dark" />
           </button>
@@ -72,7 +84,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({ business, onClose }) 
             <h3 className="text-lg font-medium text-app-black mb-4">More Stories</h3>
             <div className="space-y-4">
               {business.stories.map(story => (
-                <div key={story.id} className="border-l-2 border-app-gray-light pl-4">
+                <div key={story.id} className="story-item border-l-2 border-app-gray-light pl-4">
                   <p className="text-app-gray-dark text-sm">
                     {story.text.length > 120 ? `${story.text.substring(0, 120)}...` : story.text}
                   </p>

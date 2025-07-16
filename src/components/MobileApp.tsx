@@ -4,6 +4,7 @@ import InitiationPage from './InitiationPage';
 import HomePage from './HomePage';
 import SettingsPage from './SettingsPage';
 import ExplorePage from './ExplorePage';
+import { useBusinessesData } from '../hooks/useBusinessesData';
 
 interface UserData {
   salary: string;
@@ -16,35 +17,7 @@ const MobileApp: React.FC = () => {
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
   const [userData, setUserData] = useState<UserData | null>(null);
   const constraintsRef = useRef(null);
-
-  // Mock data
-  const businesses = [
-    {
-      id: '1',
-      name: 'Cafe Priyanka',
-      position: { lat: 40.7831, lng: -73.9712 },
-      rating: 5.0,
-      salary: '$13.6',
-      stories: [
-        { id: '1', text: 'Great place to work, flexible hours', author: 'Sarah123' },
-        { id: '2', text: 'Management is really supportive', author: 'Mike_B' }
-      ],
-      roles: [
-        { role: 'Barista', salary: '$13.6' },
-        { role: 'Manager', salary: '$18.5' }
-      ]
-    },
-    {
-      id: '2',
-      name: 'Taco Bell',
-      position: { lat: 40.7841, lng: -73.9702 },
-      rating: 4.2,
-      salary: '$15.0',
-      stories: [
-        { id: '3', text: 'Fast-paced environment, good for building skills', author: 'JobSeeker' }
-      ]
-    }
-  ];
+  const { businesses, loading } = useBusinessesData();
 
   const posts = [
     {
