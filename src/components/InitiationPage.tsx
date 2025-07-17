@@ -12,8 +12,8 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   const [isComplete, setIsComplete] = useState(false);
 
   const handleSalaryChange = (value: string) => {
-    // Auto-add $ if not included
-    const cleanValue = value.replace('$', '');
+    // Only allow numbers and auto-add $
+    const cleanValue = value.replace(/[^0-9.]/g, '');
     setSalary(cleanValue ? `$${cleanValue}` : '');
   };
 

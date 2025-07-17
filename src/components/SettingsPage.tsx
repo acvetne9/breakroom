@@ -50,13 +50,17 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
   };
 
   const updatePastJob = (id: string, field: keyof Omit<PastJob, 'id'>, value: string) => {
+    const processedValue = field === 'salary' ? 
+      (value.replace(/[^0-9.]/g, '') ? `$${value.replace(/[^0-9.]/g, '')}` : '') : 
+      value;
     setPastJobs(pastJobs.map(job => 
-      job.id === id ? { ...job, [field]: value } : job
+      job.id === id ? { ...job, [field]: processedValue } : job
     ));
   };
 
   const handleSalaryChange = (value: string) => {
-    const cleanValue = value.replace('$', '');
+    // Only allow numbers and auto-add $
+    const cleanValue = value.replace(/[^0-9.]/g, '');
     setCurrentJob({ ...currentJob, salary: cleanValue ? `$${cleanValue}` : '' });
   };
 

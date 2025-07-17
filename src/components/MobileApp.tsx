@@ -66,7 +66,10 @@ const MobileApp: React.FC = () => {
   }
 
   return (
-    <div className="fixed inset-0 overflow-hidden bg-white">
+    <div className="fixed inset-0 overflow-hidden">
+      {/* Map is always the background */}
+      <HomePage businesses={businesses} />
+      
       <div ref={constraintsRef} className="w-full h-full relative">
         <motion.div
           className="flex w-[300vw] h-full"
@@ -79,28 +82,30 @@ const MobileApp: React.FC = () => {
         >
           {/* Settings Page */}
           <div className="w-screen h-full relative">
-            <HomePage businesses={businesses} />
-            <div className="absolute inset-0 bg-white bg-opacity-95 z-10">
-              {userData && <SettingsPage initialData={userData} />}
+            <div className="absolute inset-0 z-10 pointer-events-none">
+              <div className="pointer-events-auto">
+                {userData && <SettingsPage initialData={userData} />}
+              </div>
             </div>
           </div>
 
           {/* Home Page */}
           <div className="w-screen h-full">
-            <HomePage businesses={businesses} />
+            {/* Map visible here */}
           </div>
 
           {/* Explore Page */}
           <div className="w-screen h-full relative">
-            <HomePage businesses={businesses} />
-            <div className="absolute inset-0 bg-white bg-opacity-95 z-10">
-              <ExplorePage 
-                posts={posts}
-                onBusinessView={(businessId) => {
-                  // TODO: Filter explore to show posts for this business
-                  console.log('View business:', businessId);
-                }}
-              />
+            <div className="absolute inset-0 z-10 pointer-events-none">
+              <div className="pointer-events-auto">
+                <ExplorePage 
+                  posts={posts}
+                  onBusinessView={(businessId) => {
+                    // TODO: Filter explore to show posts for this business
+                    console.log('View business:', businessId);
+                  }}
+                />
+              </div>
             </div>
           </div>
         </motion.div>
