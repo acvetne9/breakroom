@@ -70,58 +70,74 @@ const MobileApp: React.FC = () => {
       {/* Map is always the background */}
       <HomePage businesses={businesses} />
       
-      <div ref={constraintsRef} className="w-full h-full relative">
+      {/* Settings Card */}
+      {currentSlide === 0 && userData && (
         <motion.div
-          className="flex w-[300vw] h-full"
-          animate={{ x: `${-currentSlide * 100}vw` }}
+          initial={{ y: '100%' }}
+          animate={{ y: 0 }}
+          exit={{ y: '100%' }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          className="absolute inset-x-0 top-16 bottom-16 z-20 mx-4"
+        >
+          <div className="bg-background rounded-t-3xl shadow-2xl h-full overflow-hidden">
+            <SettingsPage initialData={userData} />
+          </div>
+        </motion.div>
+      )}
+
+      {/* Explore Card */}
+      {currentSlide === 2 && (
+        <motion.div
+          initial={{ y: '100%' }}
+          animate={{ y: 0 }}
+          exit={{ y: '100%' }}
+          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          className="absolute inset-x-0 top-16 bottom-16 z-20 mx-4"
+        >
+          <div className="bg-background rounded-t-3xl shadow-2xl h-full overflow-hidden">
+            <ExplorePage 
+              posts={posts}
+              onBusinessView={(businessId) => {
+                // TODO: Filter explore to show posts for this business
+                console.log('View business:', businessId);
+              }}
+            />
+          </div>
+        </motion.div>
+      )}
+
+      {/* Swipe detection overlay */}
+      <div 
+        ref={constraintsRef} 
+        className="absolute inset-0 z-10"
+        onTouchStart={(e) => {
+          const touch = e.touches[0];
+          const screenWidth = window.innerWidth;
+          const edgeThreshold = 50;
+          const isNearEdge = touch.clientX < edgeThreshold || touch.clientX > screenWidth - edgeThreshold;
+          if (!isNearEdge) e.preventDefault();
+        }}
+      >
+        <motion.div
+          className="w-full h-full"
           drag="x"
           dragConstraints={constraintsRef}
           dragElastic={0.1}
           onDragEnd={handleDragEnd}
-        >
-          {/* Settings Page */}
-          <div className="w-screen h-full relative">
-            <div className="absolute inset-0 z-10 pointer-events-none">
-              <div className="pointer-events-auto">
-                {userData && <SettingsPage initialData={userData} />}
-              </div>
-            </div>
-          </div>
+        />
+      </div>
 
-          {/* Home Page */}
-          <div className="w-screen h-full">
-            {/* Map visible here */}
-          </div>
-
-          {/* Explore Page */}
-          <div className="w-screen h-full relative">
-            <div className="absolute inset-0 z-10 pointer-events-none">
-              <div className="pointer-events-auto">
-                <ExplorePage 
-                  posts={posts}
-                  onBusinessView={(businessId) => {
-                    // TODO: Filter explore to show posts for this business
-                    console.log('View business:', businessId);
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Slide indicators */}
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-50">
-          {[0, 1, 2].map(index => (
-            <button
-              key={index}
-              onClick={() => setCurrentSlide(index)}
-              className={`w-3 h-3 rounded-full transition-colors ${
-                index === currentSlide ? 'bg-app-yellow' : 'bg-app-gray-light'
-              }`}
-            />
-          ))}
-        </div>
+      {/* Slide indicators */}
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-50">
+        {[0, 1, 2].map(index => (
+          <button
+            key={index}
+            onClick={() => setCurrentSlide(index)}
+            className={`w-3 h-3 rounded-full transition-colors ${
+              index === currentSlide ? 'bg-app-yellow' : 'bg-app-gray-light'
+            }`}
+          />
+        ))}
       </div>
     </div>
   );
