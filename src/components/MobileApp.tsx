@@ -61,14 +61,15 @@ const MobileApp: React.FC = () => {
     }
   };
 
-  if (currentView === 'initiation') {
-    return <InitiationPage onComplete={handleInitiationComplete} />;
-  }
-
   return (
     <div className="fixed inset-0 overflow-hidden">
       {/* Map is always the background */}
       <HomePage businesses={businesses} />
+      
+      {/* Initiation Card - slides up and disappears */}
+      {currentView === 'initiation' && (
+        <InitiationPage onComplete={handleInitiationComplete} />
+      )}
       
       {/* Settings Card - slides from left */}
       {currentSlide === 0 && userData && (
@@ -78,6 +79,14 @@ const MobileApp: React.FC = () => {
           exit={{ x: '-100%' }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           className="absolute inset-0 z-20"
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.1}
+          onDragEnd={(event, info) => {
+            if (info.offset.x < -100) {
+              setCurrentSlide(1);
+            }
+          }}
         >
           <SettingsPage initialData={userData} />
         </motion.div>
@@ -91,6 +100,14 @@ const MobileApp: React.FC = () => {
           exit={{ x: '100%' }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           className="absolute inset-0 z-20"
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.1}
+          onDragEnd={(event, info) => {
+            if (info.offset.x > 100) {
+              setCurrentSlide(1);
+            }
+          }}
         >
           <ExplorePage 
             posts={posts}
