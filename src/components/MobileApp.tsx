@@ -70,39 +70,35 @@ const MobileApp: React.FC = () => {
       {/* Map is always the background */}
       <HomePage businesses={businesses} />
       
-      {/* Settings Card */}
+      {/* Settings Card - slides from left */}
       {currentSlide === 0 && userData && (
         <motion.div
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
+          initial={{ x: '-100%' }}
+          animate={{ x: 0 }}
+          exit={{ x: '-100%' }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          className="absolute inset-x-0 top-16 bottom-16 z-20 mx-4"
+          className="absolute inset-0 z-20"
         >
-          <div className="bg-background rounded-t-3xl shadow-2xl h-full overflow-hidden">
-            <SettingsPage initialData={userData} />
-          </div>
+          <SettingsPage initialData={userData} />
         </motion.div>
       )}
 
-      {/* Explore Card */}
+      {/* Explore Card - slides from right */}
       {currentSlide === 2 && (
         <motion.div
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
+          initial={{ x: '100%' }}
+          animate={{ x: 0 }}
+          exit={{ x: '100%' }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          className="absolute inset-x-0 top-16 bottom-16 z-20 mx-4"
+          className="absolute inset-0 z-20"
         >
-          <div className="bg-background rounded-t-3xl shadow-2xl h-full overflow-hidden">
-            <ExplorePage 
-              posts={posts}
-              onBusinessView={(businessId) => {
-                // TODO: Filter explore to show posts for this business
-                console.log('View business:', businessId);
-              }}
-            />
-          </div>
+          <ExplorePage 
+            posts={posts}
+            onBusinessView={(businessId) => {
+              // TODO: Filter explore to show posts for this business
+              console.log('View business:', businessId);
+            }}
+          />
         </motion.div>
       )}
 
