@@ -102,24 +102,60 @@ const MobileApp: React.FC = () => {
         </motion.div>
       )}
 
-      {/* Swipe detection overlay */}
+      {/* Swipe detection overlay - only at screen edges */}
       <div 
-        ref={constraintsRef} 
-        className="absolute inset-0 z-10"
-        onTouchStart={(e) => {
-          const touch = e.touches[0];
-          const screenWidth = window.innerWidth;
-          const edgeThreshold = 50;
-          const isNearEdge = touch.clientX < edgeThreshold || touch.clientX > screenWidth - edgeThreshold;
-          if (!isNearEdge) e.preventDefault();
-        }}
+        className="absolute inset-0 z-10 pointer-events-none"
       >
-        <motion.div
-          className="w-full h-full"
-          drag="x"
-          dragConstraints={constraintsRef}
-          dragElastic={0.1}
-          onDragEnd={handleDragEnd}
+        {/* Left edge swipe area */}
+        <div 
+          className="absolute left-0 top-0 w-12 h-full pointer-events-auto"
+          onTouchStart={(e) => {
+            if (currentSlide > 0) {
+              const touch = e.touches[0];
+              const startX = touch.clientX;
+              const handleTouchMove = (moveEvent: TouchEvent) => {
+                const moveTouch = moveEvent.touches[0];
+                const deltaX = moveTouch.clientX - startX;
+                if (deltaX > 100) {
+                  setCurrentSlide(currentSlide - 1);
+                  document.removeEventListener('touchmove', handleTouchMove);
+                  document.removeEventListener('touchend', handleTouchEnd);
+                }
+              };
+              const handleTouchEnd = () => {
+                document.removeEventListener('touchmove', handleTouchMove);
+                document.removeEventListener('touchend', handleTouchEnd);
+              };
+              document.addEventListener('touchmove', handleTouchMove);
+              document.addEventListener('touchend', handleTouchEnd);
+            }
+          }}
+        />
+        
+        {/* Right edge swipe area */}
+        <div 
+          className="absolute right-0 top-0 w-12 h-full pointer-events-auto"
+          onTouchStart={(e) => {
+            if (currentSlide < 2) {
+              const touch = e.touches[0];
+              const startX = touch.clientX;
+              const handleTouchMove = (moveEvent: TouchEvent) => {
+                const moveTouch = moveEvent.touches[0];
+                const deltaX = startX - moveTouch.clientX;
+                if (deltaX > 100) {
+                  setCurrentSlide(currentSlide + 1);
+                  document.removeEventListener('touchmove', handleTouchMove);
+                  document.removeEventListener('touchend', handleTouchEnd);
+                }
+              };
+              const handleTouchEnd = () => {
+                document.removeEventListener('touchmove', handleTouchMove);
+                document.removeEventListener('touchend', handleTouchEnd);
+              };
+              document.addEventListener('touchmove', handleTouchMove);
+              document.addEventListener('touchend', handleTouchEnd);
+            }
+          }}
         />
       </div>
 
