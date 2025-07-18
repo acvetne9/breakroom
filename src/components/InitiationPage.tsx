@@ -222,11 +222,6 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
               />
             </div>
 
-            <div className="text-center">
-              <p className="text-sm text-app-black mb-4">Find businesses, industries...</p>
-            </div>
-
-            {/* Business Search Section */}
             <div className="space-y-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-app-gray-medium" />
@@ -235,7 +230,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                   type="text"
                   value={businessSearch}
                   onChange={(e) => setBusinessSearch(e.target.value)}
-                  placeholder="Search businesses, industries..."
+                  placeholder="Search..."
                   className="app-input pl-10"
                 />
                 <button
