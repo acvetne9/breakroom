@@ -12,8 +12,8 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   const [isComplete, setIsComplete] = useState(false);
 
   const handleSalaryChange = (value: string) => {
-    // Auto-add $ if not included
-    const cleanValue = value.replace('$', '');
+    // Only allow numbers and auto-add $
+    const cleanValue = value.replace(/[^0-9.]/g, '');
     setSalary(cleanValue ? `$${cleanValue}` : '');
   };
 
@@ -31,10 +31,10 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
 
   return (
     <motion.div
-      initial={{ opacity: 1, y: 0 }}
-      animate={{ opacity: isComplete ? 0 : 1, y: isComplete ? -100 : 0 }}
-      transition={{ duration: 0.3, ease: 'easeInOut' }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-white"
+      initial={{ y: 0 }}
+      animate={{ y: isComplete ? '-100vh' : 0 }}
+      transition={{ duration: 0.5, ease: 'easeInOut' }}
+      className="absolute inset-0 z-50 flex items-center justify-center"
     >
       <div className="app-card flex flex-col justify-center px-8 py-12">
         <div className="space-y-6">

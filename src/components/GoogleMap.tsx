@@ -31,15 +31,15 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
       try {
         await loader.load();
         
-        // Tighter NYC bounds around New Jersey area
+        // All 5 NYC boroughs bounds
         const nycBounds = new google.maps.LatLngBounds(
-          new google.maps.LatLng(40.6892, -74.0445), // Southwest corner (tighter)
-          new google.maps.LatLng(40.8176, -73.9442)  // Northeast corner (tighter)
+          new google.maps.LatLng(40.4774, -74.2591), // Southwest corner (Staten Island)
+          new google.maps.LatLng(40.9176, -73.7004)  // Northeast corner (Bronx)
         );
         
         const mapInstance = new google.maps.Map(mapRef.current, {
           center: { lat: 40.7831, lng: -73.9712 }, // NYC center
-          zoom: 12,
+          zoom: 10,
           restriction: {
             latLngBounds: nycBounds,
             strictBounds: false

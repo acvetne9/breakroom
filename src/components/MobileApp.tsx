@@ -61,62 +61,132 @@ const MobileApp: React.FC = () => {
     }
   };
 
-  if (currentView === 'initiation') {
-    return <InitiationPage onComplete={handleInitiationComplete} />;
-  }
-
   return (
-    <div className="fixed inset-0 overflow-hidden bg-white">
-      <div ref={constraintsRef} className="w-full h-full relative">
+    <div className="fixed inset-0 overflow-hidden">
+      {/* Map is always the background */}
+      <HomePage businesses={businesses} />
+      
+      {/* Initiation Card - slides up and disappears */}
+      {currentView === 'initiation' && (
+        <InitiationPage onComplete={handleInitiationComplete} />
+      )}
+      
+      {/* Settings Card - slides from left */}
+      {currentSlide === 0 && userData && (
         <motion.div
-          className="flex w-[300vw] h-full"
-          animate={{ x: `${-currentSlide * 100}vw` }}
+          initial={{ x: '-100%' }}
+          animate={{ x: 0 }}
+          exit={{ x: '-100%' }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          className="absolute inset-0 z-20"
           drag="x"
-          dragConstraints={constraintsRef}
+          dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.1}
-          onDragEnd={handleDragEnd}
+          onDragEnd={(event, info) => {
+            if (info.offset.x < -100) {
+              setCurrentSlide(1);
+            }
+          }}
         >
-          {/* Settings Page */}
-          <div className="w-screen h-full relative">
-            <HomePage businesses={businesses} />
-            <div className="absolute inset-0 bg-white bg-opacity-95 z-10">
-              {userData && <SettingsPage initialData={userData} />}
-            </div>
-          </div>
-
-          {/* Home Page */}
-          <div className="w-screen h-full">
-            <HomePage businesses={businesses} />
-          </div>
-
-          {/* Explore Page */}
-          <div className="w-screen h-full relative">
-            <HomePage businesses={businesses} />
-            <div className="absolute inset-0 bg-white bg-opacity-95 z-10">
-              <ExplorePage 
-                posts={posts}
-                onBusinessView={(businessId) => {
-                  // TODO: Filter explore to show posts for this business
-                  console.log('View business:', businessId);
-                }}
-              />
-            </div>
-          </div>
+          <SettingsPage initialData={userData} />
         </motion.div>
+      )}
 
-        {/* Slide indicators */}
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-50">
-          {[0, 1, 2].map(index => (
-            <button
-              key={index}
-              onClick={() => setCurrentSlide(index)}
-              className={`w-3 h-3 rounded-full transition-colors ${
-                index === currentSlide ? 'bg-app-yellow' : 'bg-app-gray-light'
-              }`}
-            />
-          ))}
-        </div>
+      {/* Explore Card - slides from right */}
+      {currentSlide === 2 && (
+        <motion.div
+          initial={{ x: '100%' }}
+          animate={{ x: 0 }}
+          exit={{ x: '100%' }}
+          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          className="absolute inset-0 z-20"
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.1}
+          onDragEnd={(event, info) => {
+            if (info.offset.x > 100) {
+              setCurrentSlide(1);
+            }
+          }}
+        >
+          <ExplorePage 
+            posts={posts}
+            onBusinessView={(businessId) => {
+              // TODO: Filter explore to show posts for this business
+              console.log('View business:', businessId);
+            }}
+          />
+        </motion.div>
+      )}
+
+      {/* Swipe detection overlay - only at screen edges */}
+      <div 
+        className="absolute inset-0 z-10 pointer-events-none"
+      >
+        {/* Left edge swipe area */}
+        <div 
+          className="absolute left-0 top-0 w-12 h-full pointer-events-auto"
+          onTouchStart={(e) => {
+            if (currentSlide > 0) {
+              const touch = e.touches[0];
+              const startX = touch.clientX;
+              const handleTouchMove = (moveEvent: TouchEvent) => {
+                const moveTouch = moveEvent.touches[0];
+                const deltaX = moveTouch.clientX - startX;
+                if (deltaX > 100) {
+                  setCurrentSlide(currentSlide - 1);
+                  document.removeEventListener('touchmove', handleTouchMove);
+                  document.removeEventListener('touchend', handleTouchEnd);
+                }
+              };
+              const handleTouchEnd = () => {
+                document.removeEventListener('touchmove', handleTouchMove);
+                document.removeEventListener('touchend', handleTouchEnd);
+              };
+              document.addEventListener('touchmove', handleTouchMove);
+              document.addEventListener('touchend', handleTouchEnd);
+            }
+          }}
+        />
+        
+        {/* Right edge swipe area */}
+        <div 
+          className="absolute right-0 top-0 w-12 h-full pointer-events-auto"
+          onTouchStart={(e) => {
+            if (currentSlide < 2) {
+              const touch = e.touches[0];
+              const startX = touch.clientX;
+              const handleTouchMove = (moveEvent: TouchEvent) => {
+                const moveTouch = moveEvent.touches[0];
+                const deltaX = startX - moveTouch.clientX;
+                if (deltaX > 100) {
+                  setCurrentSlide(currentSlide + 1);
+                  document.removeEventListener('touchmove', handleTouchMove);
+                  document.removeEventListener('touchend', handleTouchEnd);
+                }
+              };
+              const handleTouchEnd = () => {
+                document.removeEventListener('touchmove', handleTouchMove);
+                document.removeEventListener('touchend', handleTouchEnd);
+              };
+              document.addEventListener('touchmove', handleTouchMove);
+              document.addEventListener('touchend', handleTouchEnd);
+            }
+          }}
+        />
+      </div>
+
+      {/* Slide indicators */}
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-50">
+        {[0, 1, 2].map(index => (
+          <button
+            key={index}
+            onClick={() => setCurrentSlide(index)}
+            className={`w-3 h-3 rounded-full transition-colors ${
+              index === currentSlide ? 'bg-app-yellow' : 'bg-app-gray-light'
+            }`}
+          />
+        ))}
       </div>
     </div>
   );
