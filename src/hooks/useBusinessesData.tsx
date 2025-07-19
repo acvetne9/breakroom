@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 interface Business {
   id: string;
   name: string;
+  type: string;
   position: { lat: number; lng: number };
   rating: number;
   salary?: string;
@@ -46,6 +47,7 @@ export const useBusinessesData = () => {
               businesses.push({
                 id: `business-${businessIndex}`,
                 name: `${randomName} ${area.name}`,
+                type: randomType,
                 position: {
                   lat: area.lat + (Math.random() - 0.5) * 0.02,
                   lng: area.lng + (Math.random() - 0.5) * 0.02
@@ -83,6 +85,7 @@ export const useBusinessesData = () => {
           {
             id: '1',
             name: 'Cafe Priyanka',
+            type: 'Cafe',
             position: { lat: 40.7831, lng: -73.9712 },
             rating: 5.0,
             salary: '$13.6',
@@ -98,6 +101,7 @@ export const useBusinessesData = () => {
           {
             id: '2',
             name: 'Taco Bell',
+            type: 'Fast Food',
             position: { lat: 40.7841, lng: -73.9702 },
             rating: 4.2,
             salary: '$15.0',

@@ -6,15 +6,17 @@ interface GoogleMapProps {
   businesses?: Array<{
     id: string;
     name: string;
+    type: string;
     position: { lat: number; lng: number };
     rating: number;
     salary?: string;
   }>;
   onBusinessClick?: (business: any) => void;
   selectedBusiness?: { position: { lat: number; lng: number } } | null;
+  filteredType?: string;
 }
 
-const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBusinessClick, selectedBusiness }) => {
+const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBusinessClick, selectedBusiness, filteredType }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [markers, setMarkers] = useState<google.maps.Marker[]>([]);
@@ -79,6 +81,8 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
     markers.forEach(marker => marker.setMap(null));
 
     const newMarkers = businesses.map(business => {
+      const isFiltered = filteredType && business.type === filteredType;
+      
       const marker = new google.maps.Marker({
         position: business.position,
         map: map,
@@ -86,9 +90,9 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
           scale: 8,
-          fillColor: '#FFEB3B',
+          fillColor: isFiltered ? '#FF8C00' : '#FFEB3B',
           fillOpacity: 1,
-          strokeColor: '#FFC107',
+          strokeColor: isFiltered ? '#FF7F00' : '#FFC107',
           strokeWeight: 2
         }
       });
@@ -105,7 +109,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
     return () => {
       newMarkers.forEach(marker => marker.setMap(null));
     };
-  }, [map, businesses, onBusinessClick]);
+  }, [map, businesses, onBusinessClick, filteredType]);
 
   // Add occasional confetti bursts
   useEffect(() => {
