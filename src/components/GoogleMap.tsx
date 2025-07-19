@@ -144,12 +144,14 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
     return () => clearInterval(interval);
   }, [map]);
 
-  // Center map on selected business
+  // Center map on selected business with smooth animation
   useEffect(() => {
     if (!map || !selectedBusiness) return;
     
     map.panTo(selectedBusiness.position);
-    map.setZoom(15);
+    setTimeout(() => {
+      map.setZoom(15);
+    }, 300);
   }, [map, selectedBusiness]);
 
   return (
