@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { Loader } from '@googlemaps/js-api-loader';
 
 interface InitiationPageProps {
   onComplete: (data: { salary: string; role: string; location: string }) => void;
@@ -10,15 +11,59 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   const [role, setRole] = useState('');
   const [location, setLocation] = useState('');
   const [isComplete, setIsComplete] = useState(false);
+  const autocompleteRef = useRef<HTMLInputElement>(null);
+  const autocompleteInstance = useRef<google.maps.places.Autocomplete | null>(null);
 
   const handleSalaryChange = (value: string) => {
-    // Only allow numbers and auto-add $
     const cleanValue = value.replace(/[^0-9.]/g, '');
     setSalary(cleanValue ? `$${cleanValue}` : '');
   };
 
+  useEffect(() => {
+    const initAutocomplete = async () => {
+      if (!autocompleteRef.current) return;
+
+      const loader = new Loader({
+        apiKey: 'AIzaSyCkLj9I2chNXHkMTbBO0k-KkEmnc_jAqyQ',
+        version: 'weekly',
+        libraries: ['places']
+      });
+
+      try {
+        await loader.load();
+        
+        // NYC bounds
+        const nycBounds = new google.maps.LatLngBounds(
+          new google.maps.LatLng(40.4774, -74.2591),
+          new google.maps.LatLng(40.9176, -73.7004)
+        );
+
+        autocompleteInstance.current = new google.maps.places.Autocomplete(
+          autocompleteRef.current,
+          {
+            bounds: nycBounds,
+            strictBounds: true,
+            types: ['establishment', 'geocode'],
+            componentRestrictions: { country: 'us' }
+          }
+        );
+
+        autocompleteInstance.current.addListener('place_changed', () => {
+          const place = autocompleteInstance.current?.getPlace();
+          if (place?.name) {
+            setLocation(place.name);
+            handleFieldBlur();
+          }
+        });
+      } catch (error) {
+        console.error('Error loading Google Places:', error);
+      }
+    };
+
+    initAutocomplete();
+  }, []);
+
   const handleFieldBlur = () => {
-    // Check if all fields are filled
     const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
     
     if (allFilled && !isComplete) {
@@ -80,11 +125,12 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
 
             <div>
               <input
+                ref={autocompleteRef}
                 type="text"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 onBlur={handleFieldBlur}
-                placeholder="Browse Businesses..."
+                placeholder="Search NYC locations..."
                 className="app-input"
               />
             </div>

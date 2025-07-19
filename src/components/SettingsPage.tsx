@@ -32,7 +32,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
   });
 
   const [pastJobs, setPastJobs] = useState<PastJob[]>([
-    { id: '1', salary: '$17', role: 'Security Guard', location: 'AMC' }
+    { id: '1', salary: '', role: '', location: '' }
   ]);
 
   const addPastJob = () => {
