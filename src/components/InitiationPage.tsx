@@ -111,14 +111,28 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
             </div>
 
             <div>
-              <input
-                type="text"
+              <select
                 value={role}
-                onChange={(e) => setRole(e.target.value)}
-                onBlur={handleFieldBlur}
-                placeholder="Barista"
+                onChange={(e) => {
+                  setRole(e.target.value);
+                  handleFieldBlur();
+                }}
                 className="app-input"
-              />
+              >
+                <option value="">Select a job role...</option>
+                <option value="Barista">Barista</option>
+                <option value="Server">Server</option>
+                <option value="Cook">Cook</option>
+                <option value="Cashier">Cashier</option>
+                <option value="Security Guard">Security Guard</option>
+                <option value="Retail Associate">Retail Associate</option>
+                <option value="Delivery Driver">Delivery Driver</option>
+                <option value="Host/Hostess">Host/Hostess</option>
+                <option value="Cleaner">Cleaner</option>
+                <option value="Stock Associate">Stock Associate</option>
+                <option value="Customer Service">Customer Service</option>
+                <option value="Manager">Manager</option>
+              </select>
             </div>
 
             <div className="text-center">

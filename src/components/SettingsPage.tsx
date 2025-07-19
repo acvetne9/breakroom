@@ -89,13 +89,25 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
               </select>
             </div>
 
-            <input
-              type="text"
+            <select
               value={currentJob.role}
               onChange={(e) => setCurrentJob({ ...currentJob, role: e.target.value })}
               className="app-input"
-              placeholder="Barista"
-            />
+            >
+              <option value="">Select a job role...</option>
+              <option value="Barista">Barista</option>
+              <option value="Server">Server</option>
+              <option value="Cook">Cook</option>
+              <option value="Cashier">Cashier</option>
+              <option value="Security Guard">Security Guard</option>
+              <option value="Retail Associate">Retail Associate</option>
+              <option value="Delivery Driver">Delivery Driver</option>
+              <option value="Host/Hostess">Host/Hostess</option>
+              <option value="Cleaner">Cleaner</option>
+              <option value="Stock Associate">Stock Associate</option>
+              <option value="Customer Service">Customer Service</option>
+              <option value="Manager">Manager</option>
+            </select>
 
             <input
               type="text"
@@ -168,13 +180,25 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
                   </button>
                 </div>
 
-                <input
-                  type="text"
+                <select
                   value={job.role}
                   onChange={(e) => updatePastJob(job.id, 'role', e.target.value)}
                   className="app-input"
-                  placeholder="Security Guard"
-                />
+                >
+                  <option value="">Select a job role...</option>
+                  <option value="Barista">Barista</option>
+                  <option value="Server">Server</option>
+                  <option value="Cook">Cook</option>
+                  <option value="Cashier">Cashier</option>
+                  <option value="Security Guard">Security Guard</option>
+                  <option value="Retail Associate">Retail Associate</option>
+                  <option value="Delivery Driver">Delivery Driver</option>
+                  <option value="Host/Hostess">Host/Hostess</option>
+                  <option value="Cleaner">Cleaner</option>
+                  <option value="Stock Associate">Stock Associate</option>
+                  <option value="Customer Service">Customer Service</option>
+                  <option value="Manager">Manager</option>
+                </select>
 
                 <input
                   type="text"
