@@ -10,6 +10,7 @@ interface UserData {
   salary: string;
   role: string;
   location: string;
+  fullLocation?: string;
 }
 
 const MobileApp: React.FC = () => {

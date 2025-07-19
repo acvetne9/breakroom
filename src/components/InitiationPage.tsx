@@ -3,13 +3,14 @@ import { motion } from 'framer-motion';
 import { Loader } from '@googlemaps/js-api-loader';
 
 interface InitiationPageProps {
-  onComplete: (data: { salary: string; role: string; location: string }) => void;
+  onComplete: (data: { salary: string; role: string; location: string; fullLocation?: string }) => void;
 }
 
 const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   const [salary, setSalary] = useState('');
   const [role, setRole] = useState('');
   const [location, setLocation] = useState('');
+  const [fullLocation, setFullLocation] = useState('');
   const [isComplete, setIsComplete] = useState(false);
   const autocompleteRef = useRef<HTMLInputElement>(null);
   const autocompleteInstance = useRef<google.maps.places.Autocomplete | null>(null);
@@ -52,6 +53,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
           const place = autocompleteInstance.current?.getPlace();
           if (place?.name) {
             setLocation(place.name);
+            setFullLocation(place.formatted_address || place.name);
             handleFieldBlur();
           }
         });
@@ -69,7 +71,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
     if (allFilled && !isComplete) {
       setIsComplete(true);
       setTimeout(() => {
-        onComplete({ salary, role, location });
+        onComplete({ salary, role, location, fullLocation });
       }, 300);
     }
   };

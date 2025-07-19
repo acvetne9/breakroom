@@ -20,6 +20,7 @@ interface SettingsPageProps {
     salary: string;
     role: string;
     location: string;
+    fullLocation?: string;
   };
 }
 
@@ -27,7 +28,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
   const [currentJob, setCurrentJob] = useState<UserInfo>({
     salary: initialData.salary,
     role: initialData.role,
-    location: initialData.location,
+    location: initialData.fullLocation || initialData.location,
     isHiring: false
   });
 
