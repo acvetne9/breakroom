@@ -53,6 +53,7 @@ const HomePage: React.FC<HomePageProps> = ({ businesses }) => {
       <GoogleMap 
         businesses={businesses}
         onBusinessClick={handleBusinessClick}
+        selectedBusiness={selectedBusiness}
       />
       
       {/* Search results */}
