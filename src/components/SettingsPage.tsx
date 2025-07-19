@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Minus } from 'lucide-react';
+import JobSearchDropdown from './JobSearchDropdown';
 
 interface UserInfo {
   salary: string;
@@ -89,25 +90,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
               </select>
             </div>
 
-            <select
+            <JobSearchDropdown
               value={currentJob.role}
-              onChange={(e) => setCurrentJob({ ...currentJob, role: e.target.value })}
+              onChange={(value) => setCurrentJob({ ...currentJob, role: value })}
+              placeholder="Search or select a job role..."
               className="app-input"
-            >
-              <option value="">Select a job role...</option>
-              <option value="Barista">Barista</option>
-              <option value="Server">Server</option>
-              <option value="Cook">Cook</option>
-              <option value="Cashier">Cashier</option>
-              <option value="Security Guard">Security Guard</option>
-              <option value="Retail Associate">Retail Associate</option>
-              <option value="Delivery Driver">Delivery Driver</option>
-              <option value="Host/Hostess">Host/Hostess</option>
-              <option value="Cleaner">Cleaner</option>
-              <option value="Stock Associate">Stock Associate</option>
-              <option value="Customer Service">Customer Service</option>
-              <option value="Manager">Manager</option>
-            </select>
+            />
 
             <input
               type="text"
@@ -180,25 +168,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
                   </button>
                 </div>
 
-                <select
+                <JobSearchDropdown
                   value={job.role}
-                  onChange={(e) => updatePastJob(job.id, 'role', e.target.value)}
+                  onChange={(value) => updatePastJob(job.id, 'role', value)}
+                  placeholder="Search or select a job role..."
                   className="app-input"
-                >
-                  <option value="">Select a job role...</option>
-                  <option value="Barista">Barista</option>
-                  <option value="Server">Server</option>
-                  <option value="Cook">Cook</option>
-                  <option value="Cashier">Cashier</option>
-                  <option value="Security Guard">Security Guard</option>
-                  <option value="Retail Associate">Retail Associate</option>
-                  <option value="Delivery Driver">Delivery Driver</option>
-                  <option value="Host/Hostess">Host/Hostess</option>
-                  <option value="Cleaner">Cleaner</option>
-                  <option value="Stock Associate">Stock Associate</option>
-                  <option value="Customer Service">Customer Service</option>
-                  <option value="Manager">Manager</option>
-                </select>
+                />
 
                 <input
                   type="text"
