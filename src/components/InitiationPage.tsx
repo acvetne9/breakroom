@@ -91,8 +91,13 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
 
           <div className="space-y-6">
             <div>
-              <input type="text" value={salary} onChange={e => handleSalaryChange(e.target.value)} onBlur={handleFieldBlur} placeholder="$14" className="app-input text-center text-lg" />
-              
+              <div className="flex items-center space-x-3">
+                <input type="text" value={salary} onChange={e => handleSalaryChange(e.target.value)} onBlur={handleFieldBlur} placeholder="$14" className="app-input text-center text-lg flex-1" />
+                <select className="px-3 py-2 border border-app-gray-light rounded-lg bg-white text-sm">
+                  <option>HR</option>
+                  <option>Annual</option>
+                </select>
+              </div>
             </div>
 
             <div className="text-center">
