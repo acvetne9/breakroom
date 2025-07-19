@@ -7,7 +7,6 @@ interface HomePageProps {
   businesses: Array<{
     id: string;
     name: string;
-    type: string;
     position: { lat: number; lng: number };
     rating: number;
     salary?: string;
@@ -20,7 +19,6 @@ const HomePage: React.FC<HomePageProps> = ({ businesses }) => {
   const [selectedBusiness, setSelectedBusiness] = useState<any>(null);
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [selectedFilter, setSelectedFilter] = useState<string>('');
 
   const handleSearch = (value: string) => {
     setSearchValue(value);
@@ -49,13 +47,6 @@ const HomePage: React.FC<HomePageProps> = ({ businesses }) => {
     setShowBusinessDetails(false);
   };
 
-  const handleFilterChange = (filter: string) => {
-    setSelectedFilter(filter);
-  };
-
-  // Get unique business types for filter options
-  const businessTypes = [...new Set(businesses.map(b => b.type))].sort();
-
   return (
     <div className="relative w-full h-full">
       {/* Google Maps base layer */}
@@ -63,7 +54,6 @@ const HomePage: React.FC<HomePageProps> = ({ businesses }) => {
         businesses={businesses}
         onBusinessClick={handleBusinessClick}
         selectedBusiness={selectedBusiness}
-        filteredType={selectedFilter}
       />
       
       {/* Search results */}
@@ -100,20 +90,6 @@ const HomePage: React.FC<HomePageProps> = ({ businesses }) => {
           onClose={handleClosePreview}
         />
       )}
-
-      {/* Filter dropdown */}
-      <div className="absolute top-4 right-4 z-20">
-        <select
-          value={selectedFilter}
-          onChange={(e) => handleFilterChange(e.target.value)}
-          className="app-popup px-3 py-2 text-sm rounded-lg border-none outline-none"
-        >
-          <option value="">All Types</option>
-          {businessTypes.map(type => (
-            <option key={type} value={type}>{type}</option>
-          ))}
-        </select>
-      </div>
 
       {/* Search bar at bottom */}
       <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
