@@ -11,9 +11,10 @@ interface GoogleMapProps {
     salary?: string;
   }>;
   onBusinessClick?: (business: any) => void;
+  selectedBusiness?: { position: { lat: number; lng: number } } | null;
 }
 
-const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBusinessClick }) => {
+const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBusinessClick, selectedBusiness }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [markers, setMarkers] = useState<google.maps.Marker[]>([]);
@@ -142,6 +143,16 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
     const interval = setInterval(addConfettiBurst, 8000 + Math.random() * 7000);
     return () => clearInterval(interval);
   }, [map]);
+
+  // Center map on selected business with smooth animation
+  useEffect(() => {
+    if (!map || !selectedBusiness) return;
+    
+    map.panTo(selectedBusiness.position);
+    setTimeout(() => {
+      map.setZoom(15);
+    }, 300);
+  }, [map, selectedBusiness]);
 
   return (
     <div 

@@ -33,15 +33,15 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, onClose, on
 
   return (
     <div 
-      className="fixed inset-0 z-30 flex items-center justify-center"
+      className="fixed inset-0 z-30 flex items-start justify-center pt-20"
       onClick={handleBackgroundClick}
     >
       {/* Yellow circle for selected pin */}
-      <div className="absolute w-6 h-6 bg-app-yellow rounded-full opacity-50" 
-           style={{ top: '45%', left: '50%', transform: 'translate(-50%, -50%)' }} />
+      <div className="absolute w-6 h-6 bg-app-yellow rounded-full opacity-50 animate-scale-in" 
+           style={{ top: '35%', left: '50%', transform: 'translate(-50%, -50%)' }} />
       
       <div 
-        className="app-popup p-6 cursor-pointer relative"
+        className="app-popup p-6 cursor-pointer relative animate-fade-in"
         onClick={handlePreviewClick}
       >
         <div className="flex justify-between items-start mb-4">

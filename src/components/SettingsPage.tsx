@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Minus } from 'lucide-react';
+import JobSearchDropdown from './JobSearchDropdown';
 
 interface UserInfo {
   salary: string;
@@ -20,6 +21,7 @@ interface SettingsPageProps {
     salary: string;
     role: string;
     location: string;
+    fullLocation?: string;
   };
 }
 
@@ -27,7 +29,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
   const [currentJob, setCurrentJob] = useState<UserInfo>({
     salary: initialData.salary,
     role: initialData.role,
-    location: initialData.location,
+    location: initialData.fullLocation || initialData.location,
     isHiring: false
   });
 
@@ -88,12 +90,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
               </select>
             </div>
 
-            <input
-              type="text"
+            <JobSearchDropdown
               value={currentJob.role}
-              onChange={(e) => setCurrentJob({ ...currentJob, role: e.target.value })}
+              onChange={(value) => setCurrentJob({ ...currentJob, role: value })}
+              placeholder="Search or select a job role..."
               className="app-input"
-              placeholder="Barista"
             />
 
             <input
@@ -167,12 +168,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
                   </button>
                 </div>
 
-                <input
-                  type="text"
+                <JobSearchDropdown
                   value={job.role}
-                  onChange={(e) => updatePastJob(job.id, 'role', e.target.value)}
+                  onChange={(value) => updatePastJob(job.id, 'role', value)}
+                  placeholder="Search or select a job role..."
                   className="app-input"
-                  placeholder="Security Guard"
                 />
 
                 <input

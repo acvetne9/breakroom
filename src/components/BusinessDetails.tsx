@@ -39,10 +39,10 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({ business, onClose }) 
 
   return (
     <div 
-      className="fixed inset-0 z-40 flex items-center justify-center"
+      className="fixed inset-0 z-40 flex items-start justify-center pt-16"
       onClick={handleBackgroundClick}
     >
-      <div className="app-card p-6 overflow-y-auto" onClick={handleCardClick}>
+      <div className="app-card p-6 overflow-y-auto animate-fade-in" onClick={handleCardClick}>
         <div className="flex justify-between items-start mb-6">
           <div>
             <h2 className="text-xl font-medium text-app-black">{business.name}</h2>
