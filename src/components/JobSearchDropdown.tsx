@@ -93,7 +93,7 @@ const JobSearchDropdown: React.FC<JobSearchDropdownProps> = ({
   const displayValue = searchTerm || value;
 
   return (
-    <div ref={dropdownRef} className="relative">
+    <div ref={dropdownRef} className="relative w-full">
       <div className="relative">
         <input
           ref={inputRef}
