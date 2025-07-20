@@ -89,22 +89,29 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
                 <option>MO</option>
                 <option>YR</option>
               </select>
+              <div className="w-6"></div>
             </div>
 
-            <JobSearchDropdown
-              value={currentJob.role}
-              onChange={(value) => setCurrentJob({ ...currentJob, role: value })}
-              placeholder="Search or select a job role..."
-              className="app-input"
-            />
+            <div className="flex items-center space-x-3">
+              <JobSearchDropdown
+                value={currentJob.role}
+                onChange={(value) => setCurrentJob({ ...currentJob, role: value })}
+                placeholder="Search or select a job role..."
+                className="app-input flex-1"
+              />
+              <div className="w-6"></div>
+            </div>
 
-            <input
-              type="text"
-              value={currentJob.location}
-              onChange={(e) => setCurrentJob({ ...currentJob, location: e.target.value })}
-              className="app-input"
-              placeholder="Starbucks"
-            />
+            <div className="flex items-center space-x-3">
+              <input
+                type="text"
+                value={currentJob.location}
+                onChange={(e) => setCurrentJob({ ...currentJob, location: e.target.value })}
+                className="app-input flex-1"
+                placeholder="Starbucks"
+              />
+              <div className="w-6"></div>
+            </div>
 
             <div className="flex items-center space-x-4">
               <span className="text-app-black">Hiring?</span>
@@ -162,14 +169,18 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
                     <option>MO</option>
                     <option>YR</option>
                   </select>
+                  <div className="w-6"></div>
                 </div>
 
-                <JobSearchDropdown
-                  value={job.role}
-                  onChange={(value) => updatePastJob(job.id, 'role', value)}
-                  placeholder="Search or select a job role..."
-                  className="app-input"
-                />
+                <div className="flex items-center space-x-3">
+                  <JobSearchDropdown
+                    value={job.role}
+                    onChange={(value) => updatePastJob(job.id, 'role', value)}
+                    placeholder="Search or select a job role..."
+                    className="app-input flex-1"
+                  />
+                  <div className="w-6"></div>
+                </div>
 
                 <div className="flex items-center space-x-3">
                   <input
