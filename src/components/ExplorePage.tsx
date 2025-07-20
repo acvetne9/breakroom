@@ -11,10 +11,14 @@ interface Post {
 interface ExplorePageProps {
   posts: Post[];
   onBusinessView?: (businessId: string) => void;
+  onExpandedPostChange?: (postId: string | null) => void;
+  onCommentSubmit?: (postId: string, comment: string) => void;
 }
 const ExplorePage: React.FC<ExplorePageProps> = ({
   posts,
-  onBusinessView
+  onBusinessView,
+  onExpandedPostChange,
+  onCommentSubmit
 }) => {
   const [newPostText, setNewPostText] = useState('');
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
@@ -29,17 +33,21 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
       setNewPostText('');
     }
   };
-  const handleCommentSubmit = (postId: string) => {
-    if (newComment.trim()) {
+  const handleCommentSubmit = (postId: string, comment?: string) => {
+    const commentText = comment || newComment;
+    if (commentText.trim()) {
       setComments({
         ...comments,
-        [postId]: [...(comments[postId] || []), newComment]
+        [postId]: [...(comments[postId] || []), commentText]
       });
       setNewComment('');
+      onCommentSubmit?.(postId, commentText);
     }
   };
   const handlePostClick = (postId: string) => {
-    setExpandedPost(expandedPost === postId ? null : postId);
+    const newExpandedPost = expandedPost === postId ? null : postId;
+    setExpandedPost(newExpandedPost);
+    onExpandedPostChange?.(newExpandedPost);
   };
   const handleBusinessView = (businessId: string) => {
     onBusinessView?.(businessId);
@@ -80,7 +88,9 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
 
                 {/* Expanded view */}
                 {expandedPost === post.id && <div className="mt-4 pt-4 border-t border-app-gray-light">
-                    <h4 className="text-sm font-medium mb-2 text-slate-500 text-left">Be the first to share! 😉</h4>
+                    {(!comments[post.id] || comments[post.id].length === 0) && (
+                      <h4 className="text-sm font-medium mb-2 text-slate-500 text-left">Be the first to share! 😉</h4>
+                    )}
                     <div className="space-y-2 mb-3">
                       {(comments[post.id] || []).map((comment, idx) => <p key={idx} className="text-sm text-app-gray-dark">
                           {comment}
@@ -93,28 +103,6 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
         </div>
       </div>
 
-      {/* Bottom input bar */}
-      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
-        {expandedPost ? <div className="flex space-x-2">
-            <input type="text" value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Write a comment..." className="search-bar" onKeyPress={e => {
-          if (e.key === 'Enter') {
-            handleCommentSubmit(expandedPost);
-          }
-        }} />
-            <button onClick={() => handleCommentSubmit(expandedPost)} className="px-4 py-3 bg-app-yellow rounded-lg font-medium">
-              Send
-            </button>
-          </div> : <div className="relative">
-            <input type="text" value={newPostText} onChange={e => setNewPostText(e.target.value)} placeholder="What's happening at work?" className="search-bar pr-14" onKeyPress={e => {
-          if (e.key === 'Enter') {
-            handlePostSubmit();
-          }
-        }} />
-            <button onClick={handlePostSubmit} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-lg bg-transparent">
-              🗣️
-            </button>
-          </div>}
-      </div>
     </div>;
 };
 export default ExplorePage;

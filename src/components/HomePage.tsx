@@ -13,12 +13,21 @@ interface HomePageProps {
     stories?: Array<{ id: string; text: string; author: string }>;
   }>;
   currentSlide?: number;
+  expandedPost?: string | null;
   onPostSubmit?: (text: string) => void;
+  onCommentSubmit?: (comment: string) => void;
 }
 
-const HomePage: React.FC<HomePageProps> = ({ businesses, currentSlide = 1, onPostSubmit }) => {
+const HomePage: React.FC<HomePageProps> = ({ 
+  businesses, 
+  currentSlide = 1, 
+  expandedPost,
+  onPostSubmit,
+  onCommentSubmit 
+}) => {
   const [searchValue, setSearchValue] = useState('');
   const [postText, setPostText] = useState('');
+  const [commentText, setCommentText] = useState('');
   const [selectedBusiness, setSelectedBusiness] = useState<any>(null);
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -54,6 +63,13 @@ const HomePage: React.FC<HomePageProps> = ({ businesses, currentSlide = 1, onPos
     if (postText.trim() && onPostSubmit) {
       onPostSubmit(postText);
       setPostText('');
+    }
+  };
+
+  const handleCommentSubmit = () => {
+    if (commentText.trim() && onCommentSubmit) {
+      onCommentSubmit(commentText);
+      setCommentText('');
     }
   };
 
@@ -101,30 +117,54 @@ const HomePage: React.FC<HomePageProps> = ({ businesses, currentSlide = 1, onPos
         />
       )}
 
-      {/* Search/Post bar at bottom */}
+      {/* Search/Post/Comment bar at bottom */}
       <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
         {currentSlide === 2 ? (
-          // Post input for explore page
-          <div className="relative">
-            <input
-              type="text"
-              value={postText}
-              onChange={(e) => setPostText(e.target.value)}
-              placeholder="What's happening at work?"
-              className="search-bar pr-14"
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  handlePostSubmit();
-                }
-              }}
-            />
-            <button 
-              onClick={handlePostSubmit} 
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-lg bg-transparent"
-            >
-              🗣️
-            </button>
-          </div>
+          expandedPost ? (
+            // Comment input when post is expanded
+            <div className="relative">
+              <input
+                type="text"
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                placeholder="Write a comment..."
+                className="search-bar pr-14"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleCommentSubmit();
+                  }
+                }}
+              />
+              <button 
+                onClick={handleCommentSubmit} 
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-lg bg-transparent"
+              >
+                🗣️
+              </button>
+            </div>
+          ) : (
+            // Post input for explore page
+            <div className="relative">
+              <input
+                type="text"
+                value={postText}
+                onChange={(e) => setPostText(e.target.value)}
+                placeholder="What's happening at work?"
+                className="search-bar pr-14"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handlePostSubmit();
+                  }
+                }}
+              />
+              <button 
+                onClick={handlePostSubmit} 
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-lg bg-transparent"
+              >
+                🗣️
+              </button>
+            </div>
+          )
         ) : (
           // Search input for home page
           <input
