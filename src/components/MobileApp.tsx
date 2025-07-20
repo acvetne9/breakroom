@@ -65,7 +65,14 @@ const MobileApp: React.FC = () => {
   return (
     <div className="fixed inset-0 overflow-hidden">
       {/* Map is always the background */}
-      <HomePage businesses={businesses} />
+      <HomePage 
+        businesses={businesses} 
+        currentSlide={currentSlide}
+        onPostSubmit={(text: string) => {
+          // TODO: Add new post to posts array
+          console.log('New post:', text);
+        }}
+      />
       
       {/* Initiation Card - slides up and disappears */}
       {currentView === 'initiation' && (

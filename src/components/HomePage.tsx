@@ -12,10 +12,13 @@ interface HomePageProps {
     salary?: string;
     stories?: Array<{ id: string; text: string; author: string }>;
   }>;
+  currentSlide?: number;
+  onPostSubmit?: (text: string) => void;
 }
 
-const HomePage: React.FC<HomePageProps> = ({ businesses }) => {
+const HomePage: React.FC<HomePageProps> = ({ businesses, currentSlide = 1, onPostSubmit }) => {
   const [searchValue, setSearchValue] = useState('');
+  const [postText, setPostText] = useState('');
   const [selectedBusiness, setSelectedBusiness] = useState<any>(null);
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -45,6 +48,13 @@ const HomePage: React.FC<HomePageProps> = ({ businesses }) => {
   const handleClosePreview = () => {
     setSelectedBusiness(null);
     setShowBusinessDetails(false);
+  };
+
+  const handlePostSubmit = () => {
+    if (postText.trim() && onPostSubmit) {
+      onPostSubmit(postText);
+      setPostText('');
+    }
   };
 
   return (
@@ -91,15 +101,40 @@ const HomePage: React.FC<HomePageProps> = ({ businesses }) => {
         />
       )}
 
-      {/* Search bar at bottom */}
+      {/* Search/Post bar at bottom */}
       <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
-        <input
-          type="text"
-          value={searchValue}
-          onChange={(e) => handleSearch(e.target.value)}
-          placeholder="Search businesses, industries..."
-          className="search-bar"
-        />
+        {currentSlide === 2 ? (
+          // Post input for explore page
+          <div className="relative">
+            <input
+              type="text"
+              value={postText}
+              onChange={(e) => setPostText(e.target.value)}
+              placeholder="What's happening at work?"
+              className="search-bar pr-14"
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handlePostSubmit();
+                }
+              }}
+            />
+            <button 
+              onClick={handlePostSubmit} 
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-lg bg-transparent"
+            >
+              🗣️
+            </button>
+          </div>
+        ) : (
+          // Search input for home page
+          <input
+            type="text"
+            value={searchValue}
+            onChange={(e) => handleSearch(e.target.value)}
+            placeholder="Search businesses, industries..."
+            className="search-bar"
+          />
+        )}
       </div>
     </div>
   );
