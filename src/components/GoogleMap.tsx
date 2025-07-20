@@ -52,8 +52,8 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
               stylers: [{ visibility: 'off' }]
             }
           ],
-          disableDefaultUI: false,
-          zoomControl: true,
+          disableDefaultUI: true,
+          zoomControl: false,
           mapTypeControl: false,
           scaleControl: false,
           streetViewControl: false,
