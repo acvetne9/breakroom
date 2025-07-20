@@ -24,7 +24,8 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   const [newComment, setNewComment] = useState('');
   const handlePostSubmit = () => {
     if (newPostText.trim()) {
-      // TODO: Submit new post
+      // TODO: Submit new post to posts array
+      console.log('New post:', newPostText);
       setNewPostText('');
     }
   };
@@ -103,19 +104,49 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
 
       {/* Bottom input bar */}
       <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
-        {expandedPost ? <div className="w-[90vw] max-w-[400px] flex space-x-2">
-            <input type="text" value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Write a comment..." className="search-bar flex-1" onKeyPress={e => {
-          if (e.key === 'Enter') {
-            handleCommentSubmit(expandedPost);
-          }
-        }} />
-            <button onClick={() => handleCommentSubmit(expandedPost)} className="px-4 py-3 bg-app-yellow rounded-lg font-medium">
+        {expandedPost ? (
+          <div className="w-[90vw] max-w-[400px] flex space-x-2">
+            <input 
+              type="text" 
+              value={newComment} 
+              onChange={e => setNewComment(e.target.value)} 
+              placeholder="Write a comment..." 
+              className="search-bar flex-1" 
+              onKeyPress={e => {
+                if (e.key === 'Enter') {
+                  handleCommentSubmit(expandedPost);
+                }
+              }} 
+            />
+            <button 
+              onClick={() => handleCommentSubmit(expandedPost)} 
+              className="px-4 py-3 bg-app-yellow rounded-lg font-medium"
+            >
               Send
             </button>
-          </div> : <div className="w-[90vw] max-w-[400px] flex space-x-2">
-            
-            
-          </div>}
+          </div>
+        ) : (
+          <div className="w-[90vw] max-w-[400px] flex space-x-2">
+            <input 
+              type="text" 
+              value={newPostText} 
+              onChange={e => setNewPostText(e.target.value)} 
+              placeholder="What's happening at work?" 
+              className="search-bar flex-1" 
+              onKeyPress={e => {
+                if (e.key === 'Enter') {
+                  handlePostSubmit();
+                }
+              }} 
+            />
+            <button 
+              onClick={handlePostSubmit} 
+              className="px-4 py-3 bg-app-yellow rounded-lg font-medium text-lg"
+            >
+              🗣️
+            </button>
+          </div>
+        )}
       </div>
     </div>;
 };
