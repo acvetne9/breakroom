@@ -58,8 +58,8 @@ const HomePage: React.FC<HomePageProps> = ({ businesses }) => {
       
       {/* Search results */}
       {searchResults.length > 0 && (
-        <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-20">
-          <div className="app-popup p-4 max-h-60 overflow-y-auto rounded-t-lg border-b-0">
+        <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-10">
+          <div className="app-popup p-4 pb-8 max-h-60 overflow-y-auto rounded-t-lg border-b-0">
             {searchResults.map(business => (
               <div 
                 key={business.id}
