@@ -162,12 +162,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
                     <option>MO</option>
                     <option>YR</option>
                   </select>
-                  <button 
-                    onClick={() => removePastJob(job.id)}
-                    className="w-6 h-6 bg-app-yellow rounded-full flex items-center justify-center"
-                  >
-                    <Minus className="w-4 h-4 text-app-black" />
-                  </button>
                 </div>
 
                 <JobSearchDropdown
@@ -177,13 +171,21 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
                   className="app-input"
                 />
 
-                <input
-                  type="text"
-                  value={job.location}
-                  onChange={(e) => updatePastJob(job.id, 'location', e.target.value)}
-                  className="app-input"
-                  placeholder="AMC"
-                />
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="text"
+                    value={job.location}
+                    onChange={(e) => updatePastJob(job.id, 'location', e.target.value)}
+                    className="app-input flex-1"
+                    placeholder="AMC"
+                  />
+                  <button 
+                    onClick={() => removePastJob(job.id)}
+                    className="w-6 h-6 bg-app-yellow rounded-full flex items-center justify-center"
+                  >
+                    <Minus className="w-4 h-4 text-app-black" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
