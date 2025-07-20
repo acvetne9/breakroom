@@ -84,7 +84,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
                 className="app-input flex-1"
                 placeholder="$14"
               />
-              <select className="px-3 py-2 border border-app-gray-light rounded-lg bg-white text-sm">
+              <select className="px-4 py-3 bg-white text-sm" style={{ border: '1px solid hsl(var(--app-gray-light))', borderRadius: '0.5rem', height: '48px', fontSize: '16px' }}>
                 <option>HR</option>
                 <option>MO</option>
                 <option>YR</option>
@@ -157,7 +157,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
                     className="app-input flex-1"
                     placeholder="$17"
                   />
-                  <select className="px-3 py-2 border border-app-gray-light rounded-lg bg-white text-sm">
+                  <select className="px-4 py-3 bg-white text-sm" style={{ border: '1px solid hsl(var(--app-gray-light))', borderRadius: '0.5rem', height: '48px', fontSize: '16px' }}>
                     <option>HR</option>
                     <option>MO</option>
                     <option>YR</option>
