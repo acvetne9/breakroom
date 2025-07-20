@@ -104,8 +104,8 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
 
       {/* Bottom input bar */}
       <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
-        {expandedPost ? <div className="w-[90vw] max-w-[400px] flex space-x-2">
-            <input type="text" value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Write a comment..." className="search-bar flex-1" onKeyPress={e => {
+        {expandedPost ? <div className="flex space-x-2">
+            <input type="text" value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Write a comment..." className="search-bar" onKeyPress={e => {
           if (e.key === 'Enter') {
             handleCommentSubmit(expandedPost);
           }
@@ -113,13 +113,13 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
             <button onClick={() => handleCommentSubmit(expandedPost)} className="px-4 py-3 bg-app-yellow rounded-lg font-medium">
               Send
             </button>
-          </div> : <div className="w-[90vw] max-w-[400px] flex space-x-2">
-            <input type="text" value={newPostText} onChange={e => setNewPostText(e.target.value)} placeholder="What's happening at work?" className="search-bar flex-1" onKeyPress={e => {
+          </div> : <div className="relative">
+            <input type="text" value={newPostText} onChange={e => setNewPostText(e.target.value)} placeholder="What's happening at work?" className="search-bar pr-14" onKeyPress={e => {
           if (e.key === 'Enter') {
             handlePostSubmit();
           }
         }} />
-            <button onClick={handlePostSubmit} className="px-4 py-3 rounded-lg font-medium text-lg bg-transparent">
+            <button onClick={handlePostSubmit} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-lg bg-transparent">
               🗣️
             </button>
           </div>}
