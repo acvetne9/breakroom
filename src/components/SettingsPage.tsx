@@ -86,7 +86,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
               />
               <select className="px-3 py-2 border border-app-gray-light rounded-lg bg-white text-sm">
                 <option>HR</option>
-                <option>Annual</option>
+                <option>MO</option>
+                <option>YR</option>
               </select>
             </div>
 
@@ -158,7 +159,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
                   />
                   <select className="px-3 py-2 border border-app-gray-light rounded-lg bg-white text-sm">
                     <option>HR</option>
-                    <option>Annual</option>
+                    <option>MO</option>
+                    <option>YR</option>
                   </select>
                   <button 
                     onClick={() => removePastJob(job.id)}
