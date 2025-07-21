@@ -53,26 +53,6 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     onBusinessView?.(businessId);
   };
   return <div className="relative w-full h-full">
-      {/* New post input */}
-      <div className="p-4 border-b border-app-gray-light">
-        <div className="flex space-x-2">
-          <input
-            type="text"
-            value={newPostText}
-            onChange={(e) => setNewPostText(e.target.value)}
-            placeholder="What's on your mind?"
-            className="flex-1 px-3 py-2 border border-app-gray-light rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            onKeyPress={(e) => e.key === 'Enter' && handlePostSubmit()}
-          />
-          <button
-            onClick={handlePostSubmit}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
-          >
-            Post
-          </button>
-        </div>
-      </div>
-
       {/* Posts list */}
       <div className="h-full overflow-y-auto pb-20 pt-4">
         <div className="space-y-4 px-4">
@@ -111,34 +91,13 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                     {(!comments[post.id] || comments[post.id].length === 0) && (
                       <h4 className="text-sm font-medium mb-2 text-slate-500 text-left">Be the first to share! 😉</h4>
                     )}
-                     <div className="space-y-2 mb-3">
-                       {(comments[post.id] || []).map((comment, idx) => <p key={idx} className="text-sm text-app-gray-dark">
-                           {comment}
-                         </p>)}
-                     </div>
-                     
-                     {/* Comment input */}
-                     <div className="flex space-x-2">
-                       <input
-                         type="text"
-                         value={newComment}
-                         onChange={(e) => setNewComment(e.target.value)}
-                         placeholder="Add a comment..."
-                         className="flex-1 px-3 py-2 border border-app-gray-light rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                         onKeyPress={(e) => e.key === 'Enter' && handleCommentSubmit(post.id)}
-                         onClick={(e) => e.stopPropagation()}
-                       />
-                       <button
-                         onClick={(e) => {
-                           e.stopPropagation();
-                           handleCommentSubmit(post.id);
-                         }}
-                         className="px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm"
-                       >
-                         Reply
-                       </button>
-                     </div>
-                   </div>}
+                    <div className="space-y-2 mb-3">
+                      {(comments[post.id] || []).map((comment, idx) => <p key={idx} className="text-sm text-app-gray-dark">
+                          {comment}
+                        </p>)}
+                    </div>
+                    
+                  </div>}
               </div>
             </div>)}
         </div>
