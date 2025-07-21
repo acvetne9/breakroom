@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
 
@@ -144,14 +145,15 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
     return () => clearInterval(interval);
   }, [map]);
 
-  // Center map on selected business with smooth animation
+  // Center map on selected business with proper navigation
   useEffect(() => {
     if (!map || !selectedBusiness) return;
     
-    map.panTo(selectedBusiness.position);
-    setTimeout(() => {
-      map.setZoom(15);
-    }, 300);
+    // Use a single setOptions call for smoother navigation
+    map.setOptions({
+      center: selectedBusiness.position,
+      zoom: 16
+    });
   }, [map, selectedBusiness]);
 
   return (

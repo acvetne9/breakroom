@@ -157,7 +157,7 @@ const HomePage: React.FC<HomePageProps> = ({
       {/* Search input bar at bottom - only show on home slide */}
       {currentSlide === 1 && (
         <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
-          <div className="relative w-[90vw] max-w-400px">
+          <div className="relative">
             <input
               type="text"
               value={searchValue}
