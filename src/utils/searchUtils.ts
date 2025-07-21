@@ -2,6 +2,10 @@
 interface Business {
   id: string;
   name: string;
+  position: { lat: number; lng: number };
+  rating: number;
+  salary?: string;
+  stories?: Array<{ id: string; text: string; author: string }>;
   businessType?: string;
   roles?: Array<{ role: string; salary: string }>;
 }
