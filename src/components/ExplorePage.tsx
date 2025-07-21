@@ -1,6 +1,7 @@
-
 import React, { useState } from 'react';
 import { Eye } from 'lucide-react';
+import { isProfane } from '../utils/profanityFilter';
+import { useToast } from '@/hooks/use-toast';
 
 interface Post {
   id: string;
@@ -32,23 +33,48 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   }>({});
   const [postText, setPostText] = useState('');
   const [commentText, setCommentText] = useState('');
+  const { toast } = useToast();
 
   const handlePostSubmit = () => {
-    if (postText.trim() && onPostSubmit) {
+    if (!postText.trim()) return;
+    
+    // Check for profanity
+    if (isProfane(postText)) {
+      toast({
+        title: "Post blocked",
+        description: "Inappropriate content detected",
+        variant: "destructive"
+      });
+      setPostText(''); // Clear the input
+      return;
+    }
+    
+    if (onPostSubmit) {
       onPostSubmit(postText);
       setPostText('');
     }
   };
 
   const handleCommentSubmit = () => {
-    if (commentText.trim() && expandedPost) {
-      setComments({
-        ...comments,
-        [expandedPost]: [...(comments[expandedPost] || []), commentText]
+    if (!commentText.trim() || !expandedPost) return;
+    
+    // Check for profanity
+    if (isProfane(commentText)) {
+      toast({
+        title: "Comment blocked",
+        description: "Inappropriate content detected",
+        variant: "destructive"
       });
-      setCommentText('');
-      onCommentSubmit?.(expandedPost, commentText);
+      setCommentText(''); // Clear the input
+      return;
     }
+    
+    setComments({
+      ...comments,
+      [expandedPost]: [...(comments[expandedPost] || []), commentText]
+    });
+    setCommentText('');
+    onCommentSubmit?.(expandedPost, commentText);
   };
 
   const handlePostClick = (postId: string) => {

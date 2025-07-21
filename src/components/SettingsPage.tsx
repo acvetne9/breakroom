@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Plus, Minus } from 'lucide-react';
 import JobSearchDropdown from './JobSearchDropdown';
+import { isProfane } from '../utils/profanityFilter';
+import { useToast } from '@/hooks/use-toast';
 
 interface UserInfo {
   salary: string;
@@ -37,6 +39,20 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
     { id: '1', salary: '', role: '', location: '' }
   ]);
 
+  const { toast } = useToast();
+
+  const validateProfanity = (text: string, fieldName: string): boolean => {
+    if (isProfane(text)) {
+      toast({
+        title: `Invalid ${fieldName}`,
+        description: `Inappropriate content detected in ${fieldName}`,
+        variant: "destructive"
+      });
+      return false;
+    }
+    return true;
+  };
+
   const addPastJob = () => {
     const newJob: PastJob = {
       id: Date.now().toString(),
@@ -52,6 +68,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
   };
 
   const updatePastJob = (id: string, field: keyof Omit<PastJob, 'id'>, value: string) => {
+    // Validate profanity for role and location fields
+    if ((field === 'role' || field === 'location') && value && !validateProfanity(value, field)) {
+      return; // Don't update if profanity detected
+    }
+
     const processedValue = field === 'salary' ? 
       (value.replace(/[^0-9.]/g, '') ? `$${value.replace(/[^0-9.]/g, '')}` : '') : 
       value;
@@ -64,6 +85,21 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
     // Only allow numbers and auto-add $
     const cleanValue = value.replace(/[^0-9.]/g, '');
     setCurrentJob({ ...currentJob, salary: cleanValue ? `$${cleanValue}` : '' });
+  };
+
+  const handleCurrentJobRoleChange = (value: string) => {
+    if (value && !validateProfanity(value, 'role')) {
+      return; // Don't update if profanity detected
+    }
+    setCurrentJob({ ...currentJob, role: value });
+  };
+
+  const handleCurrentJobLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value && !validateProfanity(value, 'location')) {
+      return; // Don't update if profanity detected
+    }
+    setCurrentJob({ ...currentJob, location: value });
   };
 
   return (
@@ -95,7 +131,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
             <div className="flex items-center space-x-3">
               <JobSearchDropdown
                 value={currentJob.role}
-                onChange={(value) => setCurrentJob({ ...currentJob, role: value })}
+                onChange={handleCurrentJobRoleChange}
                 placeholder="Search or select a job role..."
                 className="app-input flex-1"
               />
@@ -106,7 +142,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
               <input
                 type="text"
                 value={currentJob.location}
-                onChange={(e) => setCurrentJob({ ...currentJob, location: e.target.value })}
+                onChange={handleCurrentJobLocationChange}
                 className="app-input flex-1"
                 placeholder="Starbucks"
               />

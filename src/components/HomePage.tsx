@@ -1,10 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
 import GoogleMap from './GoogleMap';
 import BusinessPreview from './BusinessPreview';
 import BusinessDetails from './BusinessDetails';
 import { searchBusinesses } from '../utils/searchUtils';
+import { isProfane } from '../utils/profanityFilter';
 import { Search } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface HomePageProps {
   businesses: Array<{
@@ -30,6 +31,7 @@ const HomePage: React.FC<HomePageProps> = ({
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [filteredBusinesses, setFilteredBusinesses] = useState(businesses);
   const [isSearchActive, setIsSearchActive] = useState(false);
+  const { toast } = useToast();
 
   // Update filtered businesses when businesses prop changes
   useEffect(() => {
@@ -59,6 +61,17 @@ const HomePage: React.FC<HomePageProps> = ({
 
   const performSearch = () => {
     if (!searchValue.trim()) return;
+    
+    // Check for profanity in search terms
+    if (isProfane(searchValue)) {
+      toast({
+        title: "Search blocked",
+        description: "Inappropriate search terms detected",
+        variant: "destructive"
+      });
+      setSearchValue(''); // Clear the search input
+      return;
+    }
     
     const { filteredBusinesses: filtered, exactMatch } = searchBusinesses(businesses, searchValue);
     
