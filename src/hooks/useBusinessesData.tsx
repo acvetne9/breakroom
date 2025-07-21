@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 
 interface Business {
@@ -8,6 +9,7 @@ interface Business {
   salary?: string;
   stories?: Array<{ id: string; text: string; author: string }>;
   roles?: Array<{ role: string; salary: string }>;
+  businessType?: string;
 }
 
 export const useBusinessesData = () => {
@@ -28,7 +30,13 @@ export const useBusinessesData = () => {
             { name: 'Staten Island', lat: 40.5795, lng: -74.1502 }
           ];
           
-          const businessTypes = ['Restaurant', 'Cafe', 'Bar', 'Deli', 'Bakery', 'Fast Food', 'Pizza Place', 'Grocery Store'];
+          const businessTypes = [
+            'Restaurant', 'Cafe', 'Bar', 'Deli', 'Bakery', 'Fast Food', 
+            'Pizza Place', 'Grocery Store', 'Movie Theater', 'Retail Store',
+            'Tech Company', 'Clothing Store', 'Bookstore', 'Pharmacy',
+            'Hair Salon', 'Fitness Center', 'Hotel', 'Bank'
+          ];
+          
           const businessNames = [
             'Joe\'s Coffee', 'Tony\'s Pizza', 'Brooklyn Bagels', 'Manhattan Deli', 'Queens Cafe',
             'Bronx Bistro', 'Staten Island Eats', 'NYC Grill', 'Broadway Burgers', 'Central Park Cafe',
@@ -37,15 +45,36 @@ export const useBusinessesData = () => {
             'Greenwich Gourmet', 'Chinatown Chow', 'Little Italy Lunch', 'Financial District Food'
           ];
 
+          const jobRoles = [
+            { role: 'Server', salary: '$13.6' },
+            { role: 'Manager', salary: '$18.5' },
+            { role: 'Barista', salary: '$14.2' },
+            { role: 'Cook', salary: '$15.8' },
+            { role: 'Cashier', salary: '$13.0' },
+            { role: 'Architect', salary: '$28.5' },
+            { role: 'Designer', salary: '$22.3' },
+            { role: 'Developer', salary: '$35.0' },
+            { role: 'Sales Associate', salary: '$14.5' },
+            { role: 'Receptionist', salary: '$16.2' },
+            { role: 'Trainer', salary: '$19.8' },
+            { role: 'Pharmacist', salary: '$32.1' },
+            { role: 'Stylist', salary: '$18.7' }
+          ];
+
           nycAreas.forEach((area, areaIndex) => {
             for (let i = 0; i < 50; i++) { // 50 businesses per area = 250 total
               const businessIndex = areaIndex * 50 + i;
               const randomName = businessNames[Math.floor(Math.random() * businessNames.length)];
               const randomType = businessTypes[Math.floor(Math.random() * businessTypes.length)];
               
+              // Select 2-3 random roles for each business
+              const shuffledRoles = [...jobRoles].sort(() => 0.5 - Math.random());
+              const selectedRoles = shuffledRoles.slice(0, 2 + Math.floor(Math.random() * 2));
+              
               businesses.push({
                 id: `business-${businessIndex}`,
                 name: `${randomName} ${area.name}`,
+                businessType: randomType,
                 position: {
                   lat: area.lat + (Math.random() - 0.5) * 0.02,
                   lng: area.lng + (Math.random() - 0.5) * 0.02
@@ -64,10 +93,7 @@ export const useBusinessesData = () => {
                     author: `Worker${Math.floor(Math.random() * 1000)}` 
                   }
                 ],
-                roles: [
-                  { role: 'Server', salary: `$${(13 + Math.random() * 5).toFixed(1)}` },
-                  { role: 'Manager', salary: `$${(18 + Math.random() * 7).toFixed(1)}` }
-                ]
+                roles: selectedRoles
               });
             }
           });
@@ -83,6 +109,7 @@ export const useBusinessesData = () => {
           {
             id: '1',
             name: 'Cafe Priyanka',
+            businessType: 'Cafe',
             position: { lat: 40.7831, lng: -73.9712 },
             rating: 5.0,
             salary: '$13.6',
@@ -98,11 +125,16 @@ export const useBusinessesData = () => {
           {
             id: '2',
             name: 'Taco Bell',
+            businessType: 'Fast Food',
             position: { lat: 40.7841, lng: -73.9702 },
             rating: 4.2,
             salary: '$15.0',
             stories: [
               { id: '3', text: 'Fast-paced environment, good for building skills', author: 'JobSeeker' }
+            ],
+            roles: [
+              { role: 'Cashier', salary: '$15.0' },
+              { role: 'Cook', salary: '$16.2' }
             ]
           }
         ]);
