@@ -80,7 +80,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                   e.stopPropagation();
                   handleBusinessView(post.businessId!);
                 }} className="flex items-center space-x-1 text-app-gray-medium hover:text-app-black">
-                        <Eye className="w-4 h-4" />
+                        <span>👀<span/>{/* <Eye className="w-4 h-4" /> */}
                       </button>}
                   </div>
                   <p className="text-app-black">{post.text}</p>
