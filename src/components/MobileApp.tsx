@@ -17,6 +17,8 @@ const MobileApp: React.FC = () => {
   const [currentView, setCurrentView] = useState<'initiation' | 'main'>('initiation');
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
   const [userData, setUserData] = useState<UserData | null>(null);
+  const [expandedPost, setExpandedPost] = useState<string | null>(null);
+  const [comments, setComments] = useState<{[postId: string]: string[]}>({});
   const constraintsRef = useRef(null);
   const { businesses, loading } = useBusinessesData();
 
@@ -65,7 +67,23 @@ const MobileApp: React.FC = () => {
   return (
     <div className="fixed inset-0 overflow-hidden">
       {/* Map is always the background */}
-      <HomePage businesses={businesses} />
+      <HomePage 
+        businesses={businesses} 
+        currentSlide={currentSlide}
+        expandedPost={expandedPost}
+        onPostSubmit={(text: string) => {
+          // TODO: Add new post to posts array
+          console.log('New post:', text);
+        }}
+        onCommentSubmit={(comment: string) => {
+          if (expandedPost) {
+            setComments({
+              ...comments,
+              [expandedPost]: [...(comments[expandedPost] || []), comment]
+            });
+          }
+        }}
+      />
       
       {/* Initiation Card - slides up and disappears */}
       {currentView === 'initiation' && (
@@ -115,6 +133,15 @@ const MobileApp: React.FC = () => {
             onBusinessView={(businessId) => {
               // TODO: Filter explore to show posts for this business
               console.log('View business:', businessId);
+            }}
+            onExpandedPostChange={(postId) => {
+              setExpandedPost(postId);
+            }}
+            onCommentSubmit={(postId, comment) => {
+              setComments({
+                ...comments,
+                [postId]: [...(comments[postId] || []), comment]
+              });
             }}
           />
         </motion.div>
