@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Eye } from 'lucide-react';
+import { Input } from './ui/input';
+import { Button } from './ui/button';
 interface Post {
   id: string;
   author: string;
@@ -53,8 +55,29 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     onBusinessView?.(businessId);
   };
   return <div className="relative w-full h-full">
+      {/* New Post Input - Fixed at top */}
+      <div className="fixed top-4 left-4 right-4 z-50 bg-background/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg">
+        <div className="flex gap-2">
+          <Input
+            placeholder="What's happening at work?"
+            value={newPostText}
+            onChange={(e) => setNewPostText(e.target.value)}
+            className="flex-1"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handlePostSubmit();
+              }
+            }}
+          />
+          <Button onClick={handlePostSubmit} disabled={!newPostText.trim()}>
+            Post
+          </Button>
+        </div>
+      </div>
+
       {/* Posts list */}
-      <div className="h-full overflow-y-auto pb-20 pt-4">
+      <div className="h-full overflow-y-auto pb-20 pt-20">
         <div className="space-y-4 px-4">
           {posts.map(post => <div key={post.id} className="relative">
               {/* Post with background collage if business has 5+ photos */}
@@ -97,6 +120,28 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                         </p>)}
                     </div>
                     
+                    {/* Comment Input */}
+                    <div className="flex gap-2 mt-3">
+                      <Input
+                        placeholder="Write a comment..."
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        className="flex-1"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleCommentSubmit(post.id);
+                          }
+                        }}
+                      />
+                      <Button 
+                        onClick={() => handleCommentSubmit(post.id)} 
+                        disabled={!newComment.trim()}
+                        size="sm"
+                      >
+                        Reply
+                      </Button>
+                    </div>
                   </div>}
               </div>
             </div>)}
