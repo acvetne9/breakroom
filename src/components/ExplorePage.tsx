@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Eye } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 interface Post {
   id: string;
   author: string;
@@ -53,8 +55,36 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     onBusinessView?.(businessId);
   };
   return <div className="relative w-full h-full">
+      {/* What's happening input */}
+      <div className="absolute top-4 left-4 right-4 z-20 app-popup p-3 mb-4">
+        <Textarea
+          placeholder="What's happening at work?"
+          value={newPostText}
+          onChange={(e) => setNewPostText(e.target.value)}
+          className="mb-2 min-h-[60px] resize-none"
+        />
+        <Button onClick={handlePostSubmit} size="sm" className="w-full">
+          Post
+        </Button>
+      </div>
+
+      {/* Comment input - only show when a post is expanded */}
+      {expandedPost && (
+        <div className="absolute bottom-4 left-4 right-4 z-20 app-popup p-3">
+          <Textarea
+            placeholder="Write a comment..."
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            className="mb-2 min-h-[60px] resize-none"
+          />
+          <Button onClick={() => handleCommentSubmit(expandedPost)} size="sm" className="w-full">
+            Comment
+          </Button>
+        </div>
+      )}
+
       {/* Posts list */}
-      <div className="h-full overflow-y-auto pb-20 pt-4">
+      <div className="h-full overflow-y-auto pb-32 pt-24">
         <div className="space-y-4 px-4">
           {posts.map(post => <div key={post.id} className="relative">
               {/* Post with background collage if business has 5+ photos */}
