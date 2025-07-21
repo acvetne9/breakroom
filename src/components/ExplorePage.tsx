@@ -144,7 +144,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
               type="text"
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
-              placeholder="Write a comment..."
+              placeholder="Leave a comment!"
               className="search-bar pr-14"
               onKeyPress={(e) => {
                 if (e.key === 'Enter') {
