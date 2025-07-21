@@ -166,7 +166,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
               type="text"
               value={postText}
               onChange={(e) => setPostText(e.target.value)}
-              placeholder="What's happening at work?"
+              placeholder="How's work?"
               className="search-bar pr-14"
               onKeyPress={(e) => {
                 if (e.key === 'Enter') {
