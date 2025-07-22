@@ -96,25 +96,25 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
           console.log('Google Places selected:', place);
           if (place?.name) {
             // Validate location for profanity before setting
-            if (isProfane(place.name)) {
-              toast({
-                title: "Invalid location",
-                description: "Inappropriate content detected in location",
-                variant: "destructive"
-              });
-              // Clear the input
-              if (autocompleteRef.current) {
-                autocompleteRef.current.value = '';
-              }
-              setLocation(place.name);
-              setFullLocation(fullAddr);
-              setIsGooglePlacesSelected(true);
+            // if (isProfane(place.name)) {
+            //   toast({
+            //     title: "Invalid location",
+            //     description: "Inappropriate content detected in location",
+            //     variant: "destructive"
+            //   });
+            //   // Clear the input
+            //   if (autocompleteRef.current) {
+            //     autocompleteRef.current.value = '';
+            //   }
+            //   setLocation(place.name);
+            //   setFullLocation(fullAddr);
+            //   setIsGooglePlacesSelected(true);
               
-              // Wait a tick before triggering the slide away
-              setTimeout(() => {
-                handleFieldBlur();
-              }, 10);
-            }
+            //   // Wait a tick before triggering the slide away
+            //   setTimeout(() => {
+            //     handleFieldBlur();
+            //   }, 10);
+            // }
             
             setLocation(place.name);
             const fullAddr = place.formatted_address || place.name;
