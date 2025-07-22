@@ -113,13 +113,13 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
             }
             
             setLocation(place.name);
-            const fullAddr = place.formatted_address || place.name;
             setFullLocation(fullAddr);
             setIsGooglePlacesSelected(true);
-            console.log('Set location from Google Places:', place.name, 'Full address:', fullAddr);
-            handleFieldBlur();
-          }
-        });
+            
+            // Wait a tick before triggering the slide away
+            setTimeout(() => {
+              handleFieldBlur();
+          }, 10);
       } catch (error) {
         console.error('Error loading Google Places:', error);
       }
