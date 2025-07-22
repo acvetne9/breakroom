@@ -73,7 +73,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
 
         {/* Stories section */}
         {business.stories && business.stories.length > 0 && <div>
-            <h3 className="text-lg font-medium text-app-black mb-4">More Stories</h3>
+            <h3 className="text-lg font-medium text-app-black mb-4">More Stories 📖</h3>
             <div className="space-y-4">
               {business.stories.map(story => <div key={story.id} className="story-item border-l-2 border-app-gray-light pl-4">
                   <p className="text-app-gray-dark text-sm">
