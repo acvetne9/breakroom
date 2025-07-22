@@ -56,7 +56,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({ business, onClose }) 
             onClick={handleCompassClick}
             className="compass-button p-2 hover:bg-gray-100 rounded-lg"
           >
-            <Compass className="w-6 h-6 text-app-gray-dark" />
+            <span>🧭</span>{/* <Compass className="w-6 h-6 text-app-gray-dark" /> */}
           </button>
         </div>
 
