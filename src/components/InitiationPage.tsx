@@ -46,6 +46,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   const [location, setLocation] = useState('');
   const [fullLocation, setFullLocation] = useState('');
   const [isComplete, setIsComplete] = useState(false);
+  const [isGooglePlacesSelected, setIsGooglePlacesSelected] = useState(false);
   const autocompleteRef = useRef<HTMLInputElement>(null);
   const autocompleteInstance = useRef<google.maps.places.Autocomplete | null>(null);
   const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
@@ -107,12 +108,14 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
               }
               setLocation('');
               setFullLocation('');
+              setIsGooglePlacesSelected(false);
               return;
             }
             
             setLocation(place.name);
             const fullAddr = place.formatted_address || place.name;
             setFullLocation(fullAddr);
+            setIsGooglePlacesSelected(true);
             console.log('Set location from Google Places:', place.name, 'Full address:', fullAddr);
             handleFieldBlur();
           }
@@ -229,6 +232,8 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     if (fullLocation && value !== location) {
       setFullLocation('');
     }
+    // Reset the Google Places flag when manually typing
+    setIsGooglePlacesSelected(false);
   };
 
   const handleLocationBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
@@ -237,6 +242,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     if (!value) {
       setLocation('');
       setFullLocation('');
+      setIsGooglePlacesSelected(false);
       handleFieldBlur();
       return;
     }
@@ -251,9 +257,17 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       // Clear the invalid input
       setLocation('');
       setFullLocation('');
+      setIsGooglePlacesSelected(false);
       if (autocompleteRef.current) {
         autocompleteRef.current.value = '';
       }
+      return;
+    }
+    
+    // Skip prediction logic if Google Places was already selected
+    if (isGooglePlacesSelected) {
+      console.log('Skipping predictions - Google Places already selected');
+      handleFieldBlur();
       return;
     }
     
