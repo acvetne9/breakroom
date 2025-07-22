@@ -196,7 +196,9 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     
     if (allFilled) {
       if (!isComplete) {
-        setIsComplete(true);
+        setTimeout(() => {
+          setIsComplete(true);
+        }, 10); 
         console.log('Completing with data:', { salary, role, location, fullLocation });
         setTimeout(() => {
           onComplete({
