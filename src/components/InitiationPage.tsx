@@ -1,4 +1,5 @@
 
+
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Loader } from '@googlemaps/js-api-loader';
@@ -55,9 +56,12 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
         });
         autocompleteInstance.current.addListener('place_changed', () => {
           const place = autocompleteInstance.current?.getPlace();
+          console.log('Google Places selected:', place);
           if (place?.name) {
             setLocation(place.name);
-            setFullLocation(place.formatted_address || place.name);
+            const fullAddr = place.formatted_address || place.name;
+            setFullLocation(fullAddr);
+            console.log('Set location:', place.name, 'Full address:', fullAddr);
             handleFieldBlur();
           }
         });
@@ -97,6 +101,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
 
   const handleFieldBlur = () => {
     const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
+    console.log('handleFieldBlur called:', { salary, role, location, allFilled });
     
     if (allFilled) {
       // Validate inputs before completing
@@ -106,6 +111,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       
       if (!isComplete) {
         setIsComplete(true);
+        console.log('Completing with data:', { salary, role, location, fullLocation });
         setTimeout(() => {
           onComplete({
             salary,
@@ -125,6 +131,10 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setLocation(value);
+    // Clear fullLocation when manually typing
+    if (fullLocation && value !== location) {
+      setFullLocation('');
+    }
   };
 
   return (
@@ -202,3 +212,4 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
 };
 
 export default InitiationPage;
+
