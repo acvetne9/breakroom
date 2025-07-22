@@ -1,4 +1,5 @@
 
+
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Loader } from '@googlemaps/js-api-loader';
@@ -180,6 +181,12 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       return;
     }
     
+    // If fullLocation is not set (manual input case), set it to the typed location
+    if (value && !fullLocation) {
+      setFullLocation(value);
+      console.log('Set fullLocation from manual input:', value);
+    }
+    
     handleFieldBlur();
   };
 
@@ -257,3 +264,4 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
 };
 
 export default InitiationPage;
+
