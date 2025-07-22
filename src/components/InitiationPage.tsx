@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Loader } from '@googlemaps/js-api-loader';
@@ -103,9 +104,9 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
             setFullLocation(fullAddr);
             setIsGooglePlacesSelected(true);
             
-            // Wait a tick before triggering the slide away
+            // Wait a tick before triggering completion check
             setTimeout(() => {
-              handleFieldBlur();
+              checkForCompletion();
             }, 10);
           }
         });
@@ -116,11 +117,23 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     initAutocomplete();
   }, []);
   
+  // Centralized completion effect with proper data validation
   useEffect(() => {
     if (isComplete) {
-      onComplete({ salary, role, location, fullLocation });
+      // Validate that all required data is present
+      const dataToPass = { salary, role, location, fullLocation };
+      console.log('InitiationPage completing with data:', dataToPass);
+      
+      // Ensure we have all required fields
+      if (salary.trim() && role.trim() && location.trim()) {
+        console.log('All fields validated, calling onComplete');
+        onComplete(dataToPass);
+      } else {
+        console.log('Missing required fields, not calling onComplete');
+        setIsComplete(false); // Reset if validation fails
+      }
     }
-  }, [isComplete]);
+  }, [isComplete, salary, role, location, fullLocation, onComplete]);
 
   const getPredictionsAndSetLocation = (input: string): Promise<void> => {
     return new Promise((resolve) => {
@@ -178,25 +191,14 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     });
   };
 
-  const handleFieldBlur = () => {
+  // Simplified completion check
+  const checkForCompletion = () => {
     const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
-    console.log('handleFieldBlur called:', { salary, role, location, allFilled });
+    console.log('checkForCompletion called:', { salary, role, location, allFilled });
     
-    if (allFilled) {
-      if (!isComplete) {
-        setTimeout(() => {
-          setIsComplete(true);
-        }, 10); 
-        console.log('Completing with data:', { salary, role, location, fullLocation });
-        setTimeout(() => {
-          onComplete({
-            salary,
-            role,
-            location,
-            fullLocation
-          });
-        }, 300);
-      }
+    if (allFilled && !isComplete) {
+      console.log('Setting isComplete to true');
+      setIsComplete(true);
     }
   };
 
@@ -240,7 +242,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       setLocation('');
       setFullLocation('');
       setIsGooglePlacesSelected(false);
-      handleFieldBlur();
+      checkForCompletion();
       return;
     }
     
@@ -264,7 +266,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     // Skip prediction logic if Google Places was already selected
     if (isGooglePlacesSelected) {
       console.log('Skipping predictions - Google Places already selected');
-      handleFieldBlur();
+      checkForCompletion();
       return;
     }
     
@@ -274,7 +276,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       await getPredictionsAndSetLocation(value);
     }
     
-    handleFieldBlur();
+    checkForCompletion();
   };
 
   return (
@@ -299,7 +301,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
                   type="text" 
                   value={salary} 
                   onChange={e => handleSalaryChange(e.target.value)} 
-                  onBlur={handleFieldBlur} 
+                  onBlur={checkForCompletion} 
                   placeholder="$14" 
                   className="app-input text-center text-lg flex-1" 
                 />
@@ -319,7 +321,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
               <JobSearchDropdown 
                 value={role} 
                 onChange={handleRoleChange}
-                onBlur={handleFieldBlur} 
+                onBlur={checkForCompletion} 
                 placeholder="Search or select a job role..." 
                 className="app-input" 
               />
