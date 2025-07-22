@@ -133,6 +133,12 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     };
     initAutocomplete();
   }, []);
+  
+  useEffect(() => {
+    if (isComplete) {
+      onComplete({ salary, role, location, fullLocation });
+    }
+  }, [isComplete]);
 
   const getPredictionsAndSetLocation = (input: string): Promise<void> => {
     return new Promise((resolve) => {
