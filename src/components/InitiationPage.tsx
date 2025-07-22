@@ -1,5 +1,3 @@
-
-
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Loader } from '@googlemaps/js-api-loader';
@@ -50,6 +48,8 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   const [isComplete, setIsComplete] = useState(false);
   const autocompleteRef = useRef<HTMLInputElement>(null);
   const autocompleteInstance = useRef<google.maps.places.Autocomplete | null>(null);
+  const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
+  const placesService = useRef<google.maps.places.PlacesService | null>(null);
   const { toast } = useToast();
 
   const handleSalaryChange = (value: string) => {
@@ -68,6 +68,17 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       try {
         await loader.load();
 
+        // Initialize services
+        autocompleteService.current = new google.maps.places.AutocompleteService();
+        
+        // Create a map for PlacesService (hidden)
+        const mapDiv = document.createElement('div');
+        const map = new google.maps.Map(mapDiv, {
+          center: { lat: 40.7128, lng: -74.0060 },
+          zoom: 13
+        });
+        placesService.current = new google.maps.places.PlacesService(map);
+
         // NYC bounds
         const nycBounds = new google.maps.LatLngBounds(new google.maps.LatLng(40.4774, -74.2591), new google.maps.LatLng(40.9176, -73.7004));
         autocompleteInstance.current = new google.maps.places.Autocomplete(autocompleteRef.current, {
@@ -78,6 +89,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
             country: 'us'
           }
         });
+        
         autocompleteInstance.current.addListener('place_changed', () => {
           const place = autocompleteInstance.current?.getPlace();
           console.log('Google Places selected:', place);
@@ -101,7 +113,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
             setLocation(place.name);
             const fullAddr = place.formatted_address || place.name;
             setFullLocation(fullAddr);
-            console.log('Set location:', place.name, 'Full address:', fullAddr);
+            console.log('Set location from Google Places:', place.name, 'Full address:', fullAddr);
             handleFieldBlur();
           }
         });
@@ -111,6 +123,57 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     };
     initAutocomplete();
   }, []);
+
+  const getPredictionsAndSetLocation = (input: string) => {
+    if (!autocompleteService.current || !placesService.current) {
+      // Fallback: just use the typed input
+      setFullLocation(input);
+      console.log('Set fullLocation from manual input (no service):', input);
+      return;
+    }
+
+    const request = {
+      input: input,
+      bounds: new google.maps.LatLngBounds(
+        new google.maps.LatLng(40.4774, -74.2591), 
+        new google.maps.LatLng(40.9176, -73.7004)
+      ),
+      strictBounds: true,
+      componentRestrictions: { country: 'us' }
+    };
+
+    autocompleteService.current.getPlacePredictions(request, (predictions, status) => {
+      if (status === google.maps.places.PlacesServiceStatus.OK && predictions && predictions.length > 0) {
+        const firstPrediction = predictions[0];
+        console.log('Got prediction:', firstPrediction);
+        
+        // Get place details for the first prediction
+        const detailsRequest = {
+          placeId: firstPrediction.place_id,
+          fields: ['name', 'formatted_address']
+        };
+        
+        placesService.current!.getDetails(detailsRequest, (place, detailsStatus) => {
+          if (detailsStatus === google.maps.places.PlacesServiceStatus.OK && place) {
+            const placeName = place.name || firstPrediction.structured_formatting.main_text;
+            const fullAddr = place.formatted_address || firstPrediction.description;
+            
+            console.log('Set location from prediction:', placeName, 'Full address:', fullAddr);
+            setLocation(placeName);
+            setFullLocation(fullAddr);
+          } else {
+            // Fallback to the prediction description
+            setFullLocation(firstPrediction.description);
+            console.log('Set fullLocation from prediction description:', firstPrediction.description);
+          }
+        });
+      } else {
+        // No predictions found, use the typed input as fallback
+        setFullLocation(input);
+        console.log('Set fullLocation from manual input (no predictions):', input);
+      }
+    });
+  };
 
   const handleFieldBlur = () => {
     const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
@@ -157,14 +220,21 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     const value = e.target.value;
     // Update location state immediately to allow smooth typing
     setLocation(value);
-    // Clear fullLocation when manually typing
+    // Clear fullLocation when manually typing to indicate it needs to be resolved
     if (fullLocation && value !== location) {
       setFullLocation('');
     }
   };
 
   const handleLocationBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+    const value = e.target.value.trim();
+    
+    if (!value) {
+      setLocation('');
+      setFullLocation('');
+      handleFieldBlur();
+      return;
+    }
     
     // Only validate for profanity on blur for manual input
     if (value && isProfane(value)) {
@@ -175,16 +245,18 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       });
       // Clear the invalid input
       setLocation('');
+      setFullLocation('');
       if (autocompleteRef.current) {
         autocompleteRef.current.value = '';
       }
       return;
     }
     
-    // If fullLocation is not set (manual input case), set it to the typed location
-    if (value && !fullLocation) {
-      setFullLocation(value);
-      console.log('Set fullLocation from manual input:', value);
+    // If fullLocation is not set (user typed but didn't select from autocomplete)
+    // Try to get the best match from Google Places
+    if (!fullLocation) {
+      console.log('No fullLocation set, getting predictions for:', value);
+      getPredictionsAndSetLocation(value);
     }
     
     handleFieldBlur();
@@ -264,4 +336,3 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
 };
 
 export default InitiationPage;
-
