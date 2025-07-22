@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Loader } from '@googlemaps/js-api-loader';
@@ -91,6 +92,8 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
               if (autocompleteRef.current) {
                 autocompleteRef.current.value = '';
               }
+              setLocation('');
+              setFullLocation('');
               return;
             }
             
@@ -151,22 +154,33 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
 
   const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+    // Update location state immediately to allow smooth typing
+    setLocation(value);
+    // Clear fullLocation when manually typing
+    if (fullLocation && value !== location) {
+      setFullLocation('');
+    }
+  };
+
+  const handleLocationBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const value = e.target.value;
     
-    // Validate for profanity before setting
+    // Only validate for profanity on blur for manual input
     if (value && isProfane(value)) {
       toast({
         title: "Invalid location",
         description: "Inappropriate content detected in location",
         variant: "destructive"
       });
-      return; // Don't set the value if it's profane
+      // Clear the invalid input
+      setLocation('');
+      if (autocompleteRef.current) {
+        autocompleteRef.current.value = '';
+      }
+      return;
     }
     
-    setLocation(value);
-    // Clear fullLocation when manually typing
-    if (fullLocation && value !== location) {
-      setFullLocation('');
-    }
+    handleFieldBlur();
   };
 
   return (
@@ -225,9 +239,8 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
               <input 
                 ref={autocompleteRef} 
                 type="text" 
-                value={location} 
                 onChange={handleLocationChange}
-                onBlur={handleFieldBlur} 
+                onBlur={handleLocationBlur} 
                 placeholder="Search NYC locations..." 
                 className="app-input" 
               />
