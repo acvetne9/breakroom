@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Plus, Minus } from 'lucide-react';
 import JobSearchDropdown from './JobSearchDropdown';
@@ -68,11 +69,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
   };
 
   const updatePastJob = (id: string, field: keyof Omit<PastJob, 'id'>, value: string) => {
-    // Validate profanity for role and location fields
-    if ((field === 'role' || field === 'location') && value && !validateProfanity(value, field)) {
-      return; // Don't update if profanity detected
-    }
-
     const processedValue = field === 'salary' ? 
       (value.replace(/[^0-9.]/g, '') ? `$${value.replace(/[^0-9.]/g, '')}` : '') : 
       value;
@@ -88,18 +84,30 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
   };
 
   const handleCurrentJobRoleChange = (value: string) => {
-    if (value && !validateProfanity(value, 'role')) {
-      return; // Don't update if profanity detected
-    }
     setCurrentJob({ ...currentJob, role: value });
   };
 
   const handleCurrentJobLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (value && !validateProfanity(value, 'location')) {
-      return; // Don't update if profanity detected
-    }
     setCurrentJob({ ...currentJob, location: value });
+  };
+
+  const handleCurrentJobRoleBlur = () => {
+    if (currentJob.role && !validateProfanity(currentJob.role, 'role')) {
+      setCurrentJob({ ...currentJob, role: '' });
+    }
+  };
+
+  const handleCurrentJobLocationBlur = () => {
+    if (currentJob.location && !validateProfanity(currentJob.location, 'location')) {
+      setCurrentJob({ ...currentJob, location: '' });
+    }
+  };
+
+  const handlePastJobBlur = (id: string, field: 'role' | 'location', value: string) => {
+    if (value && !validateProfanity(value, field)) {
+      updatePastJob(id, field, '');
+    }
   };
 
   return (
@@ -132,6 +140,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
               <JobSearchDropdown
                 value={currentJob.role}
                 onChange={handleCurrentJobRoleChange}
+                onBlur={handleCurrentJobRoleBlur}
                 placeholder="Search or select a job role..."
                 className="app-input flex-1"
               />
@@ -143,6 +152,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
                 type="text"
                 value={currentJob.location}
                 onChange={handleCurrentJobLocationChange}
+                onBlur={handleCurrentJobLocationBlur}
                 className="app-input flex-1"
                 placeholder="Starbucks"
               />
@@ -212,6 +222,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
                   <JobSearchDropdown
                     value={job.role}
                     onChange={(value) => updatePastJob(job.id, 'role', value)}
+                    onBlur={() => handlePastJobBlur(job.id, 'role', job.role)}
                     placeholder="Search or select a job role..."
                     className="app-input flex-1"
                   />
@@ -223,6 +234,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
                     type="text"
                     value={job.location}
                     onChange={(e) => updatePastJob(job.id, 'location', e.target.value)}
+                    onBlur={() => handlePastJobBlur(job.id, 'location', job.location)}
                     className="app-input flex-1"
                     placeholder="AMC"
                   />

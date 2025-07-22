@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Loader } from '@googlemaps/js-api-loader';
@@ -119,36 +120,11 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
 
   const handleRoleChange = (value: string) => {
     setRole(value);
-    
-    // Real-time validation for role
-    if (value && isProfane(value)) {
-      toast({
-        title: "Invalid role",
-        description: "Inappropriate content detected in job role",
-        variant: "destructive"
-      });
-      setRole('');
-      return;
-    }
-    
-    handleFieldBlur();
   };
 
   const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setLocation(value);
-    
-    // Real-time validation for location
-    if (value && isProfane(value)) {
-      toast({
-        title: "Invalid location",
-        description: "Inappropriate content detected in location",
-        variant: "destructive"
-      });
-      setLocation('');
-      setFullLocation('');
-      return;
-    }
   };
 
   return (
