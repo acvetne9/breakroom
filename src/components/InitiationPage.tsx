@@ -58,6 +58,20 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
           const place = autocompleteInstance.current?.getPlace();
           console.log('Google Places selected:', place);
           if (place?.name) {
+            // Validate location for profanity before setting
+            if (isProfane(place.name)) {
+              toast({
+                title: "Invalid location",
+                description: "Inappropriate content detected in location",
+                variant: "destructive"
+              });
+              // Clear the input
+              if (autocompleteRef.current) {
+                autocompleteRef.current.value = '';
+              }
+              return;
+            }
+            
             setLocation(place.name);
             const fullAddr = place.formatted_address || place.name;
             setFullLocation(fullAddr);
@@ -72,43 +86,11 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     initAutocomplete();
   }, []);
 
-  const validateInputs = () => {
-    // Check role for profanity
-    if (isProfane(role)) {
-      toast({
-        title: "Invalid role",
-        description: "Inappropriate content detected in job role",
-        variant: "destructive"
-      });
-      setRole('');
-      return false;
-    }
-
-    // Check location for profanity
-    if (isProfane(location)) {
-      toast({
-        title: "Invalid location",
-        description: "Inappropriate content detected in location",
-        variant: "destructive"
-      });
-      setLocation('');
-      setFullLocation('');
-      return false;
-    }
-
-    return true;
-  };
-
   const handleFieldBlur = () => {
     const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
     console.log('handleFieldBlur called:', { salary, role, location, allFilled });
     
     if (allFilled) {
-      // Validate inputs before completing
-      if (!validateInputs()) {
-        return;
-      }
-      
       if (!isComplete) {
         setIsComplete(true);
         console.log('Completing with data:', { salary, role, location, fullLocation });
@@ -125,11 +107,31 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   };
 
   const handleRoleChange = (value: string) => {
+    // Validate for profanity before setting
+    if (value && isProfane(value)) {
+      toast({
+        title: "Invalid role",
+        description: "Inappropriate content detected in job role",
+        variant: "destructive"
+      });
+      return; // Don't set the value if it's profane
+    }
     setRole(value);
   };
 
   const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+    
+    // Validate for profanity before setting
+    if (value && isProfane(value)) {
+      toast({
+        title: "Invalid location",
+        description: "Inappropriate content detected in location",
+        variant: "destructive"
+      });
+      return; // Don't set the value if it's profane
+    }
+    
     setLocation(value);
     // Clear fullLocation when manually typing
     if (fullLocation && value !== location) {
