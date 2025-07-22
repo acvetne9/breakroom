@@ -106,10 +106,14 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
               if (autocompleteRef.current) {
                 autocompleteRef.current.value = '';
               }
-              setLocation('');
-              setFullLocation('');
-              setIsGooglePlacesSelected(false);
-              return;
+              setLocation(place.name);
+              setFullLocation(fullAddr);
+              setIsGooglePlacesSelected(true);
+              
+              // Wait a tick before triggering the slide away
+              setTimeout(() => {
+                handleFieldBlur();
+              }, 10);
             }
             
             setLocation(place.name);
