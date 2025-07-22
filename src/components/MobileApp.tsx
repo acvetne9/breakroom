@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { motion, PanInfo } from 'framer-motion';
 import InitiationPage from './InitiationPage';
@@ -22,7 +23,7 @@ const MobileApp: React.FC = () => {
   const constraintsRef = useRef(null);
   const { businesses, loading } = useBusinessesData();
 
-  const posts = [
+  const [posts, setPosts] = useState([
     {
       id: '1',
       author: 'BaristaBoss',
@@ -38,11 +39,22 @@ const MobileApp: React.FC = () => {
       businessId: '1',
       businessName: 'Cafe Priyanka'
     }
-  ];
+  ]);
 
   const handleInitiationComplete = (data: UserData) => {
     setUserData(data);
     setCurrentView('main');
+  };
+
+  const handlePostSubmit = (text: string) => {
+    const newPost = {
+      id: String(posts.length + 1),
+      author: 'You',
+      text: text,
+      businessId: undefined,
+      businessName: undefined
+    };
+    setPosts([newPost, ...posts]);
   };
 
   const handleDragEnd = (event: any, info: PanInfo) => {
@@ -70,19 +82,6 @@ const MobileApp: React.FC = () => {
       <HomePage 
         businesses={businesses} 
         currentSlide={currentSlide}
-        expandedPost={expandedPost}
-        onPostSubmit={(text: string) => {
-          // TODO: Add new post to posts array
-          console.log('New post:', text);
-        }}
-        onCommentSubmit={(comment: string) => {
-          if (expandedPost) {
-            setComments({
-              ...comments,
-              [expandedPost]: [...(comments[expandedPost] || []), comment]
-            });
-          }
-        }}
       />
       
       {/* Initiation Card - slides up and disappears */}
@@ -143,6 +142,7 @@ const MobileApp: React.FC = () => {
                 [postId]: [...(comments[postId] || []), comment]
               });
             }}
+            onPostSubmit={handlePostSubmit}
           />
         </motion.div>
       )}

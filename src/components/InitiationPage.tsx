@@ -2,6 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Loader } from '@googlemaps/js-api-loader';
 import JobSearchDropdown from './JobSearchDropdown';
+import { isProfane } from '../utils/profanityFilter';
+import { useToast } from '@/hooks/use-toast';
+
 interface InitiationPageProps {
   onComplete: (data: {
     salary: string;
@@ -10,6 +13,7 @@ interface InitiationPageProps {
     fullLocation?: string;
   }) => void;
 }
+
 const InitiationPage: React.FC<InitiationPageProps> = ({
   onComplete
 }) => {
@@ -20,10 +24,13 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   const [isComplete, setIsComplete] = useState(false);
   const autocompleteRef = useRef<HTMLInputElement>(null);
   const autocompleteInstance = useRef<google.maps.places.Autocomplete | null>(null);
+  const { toast } = useToast();
+
   const handleSalaryChange = (value: string) => {
     const cleanValue = value.replace(/[^0-9.]/g, '');
     setSalary(cleanValue ? `$${cleanValue}` : '');
   };
+
   useEffect(() => {
     const initAutocomplete = async () => {
       if (!autocompleteRef.current) return;
@@ -59,28 +66,98 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     };
     initAutocomplete();
   }, []);
+
+  const validateInputs = () => {
+    // Check role for profanity
+    if (isProfane(role)) {
+      toast({
+        title: "Invalid role",
+        description: "Inappropriate content detected in job role",
+        variant: "destructive"
+      });
+      setRole('');
+      return false;
+    }
+
+    // Check location for profanity
+    if (isProfane(location)) {
+      toast({
+        title: "Invalid location",
+        description: "Inappropriate content detected in location",
+        variant: "destructive"
+      });
+      setLocation('');
+      setFullLocation('');
+      return false;
+    }
+
+    return true;
+  };
+
   const handleFieldBlur = () => {
     const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
-    if (allFilled && !isComplete) {
-      setIsComplete(true);
-      setTimeout(() => {
-        onComplete({
-          salary,
-          role,
-          location,
-          fullLocation
-        });
-      }, 300);
+    
+    if (allFilled) {
+      // Validate inputs before completing
+      if (!validateInputs()) {
+        return;
+      }
+      
+      if (!isComplete) {
+        setIsComplete(true);
+        setTimeout(() => {
+          onComplete({
+            salary,
+            role,
+            location,
+            fullLocation
+          });
+        }, 300);
+      }
     }
   };
-  return <motion.div initial={{
-    y: 0
-  }} animate={{
-    y: isComplete ? '-100vh' : 0
-  }} transition={{
-    duration: 0.5,
-    ease: 'easeInOut'
-  }} className="absolute inset-0 z-50 flex items-center justify-center">
+
+  const handleRoleChange = (value: string) => {
+    setRole(value);
+    
+    // Real-time validation for role
+    if (value && isProfane(value)) {
+      toast({
+        title: "Invalid role",
+        description: "Inappropriate content detected in job role",
+        variant: "destructive"
+      });
+      setRole('');
+      return;
+    }
+    
+    handleFieldBlur();
+  };
+
+  const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setLocation(value);
+    
+    // Real-time validation for location
+    if (value && isProfane(value)) {
+      toast({
+        title: "Invalid location",
+        description: "Inappropriate content detected in location",
+        variant: "destructive"
+      });
+      setLocation('');
+      setFullLocation('');
+      return;
+    }
+  };
+
+  return (
+    <motion.div 
+      initial={{ y: 0 }} 
+      animate={{ y: isComplete ? '-100vh' : 0 }} 
+      transition={{ duration: 0.5, ease: 'easeInOut' }} 
+      className="absolute inset-0 z-50 flex items-center justify-center"
+    >
       <div className="app-card flex flex-col justify-center px-8 py-12">
         <div className="space-y-6">
           <div className="text-center">
@@ -92,7 +169,14 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
           <div className="space-y-6">
             <div>
               <div className="flex items-center space-x-3">
-                <input type="text" value={salary} onChange={e => handleSalaryChange(e.target.value)} onBlur={handleFieldBlur} placeholder="$14" className="app-input text-center text-lg flex-1" />
+                <input 
+                  type="text" 
+                  value={salary} 
+                  onChange={e => handleSalaryChange(e.target.value)} 
+                  onBlur={handleFieldBlur} 
+                  placeholder="$14" 
+                  className="app-input text-center text-lg flex-1" 
+                />
                 <select className="px-4 py-3 bg-white text-sm" style={{ border: '1px solid hsl(var(--app-gray-light))', borderRadius: '0.5rem', height: '48px', fontSize: '16px' }}>
                   <option>HR</option>
                   <option>MO</option>
@@ -106,10 +190,13 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
             </div>
 
             <div>
-              <JobSearchDropdown value={role} onChange={value => {
-              setRole(value);
-              handleFieldBlur();
-            }} onBlur={handleFieldBlur} placeholder="Search or select a job role..." className="app-input" />
+              <JobSearchDropdown 
+                value={role} 
+                onChange={handleRoleChange}
+                onBlur={handleFieldBlur} 
+                placeholder="Search or select a job role..." 
+                className="app-input" 
+              />
             </div>
 
             <div className="text-center">
@@ -117,7 +204,15 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
             </div>
 
             <div>
-              <input ref={autocompleteRef} type="text" value={location} onChange={e => setLocation(e.target.value)} onBlur={handleFieldBlur} placeholder="Search NYC locations..." className="app-input" />
+              <input 
+                ref={autocompleteRef} 
+                type="text" 
+                value={location} 
+                onChange={handleLocationChange}
+                onBlur={handleFieldBlur} 
+                placeholder="Search NYC locations..." 
+                className="app-input" 
+              />
             </div>
 
             <div className="text-center mt-8">
@@ -126,6 +221,8 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
           </div>
         </div>
       </div>
-    </motion.div>;
+    </motion.div>
+  );
 };
+
 export default InitiationPage;

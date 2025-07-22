@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -141,13 +142,13 @@
     color: hsl(var(--app-gray-medium));
   }
   
-  /* Search bar styling */
+  /* Search bar styling with button support - standardized to match card width */
   .search-bar {
     @apply w-[90vw] mx-auto px-4 py-3 bg-white;
     border: 1px solid hsl(var(--app-gray-light));
     border-radius: 0.5rem !important;
-    max-width: 400px;
     font-size: 16px;
+    max-width: 400px;
   }
   
   .search-bar::placeholder {
