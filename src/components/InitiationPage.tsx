@@ -95,29 +95,11 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
           const place = autocompleteInstance.current?.getPlace();
           console.log('Google Places selected:', place);
           if (place?.name) {
-            // Validate location for profanity before setting
-            // if (isProfane(place.name)) {
-            //   toast({
-            //     title: "Invalid location",
-            //     description: "Inappropriate content detected in location",
-            //     variant: "destructive"
-            //   });
-            //   // Clear the input
-            //   if (autocompleteRef.current) {
-            //     autocompleteRef.current.value = '';
-            //   }
-            //   setLocation(place.name);
-            //   setFullLocation(fullAddr);
-            //   setIsGooglePlacesSelected(true);
-              
-            //   // Wait a tick before triggering the slide away
-            //   setTimeout(() => {
-            //     handleFieldBlur();
-            //   }, 10);
-            // }
-            
-            setLocation(place.name);
+            const placeName = place.name;
             const fullAddr = place.formatted_address || place.name;
+            
+            console.log('Setting location from Google Places:', placeName, 'Full address:', fullAddr);
+            setLocation(placeName);
             setFullLocation(fullAddr);
             setIsGooglePlacesSelected(true);
             
