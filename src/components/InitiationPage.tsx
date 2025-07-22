@@ -1,11 +1,33 @@
-
-
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Loader } from '@googlemaps/js-api-loader';
 import JobSearchDropdown from './JobSearchDropdown';
 import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
+
+// Import the predefined job options to check against
+const JOB_OPTIONS = [
+  'Barista',
+  'Server', 
+  'Cook',
+  'Cashier',
+  'Security Guard',
+  'Retail Associate',
+  'Delivery Driver',
+  'Host/Hostess',
+  'Cleaner',
+  'Stock Associate',
+  'Customer Service',
+  'Manager',
+  'Waiter/Waitress',
+  'Receptionist',
+  'Sales Associate',
+  'Food Service Worker',
+  'Maintenance',
+  'Supervisor',
+  'Shift Leader',
+  'Assistant Manager'
+];
 
 interface InitiationPageProps {
   onComplete: (data: {
@@ -107,8 +129,14 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   };
 
   const handleRoleChange = (value: string) => {
-    // Validate for profanity before setting
-    if (value && isProfane(value)) {
+    console.log('handleRoleChange called with:', value);
+    
+    // Check if this is a predefined job option (safe to use)
+    const isPredefinedOption = JOB_OPTIONS.includes(value);
+    
+    // Only validate for profanity if it's NOT a predefined option
+    if (!isPredefinedOption && value && isProfane(value)) {
+      console.log('Profanity detected in manual role input:', value);
       toast({
         title: "Invalid role",
         description: "Inappropriate content detected in job role",
@@ -116,6 +144,8 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       });
       return; // Don't set the value if it's profane
     }
+    
+    console.log('Setting role:', value, 'isPredefined:', isPredefinedOption);
     setRole(value);
   };
 
@@ -214,4 +244,3 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
 };
 
 export default InitiationPage;
-
