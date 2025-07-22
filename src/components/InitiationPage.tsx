@@ -124,54 +124,59 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     initAutocomplete();
   }, []);
 
-  const getPredictionsAndSetLocation = (input: string) => {
-    if (!autocompleteService.current || !placesService.current) {
-      // Fallback: just use the typed input
-      setFullLocation(input);
-      console.log('Set fullLocation from manual input (no service):', input);
-      return;
-    }
-
-    const request = {
-      input: input,
-      bounds: new google.maps.LatLngBounds(
-        new google.maps.LatLng(40.4774, -74.2591), 
-        new google.maps.LatLng(40.9176, -73.7004)
-      ),
-      strictBounds: true,
-      componentRestrictions: { country: 'us' }
-    };
-
-    autocompleteService.current.getPlacePredictions(request, (predictions, status) => {
-      if (status === google.maps.places.PlacesServiceStatus.OK && predictions && predictions.length > 0) {
-        const firstPrediction = predictions[0];
-        console.log('Got prediction:', firstPrediction);
-        
-        // Get place details for the first prediction
-        const detailsRequest = {
-          placeId: firstPrediction.place_id,
-          fields: ['name', 'formatted_address']
-        };
-        
-        placesService.current!.getDetails(detailsRequest, (place, detailsStatus) => {
-          if (detailsStatus === google.maps.places.PlacesServiceStatus.OK && place) {
-            const placeName = place.name || firstPrediction.structured_formatting.main_text;
-            const fullAddr = place.formatted_address || firstPrediction.description;
-            
-            console.log('Set location from prediction:', placeName, 'Full address:', fullAddr);
-            setLocation(placeName);
-            setFullLocation(fullAddr);
-          } else {
-            // Fallback to the prediction description
-            setFullLocation(firstPrediction.description);
-            console.log('Set fullLocation from prediction description:', firstPrediction.description);
-          }
-        });
-      } else {
-        // No predictions found, use the typed input as fallback
+  const getPredictionsAndSetLocation = (input: string): Promise<void> => {
+    return new Promise((resolve) => {
+      if (!autocompleteService.current || !placesService.current) {
+        // Fallback: just use the typed input
         setFullLocation(input);
-        console.log('Set fullLocation from manual input (no predictions):', input);
+        console.log('Set fullLocation from manual input (no service):', input);
+        resolve();
+        return;
       }
+
+      const request = {
+        input: input,
+        bounds: new google.maps.LatLngBounds(
+          new google.maps.LatLng(40.4774, -74.2591), 
+          new google.maps.LatLng(40.9176, -73.7004)
+        ),
+        strictBounds: true,
+        componentRestrictions: { country: 'us' }
+      };
+
+      autocompleteService.current.getPlacePredictions(request, (predictions, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && predictions && predictions.length > 0) {
+          const firstPrediction = predictions[0];
+          console.log('Got prediction:', firstPrediction);
+          
+          // Get place details for the first prediction
+          const detailsRequest = {
+            placeId: firstPrediction.place_id,
+            fields: ['name', 'formatted_address']
+          };
+          
+          placesService.current!.getDetails(detailsRequest, (place, detailsStatus) => {
+            if (detailsStatus === google.maps.places.PlacesServiceStatus.OK && place) {
+              const placeName = place.name || firstPrediction.structured_formatting.main_text;
+              const fullAddr = place.formatted_address || firstPrediction.description;
+              
+              console.log('Set location from prediction:', placeName, 'Full address:', fullAddr);
+              setLocation(placeName);
+              setFullLocation(fullAddr);
+            } else {
+              // Fallback to the prediction description
+              setFullLocation(firstPrediction.description);
+              console.log('Set fullLocation from prediction description:', firstPrediction.description);
+            }
+            resolve();
+          });
+        } else {
+          // No predictions found, use the typed input as fallback
+          setFullLocation(input);
+          console.log('Set fullLocation from manual input (no predictions):', input);
+          resolve();
+        }
+      });
     });
   };
 
@@ -226,7 +231,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     }
   };
 
-  const handleLocationBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+  const handleLocationBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
     const value = e.target.value.trim();
     
     if (!value) {
@@ -252,11 +257,10 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       return;
     }
     
-    // If fullLocation is not set (user typed but didn't select from autocomplete)
-    // Try to get the best match from Google Places
-    if (!fullLocation) {
-      console.log('No fullLocation set, getting predictions for:', value);
-      getPredictionsAndSetLocation(value);
+    // Always try to get the best Google Places match for any typed input
+    if (!fullLocation || fullLocation === value) {
+      console.log('Getting predictions for typed location:', value);
+      await getPredictionsAndSetLocation(value);
     }
     
     handleFieldBlur();
