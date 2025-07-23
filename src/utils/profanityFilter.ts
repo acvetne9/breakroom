@@ -1,3 +1,4 @@
+
 // Comprehensive profanity filter utility with block-only approach
 const profanityList = [
   // Common profanity - keeping this list clean for demo purposes
@@ -18,14 +19,22 @@ const whitelist = [
 ];
 
 /**
+ * Escapes special regex characters to prevent syntax errors
+ */
+function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Normalizes text by removing special characters, spaces, and converting leetspeak
  */
 function normalizeText(text: string): string {
   let normalized = text.toLowerCase();
   
-  // Convert leetspeak
+  // Convert leetspeak - escape special characters before creating RegExp
   for (const [leet, normal] of Object.entries(leetSpeakMap)) {
-    normalized = normalized.replace(new RegExp(leet, 'g'), normal);
+    const escapedLeet = escapeRegExp(leet);
+    normalized = normalized.replace(new RegExp(escapedLeet, 'g'), normal);
   }
   
   // Remove spaces, punctuation, and special characters that might be used to bypass filter
