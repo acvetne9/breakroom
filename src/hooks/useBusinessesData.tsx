@@ -10,6 +10,9 @@ interface Business {
   stories?: Array<{ id: string; text: string; author: string }>;
   roles?: Array<{ role: string; salary: string }>;
   businessType?: string;
+  place_id?: string;
+  website?: string;
+  url?: string;
 }
 
 export const useBusinessesData = () => {
@@ -71,6 +74,13 @@ export const useBusinessesData = () => {
               const shuffledRoles = [...jobRoles].sort(() => 0.5 - Math.random());
               const selectedRoles = shuffledRoles.slice(0, 2 + Math.floor(Math.random() * 2));
               
+              const mockPlaceId = `ChIJ${Math.random().toString(36).substring(2, 15)}`;
+              const mockWebsites = [
+                `https://www.${randomName.toLowerCase().replace(/[^a-z]/g, '')}${area.name.toLowerCase()}.com`,
+                undefined, // Some businesses don't have websites
+              ];
+              const hasWebsite = Math.random() > 0.3; // 70% chance of having a website
+              
               businesses.push({
                 id: `business-${businessIndex}`,
                 name: `${randomName} ${area.name}`,
@@ -93,7 +103,10 @@ export const useBusinessesData = () => {
                     author: `Worker${Math.floor(Math.random() * 1000)}` 
                   }
                 ],
-                roles: selectedRoles
+                roles: selectedRoles,
+                place_id: mockPlaceId,
+                website: hasWebsite ? mockWebsites[0] : undefined,
+                url: `https://maps.google.com/?cid=${Math.random().toString().substring(2, 15)}`
               });
             }
           });
@@ -120,7 +133,10 @@ export const useBusinessesData = () => {
             roles: [
               { role: 'Barista', salary: '$13.6' },
               { role: 'Manager', salary: '$18.5' }
-            ]
+            ],
+            place_id: 'ChIJexampleplacepriyanka',
+            website: 'https://www.cafepriyanka.com',
+            url: 'https://maps.google.com/?cid=12345678901234567890'
           },
           {
             id: '2',
@@ -135,7 +151,10 @@ export const useBusinessesData = () => {
             roles: [
               { role: 'Cashier', salary: '$15.0' },
               { role: 'Cook', salary: '$16.2' }
-            ]
+            ],
+            place_id: 'ChIJexampleplacetacobell',
+            website: 'https://www.tacobell.com',
+            url: 'https://maps.google.com/?cid=09876543210987654321'
           }
         ]);
       } finally {

@@ -15,6 +15,8 @@ interface BusinessDetailsProps {
       role: string;
       salary: string;
     }>;
+    website?: string;
+    url?: string;
   };
   onClose: () => void;
 }
@@ -29,8 +31,13 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
   };
   const handleCompassClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    // TODO: Link to external business jobs page
-    window.open(`https://example.com/jobs/${business.id}`, '_blank');
+    
+    // Try business website first, then Google Maps page, then fallback to Google search
+    const destination = business.website || 
+                       business.url || 
+                       `https://www.google.com/search?q=${encodeURIComponent(business.name)}`;
+    
+    window.open(destination, '_blank');
   };
   const handleCardClick = (e: React.MouseEvent) => {
     // Check if click is on stories or compass - if so, don't close
