@@ -182,7 +182,7 @@ const HomePage: React.FC<HomePageProps> = ({
               value={searchValue}
               onChange={(e) => handleSearchInput(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Search businesses, industries..."
+              placeholder="Search businesses, roles, salary..."
               className="search-bar pr-12"
             />
             <button
