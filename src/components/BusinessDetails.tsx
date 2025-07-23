@@ -54,9 +54,23 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
           <div>
             <h2 className="text-xl font-medium text-app-black">{business.name}</h2>
             <div className="flex items-center mt-2">
-              <span className="text-app-gray-medium">
-                {'★'.repeat(Math.floor(business.rating))} {business.rating}
-              </span>
+              <div className="flex items-center">
+                <span className="text-app-gray-medium">
+                  {Array.from({ length: 5 }, (_, i) => {
+                    const starValue = i + 1;
+                    if (business.rating >= starValue) {
+                      return '★';
+                    } else if (business.rating >= starValue - 0.5) {
+                      return '☆';
+                    } else {
+                      return '☆';
+                    }
+                  }).join('')}
+                </span>
+                <span className="text-app-gray-medium ml-2">
+                  {business.rating.toFixed(1)}
+                </span>
+              </div>
             </div>
           </div>
           <button onClick={handleCompassClick} className="compass-button p-2 rounded-lg bg-gray-100/0 py-0">
