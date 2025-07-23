@@ -19,15 +19,21 @@ interface HomePageProps {
     roles?: Array<{ role: string; salary: string }>;
   }>;
   currentSlide?: number;
+  selectedBusiness?: any;
+  onBusinessSelect?: (business: any) => void;
 }
 
 const HomePage: React.FC<HomePageProps> = ({ 
   businesses, 
-  currentSlide = 1
+  currentSlide = 1,
+  selectedBusiness: propSelectedBusiness,
+  onBusinessSelect
 }) => {
   const [searchValue, setSearchValue] = useState('');
-  const [selectedBusiness, setSelectedBusiness] = useState<any>(null);
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
+  
+  // Use prop-controlled selectedBusiness if available, otherwise use local state
+  const selectedBusiness = propSelectedBusiness;
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [filteredBusinesses, setFilteredBusinesses] = useState(businesses);
   const [isSearchActive, setIsSearchActive] = useState(false);
@@ -77,7 +83,7 @@ const HomePage: React.FC<HomePageProps> = ({
     
     if (exactMatch) {
       // Navigate directly to the exact match
-      setSelectedBusiness(exactMatch);
+      onBusinessSelect?.(exactMatch);
       setShowBusinessDetails(false);
       setSearchResults([]);
       setFilteredBusinesses([exactMatch]);
@@ -97,7 +103,7 @@ const HomePage: React.FC<HomePageProps> = ({
   };
 
   const handleBusinessClick = (business: any) => {
-    setSelectedBusiness(business);
+    onBusinessSelect?.(business);
     setShowBusinessDetails(false);
     setSearchResults([]);
   };
@@ -107,7 +113,7 @@ const HomePage: React.FC<HomePageProps> = ({
   };
 
   const handleClosePreview = () => {
-    setSelectedBusiness(null);
+    onBusinessSelect?.(null);
     setShowBusinessDetails(false);
   };
 
