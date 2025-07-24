@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { Eye } from 'lucide-react';
 
 interface Post {
   id: string;

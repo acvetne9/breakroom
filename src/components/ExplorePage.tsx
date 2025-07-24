@@ -116,12 +116,17 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                 <div className={`relative z-10 ${post.images && post.images.length >= 5 ? 'post-overlay rounded-lg p-3' : ''}`}>
                   <div className="flex justify-between items-start mb-2">
                     <span className="text-app-gray-medium text-sm">@{post.author}</span>
-                    {post.businessId && <button onClick={e => {
-                  e.stopPropagation();
-                  handleBusinessView(post.businessId!);
-                }} className="flex items-center space-x-1 text-app-gray-medium hover:text-app-black">
+                    {post.businessId && !filteredBusinessId && (
+                      <button 
+                        onClick={e => {
+                          e.stopPropagation();
+                          handleBusinessView(post.businessId!);
+                        }} 
+                        className="flex items-center space-x-1 text-app-gray-medium hover:text-app-black"
+                      >
                         <span>👀</span>
-                      </button>}
+                      </button>
+                    )}
                   </div>
                   <p className="text-app-black">{post.text}</p>
                 </div>
