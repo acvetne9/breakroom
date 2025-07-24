@@ -14,6 +14,16 @@ interface UserData {
   fullLocation?: string;
 }
 
+interface Post {
+  id: string;
+  author: string;
+  text: string;
+  businessId?: string;
+  businessName?: string;
+  images?: string[];
+  isStory?: boolean;
+}
+
 const MobileApp: React.FC = () => {
   const [currentView, setCurrentView] = useState<'initiation' | 'main'>('initiation');
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
@@ -22,24 +32,27 @@ const MobileApp: React.FC = () => {
   const [comments, setComments] = useState<{[postId: string]: string[]}>({});
   const [selectedBusiness, setSelectedBusiness] = useState<any>(null);
   const [previouslySelectedBusiness, setPreviouslySelectedBusiness] = useState<any>(null);
+  const [filteredBusinessId, setFilteredBusinessId] = useState<string | null>(null);
   const constraintsRef = useRef(null);
   const { businesses, loading } = useBusinessesData();
 
-  const [posts, setPosts] = useState([
+  const [posts, setPosts] = useState<Post[]>([
     {
       id: '1',
       author: 'BaristaBoss',
       text: 'Guess what!! I never thought this would happen but my boss brought in donuts today!',
       businessId: '1',
       businessName: 'Cafe Priyanka',
-      images: Array(6).fill('https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300&h=200&fit=crop')
+      images: Array(6).fill('https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300&h=200&fit=crop'),
+      isStory: true
     },
     {
       id: '2',
       author: 'Cook52345234',
       text: 'My old manager would always refuse to approve my sick leave :(',
       businessId: '1',
-      businessName: 'Cafe Priyanka'
+      businessName: 'Cafe Priyanka',
+      isStory: true
     }
   ]);
 
@@ -48,15 +61,35 @@ const MobileApp: React.FC = () => {
     setCurrentView('main');
   };
 
-  const handlePostSubmit = (text: string) => {
-    const newPost = {
+  const handlePostSubmit = (text: string, businessId?: string) => {
+    const business = businessId ? businesses.find(b => b.id === businessId) : undefined;
+    
+    // Determine if this should be a story
+    const businessPosts = posts.filter(p => p.businessId === businessId && p.isStory);
+    const shouldBeStory = businessId && businessPosts.length < 5;
+    
+    const newPost: Post = {
       id: String(posts.length + 1),
       author: 'You',
-      text: text,
-      businessId: undefined,
-      businessName: undefined
+      text,
+      businessId,
+      businessName: business?.name,
+      isStory: shouldBeStory
     };
     setPosts([newPost, ...posts]);
+  };
+
+  const handleBusinessClick = (business: any) => {
+    setSelectedBusiness(business);
+  };
+
+  const handleBusinessStoriesClick = (businessId: string) => {
+    setFilteredBusinessId(businessId);
+    setCurrentSlide(2); // Navigate to explore page
+  };
+
+  const handleBackToAllPosts = () => {
+    setFilteredBusinessId(null);
   };
 
   // Handle business state when sliding to explore and back
@@ -100,7 +133,9 @@ const MobileApp: React.FC = () => {
         businesses={businesses} 
         currentSlide={currentSlide}
         selectedBusiness={selectedBusiness}
-        onBusinessSelect={setSelectedBusiness}
+        onBusinessSelect={handleBusinessClick}
+        posts={posts}
+        onBusinessStoriesClick={handleBusinessStoriesClick}
       />
       
       {/* Initiation Card - slides up and disappears */}
@@ -148,10 +183,8 @@ const MobileApp: React.FC = () => {
         >
           <ExplorePage 
             posts={posts}
-            onBusinessView={(businessId) => {
-              // TODO: Filter explore to show posts for this business
-              console.log('View business:', businessId);
-            }}
+            filteredBusinessId={filteredBusinessId || undefined}
+            onBusinessView={handleBusinessClick}
             onExpandedPostChange={(postId) => {
               setExpandedPost(postId);
             }}
@@ -162,6 +195,7 @@ const MobileApp: React.FC = () => {
               });
             }}
             onPostSubmit={handlePostSubmit}
+            onBackToAllPosts={handleBackToAllPosts}
           />
         </motion.div>
       )}

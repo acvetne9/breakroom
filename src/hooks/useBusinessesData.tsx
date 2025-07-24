@@ -7,7 +7,6 @@ interface Business {
   position: { lat: number; lng: number };
   rating: number;
   salary?: string;
-  stories?: Array<{ id: string; text: string; author: string }>;
   roles?: Array<{ role: string; salary: string }>;
   businessType?: string;
   place_id?: string;
@@ -91,18 +90,6 @@ export const useBusinessesData = () => {
                 },
                 rating: 3.5 + Math.random() * 1.5,
                 salary: `$${(12 + Math.random() * 8).toFixed(1)}`,
-                stories: [
-                  { 
-                    id: `story-${businessIndex}-1`, 
-                    text: 'Great place to work, flexible hours and supportive management team.', 
-                    author: `Employee${Math.floor(Math.random() * 1000)}` 
-                  },
-                  { 
-                    id: `story-${businessIndex}-2`, 
-                    text: 'Good benefits and opportunities for growth within the company.', 
-                    author: `Worker${Math.floor(Math.random() * 1000)}` 
-                  }
-                ],
                 roles: selectedRoles,
                 place_id: mockPlaceId,
                 website: hasWebsite ? mockWebsites[0] : undefined,
@@ -126,10 +113,6 @@ export const useBusinessesData = () => {
             position: { lat: 40.7831, lng: -73.9712 },
             rating: 5.0,
             salary: '$13.6',
-            stories: [
-              { id: '1', text: 'Great place to work, flexible hours', author: 'Sarah123' },
-              { id: '2', text: 'Management is really supportive', author: 'Mike_B' }
-            ],
             roles: [
               { role: 'Barista', salary: '$13.6' },
               { role: 'Manager', salary: '$18.5' }
@@ -145,9 +128,6 @@ export const useBusinessesData = () => {
             position: { lat: 40.7841, lng: -73.9702 },
             rating: 4.2,
             salary: '$15.0',
-            stories: [
-              { id: '3', text: 'Fast-paced environment, good for building skills', author: 'JobSeeker' }
-            ],
             roles: [
               { role: 'Cashier', salary: '$15.0' },
               { role: 'Cook', salary: '$16.2' }

@@ -1,6 +1,16 @@
 import React from 'react';
 import { Eye } from 'lucide-react';
 
+interface Post {
+  id: string;
+  author: string;
+  text: string;
+  businessId?: string;
+  businessName?: string;
+  images?: string[];
+  isStory?: boolean;
+}
+
 interface BusinessPreviewProps {
   business: {
     id: string;
@@ -9,14 +19,19 @@ interface BusinessPreviewProps {
     salary?: string;
     stories?: Array<{ id: string; text: string; author: string }>;
   };
+  posts: Post[];
   onClose: () => void;
   onClick: () => void;
 }
 
-const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, onClose, onClick }) => {
+const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, posts, onClose, onClick }) => {
+  // Get stories (posts) for this business
+  const businessStories = posts.filter(post => post.businessId === business.id && post.isStory).slice(0, 3);
+
   const handleStoryClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    // TODO: Open explore page filtered to this business
+    // This will trigger navigation to explore page with filtered posts
+    onClick();
   };
 
   const handleBackgroundClick = (e: React.MouseEvent) => {
@@ -77,20 +92,20 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, onClose, on
           </div>
         )}
 
-        {business.stories && business.stories.length > 0 && (
+        {businessStories.length > 0 && (
           <div>
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-sm font-medium text-app-black">Stories 📖</h4>
             </div>
             <div className="space-y-2">
-              {business.stories.slice(0, 3).map(story => (
+              {businessStories.map(story => (
                 <div 
                   key={story.id}
                   className="text-sm text-app-gray-dark cursor-pointer hover:text-app-black"
                   onClick={handleStoryClick}
                 >
                   <p className="line-clamp-2">
-                    {story.text.length > 80 ? `${story.text.substring(0, 80)}...` : story.text}
+                    <span className="font-medium">@{story.author}:</span> {story.text.length > 60 ? `${story.text.substring(0, 60)}...` : story.text}
                   </p>
                 </div>
               ))}

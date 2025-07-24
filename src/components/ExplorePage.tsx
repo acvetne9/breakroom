@@ -10,22 +10,27 @@ interface Post {
   businessId?: string;
   businessName?: string;
   images?: string[];
+  isStory?: boolean;
 }
 
 interface ExplorePageProps {
   posts: Post[];
+  filteredBusinessId?: string;
   onBusinessView?: (businessId: string) => void;
   onExpandedPostChange?: (postId: string | null) => void;
   onCommentSubmit?: (postId: string, comment: string) => void;
-  onPostSubmit?: (text: string) => void;
+  onPostSubmit?: (text: string, businessId?: string) => void;
+  onBackToAllPosts?: () => void;
 }
 
 const ExplorePage: React.FC<ExplorePageProps> = ({
   posts,
+  filteredBusinessId,
   onBusinessView,
   onExpandedPostChange,
   onCommentSubmit,
-  onPostSubmit
+  onPostSubmit,
+  onBackToAllPosts
 }) => {
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [comments, setComments] = useState<{
@@ -50,7 +55,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     }
     
     if (onPostSubmit) {
-      onPostSubmit(postText);
+      onPostSubmit(postText, filteredBusinessId);
       setPostText('');
     }
   };
@@ -87,12 +92,29 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     onBusinessView?.(businessId);
   };
 
+  // Filter posts based on business if filtering is active
+  const displayPosts = filteredBusinessId 
+    ? posts.filter(post => post.businessId === filteredBusinessId)
+    : posts;
+
   return (
     <div className="relative w-full h-full">
+      {/* Back to all posts button */}
+      {filteredBusinessId && (
+        <div className="absolute top-2 left-4 z-10">
+          <button 
+            onClick={onBackToAllPosts}
+            className="app-popup px-3 py-1 text-sm text-app-gray-medium hover:text-app-black"
+          >
+            ← Back to all posts
+          </button>
+        </div>
+      )}
+      
       {/* Posts list */}
       <div className="h-full overflow-y-auto pb-20 pt-4">
         <div className="space-y-4 px-4">
-          {posts.map(post => (
+          {displayPosts.map(post => (
             <div key={post.id} className="relative">
               {/* Post with background collage if business has 5+ photos */}
               <div 

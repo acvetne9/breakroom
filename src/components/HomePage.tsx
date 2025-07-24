@@ -7,6 +7,16 @@ import { isProfane } from '../utils/profanityFilter';
 import { Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
+interface Post {
+  id: string;
+  author: string;
+  text: string;
+  businessId?: string;
+  businessName?: string;
+  images?: string[];
+  isStory?: boolean;
+}
+
 interface HomePageProps {
   businesses: Array<{
     id: string;
@@ -21,13 +31,17 @@ interface HomePageProps {
   currentSlide?: number;
   selectedBusiness?: any;
   onBusinessSelect?: (business: any) => void;
+  posts: Post[];
+  onBusinessStoriesClick?: (businessId: string) => void;
 }
 
 const HomePage: React.FC<HomePageProps> = ({ 
   businesses, 
   currentSlide = 1,
   selectedBusiness: propSelectedBusiness,
-  onBusinessSelect
+  onBusinessSelect,
+  posts,
+  onBusinessStoriesClick
 }) => {
   const [searchValue, setSearchValue] = useState('');
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
@@ -160,8 +174,9 @@ const HomePage: React.FC<HomePageProps> = ({
       {selectedBusiness && !showBusinessDetails && (
         <BusinessPreview 
           business={selectedBusiness}
+          posts={posts}
           onClose={handleClosePreview}
-          onClick={handleBusinessPreviewClick}
+          onClick={() => onBusinessStoriesClick?.(selectedBusiness.id)}
         />
       )}
 
@@ -169,7 +184,9 @@ const HomePage: React.FC<HomePageProps> = ({
       {selectedBusiness && showBusinessDetails && (
         <BusinessDetails 
           business={selectedBusiness}
+          posts={posts}
           onClose={handleClosePreview}
+          onStoriesClick={() => onBusinessStoriesClick?.(selectedBusiness.id)}
         />
       )}
 

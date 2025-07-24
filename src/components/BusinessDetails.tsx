@@ -1,5 +1,15 @@
 import React from 'react';
 import { Compass } from 'lucide-react';
+interface Post {
+  id: string;
+  author: string;
+  text: string;
+  businessId?: string;
+  businessName?: string;
+  images?: string[];
+  isStory?: boolean;
+}
+
 interface BusinessDetailsProps {
   business: {
     id: string;
@@ -18,11 +28,15 @@ interface BusinessDetailsProps {
     website?: string;
     url?: string;
   };
+  posts: Post[];
   onClose: () => void;
+  onStoriesClick?: () => void;
 }
 const BusinessDetails: React.FC<BusinessDetailsProps> = ({
   business,
-  onClose
+  posts,
+  onClose,
+  onStoriesClick
 }) => {
   const handleBackgroundClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -39,6 +53,9 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
     
     window.open(destination, '_blank');
   };
+  // Get stories (posts) for this business
+  const businessStories = posts.filter(post => post.businessId === business.id && post.isStory);
+
   const handleCardClick = (e: React.MouseEvent) => {
     // Check if click is on stories or compass - if so, don't close
     const target = e.target as HTMLElement;
@@ -47,6 +64,10 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
     if (!isStoryClick && !isCompassClick) {
       onClose();
     }
+  };
+
+  const handleStoryClick = () => {
+    onStoriesClick?.();
   };
   return <div className="fixed inset-0 z-40 flex items-start justify-center pt-16" onClick={handleBackgroundClick}>
       <div className="app-card p-6 overflow-y-auto animate-fade-in" onClick={handleCardClick}>
@@ -93,14 +114,13 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
         </div>
 
         {/* Stories section */}
-        {business.stories && business.stories.length > 0 && <div>
+        {businessStories.length > 0 && <div>
             <h3 className="text-lg font-medium text-app-black mb-4">More Stories 📖</h3>
             <div className="space-y-4">
-              {business.stories.map(story => <div key={story.id} className="story-item border-l-2 border-app-gray-light pl-4">
+              {businessStories.map(story => <div key={story.id} className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={handleStoryClick}>
                   <p className="text-app-gray-dark text-sm">
-                    {story.text.length > 120 ? `${story.text.substring(0, 120)}...` : story.text}
+                    <span className="font-medium">@{story.author}:</span> {story.text.length > 100 ? `${story.text.substring(0, 100)}...` : story.text}
                   </p>
-                  <p className="text-app-gray-medium text-xs mt-1">— {story.author}</p>
                 </div>)}
             </div>
           </div>}
