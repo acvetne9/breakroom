@@ -88,29 +88,13 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   };
 
   // Filter posts based on business or user stories
-  const displayPosts = filteredBusinessId 
-    ? posts.filter(post => post.businessId === filteredBusinessId)
-    : filteredUserStories
-    ? posts.filter(post => post.author === 'You')
-    : posts;
+  const displayPosts = filteredBusinessId ? posts.filter(post => post.businessId === filteredBusinessId) : filteredUserStories ? posts.filter(post => post.author === 'You') : posts;
   return <div className="relative w-full h-full">
       {/* Header for filtered views */}
-      {(filteredBusinessId || filteredUserStories) && (
-        <div className="absolute top-2 left-4 right-4 z-10 bg-app-white rounded-lg p-3 shadow-lg">
-          <button
-            onClick={onBackToAllPosts}
-            className="flex items-center gap-2 text-app-black hover:text-app-gray-dark"
-          >
-            ← Back to All Posts
-          </button>
-          <h2 className="text-lg font-medium mt-1 text-app-black">
-            {filteredUserStories ? 'Your Stories 📖' : 'Business Stories'}
-          </h2>
-        </div>
-      )}
+      {filteredBusinessId || filteredUserStories}
       
       {/* Posts list */}
-      <div className={`h-full overflow-y-auto pb-20 ${(filteredBusinessId || filteredUserStories) ? 'pt-20' : 'pt-4'}`}>
+      <div className={`h-full overflow-y-auto pb-20 ${filteredBusinessId || filteredUserStories ? 'pt-20' : 'pt-4'}`}>
         <div className="space-y-4 px-4">
           {displayPosts.map(post => <div key={post.id} className="relative">
               {/* Post with background collage if business has 5+ photos */}
@@ -132,17 +116,12 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                 <div className={`relative z-10 ${post.images && post.images.length >= 5 ? 'post-overlay rounded-lg p-3' : ''}`}>
                   <div className="flex justify-between items-start mb-2">
                     <span className="text-app-gray-medium text-sm">@{post.author}</span>
-                    {post.businessId ? (
-                      <button 
-                        onClick={e => {
-                          e.stopPropagation();
-                          handleBusinessView(post.businessId!);
-                        }} 
-                        className="flex items-center space-x-1 text-app-gray-medium hover:text-app-black"
-                      >
+                    {post.businessId ? <button onClick={e => {
+                  e.stopPropagation();
+                  handleBusinessView(post.businessId!);
+                }} className="flex items-center space-x-1 text-app-gray-medium hover:text-app-black">
                         <span>👀</span>
-                      </button>
-                    ) : null}
+                      </button> : null}
                   </div>
                   <p className="text-app-black">{post.text}</p>
                 </div>
