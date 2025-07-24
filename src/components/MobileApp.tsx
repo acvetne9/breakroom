@@ -64,16 +64,16 @@ const MobileApp: React.FC = () => {
   const handlePostSubmit = (text: string, businessId?: string) => {
     const business = businessId ? businesses.find(b => b.id === businessId) : undefined;
     
-    // Determine if this should be a story
-    const businessPosts = posts.filter(p => p.businessId === businessId && p.isStory);
-    const shouldBeStory = businessId && businessPosts.length < 5;
+    // Only create business stories when specifically viewing filtered posts for that business
+    // Otherwise, create regular posts
+    const shouldBeStory = filteredBusinessId && businessId === filteredBusinessId;
     
     const newPost: Post = {
       id: String(posts.length + 1),
       author: 'You',
       text,
-      businessId,
-      businessName: business?.name,
+      businessId: shouldBeStory ? businessId : undefined,
+      businessName: shouldBeStory ? business?.name : undefined,
       isStory: shouldBeStory
     };
     setPosts([newPost, ...posts]);
@@ -81,6 +81,8 @@ const MobileApp: React.FC = () => {
 
   const handleBusinessClick = (business: any) => {
     setSelectedBusiness(business);
+    // When selecting a business, we're not filtering posts by business
+    setFilteredBusinessId(null);
   };
 
   const handleBusinessStoriesClick = (businessId: string) => {

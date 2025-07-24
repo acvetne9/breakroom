@@ -122,8 +122,12 @@ const HomePage: React.FC<HomePageProps> = ({
     setSearchResults([]);
   };
 
-  const handleBusinessPreviewClick = () => {
+  const handleShowBusinessDetails = () => {
     setShowBusinessDetails(true);
+  };
+
+  const handleBusinessStoriesClick = () => {
+    onBusinessStoriesClick?.(selectedBusiness.id);
   };
 
   const handleClosePreview = () => {
@@ -176,7 +180,8 @@ const HomePage: React.FC<HomePageProps> = ({
           business={selectedBusiness}
           posts={posts}
           onClose={handleClosePreview}
-          onClick={() => onBusinessStoriesClick?.(selectedBusiness.id)}
+          onShowDetails={handleShowBusinessDetails}
+          onStoriesClick={handleBusinessStoriesClick}
         />
       )}
 

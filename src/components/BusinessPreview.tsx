@@ -22,17 +22,18 @@ interface BusinessPreviewProps {
   };
   posts: Post[];
   onClose: () => void;
-  onClick: () => void;
+  onShowDetails: () => void;
+  onStoriesClick: () => void;
 }
 
-const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, posts, onClose, onClick }) => {
+const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, posts, onClose, onShowDetails, onStoriesClick }) => {
   // Get stories (posts) for this business
   const businessStories = posts.filter(post => post.businessId === business.id && post.isStory).slice(0, 3);
 
   const handleStoryClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     // This will trigger navigation to explore page with filtered posts
-    onClick();
+    onStoriesClick();
   };
 
   const handleBackgroundClick = (e: React.MouseEvent) => {
@@ -43,7 +44,7 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, posts, onCl
 
   const handlePreviewClick = (e: React.MouseEvent) => {
     if (!e.defaultPrevented) {
-      onClick();
+      onShowDetails();
     }
   };
 
