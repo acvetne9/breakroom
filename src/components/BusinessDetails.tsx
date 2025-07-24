@@ -15,6 +15,8 @@ interface BusinessDetailsProps {
       role: string;
       salary: string;
     }>;
+    website?: string;
+    url?: string;
   };
   onClose: () => void;
 }
@@ -29,8 +31,13 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
   };
   const handleCompassClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    // TODO: Link to external business jobs page
-    window.open(`https://example.com/jobs/${business.id}`, '_blank');
+    
+    // Try business website first, then Google Maps page, then fallback to Google search
+    const destination = business.website || 
+                       business.url || 
+                       `https://www.google.com/search?q=${encodeURIComponent(business.name)}`;
+    
+    window.open(destination, '_blank');
   };
   const handleCardClick = (e: React.MouseEvent) => {
     // Check if click is on stories or compass - if so, don't close
@@ -47,9 +54,23 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
           <div>
             <h2 className="text-xl font-medium text-app-black">{business.name}</h2>
             <div className="flex items-center mt-2">
-              <span className="text-app-gray-medium">
-                {'★'.repeat(Math.floor(business.rating))} {business.rating}
-              </span>
+              <div className="flex items-center">
+                <span className="text-app-gray-medium">
+                  {Array.from({ length: 5 }, (_, i) => {
+                    const starValue = i + 1;
+                    if (business.rating >= starValue) {
+                      return '★';
+                    } else if (business.rating >= starValue - 0.5) {
+                      return '☆';
+                    } else {
+                      return '☆';
+                    }
+                  }).join('')}
+                </span>
+                <span className="text-app-gray-medium ml-2">
+                  {business.rating.toFixed(1)}
+                </span>
+              </div>
             </div>
           </div>
           <button onClick={handleCompassClick} className="compass-button p-2 rounded-lg bg-gray-100/0 py-0">

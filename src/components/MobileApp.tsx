@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, PanInfo } from 'framer-motion';
 import InitiationPage from './InitiationPage';
 import HomePage from './HomePage';
@@ -20,6 +20,8 @@ const MobileApp: React.FC = () => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [comments, setComments] = useState<{[postId: string]: string[]}>({});
+  const [selectedBusiness, setSelectedBusiness] = useState<any>(null);
+  const [previouslySelectedBusiness, setPreviouslySelectedBusiness] = useState<any>(null);
   const constraintsRef = useRef(null);
   const { businesses, loading } = useBusinessesData();
 
@@ -57,6 +59,21 @@ const MobileApp: React.FC = () => {
     setPosts([newPost, ...posts]);
   };
 
+  // Handle business state when sliding to explore and back
+  useEffect(() => {
+    if (currentSlide === 2) {
+      // Going to explore page - save current business and close it
+      if (selectedBusiness) {
+        setPreviouslySelectedBusiness(selectedBusiness);
+        setSelectedBusiness(null);
+      }
+    } else if (currentSlide === 1 && previouslySelectedBusiness) {
+      // Coming back to home page - restore previously selected business
+      setSelectedBusiness(previouslySelectedBusiness);
+      setPreviouslySelectedBusiness(null);
+    }
+  }, [currentSlide, selectedBusiness, previouslySelectedBusiness]);
+
   const handleDragEnd = (event: any, info: PanInfo) => {
     const threshold = 100;
     const dragStartX = event.clientX || event.touches?.[0]?.clientX || 0;
@@ -82,6 +99,8 @@ const MobileApp: React.FC = () => {
       <HomePage 
         businesses={businesses} 
         currentSlide={currentSlide}
+        selectedBusiness={selectedBusiness}
+        onBusinessSelect={setSelectedBusiness}
       />
       
       {/* Initiation Card - slides up and disappears */}

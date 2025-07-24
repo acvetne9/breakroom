@@ -48,9 +48,23 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, onClose, on
           <div>
             <h3 className="text-lg font-medium text-app-black">{business.name}</h3>
             <div className="flex items-center mt-1">
-              <span className="text-app-gray-medium text-sm">
-                {'★'.repeat(Math.floor(business.rating))} {business.rating}
-              </span>
+              <div className="flex items-center">
+                <span className="text-app-gray-medium text-sm">
+                  {Array.from({ length: 5 }, (_, i) => {
+                    const starValue = i + 1;
+                    if (business.rating >= starValue) {
+                      return '★';
+                    } else if (business.rating >= starValue - 0.5) {
+                      return '☆';
+                    } else {
+                      return '☆';
+                    }
+                  }).join('')}
+                </span>
+                <span className="text-app-gray-medium text-sm ml-2">
+                  {business.rating.toFixed(1)}
+                </span>
+              </div>
             </div>
           </div>
         </div>
