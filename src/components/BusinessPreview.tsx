@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Eye } from 'lucide-react';
 
@@ -67,9 +68,10 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, posts, onCl
                 <span className="text-app-gray-medium text-sm">
                   {Array.from({ length: 5 }, (_, i) => {
                     const starValue = i + 1;
-                    if (business.rating >= starValue) {
+                    const rating = business.rating || 0;
+                    if (rating >= starValue) {
                       return '★';
-                    } else if (business.rating >= starValue - 0.5) {
+                    } else if (rating >= starValue - 0.5) {
                       return '☆';
                     } else {
                       return '☆';
@@ -77,7 +79,7 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, posts, onCl
                   }).join('')}
                 </span>
                 <span className="text-app-gray-medium text-sm ml-2">
-                  {business.rating.toFixed(1)}
+                  {(business.rating || 0).toFixed(1)}
                 </span>
               </div>
             </div>

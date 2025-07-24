@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Compass } from 'lucide-react';
 interface Post {
@@ -79,9 +80,10 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
                 <span className="text-app-gray-medium">
                   {Array.from({ length: 5 }, (_, i) => {
                     const starValue = i + 1;
-                    if (business.rating >= starValue) {
+                    const rating = business.rating || 0;
+                    if (rating >= starValue) {
                       return '★';
-                    } else if (business.rating >= starValue - 0.5) {
+                    } else if (rating >= starValue - 0.5) {
                       return '☆';
                     } else {
                       return '☆';
@@ -89,7 +91,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
                   }).join('')}
                 </span>
                 <span className="text-app-gray-medium ml-2">
-                  {business.rating.toFixed(1)}
+                  {(business.rating || 0).toFixed(1)}
                 </span>
               </div>
             </div>
