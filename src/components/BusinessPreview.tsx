@@ -95,13 +95,13 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, posts, onCl
           </div>
         )}
 
-        {businessStories.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-medium text-app-black">Stories 📖</h4>
-            </div>
-            <div className="space-y-2">
-              {businessStories.map(story => (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-medium text-app-black">Stories 📖</h4>
+          </div>
+          <div className="space-y-2">
+            {businessStories.length > 0 ? (
+              businessStories.map(story => (
                 <div 
                   key={story.id}
                   className="text-sm text-app-gray-dark cursor-pointer hover:text-app-black"
@@ -111,10 +111,17 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, posts, onCl
                     <span className="font-medium">@{story.author}:</span> {story.text.length > 60 ? `${story.text.substring(0, 60)}...` : story.text}
                   </p>
                 </div>
-              ))}
-            </div>
+              ))
+            ) : (
+              <div 
+                className="text-sm text-app-gray-medium cursor-pointer hover:text-app-black font-medium"
+                onClick={handleStoryClick}
+              >
+                <p>Be the first to post! 🚀</p>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

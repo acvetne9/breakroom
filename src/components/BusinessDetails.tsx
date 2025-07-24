@@ -116,16 +116,26 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
         </div>
 
         {/* Stories section */}
-        {businessStories.length > 0 && <div>
-            <h3 className="text-lg font-medium text-app-black mb-4">More Stories 📖</h3>
-            <div className="space-y-4">
-              {businessStories.map(story => <div key={story.id} className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={handleStoryClick}>
+        <div>
+          <h3 className="text-lg font-medium text-app-black mb-4">More Stories 📖</h3>
+          <div className="space-y-4">
+            {businessStories.length > 0 ? (
+              businessStories.map(story => (
+                <div key={story.id} className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={handleStoryClick}>
                   <p className="text-app-gray-dark text-sm">
                     <span className="font-medium">@{story.author}:</span> {story.text.length > 100 ? `${story.text.substring(0, 100)}...` : story.text}
                   </p>
-                </div>)}
-            </div>
-          </div>}
+                </div>
+              ))
+            ) : (
+              <div className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={handleStoryClick}>
+                <p className="text-app-gray-dark text-sm font-medium">
+                  Be the first to post! 🚀
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>;
 };
