@@ -41,18 +41,13 @@ const MobileApp: React.FC = () => {
       id: '1',
       author: 'BaristaBoss',
       text: 'Guess what!! I never thought this would happen but my boss brought in donuts today!',
-      businessId: '1',
-      businessName: 'Cafe Priyanka',
-      images: Array(6).fill('https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300&h=200&fit=crop'),
-      isStory: true
+      isStory: false
     },
     {
       id: '2',
       author: 'Cook52345234',
       text: 'My old manager would always refuse to approve my sick leave :(',
-      businessId: '1',
-      businessName: 'Cafe Priyanka',
-      isStory: true
+      isStory: false
     }
   ]);
 
