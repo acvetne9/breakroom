@@ -23,6 +23,8 @@ interface Post {
   businessName?: string;
   images?: string[];
   isStory?: boolean;
+  isJobUpdate?: boolean;
+  linkedLocation?: string;
 }
 
 const MobileApp: React.FC = () => {
@@ -57,6 +59,17 @@ const MobileApp: React.FC = () => {
   const handleInitiationComplete = (data: UserData) => {
     setUserData(data);
     setCurrentView('main');
+    
+    // Create automatic job update post
+    const jobUpdatePost: Post = {
+      id: `job-update-${Date.now()}`,
+      author: 'You',
+      text: `New Job Update! ${data.salary} for ${data.role} 👀`,
+      isJobUpdate: true,
+      isStory: false,
+      linkedLocation: data.fullLocation || data.location
+    };
+    setPosts(prevPosts => [jobUpdatePost, ...prevPosts]);
   };
 
   const handlePostSubmit = (text: string, businessId?: string) => {

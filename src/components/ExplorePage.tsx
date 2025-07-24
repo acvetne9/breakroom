@@ -10,6 +10,8 @@ interface Post {
   businessName?: string;
   images?: string[];
   isStory?: boolean;
+  isJobUpdate?: boolean;
+  linkedLocation?: string;
 }
 interface ExplorePageProps {
   posts: Post[];
@@ -88,7 +90,11 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   };
 
   // Filter posts based on business or user stories
-  const displayPosts = filteredBusinessId ? posts.filter(post => post.businessId === filteredBusinessId) : filteredUserStories ? posts.filter(post => post.author === 'You') : posts;
+  const displayPosts = filteredBusinessId 
+    ? posts.filter(post => post.businessId === filteredBusinessId && !post.isJobUpdate) 
+    : filteredUserStories 
+    ? posts.filter(post => post.author === 'You' && !post.isJobUpdate) 
+    : posts;
   return <div className="relative w-full h-full">
       {/* Header for filtered views */}
       {filteredBusinessId || filteredUserStories}
@@ -116,12 +122,22 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                 <div className={`relative z-10 ${post.images && post.images.length >= 5 ? 'post-overlay rounded-lg p-3' : ''}`}>
                   <div className="flex justify-between items-start mb-2">
                     <span className="text-app-gray-medium text-sm">@{post.author}</span>
-                    {post.businessId ? <button onClick={e => {
-                  e.stopPropagation();
-                  handleBusinessView(post.businessId!);
-                }} className="flex items-center space-x-1 text-app-gray-medium hover:text-app-black">
+                    {(post.businessId || post.isJobUpdate) && (
+                      <button onClick={e => {
+                        e.stopPropagation();
+                        if (post.businessId) {
+                          handleBusinessView(post.businessId);
+                        } else if (post.linkedLocation) {
+                          // Handle job update location click - could open map or search
+                          toast({
+                            title: "Location",
+                            description: post.linkedLocation,
+                          });
+                        }
+                      }} className="flex items-center space-x-1 text-app-gray-medium hover:text-app-black">
                         <span>👀</span>
-                      </button> : null}
+                      </button>
+                    )}
                   </div>
                   <p className="text-app-black">{post.text}</p>
                 </div>
