@@ -186,7 +186,13 @@ const MobileApp: React.FC = () => {
           <ExplorePage 
             posts={posts}
             filteredBusinessId={filteredBusinessId || undefined}
-            onBusinessView={handleBusinessClick}
+            onBusinessView={(businessId) => {
+              const business = businesses.find(b => b.id === businessId);
+              if (business) {
+                setSelectedBusiness(business);
+                setCurrentSlide(1); // Navigate to home page
+              }
+            }}
             onExpandedPostChange={(postId) => {
               setExpandedPost(postId);
             }}
