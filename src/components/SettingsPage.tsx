@@ -19,6 +19,13 @@ interface PastJob {
   location: string;
 }
 
+interface Post {
+  id: string;
+  author: string;
+  text: string;
+  businessName?: string;
+}
+
 interface SettingsPageProps {
   initialData: {
     salary: string;
@@ -26,9 +33,11 @@ interface SettingsPageProps {
     location: string;
     fullLocation?: string;
   };
+  userPosts?: Post[];
+  onStoriesClick?: () => void;
 }
 
-const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
+const SettingsPage: React.FC<SettingsPageProps> = ({ initialData, userPosts = [], onStoriesClick }) => {
   const [currentJob, setCurrentJob] = useState<UserInfo>({
     salary: initialData.salary,
     role: initialData.role,
@@ -39,6 +48,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
   const [pastJobs, setPastJobs] = useState<PastJob[]>([
     { id: '1', salary: '', role: '', location: '' }
   ]);
+  
+  const [isStoriesExpanded, setIsStoriesExpanded] = useState(false);
 
   const { toast } = useToast();
 
@@ -247,6 +258,45 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialData }) => {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Your Stories Section */}
+        <div className="mt-8">
+          <div className="app-card p-4">
+          <button
+            onClick={() => setIsStoriesExpanded(!isStoriesExpanded)}
+            className="flex items-center justify-between w-full text-left"
+          >
+            <h3 className="text-lg font-medium text-app-black">Your Stories 📖</h3>
+            <span className="text-app-gray-medium">
+              {isStoriesExpanded ? '−' : '+'}
+            </span>
+          </button>
+          
+          {isStoriesExpanded && (
+            <div className="mt-4 space-y-2">
+              {userPosts.length === 0 ? (
+                <p className="text-app-gray-medium text-sm">No stories yet. Share your workplace experiences!</p>
+              ) : (
+                <>
+                  {userPosts.slice(0, 3).map((post) => (
+                    <div key={post.id} className="text-sm text-app-black p-2 bg-app-gray-light rounded">
+                      {post.text.length > 60 ? `${post.text.slice(0, 60)}...` : post.text}
+                    </div>
+                  ))}
+                  {userPosts.length > 0 && (
+                    <button
+                      onClick={onStoriesClick}
+                      className="w-full mt-3 px-4 py-2 bg-app-yellow text-app-black rounded hover:bg-app-yellow/90 transition-colors"
+                    >
+                      View All Stories ({userPosts.length})
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
           </div>
         </div>
       </div>

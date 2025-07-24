@@ -33,6 +33,7 @@ const MobileApp: React.FC = () => {
   const [selectedBusiness, setSelectedBusiness] = useState<any>(null);
   const [previouslySelectedBusiness, setPreviouslySelectedBusiness] = useState<any>(null);
   const [filteredBusinessId, setFilteredBusinessId] = useState<string | null>(null);
+  const [filteredUserStories, setFilteredUserStories] = useState(false);
   const constraintsRef = useRef(null);
   const { businesses, loading } = useBusinessesData();
 
@@ -85,8 +86,14 @@ const MobileApp: React.FC = () => {
     setCurrentSlide(2); // Navigate to explore page
   };
 
+  const handleUserStoriesClick = () => {
+    setFilteredUserStories(true);
+    setCurrentSlide(2); // Navigate to explore page
+  };
+
   const handleBackToAllPosts = () => {
     setFilteredBusinessId(null);
+    setFilteredUserStories(false);
   };
 
   // Handle business state when sliding to explore and back
@@ -102,7 +109,12 @@ const MobileApp: React.FC = () => {
       setSelectedBusiness(previouslySelectedBusiness);
       setPreviouslySelectedBusiness(null);
     }
-  }, [currentSlide, selectedBusiness, previouslySelectedBusiness]);
+    
+    // Clear user stories filter when navigating away from explore
+    if (currentSlide !== 2 && filteredUserStories) {
+      setFilteredUserStories(false);
+    }
+  }, [currentSlide, selectedBusiness, previouslySelectedBusiness, filteredUserStories]);
 
   const handleDragEnd = (event: any, info: PanInfo) => {
     const threshold = 100;
@@ -157,7 +169,11 @@ const MobileApp: React.FC = () => {
             }
           }}
         >
-          <SettingsPage initialData={userData} />
+          <SettingsPage 
+            initialData={userData} 
+            userPosts={posts.filter(post => post.author === 'You')}
+            onStoriesClick={handleUserStoriesClick}
+          />
         </motion.div>
       )}
 
@@ -181,6 +197,7 @@ const MobileApp: React.FC = () => {
           <ExplorePage 
             posts={posts}
             filteredBusinessId={filteredBusinessId || undefined}
+            filteredUserStories={filteredUserStories}
             onBusinessView={(businessId) => {
               const business = businesses.find(b => b.id === businessId);
               if (business) {

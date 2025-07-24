@@ -14,6 +14,7 @@ interface Post {
 interface ExplorePageProps {
   posts: Post[];
   filteredBusinessId?: string;
+  filteredUserStories?: boolean;
   onBusinessView?: (businessId: string) => void;
   onExpandedPostChange?: (postId: string | null) => void;
   onCommentSubmit?: (postId: string, comment: string) => void;
@@ -23,6 +24,7 @@ interface ExplorePageProps {
 const ExplorePage: React.FC<ExplorePageProps> = ({
   posts,
   filteredBusinessId,
+  filteredUserStories = false,
   onBusinessView,
   onExpandedPostChange,
   onCommentSubmit,
@@ -85,16 +87,30 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     onBusinessView?.(businessId);
   };
 
-  // Filter posts based on business if filtering is active
-  const displayPosts = filteredBusinessId ? posts.filter(post => post.businessId === filteredBusinessId) : posts;
+  // Filter posts based on business or user stories
+  const displayPosts = filteredBusinessId 
+    ? posts.filter(post => post.businessId === filteredBusinessId)
+    : filteredUserStories
+    ? posts.filter(post => post.author === 'You')
+    : posts;
   return <div className="relative w-full h-full">
-      {/* Back to all posts button */}
-      {filteredBusinessId && <div className="absolute top-2 left-4 z-10">
-          
-        </div>}
+      {/* Header for filtered views */}
+      {(filteredBusinessId || filteredUserStories) && (
+        <div className="absolute top-2 left-4 right-4 z-10 bg-app-white rounded-lg p-3 shadow-lg">
+          <button
+            onClick={onBackToAllPosts}
+            className="flex items-center gap-2 text-app-black hover:text-app-gray-dark"
+          >
+            ← Back to All Posts
+          </button>
+          <h2 className="text-lg font-medium mt-1 text-app-black">
+            {filteredUserStories ? 'Your Stories 📖' : 'Business Stories'}
+          </h2>
+        </div>
+      )}
       
       {/* Posts list */}
-      <div className="h-full overflow-y-auto pb-20 pt-4">
+      <div className={`h-full overflow-y-auto pb-20 ${(filteredBusinessId || filteredUserStories) ? 'pt-20' : 'pt-4'}`}>
         <div className="space-y-4 px-4">
           {displayPosts.map(post => <div key={post.id} className="relative">
               {/* Post with background collage if business has 5+ photos */}
