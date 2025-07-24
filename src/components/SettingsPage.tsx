@@ -232,8 +232,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
               ) : (
                 <>
                   {userPosts.slice(0, 3).map(post => (
-                    <div key={post.id} className="text-sm text-app-black p-2 bg-app-gray-light rounded">
-                      {post.text.length > 60 ? `${post.text.slice(0, 60)}...` : post.text}
+                    <div key={post.id} className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={onStoriesClick}>
+                      <p className="text-app-gray-dark text-sm">
+                        <span className="font-medium">@{post.author}:</span> {post.text.length > 100 ? `${post.text.substring(0, 100)}...` : post.text}
+                      </p>
                     </div>
                   ))}
                   {userPosts.length > 0 && (
