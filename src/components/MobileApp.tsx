@@ -5,6 +5,7 @@ import InitiationPage from './InitiationPage';
 import HomePage from './HomePage';
 import SettingsPage from './SettingsPage';
 import ExplorePage from './ExplorePage';
+import PostDetail from './PostDetail';
 import { useBusinessesData } from '../hooks/useBusinessesData';
 
 interface UserData {
@@ -26,7 +27,7 @@ interface Post {
 
 const MobileApp: React.FC = () => {
   const [currentView, setCurrentView] = useState<'initiation' | 'main'>('initiation');
-  const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
+  const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore, 3: Post Detail
   const [userData, setUserData] = useState<UserData | null>(null);
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [comments, setComments] = useState<{[postId: string]: string[]}>({});
@@ -34,6 +35,7 @@ const MobileApp: React.FC = () => {
   const [previouslySelectedBusiness, setPreviouslySelectedBusiness] = useState<any>(null);
   const [filteredBusinessId, setFilteredBusinessId] = useState<string | null>(null);
   const [filteredUserStories, setFilteredUserStories] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const constraintsRef = useRef(null);
   const { businesses, loading } = useBusinessesData();
 
@@ -91,6 +93,16 @@ const MobileApp: React.FC = () => {
     setCurrentSlide(2); // Navigate to explore page
   };
 
+  const handlePostClick = (post: Post) => {
+    setSelectedPost(post);
+    setCurrentSlide(3); // Navigate to post detail page
+  };
+
+  const handleBackFromPostDetail = () => {
+    setSelectedPost(null);
+    setCurrentSlide(1); // Back to home page
+  };
+
   const handleBackToAllPosts = () => {
     setFilteredBusinessId(null);
     setFilteredUserStories(false);
@@ -129,7 +141,7 @@ const MobileApp: React.FC = () => {
     if ((isNearLeftEdge || isNearRightEdge)) {
       if (info.offset.x > threshold && currentSlide > 0) {
         setCurrentSlide(currentSlide - 1);
-      } else if (info.offset.x < -threshold && currentSlide < 2) {
+      } else if (info.offset.x < -threshold && currentSlide < 3) {
         setCurrentSlide(currentSlide + 1);
       }
     }
@@ -145,6 +157,7 @@ const MobileApp: React.FC = () => {
         onBusinessSelect={handleBusinessClick}
         posts={posts}
         onBusinessStoriesClick={handleBusinessStoriesClick}
+        onPostClick={handlePostClick}
       />
       
       {/* Initiation Card - slides up and disappears */}
@@ -173,6 +186,7 @@ const MobileApp: React.FC = () => {
             initialData={userData} 
             userPosts={posts.filter(post => post.author === 'You')}
             onStoriesClick={handleUserStoriesClick}
+            onPostClick={handlePostClick}
           />
         </motion.div>
       )}
@@ -220,6 +234,37 @@ const MobileApp: React.FC = () => {
         </motion.div>
       )}
 
+      {/* Post Detail - slides from right */}
+      {currentSlide === 3 && selectedPost && (
+        <motion.div
+          initial={{ x: '100%' }}
+          animate={{ x: 0 }}
+          exit={{ x: '100%' }}
+          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          className="absolute inset-0 z-20"
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.1}
+          onDragEnd={(event, info) => {
+            if (info.offset.x > 100) {
+              handleBackFromPostDetail();
+            }
+          }}
+        >
+          <PostDetail 
+            post={selectedPost}
+            comments={comments[selectedPost.id] || []}
+            onClose={handleBackFromPostDetail}
+            onCommentSubmit={(comment) => {
+              setComments({
+                ...comments,
+                [selectedPost.id]: [...(comments[selectedPost.id] || []), comment]
+              });
+            }}
+          />
+        </motion.div>
+      )}
+
       {/* Swipe detection overlay - only at screen edges */}
       <div 
         className="absolute inset-0 z-10 pointer-events-none"
@@ -254,7 +299,7 @@ const MobileApp: React.FC = () => {
         <div 
           className="absolute right-0 top-0 w-12 h-full pointer-events-auto"
           onTouchStart={(e) => {
-            if (currentSlide < 2) {
+             if (currentSlide < 3) {
               const touch = e.touches[0];
               const startX = touch.clientX;
               const handleTouchMove = (moveEvent: TouchEvent) => {
@@ -279,7 +324,7 @@ const MobileApp: React.FC = () => {
 
       {/* Slide indicators */}
       <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-50">
-        {[0, 1, 2].map(index => (
+        {[0, 1, 2, 3].map(index => (
           <button
             key={index}
             onClick={() => setCurrentSlide(index)}

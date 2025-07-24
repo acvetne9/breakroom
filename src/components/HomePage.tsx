@@ -33,6 +33,7 @@ interface HomePageProps {
   onBusinessSelect?: (business: any) => void;
   posts: Post[];
   onBusinessStoriesClick?: (businessId: string) => void;
+  onPostClick?: (post: Post) => void;
 }
 
 const HomePage: React.FC<HomePageProps> = ({ 
@@ -41,7 +42,8 @@ const HomePage: React.FC<HomePageProps> = ({
   selectedBusiness: propSelectedBusiness,
   onBusinessSelect,
   posts,
-  onBusinessStoriesClick
+  onBusinessStoriesClick,
+  onPostClick
 }) => {
   const [searchValue, setSearchValue] = useState('');
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
@@ -192,6 +194,7 @@ const HomePage: React.FC<HomePageProps> = ({
           posts={posts}
           onClose={handleClosePreview}
           onStoriesClick={() => onBusinessStoriesClick?.(selectedBusiness.id)}
+          onPostClick={onPostClick}
         />
       )}
 

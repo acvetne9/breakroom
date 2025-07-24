@@ -30,11 +30,13 @@ interface SettingsPageProps {
   };
   userPosts?: Post[];
   onStoriesClick?: () => void;
+  onPostClick?: (post: Post) => void;
 }
 const SettingsPage: React.FC<SettingsPageProps> = ({
   initialData,
   userPosts = [],
-  onStoriesClick
+  onStoriesClick,
+  onPostClick
 }) => {
   const [currentJob, setCurrentJob] = useState<UserInfo>({
     salary: initialData.salary,
@@ -232,7 +234,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
               ) : (
                 <>
                   {userPosts.slice(0, 3).map(post => (
-                    <div key={post.id} className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={onStoriesClick}>
+                    <div key={post.id} className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={() => onPostClick?.(post)}>
                       <p className="text-app-gray-dark text-sm">
                         <span className="font-medium">@{post.author}:</span> {post.text.length > 100 ? `${post.text.substring(0, 100)}...` : post.text}
                       </p>

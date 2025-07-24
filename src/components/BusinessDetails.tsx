@@ -32,12 +32,14 @@ interface BusinessDetailsProps {
   posts: Post[];
   onClose: () => void;
   onStoriesClick?: () => void;
+  onPostClick?: (post: Post) => void;
 }
 const BusinessDetails: React.FC<BusinessDetailsProps> = ({
   business,
   posts,
   onClose,
-  onStoriesClick
+  onStoriesClick,
+  onPostClick
 }) => {
   const handleBackgroundClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -67,8 +69,8 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
     }
   };
 
-  const handleStoryClick = () => {
-    onStoriesClick?.();
+  const handleStoryClick = (post: Post) => {
+    onPostClick?.(post);
   };
   return <div className="fixed inset-0 z-40 flex items-start justify-center pt-16" onClick={handleBackgroundClick}>
       <div className="app-card p-6 overflow-y-auto animate-fade-in" onClick={handleCardClick}>
@@ -121,14 +123,14 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
           <div className="space-y-4">
             {businessStories.length > 0 ? (
               businessStories.map(story => (
-                <div key={story.id} className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={handleStoryClick}>
+                <div key={story.id} className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={() => handleStoryClick(story)}>
                   <p className="text-app-gray-dark text-sm">
                     <span className="font-medium">@{story.author}:</span> {story.text.length > 100 ? `${story.text.substring(0, 100)}...` : story.text}
                   </p>
                 </div>
               ))
             ) : (
-              <div className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={handleStoryClick}>
+              <div className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={() => onStoriesClick?.()}>
                 <p className="text-app-gray-dark text-sm font-medium">
                   Be the first to post! 🚀
                 </p>
