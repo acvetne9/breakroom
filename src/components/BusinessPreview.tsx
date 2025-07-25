@@ -49,7 +49,7 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, posts, onCl
 
   return (
     <div 
-      className="fixed inset-0 z-30 flex items-start justify-center pt-30"
+      className="fixed inset-0 z-30 flex items-start justify-center pt-20"
       onClick={handleBackgroundClick}
     >
       {/* Yellow circle for selected pin */}
