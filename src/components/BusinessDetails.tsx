@@ -1,5 +1,16 @@
+
 import React from 'react';
 import { Compass } from 'lucide-react';
+interface Post {
+  id: string;
+  author: string;
+  text: string;
+  businessId?: string;
+  businessName?: string;
+  images?: string[];
+  isStory?: boolean;
+}
+
 interface BusinessDetailsProps {
   business: {
     id: string;
@@ -18,11 +29,17 @@ interface BusinessDetailsProps {
     website?: string;
     url?: string;
   };
+  posts: Post[];
   onClose: () => void;
+  onStoriesClick?: () => void;
+  onPostClick?: (post: Post) => void;
 }
 const BusinessDetails: React.FC<BusinessDetailsProps> = ({
   business,
-  onClose
+  posts,
+  onClose,
+  onStoriesClick,
+  onPostClick
 }) => {
   const handleBackgroundClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -39,6 +56,9 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
     
     window.open(destination, '_blank');
   };
+  // Get stories (posts) for this business
+  const businessStories = posts.filter(post => post.businessId === business.id && post.isStory);
+
   const handleCardClick = (e: React.MouseEvent) => {
     // Check if click is on stories or compass - if so, don't close
     const target = e.target as HTMLElement;
@@ -47,6 +67,10 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
     if (!isStoryClick && !isCompassClick) {
       onClose();
     }
+  };
+
+  const handleStoryClick = (post: Post) => {
+    onPostClick?.(post);
   };
   return <div className="fixed inset-0 z-40 flex items-start justify-center pt-16" onClick={handleBackgroundClick}>
       <div className="app-card p-6 overflow-y-auto animate-fade-in" onClick={handleCardClick}>
@@ -58,9 +82,10 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
                 <span className="text-app-gray-medium">
                   {Array.from({ length: 5 }, (_, i) => {
                     const starValue = i + 1;
-                    if (business.rating >= starValue) {
+                    const rating = business.rating || 0;
+                    if (rating >= starValue) {
                       return '★';
-                    } else if (business.rating >= starValue - 0.5) {
+                    } else if (rating >= starValue - 0.5) {
                       return '☆';
                     } else {
                       return '☆';
@@ -68,7 +93,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
                   }).join('')}
                 </span>
                 <span className="text-app-gray-medium ml-2">
-                  {business.rating.toFixed(1)}
+                  {(business.rating || 0).toFixed(1)}
                 </span>
               </div>
             </div>
@@ -93,17 +118,26 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
         </div>
 
         {/* Stories section */}
-        {business.stories && business.stories.length > 0 && <div>
-            <h3 className="text-lg font-medium text-app-black mb-4">More Stories 📖</h3>
-            <div className="space-y-4">
-              {business.stories.map(story => <div key={story.id} className="story-item border-l-2 border-app-gray-light pl-4">
+        <div>
+          <h3 className="text-lg font-medium text-app-black mb-4">More Stories 📖</h3>
+          <div className="space-y-4">
+            {businessStories.length > 0 ? (
+              businessStories.map(story => (
+                <div key={story.id} className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={() => handleStoryClick(story)}>
                   <p className="text-app-gray-dark text-sm">
-                    {story.text.length > 120 ? `${story.text.substring(0, 120)}...` : story.text}
+                    <span className="font-medium">@{story.author}:</span> {story.text.length > 100 ? `${story.text.substring(0, 100)}...` : story.text}
                   </p>
-                  <p className="text-app-gray-medium text-xs mt-1">— {story.author}</p>
-                </div>)}
-            </div>
-          </div>}
+                </div>
+              ))
+            ) : (
+              <div className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={() => onStoriesClick?.()}>
+                <p className="text-app-gray-dark text-sm font-medium">
+                  Be the first to post! 🚀
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>;
 };

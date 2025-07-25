@@ -5,6 +5,7 @@ import InitiationPage from './InitiationPage';
 import HomePage from './HomePage';
 import SettingsPage from './SettingsPage';
 import ExplorePage from './ExplorePage';
+
 import { useBusinessesData } from '../hooks/useBusinessesData';
 
 interface UserData {
@@ -12,6 +13,18 @@ interface UserData {
   role: string;
   location: string;
   fullLocation?: string;
+}
+
+interface Post {
+  id: string;
+  author: string;
+  text: string;
+  businessId?: string;
+  businessName?: string;
+  images?: string[];
+  isStory?: boolean;
+  isJobUpdate?: boolean;
+  linkedLocation?: string;
 }
 
 const MobileApp: React.FC = () => {
@@ -22,41 +35,81 @@ const MobileApp: React.FC = () => {
   const [comments, setComments] = useState<{[postId: string]: string[]}>({});
   const [selectedBusiness, setSelectedBusiness] = useState<any>(null);
   const [previouslySelectedBusiness, setPreviouslySelectedBusiness] = useState<any>(null);
+  const [filteredBusinessId, setFilteredBusinessId] = useState<string | null>(null);
+  const [filteredUserStories, setFilteredUserStories] = useState(false);
+  
   const constraintsRef = useRef(null);
   const { businesses, loading } = useBusinessesData();
 
-  const [posts, setPosts] = useState([
+  const [posts, setPosts] = useState<Post[]>([
     {
       id: '1',
       author: 'BaristaBoss',
       text: 'Guess what!! I never thought this would happen but my boss brought in donuts today!',
-      businessId: '1',
-      businessName: 'Cafe Priyanka',
-      images: Array(6).fill('https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300&h=200&fit=crop')
+      isStory: false
     },
     {
       id: '2',
       author: 'Cook52345234',
       text: 'My old manager would always refuse to approve my sick leave :(',
-      businessId: '1',
-      businessName: 'Cafe Priyanka'
+      isStory: false
     }
   ]);
 
   const handleInitiationComplete = (data: UserData) => {
     setUserData(data);
     setCurrentView('main');
+    
+    // Create automatic job update post
+    const jobUpdatePost: Post = {
+      id: `job-update-${Date.now()}`,
+      author: 'You',
+      text: `New Job Update! ${data.salary} for ${data.role} 👀`,
+      isJobUpdate: true,
+      isStory: false,
+      linkedLocation: data.fullLocation || data.location
+    };
+    setPosts(prevPosts => [jobUpdatePost, ...prevPosts]);
   };
 
-  const handlePostSubmit = (text: string) => {
-    const newPost = {
+  const handlePostSubmit = (text: string, businessId?: string) => {
+    const business = businessId ? businesses.find(b => b.id === businessId) : undefined;
+    
+    // Only create business stories when specifically viewing filtered posts for that business
+    // Otherwise, create regular posts
+    const shouldBeStory = filteredBusinessId && businessId === filteredBusinessId;
+    
+    const newPost: Post = {
       id: String(posts.length + 1),
       author: 'You',
-      text: text,
-      businessId: undefined,
-      businessName: undefined
+      text,
+      businessId: shouldBeStory ? businessId : undefined,
+      businessName: shouldBeStory ? business?.name : undefined,
+      isStory: shouldBeStory
     };
     setPosts([newPost, ...posts]);
+  };
+
+  const handleBusinessClick = (business: any) => {
+    setSelectedBusiness(business);
+    // When selecting a business, we're not filtering posts by business
+    setFilteredBusinessId(null);
+  };
+
+  const handleBusinessStoriesClick = (businessId: string) => {
+    setFilteredBusinessId(businessId);
+    setCurrentSlide(2); // Navigate to explore page
+  };
+
+  const handleUserStoriesClick = () => {
+    setFilteredUserStories(true);
+    setCurrentSlide(2); // Navigate to explore page
+  };
+
+
+  const handleBackToAllPosts = () => {
+    setFilteredBusinessId(null);
+    setFilteredUserStories(false);
   };
 
   // Handle business state when sliding to explore and back
@@ -72,7 +125,12 @@ const MobileApp: React.FC = () => {
       setSelectedBusiness(previouslySelectedBusiness);
       setPreviouslySelectedBusiness(null);
     }
-  }, [currentSlide, selectedBusiness, previouslySelectedBusiness]);
+    
+    // Clear user stories filter when navigating away from explore
+    if (currentSlide !== 2 && filteredUserStories) {
+      setFilteredUserStories(false);
+    }
+  }, [currentSlide, selectedBusiness, previouslySelectedBusiness, filteredUserStories]);
 
   const handleDragEnd = (event: any, info: PanInfo) => {
     const threshold = 100;
@@ -100,7 +158,9 @@ const MobileApp: React.FC = () => {
         businesses={businesses} 
         currentSlide={currentSlide}
         selectedBusiness={selectedBusiness}
-        onBusinessSelect={setSelectedBusiness}
+        onBusinessSelect={handleBusinessClick}
+        posts={posts}
+        onBusinessStoriesClick={handleBusinessStoriesClick}
       />
       
       {/* Initiation Card - slides up and disappears */}
@@ -125,7 +185,11 @@ const MobileApp: React.FC = () => {
             }
           }}
         >
-          <SettingsPage initialData={userData} />
+          <SettingsPage 
+            initialData={userData} 
+            userPosts={posts.filter(post => post.author === 'You')}
+            onStoriesClick={handleUserStoriesClick}
+          />
         </motion.div>
       )}
 
@@ -148,9 +212,14 @@ const MobileApp: React.FC = () => {
         >
           <ExplorePage 
             posts={posts}
+            filteredBusinessId={filteredBusinessId || undefined}
+            filteredUserStories={filteredUserStories}
             onBusinessView={(businessId) => {
-              // TODO: Filter explore to show posts for this business
-              console.log('View business:', businessId);
+              const business = businesses.find(b => b.id === businessId);
+              if (business) {
+                setSelectedBusiness(business);
+                setCurrentSlide(1); // Navigate to home page
+              }
             }}
             onExpandedPostChange={(postId) => {
               setExpandedPost(postId);
@@ -162,9 +231,11 @@ const MobileApp: React.FC = () => {
               });
             }}
             onPostSubmit={handlePostSubmit}
+            onBackToAllPosts={handleBackToAllPosts}
           />
         </motion.div>
       )}
+
 
       {/* Swipe detection overlay - only at screen edges */}
       <div 
@@ -200,7 +271,7 @@ const MobileApp: React.FC = () => {
         <div 
           className="absolute right-0 top-0 w-12 h-full pointer-events-auto"
           onTouchStart={(e) => {
-            if (currentSlide < 2) {
+             if (currentSlide < 2) {
               const touch = e.touches[0];
               const startX = touch.clientX;
               const handleTouchMove = (moveEvent: TouchEvent) => {

@@ -1,5 +1,15 @@
+
 import React from 'react';
-import { Eye } from 'lucide-react';
+
+interface Post {
+  id: string;
+  author: string;
+  text: string;
+  businessId?: string;
+  businessName?: string;
+  images?: string[];
+  isStory?: boolean;
+}
 
 interface BusinessPreviewProps {
   business: {
@@ -9,14 +19,20 @@ interface BusinessPreviewProps {
     salary?: string;
     stories?: Array<{ id: string; text: string; author: string }>;
   };
+  posts: Post[];
   onClose: () => void;
-  onClick: () => void;
+  onShowDetails: () => void;
+  onStoriesClick: () => void;
 }
 
-const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, onClose, onClick }) => {
+const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, posts, onClose, onShowDetails, onStoriesClick }) => {
+  // Get stories (posts) for this business
+  const businessStories = posts.filter(post => post.businessId === business.id && post.isStory).slice(0, 3);
+
   const handleStoryClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    // TODO: Open explore page filtered to this business
+    // This will trigger navigation to explore page with filtered posts
+    onStoriesClick();
   };
 
   const handleBackgroundClick = (e: React.MouseEvent) => {
@@ -27,7 +43,7 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, onClose, on
 
   const handlePreviewClick = (e: React.MouseEvent) => {
     if (!e.defaultPrevented) {
-      onClick();
+      onShowDetails();
     }
   };
 
@@ -52,9 +68,10 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, onClose, on
                 <span className="text-app-gray-medium text-sm">
                   {Array.from({ length: 5 }, (_, i) => {
                     const starValue = i + 1;
-                    if (business.rating >= starValue) {
+                    const rating = business.rating || 0;
+                    if (rating >= starValue) {
                       return '★';
-                    } else if (business.rating >= starValue - 0.5) {
+                    } else if (rating >= starValue - 0.5) {
                       return '☆';
                     } else {
                       return '☆';
@@ -62,7 +79,7 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, onClose, on
                   }).join('')}
                 </span>
                 <span className="text-app-gray-medium text-sm ml-2">
-                  {business.rating.toFixed(1)}
+                  {(business.rating || 0).toFixed(1)}
                 </span>
               </div>
             </div>
@@ -77,26 +94,33 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, onClose, on
           </div>
         )}
 
-        {business.stories && business.stories.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-medium text-app-black">Stories 📖</h4>
-            </div>
-            <div className="space-y-2">
-              {business.stories.slice(0, 3).map(story => (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-medium text-app-black">Stories 📖</h4>
+          </div>
+          <div className="space-y-2">
+            {businessStories.length > 0 ? (
+              businessStories.map(story => (
                 <div 
                   key={story.id}
                   className="text-sm text-app-gray-dark cursor-pointer hover:text-app-black"
                   onClick={handleStoryClick}
                 >
                   <p className="line-clamp-2">
-                    {story.text.length > 80 ? `${story.text.substring(0, 80)}...` : story.text}
+                    <span className="font-medium">@{story.author}:</span> {story.text.length > 60 ? `${story.text.substring(0, 60)}...` : story.text}
                   </p>
                 </div>
-              ))}
-            </div>
+              ))
+            ) : (
+              <div 
+                className="text-sm text-app-gray-medium cursor-pointer hover:text-app-black font-medium"
+                onClick={handleStoryClick}
+              >
+                <p>Be the first to post! 🚀</p>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

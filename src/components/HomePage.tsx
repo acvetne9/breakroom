@@ -7,6 +7,16 @@ import { isProfane } from '../utils/profanityFilter';
 import { Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
+interface Post {
+  id: string;
+  author: string;
+  text: string;
+  businessId?: string;
+  businessName?: string;
+  images?: string[];
+  isStory?: boolean;
+}
+
 interface HomePageProps {
   businesses: Array<{
     id: string;
@@ -21,13 +31,19 @@ interface HomePageProps {
   currentSlide?: number;
   selectedBusiness?: any;
   onBusinessSelect?: (business: any) => void;
+  posts: Post[];
+  onBusinessStoriesClick?: (businessId: string) => void;
+  onPostClick?: (post: Post) => void;
 }
 
 const HomePage: React.FC<HomePageProps> = ({ 
   businesses, 
   currentSlide = 1,
   selectedBusiness: propSelectedBusiness,
-  onBusinessSelect
+  onBusinessSelect,
+  posts,
+  onBusinessStoriesClick,
+  onPostClick
 }) => {
   const [searchValue, setSearchValue] = useState('');
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
@@ -108,8 +124,12 @@ const HomePage: React.FC<HomePageProps> = ({
     setSearchResults([]);
   };
 
-  const handleBusinessPreviewClick = () => {
+  const handleShowBusinessDetails = () => {
     setShowBusinessDetails(true);
+  };
+
+  const handleBusinessStoriesClick = () => {
+    onBusinessStoriesClick?.(selectedBusiness.id);
   };
 
   const handleClosePreview = () => {
@@ -160,8 +180,10 @@ const HomePage: React.FC<HomePageProps> = ({
       {selectedBusiness && !showBusinessDetails && (
         <BusinessPreview 
           business={selectedBusiness}
+          posts={posts}
           onClose={handleClosePreview}
-          onClick={handleBusinessPreviewClick}
+          onShowDetails={handleShowBusinessDetails}
+          onStoriesClick={handleBusinessStoriesClick}
         />
       )}
 
@@ -169,7 +191,10 @@ const HomePage: React.FC<HomePageProps> = ({
       {selectedBusiness && showBusinessDetails && (
         <BusinessDetails 
           business={selectedBusiness}
+          posts={posts}
           onClose={handleClosePreview}
+          onStoriesClick={() => onBusinessStoriesClick?.(selectedBusiness.id)}
+          onPostClick={onPostClick}
         />
       )}
 

@@ -147,13 +147,11 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
 
   // Center map on selected business with proper navigation
   useEffect(() => {
-    if (!map || !selectedBusiness) return;
+    if (!map || !selectedBusiness?.position) return;
     
-    // Use a single setOptions call for smoother navigation
-    map.setOptions({
-      center: selectedBusiness.position,
-      zoom: 16
-    });
+    // Use panTo and setZoom for smoother animation
+    map.panTo(selectedBusiness.position);
+    map.setZoom(16);
   }, [map, selectedBusiness]);
 
   return (
