@@ -129,7 +129,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                   </div>}
 
                 {/* Post content */}
-                <div className={`relative z-10 ${post.images && post.images.length >= 5 ? 'post-overlay rounded-lg p-3' : ''}`}>
+                <div className={`relative z-10 pb-10 ${post.images && post.images.length >= 5 ? 'post-overlay rounded-lg p-3' : ''}`}>
                   <div className="flex justify-between items-start mb-2">
                     <span className="text-app-gray-medium text-sm">@{post.author}</span>
                     {(post.businessId || post.isJobUpdate) && (
@@ -149,7 +149,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                       </button>
                     )}
                   </div>
-                  <p className="text-app-black">{post.text}</p>
+                  <p className="text-app-black pr-16">{post.text}</p>
                   
                   {/* Voting component in bottom right */}
                   <div className="absolute bottom-2 right-2">

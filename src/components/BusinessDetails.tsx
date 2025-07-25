@@ -66,11 +66,12 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
   const businessStories = posts.filter(post => post.businessId === business.id && post.isStory);
 
   const handleCardClick = (e: React.MouseEvent) => {
-    // Check if click is on stories or compass - if so, don't close
+    // Check if click is on stories, compass, or voting - if so, don't close
     const target = e.target as HTMLElement;
     const isStoryClick = target.closest('.story-item');
     const isCompassClick = target.closest('.compass-button');
-    if (!isStoryClick && !isCompassClick) {
+    const isVotingClick = target.closest('[data-voting-component]');
+    if (!isStoryClick && !isCompassClick && !isVotingClick) {
       onClose();
     }
   };

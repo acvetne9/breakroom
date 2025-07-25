@@ -28,7 +28,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
   };
 
   return (
-    <div className={`flex items-center space-x-1 text-sm ${className}`}>
+    <div className={`flex items-center space-x-1 text-sm ${className}`} data-voting-component>
       <button
         onClick={handleUpvote}
         className={`p-1 rounded transition-all ${
