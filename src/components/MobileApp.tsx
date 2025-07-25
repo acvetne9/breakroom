@@ -253,10 +253,10 @@ const MobileApp: React.FC = () => {
     }
   }, [businesses, selectedBusiness?.id]);
 
-  // Handle business state when sliding to explore and back
+  // Handle business state when sliding to explore/settings and back
   useEffect(() => {
-    if (currentSlide === 2) {
-      // Going to explore page - save current business and close it
+    if (currentSlide === 2 || currentSlide === 0) {
+      // Going to explore or settings page - save current business and close it
       if (selectedBusiness) {
         setPreviouslySelectedBusiness(selectedBusiness);
         setSelectedBusiness(null);
