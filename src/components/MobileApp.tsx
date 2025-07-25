@@ -13,6 +13,7 @@ interface UserData {
   role: string;
   location: string;
   fullLocation?: string;
+  timePeriod: string;
 }
 
 interface Post {

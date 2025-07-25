@@ -27,6 +27,7 @@ interface SettingsPageProps {
     role: string;
     location: string;
     fullLocation?: string;
+    timePeriod?: string;
   };
   userPosts?: Post[];
   onStoriesClick?: () => void;
@@ -44,6 +45,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     location: initialData.fullLocation || initialData.location,
     isHiring: false
   });
+  const [currentTimePeriod, setCurrentTimePeriod] = useState(initialData.timePeriod || 'HR');
   const [pastJobs, setPastJobs] = useState<PastJob[]>([{
     id: '1',
     salary: '',
@@ -137,15 +139,20 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           <div className="space-y-4">
             <div className="flex items-center space-x-3">
               <input type="text" value={currentJob.salary} onChange={e => handleSalaryChange(e.target.value)} className="app-input flex-1" placeholder="$14" />
-              <select className="px-4 py-3 bg-white text-sm" style={{
-              border: '1px solid hsl(var(--app-gray-light))',
-              borderRadius: '0.5rem',
-              height: '48px',
-              fontSize: '16px'
-            }}>
-                <option>HR</option>
-                <option>MO</option>
-                <option>YR</option>
+              <select 
+                value={currentTimePeriod}
+                onChange={(e) => setCurrentTimePeriod(e.target.value)}
+                className="px-4 py-3 bg-white text-sm" 
+                style={{
+                  border: '1px solid hsl(var(--app-gray-light))',
+                  borderRadius: '0.5rem',
+                  height: '48px',
+                  fontSize: '16px'
+                }}
+              >
+                <option value="HR">HR</option>
+                <option value="MO">MO</option>
+                <option value="YR">YR</option>
               </select>
               <div className="w-6"></div>
             </div>
