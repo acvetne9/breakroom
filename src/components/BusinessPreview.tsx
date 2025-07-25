@@ -107,7 +107,7 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, posts, onCl
                   onClick={handleStoryClick}
                 >
                   <p className="line-clamp-2">
-                    <span className="font-medium">@{story.author}:</span> {story.text.length > 60 ? `${story.text.substring(0, 60)}...` : story.text}
+                    <span className="font-medium">{story.author}:</span> {story.text.length > 60 ? `${story.text.substring(0, 60)}...` : story.text}
                   </p>
                 </div>
               ))

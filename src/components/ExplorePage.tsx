@@ -131,7 +131,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                 {/* Post content */}
                 <div className={`relative z-10 pb-10 ${post.images && post.images.length >= 5 ? 'post-overlay rounded-lg p-3' : ''}`}>
                   <div className="flex justify-between items-start mb-2">
-                    <span className="text-app-gray-medium text-sm">@{post.author}</span>
+                    <span className="text-app-gray-medium text-sm">{post.author}</span>
                     {(post.businessId || post.isJobUpdate) && (
                       <button onClick={e => {
                         e.stopPropagation();
