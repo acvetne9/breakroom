@@ -131,7 +131,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                 {/* Post content */}
                 <div className={`relative z-10 pb-10 ${post.images && post.images.length >= 5 ? 'post-overlay rounded-lg p-3' : ''}`}>
                   <div className="flex items-start justify-between mb-2">
-                    <p className="text-app-black flex-1 pr-4 break-words overflow-wrap-anywhere hyphens-auto word-break-break-all">{post.text}</p>
+                    <p className="text-app-black flex-1 pr-4 break-words overflow-wrap-break-word">{post.text}</p>
                     <div className="flex-shrink-0 w-8 flex justify-center mt-1">
                       {(post.businessId || post.isJobUpdate) && (
                         <button onClick={e => {
