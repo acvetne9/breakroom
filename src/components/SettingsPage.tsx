@@ -236,7 +236,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                          {post.text.length > 100 ? `${post.text.substring(0, 100)}...` : post.text}
                       </p>
                     </div>)}
-                  {userPosts.length > 0 && <button onClick={onStoriesClick} className="w-full mt-3 px-4 py-2 bg-app-yellow text-app-black rounded hover:bg-app-yellow/90 transition-colors">
+                  {userPosts.length > 0 && <button onClick={onStoriesClick} className="w-full mt-3 px-4 py-2 bg-white border border-app-yellow text-app-black rounded hover:bg-app-gray-light transition-colors">
                       View All Stories ({userPosts.length})
                     </button>}
                 </>}
