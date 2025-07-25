@@ -243,6 +243,16 @@ const MobileApp: React.FC = () => {
     });
   };
 
+  // Sync selectedBusiness when businesses data changes (for voting updates)
+  useEffect(() => {
+    if (selectedBusiness) {
+      const updatedBusiness = businesses.find(b => b.id === selectedBusiness.id);
+      if (updatedBusiness) {
+        setSelectedBusiness(updatedBusiness);
+      }
+    }
+  }, [businesses, selectedBusiness?.id]);
+
   // Handle business state when sliding to explore and back
   useEffect(() => {
     if (currentSlide === 2) {
