@@ -181,7 +181,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
           </div> :
       // Post input for explore page
       <div className="relative">
-            <input type="text" value={postText} onChange={e => setPostText(e.target.value)} placeholder="How's work?" className="search-bar pr-14" onKeyPress={e => {
+            <input type="text" value={postText} onChange={e => setPostText(e.target.value)} placeholder={filteredBusinessId ? "Thoughts about this business?" : "How's work?"} className="search-bar pr-14" onKeyPress={e => {
           if (e.key === 'Enter') {
             handlePostSubmit();
           }
