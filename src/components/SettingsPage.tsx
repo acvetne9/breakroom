@@ -219,7 +219,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 </div>
 
                 <div className="flex items-center space-x-3">
-                  <input type="text" value={job.location} onChange={e => updatePastJob(job.id, 'location', e.target.value)} onBlur={() => handlePastJobBlur(job.id, 'location', job.location)} className="app-input flex-1" placeholder="AMC" />
+                  <input type="text" value={job.location} onChange={e => updatePastJob(job.id, 'location', e.target.value)} onBlur={() => handlePastJobBlur(job.id, 'location', job.location)} className="app-input flex-1" placeholder="Movie Theater" />
                   <button onClick={() => removePastJob(job.id)} className="w-6 h-6 bg-app-yellow rounded-full flex items-center justify-center">
                     <Minus className="w-4 h-4 text-app-black" />
                   </button>
