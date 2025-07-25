@@ -226,7 +226,7 @@ const HomePage: React.FC<HomePageProps> = ({
               onClick={performSearch}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-app-gray-medium hover:text-app-gray-dark transition-colors"
             >
-              <Search size={20} />
+              <span>🔍</span>
             </button>
           </div>
         </div>
