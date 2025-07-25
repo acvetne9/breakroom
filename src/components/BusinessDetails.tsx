@@ -121,15 +121,12 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
             {business.roles ? business.roles.map((role, index) => <div key={index} className="flex justify-between items-center">
                 <span className="text-app-black">{role.role}</span>
                 <div className="flex items-center space-x-3">
-                  <div className="text-right">
-                    <span className="font-medium text-app-black">{role.salary}</span>
-                    <div className="text-xs text-app-gray-medium">
-                      {role.salary.toLowerCase().includes('/hr') ? 'hourly' : 
-                       role.salary.toLowerCase().includes('/month') ? 'monthly' : 
-                       role.salary.toLowerCase().includes('/yr') || role.salary.toLowerCase().includes('/year') ? 'yearly' : 
-                       role.salary.toLowerCase().includes('$') && !role.salary.includes('/') ? 'hourly' : 'hourly'}
-                    </div>
-                  </div>
+                  <span className="font-medium text-app-black">
+                    {role.salary}
+                    {!role.salary.includes('/') && (
+                      <span className="text-xs text-app-gray-medium ml-1">/hr</span>
+                    )}
+                  </span>
                   <VotingComponent
                     upvotes={role.upvotes || 0}
                     downvotes={role.downvotes || 0}
