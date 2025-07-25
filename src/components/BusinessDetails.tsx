@@ -147,6 +147,9 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
                 </div>
               </div>}
           </div>
+          <div className="flex justify-end mt-3">
+            <span className="text-xs text-app-gray-medium">do these seem right?</span>
+          </div>
         </div>
 
         {/* Stories section */}
