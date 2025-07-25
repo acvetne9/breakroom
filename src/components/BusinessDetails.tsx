@@ -83,7 +83,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
   const handleRoleVote = (roleIndex: number, voteType: 'up' | 'down') => {
     onRoleVote?.(business.id, roleIndex, voteType);
   };
-  return <div className="fixed inset-0 z-40 flex items-start justify-center" style={{ paddingTop: '10vh' }} onClick={handleBackgroundClick}>
+  return <div className="fixed inset-0 z-40 flex items-start justify-center" style={{ paddingTop: '9vh' }} onClick={handleBackgroundClick}>
       <div className="app-card p-6 overflow-y-auto animate-fade-in" onClick={handleCardClick}>
         <div className="flex justify-between items-start mb-6">
           <div>
