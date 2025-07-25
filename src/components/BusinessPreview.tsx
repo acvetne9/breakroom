@@ -54,7 +54,7 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, posts, onCl
     >
       {/* Yellow circle for selected pin */}
       <div className="absolute w-6 h-6 bg-app-yellow rounded-full opacity-50 animate-scale-in" 
-           style={{ top: '60%', left: '50%', transform: 'translate(-50%, -50%)' }} />
+           style={{ top: '10%', left: '50%', transform: 'translate(-50%, -50%)' }} />
       
       <div 
         className="app-popup p-6 cursor-pointer relative animate-fade-in"
