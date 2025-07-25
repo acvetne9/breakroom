@@ -148,6 +148,10 @@ const HomePage: React.FC<HomePageProps> = ({
     setShowBusinessDetails(false);
   };
 
+  const handleBackToPreview = () => {
+    setShowBusinessDetails(false);
+  };
+
   return (
     <div className="relative w-full h-full">
       {/* Google Maps base layer */}
@@ -203,7 +207,7 @@ const HomePage: React.FC<HomePageProps> = ({
         <BusinessDetails 
           business={selectedBusiness}
           posts={posts}
-          onClose={handleClosePreview}
+          onClose={handleBackToPreview}
           onStoriesClick={() => onBusinessStoriesClick?.(selectedBusiness.id)}
           onPostClick={onPostClick}
           onRoleVote={onRoleVote}
