@@ -160,7 +160,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
               businessStories.map(story => (
                 <div key={story.id} className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={() => handleStoryClick(story)}>
                   <p className="text-app-gray-dark text-sm">
-                    <span className="font-medium">{story.author}:</span> {story.text.length > 100 ? `${story.text.substring(0, 100)}...` : story.text}
+                    {story.text.length > 100 ? `${story.text.substring(0, 100)}...` : story.text}
                   </p>
                 </div>
               ))
