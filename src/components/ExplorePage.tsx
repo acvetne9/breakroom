@@ -146,7 +146,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                   </div>
                   
                   {/* Voting component in bottom right */}
-                  <div className="absolute bottom-2 right-2">
+                  <div className="absolute bottom-1 right-1">
                     <VotingComponent upvotes={post.upvotes} downvotes={post.downvotes} userVote={post.userVote} onVote={voteType => handlePostVote(post.id, voteType)} />
                   </div>
                 </div>
