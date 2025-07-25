@@ -299,6 +299,7 @@ const MobileApp: React.FC = () => {
       <HomePage 
         businesses={businesses} 
         currentSlide={currentSlide}
+        currentView={currentView}
         selectedBusiness={selectedBusiness}
         onBusinessSelect={handleBusinessClick}
         posts={posts}

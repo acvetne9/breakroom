@@ -38,6 +38,7 @@ interface HomePageProps {
     url?: string;
   }>;
   currentSlide?: number;
+  currentView?: 'initiation' | 'main';
   selectedBusiness?: any;
   onBusinessSelect?: (business: any) => void;
   posts: Post[];
@@ -49,6 +50,7 @@ interface HomePageProps {
 const HomePage: React.FC<HomePageProps> = ({ 
   businesses, 
   currentSlide = 1,
+  currentView = 'main',
   selectedBusiness: propSelectedBusiness,
   onBusinessSelect,
   posts,
@@ -214,8 +216,8 @@ const HomePage: React.FC<HomePageProps> = ({
         />
       )}
 
-      {/* Search input bar at bottom - only show on home slide */}
-      {currentSlide === 1 && (
+      {/* Search input bar at bottom - only show on home slide and not during initiation */}
+      {currentSlide === 1 && currentView === 'main' && (
         <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
           <div className="relative">
             <input
