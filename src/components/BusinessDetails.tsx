@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Compass } from 'lucide-react';
+import VotingComponent from './VotingComponent';
 interface Post {
   id: string;
   author: string;
@@ -25,6 +26,9 @@ interface BusinessDetailsProps {
     roles?: Array<{
       role: string;
       salary: string;
+      upvotes?: number;
+      downvotes?: number;
+      userVote?: 'up' | 'down' | null;
     }>;
     website?: string;
     url?: string;
@@ -33,13 +37,15 @@ interface BusinessDetailsProps {
   onClose: () => void;
   onStoriesClick?: () => void;
   onPostClick?: (post: Post) => void;
+  onRoleVote?: (businessId: string, roleIndex: number, voteType: 'up' | 'down') => void;
 }
 const BusinessDetails: React.FC<BusinessDetailsProps> = ({
   business,
   posts,
   onClose,
   onStoriesClick,
-  onPostClick
+  onPostClick,
+  onRoleVote
 }) => {
   const handleBackgroundClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -71,6 +77,10 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
 
   const handleStoryClick = (post: Post) => {
     onPostClick?.(post);
+  };
+
+  const handleRoleVote = (roleIndex: number, voteType: 'up' | 'down') => {
+    onRoleVote?.(business.id, roleIndex, voteType);
   };
   return <div className="fixed inset-0 z-40 flex items-start justify-center pt-16" onClick={handleBackgroundClick}>
       <div className="app-card p-6 overflow-y-auto animate-fade-in" onClick={handleCardClick}>
@@ -109,10 +119,26 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
           <div className="space-y-3">
             {business.roles ? business.roles.map((role, index) => <div key={index} className="flex justify-between items-center">
                 <span className="text-app-black">{role.role}</span>
-                <span className="font-medium text-app-black">{role.salary}</span>
+                <div className="flex items-center space-x-3">
+                  <span className="font-medium text-app-black">{role.salary}</span>
+                  <VotingComponent
+                    upvotes={role.upvotes || 0}
+                    downvotes={role.downvotes || 0}
+                    userVote={role.userVote}
+                    onVote={(voteType) => handleRoleVote(index, voteType)}
+                  />
+                </div>
               </div>) : <div className="flex justify-between items-center">
                 <span className="text-app-black">Barista</span>
-                <span className="font-medium text-app-black">{business.salary || '$13.6'}</span>
+                <div className="flex items-center space-x-3">
+                  <span className="font-medium text-app-black">{business.salary || '$13.6'}</span>
+                  <VotingComponent
+                    upvotes={0}
+                    downvotes={0}
+                    userVote={null}
+                    onVote={() => {}}
+                  />
+                </div>
               </div>}
           </div>
         </div>

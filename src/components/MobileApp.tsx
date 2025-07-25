@@ -25,6 +25,9 @@ interface Post {
   isStory?: boolean;
   isJobUpdate?: boolean;
   linkedLocation?: string;
+  upvotes: number;
+  downvotes: number;
+  userVote?: 'up' | 'down' | null;
 }
 
 const MobileApp: React.FC = () => {
@@ -39,20 +42,26 @@ const MobileApp: React.FC = () => {
   const [filteredUserStories, setFilteredUserStories] = useState(false);
   
   const constraintsRef = useRef(null);
-  const { businesses, loading } = useBusinessesData();
+  const { businesses, loading, setBusinesses } = useBusinessesData();
 
   const [posts, setPosts] = useState<Post[]>([
     {
       id: '1',
       author: 'BaristaBoss',
       text: 'Guess what!! I never thought this would happen but my boss brought in donuts today!',
-      isStory: false
+      isStory: false,
+      upvotes: 0,
+      downvotes: 0,
+      userVote: null
     },
     {
       id: '2',
       author: 'Cook52345234',
       text: 'My old manager would always refuse to approve my sick leave :(',
-      isStory: false
+      isStory: false,
+      upvotes: 0,
+      downvotes: 0,
+      userVote: null
     }
   ]);
 
@@ -67,7 +76,10 @@ const MobileApp: React.FC = () => {
       text: `New Job Update! ${data.salary} for ${data.role} 👀`,
       isJobUpdate: true,
       isStory: false,
-      linkedLocation: data.fullLocation || data.location
+      linkedLocation: data.fullLocation || data.location,
+      upvotes: 0,
+      downvotes: 0,
+      userVote: null
     };
     setPosts(prevPosts => [jobUpdatePost, ...prevPosts]);
   };
@@ -85,7 +97,10 @@ const MobileApp: React.FC = () => {
       text,
       businessId: shouldBeStory ? businessId : undefined,
       businessName: shouldBeStory ? business?.name : undefined,
-      isStory: shouldBeStory
+      isStory: shouldBeStory,
+      upvotes: 0,
+      downvotes: 0,
+      userVote: null
     };
     setPosts([newPost, ...posts]);
   };
@@ -110,6 +125,122 @@ const MobileApp: React.FC = () => {
   const handleBackToAllPosts = () => {
     setFilteredBusinessId(null);
     setFilteredUserStories(false);
+  };
+
+  const handlePostVote = (postId: string, voteType: 'up' | 'down') => {
+    setPosts(prevPosts => {
+      const updatedPosts = prevPosts.map(post => {
+        if (post.id === postId) {
+          let newUpvotes = post.upvotes;
+          let newDownvotes = post.downvotes;
+          let newUserVote: 'up' | 'down' | null = post.userVote;
+
+          if (voteType === 'up') {
+            if (post.userVote === 'up') {
+              // Remove upvote
+              newUpvotes--;
+              newUserVote = null;
+            } else if (post.userVote === 'down') {
+              // Switch from downvote to upvote
+              newDownvotes--;
+              newUpvotes++;
+              newUserVote = 'up';
+            } else {
+              // Add upvote
+              newUpvotes++;
+              newUserVote = 'up';
+            }
+          } else {
+            if (post.userVote === 'down') {
+              // Remove downvote
+              newDownvotes--;
+              newUserVote = null;
+            } else if (post.userVote === 'up') {
+              // Switch from upvote to downvote
+              newUpvotes--;
+              newDownvotes++;
+              newUserVote = 'down';
+            } else {
+              // Add downvote
+              newDownvotes++;
+              newUserVote = 'down';
+            }
+          }
+
+          return {
+            ...post,
+            upvotes: newUpvotes,
+            downvotes: newDownvotes,
+            userVote: newUserVote
+          };
+        }
+        return post;
+      });
+
+      // Auto-delete posts with score <= -3
+      return updatedPosts.filter(post => (post.upvotes - post.downvotes) > -3);
+    });
+  };
+
+  const handleRoleVote = (businessId: string, roleIndex: number, voteType: 'up' | 'down') => {
+    setBusinesses(prevBusinesses => {
+      const updatedBusinesses = prevBusinesses.map(business => {
+        if (business.id === businessId && business.roles) {
+          const updatedRoles = business.roles.map((role, index) => {
+            if (index === roleIndex) {
+              let newUpvotes = role.upvotes;
+              let newDownvotes = role.downvotes;
+              let newUserVote: 'up' | 'down' | null = role.userVote;
+
+              if (voteType === 'up') {
+                if (role.userVote === 'up') {
+                  newUpvotes--;
+                  newUserVote = null;
+                } else if (role.userVote === 'down') {
+                  newDownvotes--;
+                  newUpvotes++;
+                  newUserVote = 'up';
+                } else {
+                  newUpvotes++;
+                  newUserVote = 'up';
+                }
+              } else {
+                if (role.userVote === 'down') {
+                  newDownvotes--;
+                  newUserVote = null;
+                } else if (role.userVote === 'up') {
+                  newUpvotes--;
+                  newDownvotes++;
+                  newUserVote = 'down';
+                } else {
+                  newDownvotes++;
+                  newUserVote = 'down';
+                }
+              }
+
+              return {
+                ...role,
+                upvotes: newUpvotes,
+                downvotes: newDownvotes,
+                userVote: newUserVote
+              };
+            }
+            return role;
+          });
+
+          // Auto-delete roles with score <= -3
+          const filteredRoles = updatedRoles.filter(role => (role.upvotes - role.downvotes) > -3);
+
+          return {
+            ...business,
+            roles: filteredRoles
+          };
+        }
+        return business;
+      });
+
+      return updatedBusinesses;
+    });
   };
 
   // Handle business state when sliding to explore and back
@@ -161,6 +292,10 @@ const MobileApp: React.FC = () => {
         onBusinessSelect={handleBusinessClick}
         posts={posts}
         onBusinessStoriesClick={handleBusinessStoriesClick}
+        onPostClick={(post) => {
+          setExpandedPost(post.id);
+        }}
+        onRoleVote={handleRoleVote}
       />
       
       {/* Initiation Card - slides up and disappears */}
@@ -232,6 +367,7 @@ const MobileApp: React.FC = () => {
             }}
             onPostSubmit={handlePostSubmit}
             onBackToAllPosts={handleBackToAllPosts}
+            onPostVote={handlePostVote}
           />
         </motion.div>
       )}

@@ -26,7 +26,16 @@ interface HomePageProps {
     salary?: string;
     stories?: Array<{ id: string; text: string; author: string }>;
     businessType?: string;
-    roles?: Array<{ role: string; salary: string }>;
+    roles?: Array<{ 
+      role: string; 
+      salary: string; 
+      upvotes?: number; 
+      downvotes?: number; 
+      userVote?: 'up' | 'down' | null; 
+    }>;
+    place_id?: string;
+    website?: string;
+    url?: string;
   }>;
   currentSlide?: number;
   selectedBusiness?: any;
@@ -34,6 +43,7 @@ interface HomePageProps {
   posts: Post[];
   onBusinessStoriesClick?: (businessId: string) => void;
   onPostClick?: (post: Post) => void;
+  onRoleVote?: (businessId: string, roleIndex: number, voteType: 'up' | 'down') => void;
 }
 
 const HomePage: React.FC<HomePageProps> = ({ 
@@ -43,7 +53,8 @@ const HomePage: React.FC<HomePageProps> = ({
   onBusinessSelect,
   posts,
   onBusinessStoriesClick,
-  onPostClick
+  onPostClick,
+  onRoleVote
 }) => {
   const [searchValue, setSearchValue] = useState('');
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
@@ -195,6 +206,7 @@ const HomePage: React.FC<HomePageProps> = ({
           onClose={handleClosePreview}
           onStoriesClick={() => onBusinessStoriesClick?.(selectedBusiness.id)}
           onPostClick={onPostClick}
+          onRoleVote={onRoleVote}
         />
       )}
 

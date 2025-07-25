@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Eye } from 'lucide-react';
 import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
+import VotingComponent from './VotingComponent';
 interface Post {
   id: string;
   author: string;
@@ -12,6 +13,9 @@ interface Post {
   isStory?: boolean;
   isJobUpdate?: boolean;
   linkedLocation?: string;
+  upvotes: number;
+  downvotes: number;
+  userVote?: 'up' | 'down' | null;
 }
 interface ExplorePageProps {
   posts: Post[];
@@ -22,6 +26,7 @@ interface ExplorePageProps {
   onCommentSubmit?: (postId: string, comment: string) => void;
   onPostSubmit?: (text: string, businessId?: string) => void;
   onBackToAllPosts?: () => void;
+  onPostVote?: (postId: string, voteType: 'up' | 'down') => void;
 }
 const ExplorePage: React.FC<ExplorePageProps> = ({
   posts,
@@ -31,7 +36,8 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   onExpandedPostChange,
   onCommentSubmit,
   onPostSubmit,
-  onBackToAllPosts
+  onBackToAllPosts,
+  onPostVote
 }) => {
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [comments, setComments] = useState<{
@@ -89,6 +95,10 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     onBusinessView?.(businessId);
   };
 
+  const handlePostVote = (postId: string, voteType: 'up' | 'down') => {
+    onPostVote?.(postId, voteType);
+  };
+
   // Filter posts based on business or user stories
   const displayPosts = filteredBusinessId 
     ? posts.filter(post => post.businessId === filteredBusinessId && !post.isJobUpdate) 
@@ -140,6 +150,16 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                     )}
                   </div>
                   <p className="text-app-black">{post.text}</p>
+                  
+                  {/* Voting component in bottom right */}
+                  <div className="absolute bottom-2 right-2">
+                    <VotingComponent
+                      upvotes={post.upvotes}
+                      downvotes={post.downvotes}
+                      userVote={post.userVote}
+                      onVote={(voteType) => handlePostVote(post.id, voteType)}
+                    />
+                  </div>
                 </div>
 
                 {/* Expanded view */}
