@@ -130,7 +130,8 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
 
                 {/* Post content */}
                 <div className={`relative z-10 pb-10 ${post.images && post.images.length >= 5 ? 'post-overlay rounded-lg p-3' : ''}`}>
-                  <div className="flex justify-between items-start mb-2">
+                  <div className="flex items-start justify-between mb-2">
+                    <p className="text-app-black flex-1 pr-4">{post.text}</p>
                     {(post.businessId || post.isJobUpdate) && (
                       <button onClick={e => {
                         e.stopPropagation();
@@ -143,12 +144,11 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                             description: post.linkedLocation,
                           });
                         }
-                      }} className="flex items-center space-x-1 text-app-gray-medium hover:text-app-black">
+                      }} className="flex items-center space-x-1 text-app-gray-medium hover:text-app-black flex-shrink-0 mt-1">
                         <span>👀</span>
                       </button>
                     )}
                   </div>
-                  <p className="text-app-black pr-16">{post.text}</p>
                   
                   {/* Voting component in bottom right */}
                   <div className="absolute bottom-2 right-2">
