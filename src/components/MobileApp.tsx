@@ -76,10 +76,26 @@ const MobileApp: React.FC = () => {
     const jobUpdatePost: Post = {
       id: `job-update-${Date.now()}`,
       author: 'You',
-      text: `New Job Update! ${data.salary} /${data.timePeriod || '/hr'} for ${data.role} 😳`,
+      text: `New Job Update! ${data.salary}/${data.timePeriod || 'HR'} for ${data.role} 😳`,
       isJobUpdate: true,
       isStory: false,
       linkedLocation: data.fullLocation || data.location,
+      upvotes: 0,
+      downvotes: 0,
+      userVote: null,
+      createdAt: new Date()
+    };
+    setPosts(prevPosts => [jobUpdatePost, ...prevPosts]);
+  };
+
+  const handleJobUpdate = (jobData: { salary: string; role: string; location: string; timePeriod: string }) => {
+    const jobUpdatePost: Post = {
+      id: `job-update-${Date.now()}`,
+      author: 'You',
+      text: `New Job Update! ${jobData.salary}/${jobData.timePeriod} for ${jobData.role} 😳`,
+      isJobUpdate: true,
+      isStory: false,
+      linkedLocation: jobData.location,
       upvotes: 0,
       downvotes: 0,
       userVote: null,
@@ -365,6 +381,7 @@ const MobileApp: React.FC = () => {
             initialData={userData} 
             userPosts={posts.filter(post => post.author === 'You')}
             onStoriesClick={handleUserStoriesClick}
+            onJobUpdate={handleJobUpdate}
           />
         </motion.div>
       )}

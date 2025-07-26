@@ -37,13 +37,15 @@ interface SettingsPageProps {
   userPosts?: Post[];
   onStoriesClick?: () => void;
   onPostClick?: (post: Post) => void;
+  onJobUpdate?: (jobData: { salary: string; role: string; location: string; timePeriod: string }) => void;
 }
 
 const SettingsPage: React.FC<SettingsPageProps> = ({
   initialData,
   userPosts = [],
   onStoriesClick,
-  onPostClick
+  onPostClick,
+  onJobUpdate
 }) => {
   // Use fullLocation if available, otherwise fall back to location
   const [currentJob, setCurrentJob] = useState<UserInfo>({
@@ -60,8 +62,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     role: '',
     location: ''
   }]);
+  const [pastJobTimePeriods, setPastJobTimePeriods] = useState<{[id: string]: string}>({ '1': 'HR' });
   const [isStoriesExpanded, setIsStoriesExpanded] = useState(false);
   const { toast } = useToast();
+
+  // Track initial values to detect changes
+  const [initialCurrentJob] = useState(currentJob);
+  const [initialTimePeriod] = useState(currentTimePeriod);
 
   const validateProfanity = (text: string, fieldName: string): boolean => {
     if (isProfane(text)) {
@@ -75,14 +82,31 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     return true;
   };
 
+  const createJobUpdatePost = (salary: string, role: string, location: string, timePeriod: string) => {
+    if (salary && role && location && onJobUpdate) {
+      onJobUpdate({ salary, role, location, timePeriod });
+    }
+  };
+
+  const hasCurrentJobChanged = () => {
+    return (
+      currentJob.salary !== initialCurrentJob.salary ||
+      currentJob.role !== initialCurrentJob.role ||
+      currentJob.location !== initialCurrentJob.location ||
+      currentTimePeriod !== initialTimePeriod
+    );
+  };
+
   const addPastJob = () => {
+    const newJobId = Date.now().toString();
     const newJob: PastJob = {
-      id: Date.now().toString(),
+      id: newJobId,
       salary: '',
       role: '',
       location: ''
     };
     setPastJobs([...pastJobs, newJob]);
+    setPastJobTimePeriods({ ...pastJobTimePeriods, [newJobId]: 'HR' });
   };
 
   const removePastJob = (id: string) => {
@@ -94,9 +118,27 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       ? (value.replace(/[^0-9.]/g, '') ? `$${value.replace(/[^0-9.]/g, '')}` : '')
       : value;
     
-    setPastJobs(pastJobs.map(job => 
+    const updatedJobs = pastJobs.map(job => 
       job.id === id ? { ...job, [field]: processedValue } : job
-    ));
+    );
+    setPastJobs(updatedJobs);
+
+    // Check if this creates a complete past job (all fields filled)
+    const updatedJob = updatedJobs.find(job => job.id === id);
+    if (updatedJob && updatedJob.salary && updatedJob.role && updatedJob.location) {
+      const timePeriod = pastJobTimePeriods[id] || 'HR';
+      createJobUpdatePost(updatedJob.salary, updatedJob.role, updatedJob.location, timePeriod);
+    }
+  };
+
+  const updatePastJobTimePeriod = (id: string, timePeriod: string) => {
+    setPastJobTimePeriods({ ...pastJobTimePeriods, [id]: timePeriod });
+    
+    // Check if this completes a past job
+    const job = pastJobs.find(job => job.id === id);
+    if (job && job.salary && job.role && job.location) {
+      createJobUpdatePost(job.salary, job.role, job.location, timePeriod);
+    }
   };
 
   const handleSalaryChange = (value: string) => {
@@ -106,6 +148,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       ...currentJob,
       salary: cleanValue ? `$${cleanValue}` : ''
     });
+  };
+
+  const handleCurrentSalaryBlur = () => {
+    if (hasCurrentJobChanged() && currentJob.salary && currentJob.role && currentJob.location) {
+      // Create post when current job is complete and has changed
+      createJobUpdatePost(currentJob.salary, currentJob.role, currentJob.location, currentTimePeriod);
+    }
   };
 
   const handleCurrentJobRoleChange = (value: string) => {
@@ -129,6 +178,17 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         ...currentJob,
         role: ''
       });
+    } else if (hasCurrentJobChanged() && currentJob.salary && currentJob.role && currentJob.location) {
+      // Create post when current job is complete and has changed
+      createJobUpdatePost(currentJob.salary, currentJob.role, currentJob.location, currentTimePeriod);
+    }
+  };
+
+  const handleCurrentTimePeriodChange = (value: string) => {
+    setCurrentTimePeriod(value);
+    // Check if current job is complete and create post if changed
+    if (currentJob.salary && currentJob.role && currentJob.location) {
+      createJobUpdatePost(currentJob.salary, currentJob.role, currentJob.location, value);
     }
   };
 
@@ -138,6 +198,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         ...currentJob,
         location: ''
       });
+    } else if (hasCurrentJobChanged() && currentJob.salary && currentJob.role && currentJob.location) {
+      // Create post when current job is complete and has changed
+      createJobUpdatePost(currentJob.salary, currentJob.role, currentJob.location, currentTimePeriod);
     }
   };
 
@@ -161,13 +224,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
               <input 
                 type="text" 
                 value={currentJob.salary} 
-                onChange={e => handleSalaryChange(e.target.value)} 
+                onChange={e => handleSalaryChange(e.target.value)}
+                onBlur={handleCurrentSalaryBlur}
                 className="app-input flex-1" 
                 placeholder="$14" 
               />
               <select 
                 value={currentTimePeriod} 
-                onChange={e => setCurrentTimePeriod(e.target.value)} 
+                onChange={e => handleCurrentTimePeriodChange(e.target.value)} 
                 className="px-4 py-3 bg-white text-sm"
                 style={{
                   border: '1px solid hsl(var(--app-gray-light))',
@@ -232,6 +296,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     placeholder="$17" 
                   />
                   <select 
+                    value={pastJobTimePeriods[job.id] || 'HR'}
+                    onChange={e => updatePastJobTimePeriod(job.id, e.target.value)}
                     className="px-4 py-3 bg-white text-sm"
                     style={{
                       border: '1px solid hsl(var(--app-gray-light))',
@@ -240,9 +306,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                       fontSize: '16px'
                     }}
                   >
-                    <option>HR</option>
-                    <option>MO</option>
-                    <option>YR</option>
+                    <option value="HR">HR</option>
+                    <option value="MO">MO</option>
+                    <option value="YR">YR</option>
                   </select>
                   <div className="w-6"></div>
                 </div>
