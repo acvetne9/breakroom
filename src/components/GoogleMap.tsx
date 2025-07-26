@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
-import { MarkerClusterer } from '@googlemaps/markerclusterer';
+import { MarkerClusterer, GridAlgorithm } from '@googlemaps/markerclusterer';
 
 interface GoogleMapProps {
   onMapLoad?: (map: google.maps.Map) => void;
@@ -137,10 +137,11 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
       return marker;
     });
 
-    // Create or update marker clusterer with minimal clustering
+    // Create or update marker clusterer with proper algorithm
     const clusterer = new MarkerClusterer({ 
       map, 
-      markers: newMarkers
+      markers: newMarkers,
+      algorithm: new GridAlgorithm({ maxZoom: 12, gridSize: 80 })
     });
 
     setMarkers(newMarkers);
