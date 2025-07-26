@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import BusinessPreview from './BusinessPreview';
 import BusinessDetails from './BusinessDetails';
 import { searchBusinesses } from '../utils/searchUtils';
 import { isProfane } from '../utils/profanityFilter';
 import { Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useDebounce } from '../hooks/useDebounce';
 
 interface Post {
   id: string;
@@ -60,13 +61,16 @@ const HomePage: React.FC<HomePageProps> = ({
 }) => {
   const [searchValue, setSearchValue] = useState('');
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
-  
-  // Use prop-controlled selectedBusiness if available, otherwise use local state
-  const selectedBusiness = propSelectedBusiness;
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [filteredBusinesses, setFilteredBusinesses] = useState(businesses);
   const [isSearchActive, setIsSearchActive] = useState(false);
   const { toast } = useToast();
+
+  // Debounce search input for better performance
+  const debouncedSearchValue = useDebounce(searchValue, 300);
+
+  // Use prop-controlled selectedBusiness if available, otherwise use local state
+  const selectedBusiness = propSelectedBusiness;
 
   // Update filtered businesses when businesses prop changes
   useEffect(() => {
@@ -75,26 +79,31 @@ const HomePage: React.FC<HomePageProps> = ({
     }
   }, [businesses, isSearchActive]);
 
-  const handleSearchInput = (value: string) => {
+  // Memoized search handler
+  const handleSearchInput = useCallback((value: string) => {
     setSearchValue(value);
     
     if (value.length === 0) {
-      // Restore all businesses when search is cleared
       setSearchResults([]);
       setFilteredBusinesses(businesses);
       setIsSearchActive(false);
-      return;
     }
-    
-    if (value.length > 2) {
-      const { filteredBusinesses: filtered } = searchBusinesses(businesses, value);
-      setSearchResults(filtered.slice(0, 5)); // Show top 5 results in dropdown
-    } else {
-      setSearchResults([]);
-    }
-  };
+  }, [businesses]);
 
-  const performSearch = () => {
+  // Effect for debounced search
+  useEffect(() => {
+    if (debouncedSearchValue.length > 2) {
+      const { filteredBusinesses: filtered } = searchBusinesses(businesses, debouncedSearchValue);
+      setSearchResults(filtered.slice(0, 5)); // Show top 5 results in dropdown
+    } else if (debouncedSearchValue.length === 0) {
+      setSearchResults([]);
+      setFilteredBusinesses(businesses);
+      setIsSearchActive(false);
+    }
+  }, [debouncedSearchValue, businesses]);
+
+  // Memoized search performer
+  const performSearch = useCallback(() => {
     if (!searchValue.trim()) return;
     
     // Check for profanity in search terms
@@ -123,36 +132,37 @@ const HomePage: React.FC<HomePageProps> = ({
       setSearchResults([]);
       setIsSearchActive(true);
     }
-  };
+  }, [searchValue, businesses, onBusinessSelect, toast]);
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  // Memoized handlers
+  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       performSearch();
     }
-  };
+  }, [performSearch]);
 
-  const handleBusinessClick = (business: any) => {
+  const handleBusinessClick = useCallback((business: any) => {
     onBusinessSelect?.(business);
     setShowBusinessDetails(false);
     setSearchResults([]);
-  };
+  }, [onBusinessSelect]);
 
-  const handleShowBusinessDetails = () => {
+  const handleShowBusinessDetails = useCallback(() => {
     setShowBusinessDetails(true);
-  };
+  }, []);
 
-  const handleBusinessStoriesClick = () => {
+  const handleBusinessStoriesClick = useCallback(() => {
     onBusinessStoriesClick?.(selectedBusiness.id);
-  };
+  }, [onBusinessStoriesClick, selectedBusiness?.id]);
 
-  const handleClosePreview = () => {
+  const handleClosePreview = useCallback(() => {
     onBusinessSelect?.(null);
     setShowBusinessDetails(false);
-  };
+  }, [onBusinessSelect]);
 
-  const handleBackToPreview = () => {
+  const handleBackToPreview = useCallback(() => {
     setShowBusinessDetails(false);
-  };
+  }, []);
 
   return (
     <div className="relative w-full h-full bg-transparent">
@@ -234,4 +244,4 @@ const HomePage: React.FC<HomePageProps> = ({
   );
 };
 
-export default HomePage;
+export default memo(HomePage);

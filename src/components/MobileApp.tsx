@@ -1,14 +1,14 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { motion, PanInfo } from 'framer-motion';
 import InitiationPage from './InitiationPage';
 import HomePage from './HomePage';
 import SettingsPage from './SettingsPage';
 import ExplorePage from './ExplorePage';
 import GoogleMap from './GoogleMap';
-
 import { useBusinessesData } from '../hooks/useBusinessesData';
 import { usePerformanceMode } from '../hooks/usePerformanceMode';
+import { useDebounce } from '../hooks/useDebounce';
 
 interface UserData {
   salary: string;
@@ -72,7 +72,7 @@ const MobileApp: React.FC = () => {
     }
   ]);
 
-  const handleInitiationComplete = (data: UserData) => {
+  const handleInitiationComplete = useCallback((data: UserData) => {
     setUserData(data);
     setCurrentView('main');
     
@@ -90,9 +90,9 @@ const MobileApp: React.FC = () => {
       createdAt: new Date()
     };
     setPosts(prevPosts => [jobUpdatePost, ...prevPosts]);
-  };
+  }, []);
 
-  const handlePostSubmit = (text: string, businessId?: string) => {
+  const handlePostSubmit = useCallback((text: string, businessId?: string) => {
     const business = businessId ? businesses.find(b => b.id === businessId) : undefined;
     
     // Only create business stories when specifically viewing filtered posts for that business
@@ -112,29 +112,28 @@ const MobileApp: React.FC = () => {
       createdAt: new Date()
     };
     setPosts([newPost, ...posts]);
-  };
+  }, [businesses, filteredBusinessId, posts]);
 
-  const handleBusinessClick = (business: any) => {
+  const handleBusinessClick = useCallback((business: any) => {
     setSelectedBusiness(business);
     // When selecting a business, we're not filtering posts by business
     setFilteredBusinessId(null);
-  };
+  }, []);
 
-  const handleBusinessStoriesClick = (businessId: string) => {
+  const handleBusinessStoriesClick = useCallback((businessId: string) => {
     setFilteredBusinessId(businessId);
     setCurrentSlide(2); // Navigate to explore page
-  };
+  }, []);
 
-  const handleUserStoriesClick = () => {
+  const handleUserStoriesClick = useCallback(() => {
     setFilteredUserStories(true);
     setCurrentSlide(2); // Navigate to explore page
-  };
+  }, []);
 
-
-  const handleBackToAllPosts = () => {
+  const handleBackToAllPosts = useCallback(() => {
     setFilteredBusinessId(null);
     setFilteredUserStories(false);
-  };
+  }, []);
 
   const handlePostVote = (postId: string, voteType: 'up' | 'down') => {
     setPosts(prevPosts => {
@@ -480,4 +479,4 @@ const MobileApp: React.FC = () => {
   );
 };
 
-export default MobileApp;
+export default memo(MobileApp);
