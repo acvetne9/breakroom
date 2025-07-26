@@ -310,8 +310,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
                 <select 
                   value={timePeriod} 
                   onChange={(e) => setTimePeriod(e.target.value)}
-                  className="px-4 py-3 bg-white text-sm" 
-                  style={{ border: '1px solid hsl(var(--app-gray-light))', borderRadius: '0.5rem', height: '48px', fontSize: '16px' }}
+                  className="app-input text-sm w-auto" 
                 >
                   <option value="HR">HR</option>
                   <option value="MO">MO</option>
