@@ -24,7 +24,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
   const [isMapReady, setIsMapReady] = useState(false);
   const { shouldReduceMotion } = usePerformanceMode();
   
-  const MARKER_VISIBILITY_ZOOM_THRESHOLD = 13;
+  const MARKER_VISIBILITY_ZOOM_THRESHOLD = 15;
 
   // Throttled zoom change handler for better performance
   const throttledZoomChange = useCallback(() => {
@@ -125,85 +125,123 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
           // Reduce animation complexity for low-performance devices
           gestureHandling: shouldReduceMotion ? 'cooperative' : 'greedy',
           disableDefaultUI: true,
-          backgroundColor: '#1a1a1a',
+          backgroundColor: '#f5f5f5',
           styles: [
-            { elementType: 'geometry', stylers: [{ color: '#1a1a1a' }] },
-            { elementType: 'labels.text.stroke', stylers: [{ color: '#1a1a1a' }] },
-            { elementType: 'labels.text.fill', stylers: [{ color: '#746855' }] },
+            // Hide all POI and businesses
+            {
+              featureType: 'poi',
+              stylers: [{ visibility: 'off' }]
+            },
+            {
+              featureType: 'poi.business',
+              stylers: [{ visibility: 'off' }]
+            },
+            {
+              featureType: 'poi.attraction',
+              stylers: [{ visibility: 'off' }]
+            },
+            {
+              featureType: 'poi.government',
+              stylers: [{ visibility: 'off' }]
+            },
+            {
+              featureType: 'poi.medical',
+              stylers: [{ visibility: 'off' }]
+            },
+            {
+              featureType: 'poi.place_of_worship',
+              stylers: [{ visibility: 'off' }]
+            },
+            {
+              featureType: 'poi.school',
+              stylers: [{ visibility: 'off' }]
+            },
+            {
+              featureType: 'poi.sports_complex',
+              stylers: [{ visibility: 'off' }]
+            },
+            // Light theme styles
+            {
+              elementType: 'geometry',
+              stylers: [{ color: '#f5f5f5' }]
+            },
+            {
+              elementType: 'labels.text.stroke',
+              stylers: [{ color: '#ffffff' }]
+            },
+            {
+              elementType: 'labels.text.fill',
+              stylers: [{ color: '#616161' }]
+            },
             {
               featureType: 'administrative.locality',
               elementType: 'labels.text.fill',
-              stylers: [{ color: '#d59563' }]
-            },
-            {
-              featureType: 'poi',
-              elementType: 'labels.text.fill',
-              stylers: [{ color: '#d59563' }]
+              stylers: [{ color: '#424242' }]
             },
             {
               featureType: 'poi.park',
               elementType: 'geometry',
-              stylers: [{ color: '#263c3f' }]
+              stylers: [{ color: '#c8e6c9' }]
             },
             {
               featureType: 'poi.park',
               elementType: 'labels.text.fill',
-              stylers: [{ color: '#6b9a76' }]
+              stylers: [{ color: '#2e7d32' }]
             },
             {
               featureType: 'road',
               elementType: 'geometry',
-              stylers: [{ color: '#38414e' }]
+              stylers: [{ color: '#ffffff' }]
             },
             {
               featureType: 'road',
               elementType: 'geometry.stroke',
-              stylers: [{ color: '#212a37' }]
+              stylers: [{ color: '#e0e0e0' }]
             },
             {
               featureType: 'road',
               elementType: 'labels.text.fill',
-              stylers: [{ color: '#9ca5b3' }]
+              stylers: [{ color: '#757575' }]
             },
             {
               featureType: 'road.highway',
               elementType: 'geometry',
-              stylers: [{ color: '#746855' }]
+              stylers: [{ color: '#ffcc02' }]
             },
             {
               featureType: 'road.highway',
               elementType: 'geometry.stroke',
-              stylers: [{ color: '#1f2835' }]
+              stylers: [{ color: '#f57c00' }]
             },
             {
               featureType: 'road.highway',
               elementType: 'labels.text.fill',
-              stylers: [{ color: '#f3d19c' }]
+              stylers: [{ color: '#424242' }]
             },
             {
               featureType: 'transit',
               elementType: 'geometry',
-              stylers: [{ color: '#2f3948' }]
+              stylers: [{ color: '#e3f2fd' }]
             },
             {
               featureType: 'transit.station',
               elementType: 'labels.text.fill',
-              stylers: [{ color: '#d59563' }]
+              stylers: [{ color: '#1976d2' }]
             },
             {
               featureType: 'water',
               elementType: 'geometry',
-              stylers: [{ color: '#17263c' }]
+              stylers: [{ color: '#b3d9ff' }]
             },
             {
               featureType: 'water',
               elementType: 'labels.text.fill',
-              stylers: [{ color: '#515c6d' }]
+              stylers: [{ color: '#1976d2' }]
             },
             {
               featureType: 'water',
               elementType: 'labels.text.stroke',
-              stylers: [{ color: '#17263c' }]
+              stylers: [{ color: '#ffffff' }]
             }
           ]
         });
@@ -295,7 +333,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
       return marker;
     });
 
-    // Create marker clusterer with simple configuration
+    // Create marker clusterer with improved configuration for better clustering
     const clusterer = new MarkerClusterer({ 
       map, 
       markers
