@@ -137,10 +137,35 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
       return marker;
     });
 
-    // Create or update marker clusterer
+    // Create or update marker clusterer with custom options
     const clusterer = new MarkerClusterer({ 
       map, 
-      markers: newMarkers
+      markers: newMarkers,
+      renderer: {
+        render: ({ count, position }) => {
+          // Only show clusters for zoom levels below 14
+          const zoom = map.getZoom() || 14;
+          if (zoom >= 14) return null;
+          
+          return new google.maps.Marker({
+            position,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: Math.min(count * 3 + 10, 25),
+              fillColor: '#FFC107',
+              fillOpacity: 0.9,
+              strokeColor: '#FF8F00',
+              strokeWeight: 2
+            },
+            label: {
+              text: count.toString(),
+              color: '#000',
+              fontSize: '12px',
+              fontWeight: 'bold'
+            }
+          });
+        }
+      }
     });
 
     setMarkers(newMarkers);
