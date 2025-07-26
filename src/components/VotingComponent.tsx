@@ -37,7 +37,10 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
             : 'hover:bg-green-50 hover:scale-105'
         }`}
       >
-        <span className={userVote === 'up' ? 'text-green-600' : 'text-gray-600'}>
+        <span 
+          className="transition-all"
+          style={{ filter: userVote === 'up' ? 'grayscale(0%)' : 'grayscale(100%)' }}
+        >
           ✅
         </span>
       </button>
@@ -54,7 +57,10 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
             : 'hover:bg-red-50 hover:scale-105'
         }`}
       >
-        <span className={userVote === 'down' ? 'text-red-600' : 'text-gray-600'}>
+        <span 
+          className="transition-all"
+          style={{ filter: userVote === 'down' ? 'grayscale(0%)' : 'grayscale(100%)' }}
+        >
           🚫
         </span>
       </button>
