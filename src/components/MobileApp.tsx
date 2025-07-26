@@ -74,7 +74,7 @@ const MobileApp: React.FC = () => {
     const jobUpdatePost: Post = {
       id: `job-update-${Date.now()}`,
       author: 'You',
-      text: `New Job Update! ${data.salary}${data.timePeriod || '/hr'} for ${data.role} 👀`,
+      text: `New Job Update! ${data.salary} /${data.timePeriod || '/hr'} for ${data.role} 😳`,
       isJobUpdate: true,
       isStory: false,
       linkedLocation: data.fullLocation || data.location,
