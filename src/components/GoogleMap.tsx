@@ -245,8 +245,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
       style={{ 
         zIndex: 1,
         minHeight: '100vh',
-        minWidth: '100vw',
-        backgroundColor: '#e5e7eb' // Temporary background to verify container visibility
+        minWidth: '100vw'
       }}
     />
   );
