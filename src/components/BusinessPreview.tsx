@@ -75,7 +75,12 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, posts, onCl
         {business.salary && (
           <div className="mb-4">
             <p className="text-app-black">
-              <span className="font-medium">{business.salary}</span> Barista
+              <span className="font-medium">
+                {business.salary}
+                {!business.salary.includes('/') && (
+                  <span className="text-xs text-app-gray-medium ml-1">/hr</span>
+                )}
+              </span> Barista
             </p>
           </div>
         )}
