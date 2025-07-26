@@ -5,6 +5,7 @@ import InitiationPage from './InitiationPage';
 import HomePage from './HomePage';
 import SettingsPage from './SettingsPage';
 import ExplorePage from './ExplorePage';
+import GoogleMap from './GoogleMap';
 
 import { useBusinessesData } from '../hooks/useBusinessesData';
 
@@ -301,6 +302,13 @@ const MobileApp: React.FC = () => {
   return (
     <div className="fixed inset-0 overflow-hidden">
       {/* Map is always the background */}
+      <GoogleMap 
+        businesses={businesses}
+        onBusinessClick={handleBusinessClick}
+        selectedBusiness={selectedBusiness}
+      />
+      
+      {/* HomePage overlay */}
       <HomePage 
         businesses={businesses} 
         currentSlide={currentSlide}
