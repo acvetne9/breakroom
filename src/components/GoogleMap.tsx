@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Loader } from '@googlemaps/js-api-loader';
 import { MarkerClusterer } from '@googlemaps/markerclusterer';
 
 interface GoogleMapProps {
@@ -37,18 +36,59 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
     };
   }, [map]);
 
+  // Load Google Maps script dynamically
   useEffect(() => {
-    const initMap = async () => {
-      if (!mapRef.current) return;
+    const loadGoogleMapsScript = () => {
+      return new Promise<void>((resolve, reject) => {
+        // Check if Google Maps is already loaded
+        if (window.google && window.google.maps) {
+          resolve();
+          return;
+        }
 
-      const loader = new Loader({
-        apiKey: 'AIzaSyCkLj9I2chNXHkMTbBO0k-KkEmnc_jAqyQ',
-        version: 'weekly',
-        libraries: ['places']
+        // Check if script is already loading
+        const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
+        if (existingScript) {
+          existingScript.addEventListener('load', () => resolve());
+          existingScript.addEventListener('error', reject);
+          return;
+        }
+
+        // Create and load the script
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyCkLj9I2chNXHkMTbBO0k-KkEmnc_jAqyQ&libraries=places&v=weekly`;
+        script.async = true;
+        script.defer = true;
+        script.addEventListener('load', () => {
+          console.log('Google Maps script loaded successfully');
+          resolve();
+        });
+        script.addEventListener('error', (error) => {
+          console.error('Failed to load Google Maps script:', error);
+          reject(error);
+        });
+        document.head.appendChild(script);
+      });
+    };
+
+    const initMap = async () => {
+      console.log('Initializing map...');
+      
+      if (!mapRef.current) {
+        console.error('Map container ref is not available');
+        return;
+      }
+
+      console.log('Map container dimensions:', {
+        width: mapRef.current.offsetWidth,
+        height: mapRef.current.offsetHeight,
+        clientWidth: mapRef.current.clientWidth,
+        clientHeight: mapRef.current.clientHeight
       });
 
       try {
-        await loader.load();
+        await loadGoogleMapsScript();
+        console.log('Google Maps API loaded');
         
         // Tighter bounds for NYC 5 boroughs only
         const nycBounds = new google.maps.LatLngBounds(
@@ -78,6 +118,8 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
           rotateControl: false,
           fullscreenControl: false
         });
+
+        console.log('Google Map instance created successfully');
 
         // Add throttled zoom change listener
         const zoomHandler = throttledZoomChange();
@@ -200,7 +242,12 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
     <div 
       ref={mapRef} 
       className="absolute inset-0 w-full h-full"
-      style={{ zIndex: 1 }}
+      style={{ 
+        zIndex: 1,
+        minHeight: '100vh',
+        minWidth: '100vw',
+        backgroundColor: '#e5e7eb' // Temporary background to verify container visibility
+      }}
     />
   );
 };
