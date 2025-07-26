@@ -40,8 +40,8 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
   useEffect(() => {
     const loadGoogleMapsScript = () => {
       return new Promise<void>((resolve, reject) => {
-        // Check if Google Maps is already loaded
-        if (window.google && window.google.maps) {
+        // Check if Google Maps is already loaded and ready
+        if (window.google && window.google.maps && window.google.maps.Map) {
           resolve();
           return;
         }
@@ -49,20 +49,32 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
         // Check if script is already loading
         const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
         if (existingScript) {
-          existingScript.addEventListener('load', () => resolve());
+          existingScript.addEventListener('load', () => {
+            // Wait a bit more for the API to be fully ready
+            setTimeout(() => {
+              if (window.google && window.google.maps && window.google.maps.Map) {
+                resolve();
+              } else {
+                reject(new Error('Google Maps API not ready after script load'));
+              }
+            }, 100);
+          });
           existingScript.addEventListener('error', reject);
           return;
         }
 
         // Create and load the script
         const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyCkLj9I2chNXHkMTbBO0k-KkEmnc_jAqyQ&libraries=places&v=weekly`;
+        script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyCkLj9I2chNXHkMTbBO0k-KkEmnc_jAqyQ&libraries=places&v=weekly&callback=initGoogleMaps`;
         script.async = true;
         script.defer = true;
-        script.addEventListener('load', () => {
-          console.log('Google Maps script loaded successfully');
+        
+        // Set up callback function
+        (window as any).initGoogleMaps = () => {
+          console.log('Google Maps callback executed');
           resolve();
-        });
+        };
+        
         script.addEventListener('error', (error) => {
           console.error('Failed to load Google Maps script:', error);
           reject(error);
