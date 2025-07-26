@@ -165,4 +165,19 @@
   .slide-transition {
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
+
+  /* Hardware acceleration for animations */
+  .animate-fade-in,
+  .animate-scale-in,
+  .story-link,
+  .hover-scale {
+    will-change: transform, opacity;
+    transform: translateZ(0);
+  }
+
+  /* Smooth scrolling optimization */
+  .overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
 }

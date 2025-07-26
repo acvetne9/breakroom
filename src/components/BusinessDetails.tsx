@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { memo } from 'react';
 import { Compass } from 'lucide-react';
 import VotingComponent from './VotingComponent';
 import { formatTimeAgo } from '../utils/timeAgo';
@@ -41,7 +41,7 @@ interface BusinessDetailsProps {
   onPostClick?: (post: Post) => void;
   onRoleVote?: (businessId: string, roleIndex: number, voteType: 'up' | 'down') => void;
 }
-const BusinessDetails: React.FC<BusinessDetailsProps> = ({
+const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
   business,
   posts,
   onClose,
@@ -173,5 +173,5 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
         </div>
       </div>
     </div>;
-};
+});
 export default BusinessDetails;
