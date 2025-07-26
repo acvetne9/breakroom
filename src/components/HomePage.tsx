@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
+import GoogleMap from './GoogleMap';
 import BusinessPreview from './BusinessPreview';
 import BusinessDetails from './BusinessDetails';
 import { searchBusinesses } from '../utils/searchUtils';
 import { isProfane } from '../utils/profanityFilter';
 import { Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useDebounce } from '../hooks/useDebounce';
 
 interface Post {
   id: string;
@@ -61,16 +61,13 @@ const HomePage: React.FC<HomePageProps> = ({
 }) => {
   const [searchValue, setSearchValue] = useState('');
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
+  
+  // Use prop-controlled selectedBusiness if available, otherwise use local state
+  const selectedBusiness = propSelectedBusiness;
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [filteredBusinesses, setFilteredBusinesses] = useState(businesses);
   const [isSearchActive, setIsSearchActive] = useState(false);
   const { toast } = useToast();
-
-  // Debounce search input for better performance
-  const debouncedSearchValue = useDebounce(searchValue, 300);
-
-  // Use prop-controlled selectedBusiness if available, otherwise use local state
-  const selectedBusiness = propSelectedBusiness;
 
   // Update filtered businesses when businesses prop changes
   useEffect(() => {
@@ -79,31 +76,26 @@ const HomePage: React.FC<HomePageProps> = ({
     }
   }, [businesses, isSearchActive]);
 
-  // Memoized search handler
-  const handleSearchInput = useCallback((value: string) => {
+  const handleSearchInput = (value: string) => {
     setSearchValue(value);
     
     if (value.length === 0) {
+      // Restore all businesses when search is cleared
       setSearchResults([]);
       setFilteredBusinesses(businesses);
       setIsSearchActive(false);
+      return;
     }
-  }, [businesses]);
-
-  // Effect for debounced search
-  useEffect(() => {
-    if (debouncedSearchValue.length > 2) {
-      const { filteredBusinesses: filtered } = searchBusinesses(businesses, debouncedSearchValue);
+    
+    if (value.length > 2) {
+      const { filteredBusinesses: filtered } = searchBusinesses(businesses, value);
       setSearchResults(filtered.slice(0, 5)); // Show top 5 results in dropdown
-    } else if (debouncedSearchValue.length === 0) {
+    } else {
       setSearchResults([]);
-      setFilteredBusinesses(businesses);
-      setIsSearchActive(false);
     }
-  }, [debouncedSearchValue, businesses]);
+  };
 
-  // Memoized search performer
-  const performSearch = useCallback(() => {
+  const performSearch = () => {
     if (!searchValue.trim()) return;
     
     // Check for profanity in search terms
@@ -132,43 +124,49 @@ const HomePage: React.FC<HomePageProps> = ({
       setSearchResults([]);
       setIsSearchActive(true);
     }
-  }, [searchValue, businesses, onBusinessSelect, toast]);
+  };
 
-  // Memoized handlers
-  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
+  const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       performSearch();
     }
-  }, [performSearch]);
+  };
 
-  const handleBusinessClick = useCallback((business: any) => {
+  const handleBusinessClick = (business: any) => {
     onBusinessSelect?.(business);
     setShowBusinessDetails(false);
     setSearchResults([]);
-  }, [onBusinessSelect]);
+  };
 
-  const handleShowBusinessDetails = useCallback(() => {
+  const handleShowBusinessDetails = () => {
     setShowBusinessDetails(true);
-  }, []);
+  };
 
-  const handleBusinessStoriesClick = useCallback(() => {
+  const handleBusinessStoriesClick = () => {
     onBusinessStoriesClick?.(selectedBusiness.id);
-  }, [onBusinessStoriesClick, selectedBusiness?.id]);
+  };
 
-  const handleClosePreview = useCallback(() => {
+  const handleClosePreview = () => {
     onBusinessSelect?.(null);
     setShowBusinessDetails(false);
-  }, [onBusinessSelect]);
+  };
 
-  const handleBackToPreview = useCallback(() => {
+  const handleBackToPreview = () => {
     setShowBusinessDetails(false);
-  }, []);
+  };
 
   return (
-    <div className="relative w-full h-full bg-transparent pointer-events-none">
+    <div className="relative w-full h-full">
+      {/* Google Maps base layer */}
+      <GoogleMap 
+        businesses={filteredBusinesses}
+        onBusinessClick={handleBusinessClick}
+        selectedBusiness={selectedBusiness}
+      />
+      
       {/* Search results dropdown */}
       {searchResults.length > 0 && (
-        <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-10 pointer-events-auto">
+        <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-10">
           <div className="app-popup p-4 pb-8 max-h-60 overflow-y-auto rounded-t-lg rounded-b-none border-b-0">
             {searchResults.map(business => (
               <div 
@@ -197,8 +195,7 @@ const HomePage: React.FC<HomePageProps> = ({
       )}
 
       {/* Business Preview Popup */}
-        {selectedBusiness && !showBusinessDetails && (
-        <div className="pointer-events-auto">
+      {selectedBusiness && !showBusinessDetails && (
         <BusinessPreview 
           business={selectedBusiness}
           posts={posts}
@@ -206,12 +203,10 @@ const HomePage: React.FC<HomePageProps> = ({
           onShowDetails={handleShowBusinessDetails}
           onStoriesClick={handleBusinessStoriesClick}
         />
-        </div>
-        )}
+      )}
 
       {/* Business Details Card */}
       {selectedBusiness && showBusinessDetails && (
-        <div className="pointer-events-auto">
         <BusinessDetails 
           business={selectedBusiness}
           posts={posts}
@@ -220,12 +215,11 @@ const HomePage: React.FC<HomePageProps> = ({
           onPostClick={onPostClick}
           onRoleVote={onRoleVote}
         />
-        </div>
-        )}
+      )}
 
       {/* Search input bar at bottom - only show on home slide and not during initiation */}
       {currentSlide === 1 && currentView === 'main' && (
-        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 pointer-events-auto">
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
           <div className="relative">
             <input
               type="text"

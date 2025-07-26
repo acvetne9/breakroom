@@ -1,14 +1,12 @@
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, PanInfo } from 'framer-motion';
 import InitiationPage from './InitiationPage';
 import HomePage from './HomePage';
 import SettingsPage from './SettingsPage';
 import ExplorePage from './ExplorePage';
-import GoogleMap from './GoogleMap';
-import { useBusinessesData } from '../hooks/useBusinessesData';
-import { usePerformanceMode } from '../hooks/usePerformanceMode';
 
+import { useBusinessesData } from '../hooks/useBusinessesData';
 
 interface UserData {
   salary: string;
@@ -46,8 +44,7 @@ const MobileApp: React.FC = () => {
   const [filteredUserStories, setFilteredUserStories] = useState(false);
   
   const constraintsRef = useRef(null);
-  const { businesses, loading, setBusinesses, loadBusinessChunk } = useBusinessesData();
-  const { shouldReduceMotion } = usePerformanceMode();
+  const { businesses, loading, setBusinesses } = useBusinessesData();
 
   const [posts, setPosts] = useState<Post[]>([
     {
@@ -72,7 +69,7 @@ const MobileApp: React.FC = () => {
     }
   ]);
 
-  const handleInitiationComplete = useCallback((data: UserData) => {
+  const handleInitiationComplete = (data: UserData) => {
     setUserData(data);
     setCurrentView('main');
     
@@ -90,9 +87,9 @@ const MobileApp: React.FC = () => {
       createdAt: new Date()
     };
     setPosts(prevPosts => [jobUpdatePost, ...prevPosts]);
-  }, []);
+  };
 
-  const handlePostSubmit = useCallback((text: string, businessId?: string) => {
+  const handlePostSubmit = (text: string, businessId?: string) => {
     const business = businessId ? businesses.find(b => b.id === businessId) : undefined;
     
     // Only create business stories when specifically viewing filtered posts for that business
@@ -112,28 +109,29 @@ const MobileApp: React.FC = () => {
       createdAt: new Date()
     };
     setPosts([newPost, ...posts]);
-  }, [businesses, filteredBusinessId, posts]);
+  };
 
-  const handleBusinessClick = useCallback((business: any) => {
+  const handleBusinessClick = (business: any) => {
     setSelectedBusiness(business);
     // When selecting a business, we're not filtering posts by business
     setFilteredBusinessId(null);
-  }, []);
+  };
 
-  const handleBusinessStoriesClick = useCallback((businessId: string) => {
+  const handleBusinessStoriesClick = (businessId: string) => {
     setFilteredBusinessId(businessId);
     setCurrentSlide(2); // Navigate to explore page
-  }, []);
+  };
 
-  const handleUserStoriesClick = useCallback(() => {
+  const handleUserStoriesClick = () => {
     setFilteredUserStories(true);
     setCurrentSlide(2); // Navigate to explore page
-  }, []);
+  };
 
-  const handleBackToAllPosts = useCallback(() => {
+
+  const handleBackToAllPosts = () => {
     setFilteredBusinessId(null);
     setFilteredUserStories(false);
-  }, []);
+  };
 
   const handlePostVote = (postId: string, voteType: 'up' | 'down') => {
     setPosts(prevPosts => {
@@ -303,14 +301,6 @@ const MobileApp: React.FC = () => {
   return (
     <div className="fixed inset-0 overflow-hidden">
       {/* Map is always the background */}
-      <GoogleMap 
-        businesses={businesses}
-        onBusinessClick={handleBusinessClick}
-        selectedBusiness={selectedBusiness}
-        loadBusinessChunk={loadBusinessChunk}
-      />
-      
-      {/* HomePage overlay */}
       <HomePage 
         businesses={businesses} 
         currentSlide={currentSlide}
@@ -336,16 +326,13 @@ const MobileApp: React.FC = () => {
           initial={{ x: '-100%' }}
           animate={{ x: 0 }}
           exit={{ x: '-100%' }}
-          transition={shouldReduceMotion ? 
-            { duration: 0.2, ease: 'easeOut' } : 
-            { type: 'spring', stiffness: 300, damping: 30 }
-          }
+          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           className="absolute inset-0 z-20"
-          drag={shouldReduceMotion ? false : "x"}
+          drag="x"
           dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={shouldReduceMotion ? 0 : 0.1}
+          dragElastic={0.1}
           onDragEnd={(event, info) => {
-            if (!shouldReduceMotion && info.offset.x < -100) {
+            if (info.offset.x < -100) {
               setCurrentSlide(1);
             }
           }}
@@ -364,16 +351,13 @@ const MobileApp: React.FC = () => {
           initial={{ x: '100%' }}
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
-          transition={shouldReduceMotion ? 
-            { duration: 0.2, ease: 'easeOut' } : 
-            { type: 'spring', stiffness: 300, damping: 30 }
-          }
+          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           className="absolute inset-0 z-20"
-          drag={shouldReduceMotion ? false : "x"}
+          drag="x"
           dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={shouldReduceMotion ? 0 : 0.1}
+          dragElastic={0.1}
           onDragEnd={(event, info) => {
-            if (!shouldReduceMotion && info.offset.x > 100) {
+            if (info.offset.x > 100) {
               setCurrentSlide(1);
             }
           }}
