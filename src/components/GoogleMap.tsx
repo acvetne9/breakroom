@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, memo } from 'react';
 import { MarkerClusterer } from '@googlemaps/markerclusterer';
 import { usePerformanceMode } from '../hooks/usePerformanceMode';
 
@@ -16,11 +16,12 @@ interface GoogleMapProps {
   loadBusinessChunk?: (areaIndex: number) => void;
 }
 
-const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBusinessClick, selectedBusiness, loadBusinessChunk }) => {
+const GoogleMap: React.FC<GoogleMapProps> = memo(({ onMapLoad, businesses = [], onBusinessClick, selectedBusiness, loadBusinessChunk }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [markerClusterer, setMarkerClusterer] = useState<MarkerClusterer | null>(null);
   const [currentZoom, setCurrentZoom] = useState<number>(14);
+  const [isMapReady, setIsMapReady] = useState(false);
   const { shouldReduceMotion } = usePerformanceMode();
   
   const MARKER_VISIBILITY_ZOOM_THRESHOLD = 13;
@@ -39,8 +40,11 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
     };
   }, [map]);
 
-  // Load Google Maps script dynamically
+  // Stable map initialization - only run once
   useEffect(() => {
+    if (!mapRef.current || map || isMapReady) {
+      return;
+    }
     const loadGoogleMapsScript = () => {
       return new Promise<void>((resolve, reject) => {
         // Check if Google Maps is already loaded and ready
@@ -363,6 +367,6 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
       }}
     />
   );
-};
+});
 
 export default GoogleMap;
