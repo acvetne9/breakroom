@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, PanInfo } from 'framer-motion';
 import InitiationPage from './InitiationPage';
@@ -89,6 +88,21 @@ const MobileApp: React.FC = () => {
     setPosts(prevPosts => [jobUpdatePost, ...prevPosts]);
   };
 
+  // NEW: Handle saving location when user clicks on a business
+  const handleLocationSave = (location: string, fullLocation: string) => {
+    console.log('Saving clicked business location:', { location, fullLocation });
+    setUserData(prev => {
+      if (prev) {
+        return {
+          ...prev,
+          location: location,
+          fullLocation: fullLocation
+        };
+      }
+      return prev;
+    });
+  };
+
   const handlePostSubmit = (text: string, businessId?: string) => {
     const business = businessId ? businesses.find(b => b.id === businessId) : undefined;
     
@@ -115,6 +129,16 @@ const MobileApp: React.FC = () => {
     setSelectedBusiness(business);
     // When selecting a business, we're not filtering posts by business
     setFilteredBusinessId(null);
+    
+    // NEW: Save the clicked business location
+    if (business.name) {
+      // Try to get the most complete location information available
+      const fullLocation = business.formatted_address || 
+                          business.vicinity || 
+                          `${business.name}${business.address ? ', ' + business.address : ''}` ||
+                          business.name;
+      handleLocationSave(business.name, fullLocation);
+    }
   };
 
   const handleBusinessStoriesClick = (businessId: string) => {
@@ -126,7 +150,6 @@ const MobileApp: React.FC = () => {
     setFilteredUserStories(true);
     setCurrentSlide(2); // Navigate to explore page
   };
-
 
   const handleBackToAllPosts = () => {
     setFilteredBusinessId(null);
@@ -313,6 +336,7 @@ const MobileApp: React.FC = () => {
           setExpandedPost(post.id);
         }}
         onRoleVote={handleRoleVote}
+        onLocationSave={handleLocationSave} // NEW: Pass the location save handler
       />
       
       {/* Initiation Card - slides up and disappears */}
@@ -388,7 +412,6 @@ const MobileApp: React.FC = () => {
           />
         </motion.div>
       )}
-
 
       {/* Swipe detection overlay - only at screen edges */}
       <div 
