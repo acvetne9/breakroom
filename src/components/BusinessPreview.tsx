@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { formatTimeAgo } from '../utils/timeAgo';
 
 interface Post {
   id: string;
@@ -9,6 +10,7 @@ interface Post {
   businessName?: string;
   images?: string[];
   isStory?: boolean;
+  createdAt: Date;
 }
 
 interface BusinessPreviewProps {
@@ -94,12 +96,13 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, posts, onCl
               businessStories.map(story => (
                 <div 
                   key={story.id}
-                  className="text-sm text-app-gray-dark cursor-pointer hover:text-app-black"
+                  className="text-sm text-app-gray-dark cursor-pointer hover:text-app-black relative pb-4"
                   onClick={handleStoryClick}
                 >
                   <p className="line-clamp-2">
                     {story.text.length > 60 ? `${story.text.substring(0, 60)}...` : story.text}
                   </p>
+                  <span className="absolute bottom-0 left-0 text-xs text-gray-400">{formatTimeAgo(story.createdAt)}</span>
                 </div>
               ))
             ) : (

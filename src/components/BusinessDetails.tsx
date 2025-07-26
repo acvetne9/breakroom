@@ -2,6 +2,7 @@
 import React from 'react';
 import { Compass } from 'lucide-react';
 import VotingComponent from './VotingComponent';
+import { formatTimeAgo } from '../utils/timeAgo';
 interface Post {
   id: string;
   author: string;
@@ -10,6 +11,7 @@ interface Post {
   businessName?: string;
   images?: string[];
   isStory?: boolean;
+  createdAt: Date;
 }
 
 interface BusinessDetailsProps {
@@ -144,10 +146,11 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
             {businessStories.length > 0 ? (
               <>
                 {businessStories.slice(0, 5).map(story => (
-                  <div key={story.id} className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={() => handleStoryClick(story)}>
-                    <p className="text-app-gray-dark text-sm">
+                  <div key={story.id} className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded relative" onClick={() => handleStoryClick(story)}>
+                    <p className="text-app-gray-dark text-sm pb-4">
                       {story.text.length > 100 ? `${story.text.substring(0, 100)}...` : story.text}
                     </p>
+                    <span className="absolute bottom-2 left-4 text-xs text-gray-400">{formatTimeAgo(story.createdAt)}</span>
                   </div>
                 ))}
                 {businessStories.length > 5 && (

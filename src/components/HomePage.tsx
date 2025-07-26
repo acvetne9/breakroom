@@ -15,6 +15,7 @@ interface Post {
   businessName?: string;
   images?: string[];
   isStory?: boolean;
+  createdAt: Date;
 }
 
 interface HomePageProps {

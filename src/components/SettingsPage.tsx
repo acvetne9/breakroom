@@ -20,6 +20,7 @@ interface Post {
   author: string;
   text: string;
   businessName?: string;
+  createdAt: Date;
 }
 interface SettingsPageProps {
   initialData: {
