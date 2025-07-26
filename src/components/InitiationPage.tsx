@@ -305,13 +305,12 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
                   onChange={e => handleSalaryChange(e.target.value)} 
                   onBlur={checkForCompletion} 
                   placeholder="$14" 
-                  className="app-input text-center text-lg flex-1" 
+                  className="app-input text-center text-lg flex-1 !py-0 h-12" 
                 />
                 <select 
                   value={timePeriod} 
                   onChange={(e) => setTimePeriod(e.target.value)}
-                  className="px-4 py-3 bg-white text-sm" 
-                  style={{ border: '1px solid hsl(var(--app-gray-light))', borderRadius: '0.5rem', height: '48px', fontSize: '16px' }}
+                  className="app-input text-lg w-auto !py-0 h-12"
                 >
                   <option value="HR">HR</option>
                   <option value="MO">MO</option>

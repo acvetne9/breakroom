@@ -8,7 +8,7 @@ interface GoogleMapProps {
     id: string;
     name: string;
     position: { lat: number; lng: number };
-    rating: number;
+    atmosphere: string[];
     salary?: string;
   }>;
   onBusinessClick?: (business: any) => void;

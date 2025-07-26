@@ -2,6 +2,7 @@
 import React from 'react';
 import { Compass } from 'lucide-react';
 import VotingComponent from './VotingComponent';
+import { formatTimeAgo } from '../utils/timeAgo';
 interface Post {
   id: string;
   author: string;
@@ -10,13 +11,14 @@ interface Post {
   businessName?: string;
   images?: string[];
   isStory?: boolean;
+  createdAt: Date;
 }
 
 interface BusinessDetailsProps {
   business: {
     id: string;
     name: string;
-    rating: number;
+    atmosphere: string[];
     salary?: string;
     stories?: Array<{
       id: string;
@@ -89,24 +91,9 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
           <div>
             <h2 className="text-xl font-medium text-app-black">{business.name}</h2>
             <div className="flex items-center mt-2">
-              <div className="flex items-center">
-                <span className="text-app-gray-medium">
-                  {Array.from({ length: 5 }, (_, i) => {
-                    const starValue = i + 1;
-                    const rating = business.rating || 0;
-                    if (rating >= starValue) {
-                      return '★';
-                    } else if (rating >= starValue - 0.5) {
-                      return '☆';
-                    } else {
-                      return '☆';
-                    }
-                  }).join('')}
-                </span>
-                <span className="text-app-gray-medium ml-2">
-                  {(business.rating || 0).toFixed(1)}
-                </span>
-              </div>
+              <span className="text-app-gray-medium">
+                {business.atmosphere.join(' • ')}
+              </span>
             </div>
           </div>
           <button onClick={handleCompassClick} className="compass-button p-2 rounded-lg bg-gray-100/0 py-0">
@@ -159,10 +146,11 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = ({
             {businessStories.length > 0 ? (
               <>
                 {businessStories.slice(0, 5).map(story => (
-                  <div key={story.id} className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={() => handleStoryClick(story)}>
-                    <p className="text-app-gray-dark text-sm">
+                  <div key={story.id} className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded relative" onClick={() => handleStoryClick(story)}>
+                    <p className="text-app-gray-dark text-sm pb-4">
                       {story.text.length > 100 ? `${story.text.substring(0, 100)}...` : story.text}
                     </p>
+                    <span className="absolute bottom-2 left-4 text-xs text-gray-400">{formatTimeAgo(story.createdAt)}</span>
                   </div>
                 ))}
                 {businessStories.length > 5 && (

@@ -20,6 +20,7 @@ interface Post {
   author: string;
   text: string;
   businessName?: string;
+  createdAt: Date;
 }
 interface SettingsPageProps {
   initialData: {
@@ -139,17 +140,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           <div className="space-y-4">
             <div className="flex items-center space-x-3">
               <input type="text" value={currentJob.salary} onChange={e => handleSalaryChange(e.target.value)} className="app-input flex-1" placeholder="$14" />
-              <select 
-                value={currentTimePeriod}
-                onChange={(e) => setCurrentTimePeriod(e.target.value)}
-                className="px-4 py-3 bg-white text-sm" 
-                style={{
-                  border: '1px solid hsl(var(--app-gray-light))',
-                  borderRadius: '0.5rem',
-                  height: '48px',
-                  fontSize: '16px'
-                }}
-              >
+              <select value={currentTimePeriod} onChange={e => setCurrentTimePeriod(e.target.value)} className="px-4 py-3 bg-white text-sm" style={{
+              border: '1px solid hsl(var(--app-gray-light))',
+              borderRadius: '0.5rem',
+              height: '48px',
+              fontSize: '16px'
+            }}>
                 <option value="HR">HR</option>
                 <option value="MO">MO</option>
                 <option value="YR">YR</option>
@@ -167,23 +163,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
               <div className="w-6"></div>
             </div>
 
-            <div className="flex items-center space-x-4">
-              <span className="text-app-black">Hiring?</span>
-              <div className="flex space-x-2">
-                <button onClick={() => setCurrentJob({
-                ...currentJob,
-                isHiring: true
-              })} className={`px-4 py-2 rounded-lg text-sm ${currentJob.isHiring ? 'bg-app-yellow text-app-black' : 'bg-app-gray-light text-app-gray-medium'}`}>
-                  Yes
-                </button>
-                <button onClick={() => setCurrentJob({
-                ...currentJob,
-                isHiring: false
-              })} className={`px-4 py-2 rounded-lg text-sm ${!currentJob.isHiring ? 'bg-app-yellow text-app-black' : 'bg-app-gray-light text-app-gray-medium'}`}>
-                  No
-                </button>
-              </div>
-            </div>
+            
           </div>
         </div>
 
@@ -234,31 +214,18 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             <h3 className="text-lg font-medium text-app-black">Your Stories 📖</h3>
           </button>
           
-          {isStoriesExpanded && (
-            <div className="mt-4 space-y-2">
-              {userPosts.length === 0 ? (
-                <p className="text-app-gray-medium text-sm">No stories yet. Share your workplace experiences!</p>
-              ) : (
-                <>
-                  {userPosts.slice(0, 3).map(post => (
-                    <div key={post.id} className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={() => onPostClick?.(post)}>
+          {isStoriesExpanded && <div className="mt-4 space-y-2">
+              {userPosts.length === 0 ? <p className="text-app-gray-medium text-sm">No stories yet. Share your workplace experiences!</p> : <>
+                  {userPosts.slice(0, 3).map(post => <div key={post.id} className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={() => onPostClick?.(post)}>
                       <p className="text-app-gray-dark text-sm">
                         {post.text.length > 100 ? `${post.text.substring(0, 100)}...` : post.text}
                       </p>
-                    </div>
-                  ))}
-                  {userPosts.length >= 5 && (
-                    <button 
-                      onClick={onStoriesClick} 
-                      className="w-full mt-3 px-4 py-2 bg-app-yellow text-app-black rounded hover:bg-app-yellow/90 transition-colors"
-                    >
+                    </div>)}
+                  {userPosts.length >= 5 && <button onClick={onStoriesClick} className="w-full mt-3 px-4 py-2 bg-app-yellow text-app-black rounded hover:bg-app-yellow/90 transition-colors">
                       View All Stories ({userPosts.length})
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          )}
+                    </button>}
+                </>}
+            </div>}
         </div>
       </div>
     </div>;

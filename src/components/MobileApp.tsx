@@ -29,6 +29,7 @@ interface Post {
   upvotes: number;
   downvotes: number;
   userVote?: 'up' | 'down' | null;
+  createdAt: Date;
 }
 
 const MobileApp: React.FC = () => {
@@ -53,7 +54,8 @@ const MobileApp: React.FC = () => {
       isStory: false,
       upvotes: 0,
       downvotes: 0,
-      userVote: null
+      userVote: null,
+      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000) // 2 hours ago
     },
     {
       id: '2',
@@ -62,7 +64,8 @@ const MobileApp: React.FC = () => {
       isStory: false,
       upvotes: 0,
       downvotes: 0,
-      userVote: null
+      userVote: null,
+      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000) // 1 day ago
     }
   ]);
 
@@ -74,13 +77,14 @@ const MobileApp: React.FC = () => {
     const jobUpdatePost: Post = {
       id: `job-update-${Date.now()}`,
       author: 'You',
-      text: `New Job Update! ${data.salary} for ${data.role} 👀`,
+      text: `New Job Update! ${data.salary} /${data.timePeriod || '/hr'} for ${data.role} 😳`,
       isJobUpdate: true,
       isStory: false,
       linkedLocation: data.fullLocation || data.location,
       upvotes: 0,
       downvotes: 0,
-      userVote: null
+      userVote: null,
+      createdAt: new Date()
     };
     setPosts(prevPosts => [jobUpdatePost, ...prevPosts]);
   };
@@ -101,7 +105,8 @@ const MobileApp: React.FC = () => {
       isStory: shouldBeStory,
       upvotes: 0,
       downvotes: 0,
-      userVote: null
+      userVote: null,
+      createdAt: new Date()
     };
     setPosts([newPost, ...posts]);
   };

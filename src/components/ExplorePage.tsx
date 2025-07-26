@@ -3,6 +3,7 @@ import { Eye } from 'lucide-react';
 import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 import VotingComponent from './VotingComponent';
+import { formatTimeAgo } from '../utils/timeAgo';
 interface Post {
   id: string;
   author: string;
@@ -16,6 +17,7 @@ interface Post {
   upvotes: number;
   downvotes: number;
   userVote?: 'up' | 'down' | null;
+  createdAt: Date;
 }
 interface ExplorePageProps {
   posts: Post[];
@@ -143,6 +145,11 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                           <span className="py-0 my-0">👀</span>
                         </button>}
                     </div>
+                  </div>
+                  
+                  {/* Timestamp in bottom left */}
+                  <div className="absolute bottom-1 left-1">
+                    <span className="text-xs text-gray-400">{formatTimeAgo(post.createdAt)}</span>
                   </div>
                   
                   {/* Voting component in bottom right */}

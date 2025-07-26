@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { formatTimeAgo } from '../utils/timeAgo';
 
 interface Post {
   id: string;
@@ -9,13 +10,14 @@ interface Post {
   businessName?: string;
   images?: string[];
   isStory?: boolean;
+  createdAt: Date;
 }
 
 interface BusinessPreviewProps {
   business: {
     id: string;
     name: string;
-    rating: number;
+    atmosphere: string[];
     salary?: string;
     stories?: Array<{ id: string; text: string; author: string }>;
   };
@@ -65,24 +67,9 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, posts, onCl
           <div>
             <h3 className="text-lg font-medium text-app-black">{business.name}</h3>
             <div className="flex items-center mt-1">
-              <div className="flex items-center">
-                <span className="text-app-gray-medium text-sm">
-                  {Array.from({ length: 5 }, (_, i) => {
-                    const starValue = i + 1;
-                    const rating = business.rating || 0;
-                    if (rating >= starValue) {
-                      return '★';
-                    } else if (rating >= starValue - 0.5) {
-                      return '☆';
-                    } else {
-                      return '☆';
-                    }
-                  }).join('')}
-                </span>
-                <span className="text-app-gray-medium text-sm ml-2">
-                  {(business.rating || 0).toFixed(1)}
-                </span>
-              </div>
+              <span className="text-app-gray-medium text-sm">
+                {business.atmosphere.join(' • ')}
+              </span>
             </div>
           </div>
         </div>
@@ -90,7 +77,12 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, posts, onCl
         {business.salary && (
           <div className="mb-4">
             <p className="text-app-black">
-              <span className="font-medium">{business.salary}</span> Barista
+              <span className="font-medium">
+                {business.salary}
+                {!business.salary.includes('/') && (
+                  <span className="text-xs text-app-gray-medium ml-1">/hr</span>
+                )}
+              </span> Barista
             </p>
           </div>
         )}
@@ -104,12 +96,13 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, posts, onCl
               businessStories.map(story => (
                 <div 
                   key={story.id}
-                  className="text-sm text-app-gray-dark cursor-pointer hover:text-app-black"
+                  className="text-sm text-app-gray-dark cursor-pointer hover:text-app-black relative pb-4"
                   onClick={handleStoryClick}
                 >
                   <p className="line-clamp-2">
                     {story.text.length > 60 ? `${story.text.substring(0, 60)}...` : story.text}
                   </p>
+                  <span className="absolute bottom-0 left-0 text-xs text-gray-400">{formatTimeAgo(story.createdAt)}</span>
                 </div>
               ))
             ) : (
