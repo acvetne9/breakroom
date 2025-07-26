@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Eye } from 'lucide-react';
 import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
+import VotingComponent from './VotingComponent';
 interface Post {
   id: string;
   author: string;
@@ -12,6 +13,9 @@ interface Post {
   isStory?: boolean;
   isJobUpdate?: boolean;
   linkedLocation?: string;
+  upvotes: number;
+  downvotes: number;
+  userVote?: 'up' | 'down' | null;
 }
 interface ExplorePageProps {
   posts: Post[];
@@ -22,6 +26,7 @@ interface ExplorePageProps {
   onCommentSubmit?: (postId: string, comment: string) => void;
   onPostSubmit?: (text: string, businessId?: string) => void;
   onBackToAllPosts?: () => void;
+  onPostVote?: (postId: string, voteType: 'up' | 'down') => void;
 }
 const ExplorePage: React.FC<ExplorePageProps> = ({
   posts,
@@ -31,7 +36,8 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   onExpandedPostChange,
   onCommentSubmit,
   onPostSubmit,
-  onBackToAllPosts
+  onBackToAllPosts,
+  onPostVote
 }) => {
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [comments, setComments] = useState<{
@@ -88,13 +94,12 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   const handleBusinessView = (businessId: string) => {
     onBusinessView?.(businessId);
   };
+  const handlePostVote = (postId: string, voteType: 'up' | 'down') => {
+    onPostVote?.(postId, voteType);
+  };
 
   // Filter posts based on business or user stories
-  const displayPosts = filteredBusinessId 
-    ? posts.filter(post => post.businessId === filteredBusinessId && !post.isJobUpdate) 
-    : filteredUserStories 
-    ? posts.filter(post => post.author === 'You' && !post.isJobUpdate) 
-    : posts;
+  const displayPosts = filteredBusinessId ? posts.filter(post => post.businessId === filteredBusinessId && !post.isJobUpdate) : filteredUserStories ? posts.filter(post => post.author === 'You' && !post.isJobUpdate) : posts;
   return <div className="relative w-full h-full">
       {/* Header for filtered views */}
       {filteredBusinessId || filteredUserStories}
@@ -119,27 +124,31 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                   </div>}
 
                 {/* Post content */}
-                <div className={`relative z-10 ${post.images && post.images.length >= 5 ? 'post-overlay rounded-lg p-3' : ''}`}>
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-app-gray-medium text-sm">@{post.author}</span>
-                    {(post.businessId || post.isJobUpdate) && (
-                      <button onClick={e => {
-                        e.stopPropagation();
-                        if (post.businessId) {
-                          handleBusinessView(post.businessId);
-                        } else if (post.linkedLocation) {
-                          // Handle job update location click - could open map or search
-                          toast({
-                            title: "Location",
-                            description: post.linkedLocation,
-                          });
-                        }
-                      }} className="flex items-center space-x-1 text-app-gray-medium hover:text-app-black">
-                        <span>👀</span>
-                      </button>
-                    )}
+                <div className={`relative z-10 pb-10 ${post.images && post.images.length >= 5 ? 'post-overlay rounded-lg p-3' : ''}`}>
+                  <div className="flex items-start justify-between mb-2">
+                    <p className="text-app-black flex-1 pr-4 break-words overflow-wrap-break-word">{post.text}</p>
+                    <div className="flex-shrink-0 w-8 flex justify-center mt-1 my-0">
+                      {(post.businessId || post.isJobUpdate) && <button onClick={e => {
+                    e.stopPropagation();
+                    if (post.businessId) {
+                      handleBusinessView(post.businessId);
+                    } else if (post.linkedLocation) {
+                      // Handle job update location click - could open map or search
+                      toast({
+                        title: "Location",
+                        description: post.linkedLocation
+                      });
+                    }
+                  }} className="flex items-center space-x-1 text-app-gray-medium hover:text-app-black">
+                          <span className="py-0 my-0">👀</span>
+                        </button>}
+                    </div>
                   </div>
-                  <p className="text-app-black">{post.text}</p>
+                  
+                  {/* Voting component in bottom right */}
+                  <div className="absolute bottom-1 right-1">
+                    <VotingComponent upvotes={post.upvotes} downvotes={post.downvotes} userVote={post.userVote} onVote={voteType => handlePostVote(post.id, voteType)} />
+                  </div>
                 </div>
 
                 {/* Expanded view */}
@@ -172,7 +181,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
           </div> :
       // Post input for explore page
       <div className="relative">
-            <input type="text" value={postText} onChange={e => setPostText(e.target.value)} placeholder="How's work?" className="search-bar pr-14" onKeyPress={e => {
+            <input type="text" value={postText} onChange={e => setPostText(e.target.value)} placeholder={filteredBusinessId ? "Thoughts about this business?" : "How's work?"} className="search-bar pr-14" onKeyPress={e => {
           if (e.key === 'Enter') {
             handlePostSubmit();
           }

@@ -26,24 +26,37 @@ interface HomePageProps {
     salary?: string;
     stories?: Array<{ id: string; text: string; author: string }>;
     businessType?: string;
-    roles?: Array<{ role: string; salary: string }>;
+    roles?: Array<{ 
+      role: string; 
+      salary: string; 
+      upvotes?: number; 
+      downvotes?: number; 
+      userVote?: 'up' | 'down' | null; 
+    }>;
+    place_id?: string;
+    website?: string;
+    url?: string;
   }>;
   currentSlide?: number;
+  currentView?: 'initiation' | 'main';
   selectedBusiness?: any;
   onBusinessSelect?: (business: any) => void;
   posts: Post[];
   onBusinessStoriesClick?: (businessId: string) => void;
   onPostClick?: (post: Post) => void;
+  onRoleVote?: (businessId: string, roleIndex: number, voteType: 'up' | 'down') => void;
 }
 
 const HomePage: React.FC<HomePageProps> = ({ 
   businesses, 
   currentSlide = 1,
+  currentView = 'main',
   selectedBusiness: propSelectedBusiness,
   onBusinessSelect,
   posts,
   onBusinessStoriesClick,
-  onPostClick
+  onPostClick,
+  onRoleVote
 }) => {
   const [searchValue, setSearchValue] = useState('');
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
@@ -137,6 +150,10 @@ const HomePage: React.FC<HomePageProps> = ({
     setShowBusinessDetails(false);
   };
 
+  const handleBackToPreview = () => {
+    setShowBusinessDetails(false);
+  };
+
   return (
     <div className="relative w-full h-full">
       {/* Google Maps base layer */}
@@ -192,14 +209,15 @@ const HomePage: React.FC<HomePageProps> = ({
         <BusinessDetails 
           business={selectedBusiness}
           posts={posts}
-          onClose={handleClosePreview}
+          onClose={handleBackToPreview}
           onStoriesClick={() => onBusinessStoriesClick?.(selectedBusiness.id)}
           onPostClick={onPostClick}
+          onRoleVote={onRoleVote}
         />
       )}
 
-      {/* Search input bar at bottom - only show on home slide */}
-      {currentSlide === 1 && (
+      {/* Search input bar at bottom - only show on home slide and not during initiation */}
+      {currentSlide === 1 && currentView === 'main' && (
         <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
           <div className="relative">
             <input
@@ -214,7 +232,7 @@ const HomePage: React.FC<HomePageProps> = ({
               onClick={performSearch}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-app-gray-medium hover:text-app-gray-dark transition-colors"
             >
-              <Search size={20} />
+              <span>🔍</span>
             </button>
           </div>
         </div>

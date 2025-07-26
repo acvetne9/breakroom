@@ -36,6 +36,7 @@ interface InitiationPageProps {
     role: string;
     location: string;
     fullLocation?: string;
+    timePeriod: string;
   }) => void;
 }
 
@@ -46,6 +47,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   const [role, setRole] = useState('');
   const [location, setLocation] = useState('');
   const [fullLocation, setFullLocation] = useState('');
+  const [timePeriod, setTimePeriod] = useState('HR');
   const [isComplete, setIsComplete] = useState(false);
   const [isGooglePlacesSelected, setIsGooglePlacesSelected] = useState(false);
   const autocompleteRef = useRef<HTMLInputElement>(null);
@@ -121,7 +123,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   useEffect(() => {
     if (isComplete) {
       // Validate that all required data is present
-      const dataToPass = { salary, role, location, fullLocation };
+      const dataToPass = { salary, role, location, fullLocation, timePeriod };
       console.log('InitiationPage completing with data:', dataToPass);
       
       // Ensure we have all required fields
@@ -305,10 +307,15 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
                   placeholder="$14" 
                   className="app-input text-center text-lg flex-1" 
                 />
-                <select className="px-4 py-3 bg-white text-sm" style={{ border: '1px solid hsl(var(--app-gray-light))', borderRadius: '0.5rem', height: '48px', fontSize: '16px' }}>
-                  <option>HR</option>
-                  <option>MO</option>
-                  <option>YR</option>
+                <select 
+                  value={timePeriod} 
+                  onChange={(e) => setTimePeriod(e.target.value)}
+                  className="px-4 py-3 bg-white text-sm" 
+                  style={{ border: '1px solid hsl(var(--app-gray-light))', borderRadius: '0.5rem', height: '48px', fontSize: '16px' }}
+                >
+                  <option value="HR">HR</option>
+                  <option value="MO">MO</option>
+                  <option value="YR">YR</option>
                 </select>
               </div>
             </div>

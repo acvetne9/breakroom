@@ -7,7 +7,13 @@ interface Business {
   position: { lat: number; lng: number };
   rating: number;
   salary?: string;
-  roles?: Array<{ role: string; salary: string }>;
+  roles?: Array<{ 
+    role: string; 
+    salary: string; 
+    upvotes: number; 
+    downvotes: number; 
+    userVote?: 'up' | 'down' | null; 
+  }>;
   businessType?: string;
   place_id?: string;
   website?: string;
@@ -71,7 +77,13 @@ export const useBusinessesData = () => {
               
               // Select 2-3 random roles for each business
               const shuffledRoles = [...jobRoles].sort(() => 0.5 - Math.random());
-              const selectedRoles = shuffledRoles.slice(0, 2 + Math.floor(Math.random() * 2));
+              const selectedRoles = shuffledRoles.slice(0, 2 + Math.floor(Math.random() * 2))
+                .map(role => ({
+                  ...role,
+                  upvotes: 0,
+                  downvotes: 0,
+                  userVote: null as 'up' | 'down' | null
+                }));
               
               const mockPlaceId = `ChIJ${Math.random().toString(36).substring(2, 15)}`;
               const mockWebsites = [
@@ -114,8 +126,8 @@ export const useBusinessesData = () => {
             rating: 5.0,
             salary: '$13.6',
             roles: [
-              { role: 'Barista', salary: '$13.6' },
-              { role: 'Manager', salary: '$18.5' }
+              { role: 'Barista', salary: '$13.6', upvotes: 0, downvotes: 0, userVote: null },
+              { role: 'Manager', salary: '$18.5', upvotes: 0, downvotes: 0, userVote: null }
             ],
             place_id: 'ChIJexampleplacepriyanka',
             website: 'https://www.cafepriyanka.com',
@@ -129,8 +141,8 @@ export const useBusinessesData = () => {
             rating: 4.2,
             salary: '$15.0',
             roles: [
-              { role: 'Cashier', salary: '$15.0' },
-              { role: 'Cook', salary: '$16.2' }
+              { role: 'Cashier', salary: '$15.0', upvotes: 0, downvotes: 0, userVote: null },
+              { role: 'Cook', salary: '$16.2', upvotes: 0, downvotes: 0, userVote: null }
             ],
             place_id: 'ChIJexampleplacetacobell',
             website: 'https://www.tacobell.com',
@@ -145,5 +157,5 @@ export const useBusinessesData = () => {
     fetchBusinesses();
   }, []);
 
-  return { businesses, loading };
+  return { businesses, loading, setBusinesses };
 };
