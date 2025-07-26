@@ -74,7 +74,40 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [initialPastJobs] = useState<PastJob[]>([]);
   const [changedJobs, setChangedJobs] = useState<Set<string>>(new Set());
   const [currentJobChanged, setCurrentJobChanged] = useState(false);
+  
+  // Use refs to track current values for cleanup function
+  const currentJobRef = useRef(currentJob);
+  const currentTimePeriodRef = useRef(currentTimePeriod);
+  const pastJobsRef = useRef(pastJobs);
+  const pastJobTimePeriodsRef = useRef(pastJobTimePeriods);
+  const changedJobsRef = useRef(changedJobs);
+  const currentJobChangedRef = useRef(currentJobChanged);
   const hasCreatedPostsRef = useRef(false);
+
+  // Update refs whenever state changes
+  useEffect(() => {
+    currentJobRef.current = currentJob;
+  }, [currentJob]);
+
+  useEffect(() => {
+    currentTimePeriodRef.current = currentTimePeriod;
+  }, [currentTimePeriod]);
+
+  useEffect(() => {
+    pastJobsRef.current = pastJobs;
+  }, [pastJobs]);
+
+  useEffect(() => {
+    pastJobTimePeriodsRef.current = pastJobTimePeriods;
+  }, [pastJobTimePeriods]);
+
+  useEffect(() => {
+    changedJobsRef.current = changedJobs;
+  }, [changedJobs]);
+
+  useEffect(() => {
+    currentJobChangedRef.current = currentJobChanged;
+  }, [currentJobChanged]);
 
   const validateProfanity = (text: string, fieldName: string): boolean => {
     if (isProfane(text)) {
@@ -112,21 +145,43 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       if (hasCreatedPostsRef.current || !onJobUpdate) return;
       hasCreatedPostsRef.current = true;
 
+      console.log('SettingsPage cleanup - checking for job changes');
+      console.log('Current job changed:', currentJobChangedRef.current);
+      console.log('Current job:', currentJobRef.current);
+      console.log('Changed jobs:', changedJobsRef.current);
+
+      // Helper function to check if current job changed using refs
+      const hasCurrentJobChangedFromRefs = () => {
+        return (
+          currentJobRef.current.salary !== initialCurrentJob.salary ||
+          currentJobRef.current.role !== initialCurrentJob.role ||
+          currentJobRef.current.location !== initialCurrentJob.location ||
+          currentTimePeriodRef.current !== initialTimePeriod
+        );
+      };
+
+      // Helper function to check if current job is complete using refs
+      const isCurrentJobCompleteFromRefs = () => {
+        return currentJobRef.current.salary && currentJobRef.current.role && currentJobRef.current.location && currentTimePeriodRef.current;
+      };
+
       // Create post for current job if changed and complete
-      if (currentJobChanged && hasCurrentJobChanged() && isCurrentJobComplete()) {
+      if (currentJobChangedRef.current && hasCurrentJobChangedFromRefs() && isCurrentJobCompleteFromRefs()) {
+        console.log('Creating post for current job:', currentJobRef.current);
         onJobUpdate({
-          salary: currentJob.salary,
-          role: currentJob.role,
-          location: currentJob.location,
-          timePeriod: currentTimePeriod
+          salary: currentJobRef.current.salary,
+          role: currentJobRef.current.role,
+          location: currentJobRef.current.location,
+          timePeriod: currentTimePeriodRef.current
         });
       }
 
       // Create posts for all changed past jobs that are complete
-      changedJobs.forEach(jobId => {
-        const job = pastJobs.find(j => j.id === jobId);
-        const timePeriod = pastJobTimePeriods[jobId];
+      changedJobsRef.current.forEach(jobId => {
+        const job = pastJobsRef.current.find(j => j.id === jobId);
+        const timePeriod = pastJobTimePeriodsRef.current[jobId];
         if (job && isPastJobComplete(job, timePeriod)) {
+          console.log('Creating post for past job:', job);
           onJobUpdate({
             salary: job.salary,
             role: job.role,
