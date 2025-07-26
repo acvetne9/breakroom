@@ -1,4 +1,5 @@
 import React from 'react';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 
 interface VotingComponentProps {
   upvotes: number;
@@ -37,9 +38,10 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
             : 'hover:bg-green-50 hover:scale-105'
         }`}
       >
-        <span className={userVote === 'up' ? 'text-green-600' : 'text-gray-600'}>
-          ✅
-        </span>
+        <ChevronUp 
+          size={16} 
+          className={userVote === 'up' ? 'text-green-600' : 'text-gray-400'} 
+        />
       </button>
       
       <span className="font-medium text-app-black min-w-[20px] text-center">
@@ -54,9 +56,10 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
             : 'hover:bg-red-50 hover:scale-105'
         }`}
       >
-        <span className={userVote === 'down' ? 'text-red-600' : 'text-gray-600'}>
-          🚫
-        </span>
+        <ChevronDown 
+          size={16} 
+          className={userVote === 'down' ? 'text-red-600' : 'text-gray-400'} 
+        />
       </button>
     </div>
   );
