@@ -155,7 +155,7 @@ const HomePage: React.FC<HomePageProps> = ({
   };
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full bg-transparent">
       {/* Search results dropdown */}
       {searchResults.length > 0 && (
         <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-10">
