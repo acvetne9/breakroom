@@ -310,42 +310,6 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
     };
   }, [map, businesses, onBusinessClick, currentZoom]);
 
-  // Add occasional confetti bursts
-  useEffect(() => {
-    if (!map) return;
-
-    const addConfettiBurst = () => {
-      const bounds = map.getBounds();
-      if (!bounds) return;
-
-      const ne = bounds.getNorthEast();
-      const sw = bounds.getSouthWest();
-      
-      const randomLat = sw.lat() + Math.random() * (ne.lat() - sw.lat());
-      const randomLng = sw.lng() + Math.random() * (ne.lng() - sw.lng());
-
-      const confettiMarker = new google.maps.Marker({
-        position: { lat: randomLat, lng: randomLng },
-        map: map,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 4,
-          fillColor: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7'][Math.floor(Math.random() * 5)],
-          fillOpacity: 0.8,
-          strokeWeight: 0
-        },
-        animation: google.maps.Animation.DROP
-      });
-
-      // Remove after animation
-      setTimeout(() => {
-        confettiMarker.setMap(null);
-      }, 2000);
-    };
-
-    const interval = setInterval(addConfettiBurst, 8000 + Math.random() * 7000);
-    return () => clearInterval(interval);
-  }, [map]);
 
   // Center map on selected business with proper navigation
   useEffect(() => {
