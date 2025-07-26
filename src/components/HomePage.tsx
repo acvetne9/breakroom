@@ -165,10 +165,10 @@ const HomePage: React.FC<HomePageProps> = ({
   }, []);
 
   return (
-    <div className="relative w-full h-full bg-transparent">
+    <div className="relative w-full h-full bg-transparent pointer-events-none">
       {/* Search results dropdown */}
       {searchResults.length > 0 && (
-        <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-10">
+        <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-10 pointer-events-auto">
           <div className="app-popup p-4 pb-8 max-h-60 overflow-y-auto rounded-t-lg rounded-b-none border-b-0">
             {searchResults.map(business => (
               <div 
@@ -197,7 +197,8 @@ const HomePage: React.FC<HomePageProps> = ({
       )}
 
       {/* Business Preview Popup */}
-      {selectedBusiness && !showBusinessDetails && (
+        {selectedBusiness && !showBusinessDetails && (
+        <div className="pointer-events-auto">
         <BusinessPreview 
           business={selectedBusiness}
           posts={posts}
@@ -205,10 +206,12 @@ const HomePage: React.FC<HomePageProps> = ({
           onShowDetails={handleShowBusinessDetails}
           onStoriesClick={handleBusinessStoriesClick}
         />
-      )}
+        </div>
+        )}
 
       {/* Business Details Card */}
       {selectedBusiness && showBusinessDetails && (
+        <div className="pointer-events-auto">
         <BusinessDetails 
           business={selectedBusiness}
           posts={posts}
@@ -217,11 +220,12 @@ const HomePage: React.FC<HomePageProps> = ({
           onPostClick={onPostClick}
           onRoleVote={onRoleVote}
         />
-      )}
+        </div>
+        )}
 
       {/* Search input bar at bottom - only show on home slide and not during initiation */}
       {currentSlide === 1 && currentView === 'main' && (
-        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 pointer-events-auto">
           <div className="relative">
             <input
               type="text"

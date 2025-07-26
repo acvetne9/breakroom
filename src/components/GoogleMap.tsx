@@ -325,10 +325,11 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
       ref={mapRef} 
       className="absolute inset-0 w-full h-full"
       style={{ 
-        zIndex: -1,
+        zIndex: 1,
         minHeight: '100vh',
         minWidth: '100vw',
-        touchAction: 'manipulation'
+        touchAction: 'manipulation',
+        pointerEvents: 'auto'
       }}
     />
   );
