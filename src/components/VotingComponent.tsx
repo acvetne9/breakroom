@@ -39,7 +39,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
       >
         <span 
           className="transition-all"
-          style={{ filter: userVote === 'up' ? 'grayscale(0%)' : 'grayscale(100%)' }}
+          style={{ filter: userVote === 'up' ? 'grayscale(0%)' : 'grayscale(90%)' }}
         >
           ✅
         </span>
@@ -59,7 +59,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
       >
         <span 
           className="transition-all"
-          style={{ filter: userVote === 'down' ? 'grayscale(0%)' : 'grayscale(100%)' }}
+          style={{ filter: userVote === 'down' ? 'grayscale(0%)' : 'grayscale(90%)' }}
         >
           🚫
         </span>
