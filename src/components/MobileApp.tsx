@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, PanInfo } from 'framer-motion';
 import InitiationPage from './InitiationPage';
 import HomePage from './HomePage';
@@ -8,7 +8,7 @@ import ExplorePage from './ExplorePage';
 import GoogleMap from './GoogleMap';
 import { useBusinessesData } from '../hooks/useBusinessesData';
 import { usePerformanceMode } from '../hooks/usePerformanceMode';
-import { useDebounce } from '../hooks/useDebounce';
+
 
 interface UserData {
   salary: string;
@@ -479,4 +479,4 @@ const MobileApp: React.FC = () => {
   );
 };
 
-export default memo(MobileApp);
+export default MobileApp;

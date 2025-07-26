@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback, memo } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { MarkerClusterer } from '@googlemaps/markerclusterer';
 import { usePerformanceMode } from '../hooks/usePerformanceMode';
 
@@ -16,7 +16,7 @@ interface GoogleMapProps {
   loadBusinessChunk?: (areaIndex: number) => void;
 }
 
-const GoogleMap: React.FC<GoogleMapProps> = memo(({ onMapLoad, businesses = [], onBusinessClick, selectedBusiness, loadBusinessChunk }) => {
+const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBusinessClick, selectedBusiness, loadBusinessChunk }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [markerClusterer, setMarkerClusterer] = useState<MarkerClusterer | null>(null);
@@ -361,12 +361,13 @@ const GoogleMap: React.FC<GoogleMapProps> = memo(({ onMapLoad, businesses = [], 
       ref={mapRef} 
       className="absolute inset-0 w-full h-full"
       style={{ 
-        zIndex: 0,
+        zIndex: -1,
         minHeight: '100vh',
-        minWidth: '100vw'
+        minWidth: '100vw',
+        touchAction: 'manipulation'
       }}
     />
   );
-});
+};
 
 export default GoogleMap;

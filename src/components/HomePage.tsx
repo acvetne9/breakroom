@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import BusinessPreview from './BusinessPreview';
 import BusinessDetails from './BusinessDetails';
 import { searchBusinesses } from '../utils/searchUtils';
@@ -244,4 +244,4 @@ const HomePage: React.FC<HomePageProps> = ({
   );
 };
 
-export default memo(HomePage);
+export default HomePage;
