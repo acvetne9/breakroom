@@ -15,7 +15,7 @@ interface BusinessPreviewProps {
   business: {
     id: string;
     name: string;
-    rating: number;
+    atmosphere: string[];
     salary?: string;
     stories?: Array<{ id: string; text: string; author: string }>;
   };
@@ -65,24 +65,9 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, posts, onCl
           <div>
             <h3 className="text-lg font-medium text-app-black">{business.name}</h3>
             <div className="flex items-center mt-1">
-              <div className="flex items-center">
-                <span className="text-app-gray-medium text-sm">
-                  {Array.from({ length: 5 }, (_, i) => {
-                    const starValue = i + 1;
-                    const rating = business.rating || 0;
-                    if (rating >= starValue) {
-                      return '★';
-                    } else if (rating >= starValue - 0.5) {
-                      return '☆';
-                    } else {
-                      return '☆';
-                    }
-                  }).join('')}
-                </span>
-                <span className="text-app-gray-medium text-sm ml-2">
-                  {(business.rating || 0).toFixed(1)}
-                </span>
-              </div>
+              <span className="text-app-gray-medium text-sm">
+                {business.atmosphere.join(' • ')}
+              </span>
             </div>
           </div>
         </div>

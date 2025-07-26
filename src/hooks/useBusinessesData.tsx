@@ -5,7 +5,7 @@ interface Business {
   id: string;
   name: string;
   position: { lat: number; lng: number };
-  rating: number;
+  atmosphere: string[];
   salary?: string;
   roles?: Array<{ 
     role: string; 
@@ -69,6 +69,18 @@ export const useBusinessesData = () => {
             { role: 'Stylist', salary: '$18.7' }
           ];
 
+          const atmosphereOptions = [
+            ['family-friendly', 'cozy', 'welcoming', 'casual'],
+            ['trendy', 'modern', 'upscale', 'stylish'],
+            ['bustling', 'energetic', 'lively', 'vibrant'],
+            ['quiet', 'relaxed', 'peaceful', 'intimate'],
+            ['professional', 'corporate', 'formal', 'efficient'],
+            ['hipster', 'artsy', 'creative', 'eclectic'],
+            ['authentic', 'traditional', 'homestyle', 'rustic'],
+            ['fast-paced', 'convenient', 'quick', 'on-the-go'],
+            ['sophisticated', 'elegant', 'refined', 'classy']
+          ];
+
           nycAreas.forEach((area, areaIndex) => {
             for (let i = 0; i < 50; i++) { // 50 businesses per area = 250 total
               const businessIndex = areaIndex * 50 + i;
@@ -100,7 +112,7 @@ export const useBusinessesData = () => {
                   lat: area.lat + (Math.random() - 0.5) * 0.02,
                   lng: area.lng + (Math.random() - 0.5) * 0.02
                 },
-                rating: 3.5 + Math.random() * 1.5,
+                atmosphere: atmosphereOptions[Math.floor(Math.random() * atmosphereOptions.length)],
                 salary: `$${(12 + Math.random() * 8).toFixed(1)}`,
                 roles: selectedRoles,
                 place_id: mockPlaceId,
@@ -123,7 +135,7 @@ export const useBusinessesData = () => {
             name: 'Cafe Priyanka',
             businessType: 'Cafe',
             position: { lat: 40.7831, lng: -73.9712 },
-            rating: 5.0,
+            atmosphere: ['cozy', 'welcoming', 'trendy', 'authentic'],
             salary: '$13.6',
             roles: [
               { role: 'Barista', salary: '$13.6', upvotes: 0, downvotes: 0, userVote: null },
@@ -138,7 +150,7 @@ export const useBusinessesData = () => {
             name: 'Taco Bell',
             businessType: 'Fast Food',
             position: { lat: 40.7841, lng: -73.9702 },
-            rating: 4.2,
+            atmosphere: ['fast-paced', 'convenient', 'casual', 'lively'],
             salary: '$15.0',
             roles: [
               { role: 'Cashier', salary: '$15.0', upvotes: 0, downvotes: 0, userVote: null },

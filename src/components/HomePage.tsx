@@ -22,7 +22,7 @@ interface HomePageProps {
     id: string;
     name: string;
     position: { lat: number; lng: number };
-    rating: number;
+    atmosphere: string[];
     salary?: string;
     stories?: Array<{ id: string; text: string; author: string }>;
     businessType?: string;
