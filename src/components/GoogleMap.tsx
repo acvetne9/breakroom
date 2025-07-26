@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
 import { MarkerClusterer } from '@googlemaps/markerclusterer';
@@ -19,7 +18,6 @@ interface GoogleMapProps {
 const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBusinessClick, selectedBusiness }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [markers, setMarkers] = useState<google.maps.Marker[]>([]);
   const [markerClusterer, setMarkerClusterer] = useState<MarkerClusterer | null>(null);
   const [currentZoom, setCurrentZoom] = useState<number>(14);
   
@@ -82,7 +80,8 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
         });
 
         // Add throttled zoom change listener
-        mapInstance.addListener('zoom_changed', throttledZoomChange());
+        const zoomHandler = throttledZoomChange();
+        mapInstance.addListener('zoom_changed', zoomHandler);
 
         setMap(mapInstance);
         onMapLoad?.(mapInstance);
@@ -92,21 +91,20 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
     };
 
     initMap();
-  }, [onMapLoad]);
+  }, [onMapLoad, throttledZoomChange]);
 
   // Add business markers with clustering and zoom-based visibility
   useEffect(() => {
     if (!map || !businesses.length) return;
 
-    // Clear existing markers and clusterer
+    // Clear existing clusterer
     if (markerClusterer) {
       markerClusterer.clearMarkers();
+      setMarkerClusterer(null);
     }
-    markers.forEach(marker => marker.setMap(null));
 
     // Only show markers if zoom level is above threshold
     if (currentZoom < MARKER_VISIBILITY_ZOOM_THRESHOLD) {
-      setMarkers([]);
       return;
     }
 
@@ -116,7 +114,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
       bounds.contains(new google.maps.LatLng(business.position.lat, business.position.lng))
     ) : businesses;
 
-    const newMarkers = visibleBusinesses.map(business => {
+    const markers = visibleBusinesses.map(business => {
       const marker = new google.maps.Marker({
         position: business.position,
         title: business.name,
@@ -137,18 +135,18 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
       return marker;
     });
 
-    // Create or update marker clusterer
+    // Create marker clusterer with simple configuration
     const clusterer = new MarkerClusterer({ 
       map, 
-      markers: newMarkers
+      markers
     });
 
-    setMarkers(newMarkers);
     setMarkerClusterer(clusterer);
 
     return () => {
-      clusterer.clearMarkers();
-      newMarkers.forEach(marker => marker.setMap(null));
+      if (clusterer) {
+        clusterer.clearMarkers();
+      }
     };
   }, [map, businesses, onBusinessClick, currentZoom]);
 
