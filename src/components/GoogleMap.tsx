@@ -19,6 +19,9 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [markers, setMarkers] = useState<google.maps.Marker[]>([]);
+  const [currentZoom, setCurrentZoom] = useState<number>(14);
+  
+  const MARKER_VISIBILITY_ZOOM_THRESHOLD = 13;
 
   useEffect(() => {
     const initMap = async () => {
@@ -41,7 +44,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
         
         const mapInstance = new google.maps.Map(mapRef.current, {
           center: { lat: 40.7831, lng: -73.9712 }, // NYC center
-          zoom: 11,
+          zoom: 14,
           restriction: {
             latLngBounds: nycBounds,
             strictBounds: true
@@ -62,6 +65,12 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
           fullscreenControl: false
         });
 
+        // Add zoom change listener
+        mapInstance.addListener('zoom_changed', () => {
+          const zoom = mapInstance.getZoom() || 14;
+          setCurrentZoom(zoom);
+        });
+
         setMap(mapInstance);
         onMapLoad?.(mapInstance);
       } catch (error) {
@@ -72,12 +81,18 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
     initMap();
   }, [onMapLoad]);
 
-  // Add business markers
+  // Add business markers with zoom-based visibility
   useEffect(() => {
     if (!map || !businesses.length) return;
 
     // Clear existing markers
     markers.forEach(marker => marker.setMap(null));
+
+    // Only show markers if zoom level is above threshold
+    if (currentZoom < MARKER_VISIBILITY_ZOOM_THRESHOLD) {
+      setMarkers([]);
+      return;
+    }
 
     const newMarkers = businesses.map(business => {
       const marker = new google.maps.Marker({
@@ -106,7 +121,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
     return () => {
       newMarkers.forEach(marker => marker.setMap(null));
     };
-  }, [map, businesses, onBusinessClick]);
+  }, [map, businesses, onBusinessClick, currentZoom]);
 
   // Add occasional confetti bursts
   useEffect(() => {
