@@ -8,6 +8,7 @@ import ExplorePage from './ExplorePage';
 import GoogleMap from './GoogleMap';
 
 import { useBusinessesData } from '../hooks/useBusinessesData';
+import { usePerformanceMode } from '../hooks/usePerformanceMode';
 
 interface UserData {
   salary: string;
@@ -45,7 +46,8 @@ const MobileApp: React.FC = () => {
   const [filteredUserStories, setFilteredUserStories] = useState(false);
   
   const constraintsRef = useRef(null);
-  const { businesses, loading, setBusinesses } = useBusinessesData();
+  const { businesses, loading, setBusinesses, loadBusinessChunk } = useBusinessesData();
+  const { shouldReduceMotion } = usePerformanceMode();
 
   const [posts, setPosts] = useState<Post[]>([
     {
@@ -306,6 +308,7 @@ const MobileApp: React.FC = () => {
         businesses={businesses}
         onBusinessClick={handleBusinessClick}
         selectedBusiness={selectedBusiness}
+        loadBusinessChunk={loadBusinessChunk}
       />
       
       {/* HomePage overlay */}
@@ -334,13 +337,16 @@ const MobileApp: React.FC = () => {
           initial={{ x: '-100%' }}
           animate={{ x: 0 }}
           exit={{ x: '-100%' }}
-          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          transition={shouldReduceMotion ? 
+            { duration: 0.2, ease: 'easeOut' } : 
+            { type: 'spring', stiffness: 300, damping: 30 }
+          }
           className="absolute inset-0 z-20"
-          drag="x"
+          drag={shouldReduceMotion ? false : "x"}
           dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={0.1}
+          dragElastic={shouldReduceMotion ? 0 : 0.1}
           onDragEnd={(event, info) => {
-            if (info.offset.x < -100) {
+            if (!shouldReduceMotion && info.offset.x < -100) {
               setCurrentSlide(1);
             }
           }}
@@ -359,13 +365,16 @@ const MobileApp: React.FC = () => {
           initial={{ x: '100%' }}
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
-          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          transition={shouldReduceMotion ? 
+            { duration: 0.2, ease: 'easeOut' } : 
+            { type: 'spring', stiffness: 300, damping: 30 }
+          }
           className="absolute inset-0 z-20"
-          drag="x"
+          drag={shouldReduceMotion ? false : "x"}
           dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={0.1}
+          dragElastic={shouldReduceMotion ? 0 : 0.1}
           onDragEnd={(event, info) => {
-            if (info.offset.x > 100) {
+            if (!shouldReduceMotion && info.offset.x > 100) {
               setCurrentSlide(1);
             }
           }}

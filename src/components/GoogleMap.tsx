@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { MarkerClusterer } from '@googlemaps/markerclusterer';
+import { usePerformanceMode } from '../hooks/usePerformanceMode';
 
 interface GoogleMapProps {
   onMapLoad?: (map: google.maps.Map) => void;
@@ -12,13 +13,15 @@ interface GoogleMapProps {
   }>;
   onBusinessClick?: (business: any) => void;
   selectedBusiness?: { position: { lat: number; lng: number } } | null;
+  loadBusinessChunk?: (areaIndex: number) => void;
 }
 
-const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBusinessClick, selectedBusiness }) => {
+const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBusinessClick, selectedBusiness, loadBusinessChunk }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [markerClusterer, setMarkerClusterer] = useState<MarkerClusterer | null>(null);
   const [currentZoom, setCurrentZoom] = useState<number>(14);
+  const { shouldReduceMotion } = usePerformanceMode();
   
   const MARKER_VISIBILITY_ZOOM_THRESHOLD = 13;
 
@@ -115,6 +118,8 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
             latLngBounds: nycBounds,
             strictBounds: true
           },
+          // Reduce animation complexity for low-performance devices
+          gestureHandling: shouldReduceMotion ? 'cooperative' : 'greedy',
           styles: [
             {
               featureType: 'poi',
@@ -136,6 +141,35 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
         // Add throttled zoom change listener
         const zoomHandler = throttledZoomChange();
         mapInstance.addListener('zoom_changed', zoomHandler);
+
+        // Add lazy loading listener for viewport changes
+        if (loadBusinessChunk) {
+          mapInstance.addListener('bounds_changed', () => {
+            const bounds = mapInstance.getBounds();
+            if (!bounds) return;
+
+            // Define NYC area boundaries for each chunk
+            const areas = [
+              { index: 0, bounds: { north: 40.8, south: 40.75, east: -73.95, west: -74.02 } }, // Manhattan
+              { index: 1, bounds: { north: 40.7, south: 40.64, east: -73.92, west: -74.02 } }, // Brooklyn
+              { index: 2, bounds: { north: 40.75, south: 40.7, east: -73.75, west: -73.85 } }, // Queens
+              { index: 3, bounds: { north: 40.88, south: 40.8, east: -73.82, west: -73.92 } }, // Bronx
+              { index: 4, bounds: { north: 40.62, south: 40.55, east: -74.1, west: -74.2 } }  // Staten Island
+            ];
+
+            // Check which areas are in viewport and load them
+            areas.forEach(area => {
+              const areaInView = bounds.intersects(new google.maps.LatLngBounds(
+                new google.maps.LatLng(area.bounds.south, area.bounds.west),
+                new google.maps.LatLng(area.bounds.north, area.bounds.east)
+              ));
+              
+              if (areaInView) {
+                loadBusinessChunk(area.index);
+              }
+            });
+          });
+        }
 
         setMap(mapInstance);
         onMapLoad?.(mapInstance);
