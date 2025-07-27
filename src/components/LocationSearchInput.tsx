@@ -23,6 +23,12 @@ const LocationSearchInput: React.FC<LocationSearchInputProps> = ({
   const { toast } = useToast();
 
   useEffect(() => {
+    if (value && autocompleteRef.current) {
+      autocompleteRef.current.value = value;
+    }
+  }, [value]);
+
+  useEffect(() => {
     const initAutocomplete = async () => {
       if (!autocompleteRef.current) return;
       
