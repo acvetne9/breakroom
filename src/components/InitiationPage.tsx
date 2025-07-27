@@ -385,6 +385,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
               <input 
                 ref={autocompleteRef} 
                 type="text" 
+                value={location}
                 onChange={handleLocationChange}
                 onBlur={handleLocationBlur} 
                 placeholder="Search NYC locations..." 
