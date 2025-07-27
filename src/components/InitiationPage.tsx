@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Loader } from '@googlemaps/js-api-loader';
@@ -122,8 +121,17 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   // Centralized completion effect with proper data validation
   useEffect(() => {
     if (isComplete) {
+      // Ensure fullLocation has a value - use location as fallback
+      const finalFullLocation = fullLocation || location;
+      
       // Validate that all required data is present
-      const dataToPass = { salary, role, location, fullLocation, timePeriod };
+      const dataToPass = { 
+        salary, 
+        role, 
+        location, 
+        fullLocation: finalFullLocation, 
+        timePeriod 
+      };
       console.log('InitiationPage completing with data:', dataToPass);
       
       // Ensure we have all required fields
@@ -135,7 +143,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
         setIsComplete(false); // Reset if validation fails
       }
     }
-  }, [isComplete, salary, role, location, fullLocation, onComplete]);
+  }, [isComplete, salary, role, location, fullLocation, timePeriod, onComplete]);
 
   const getPredictionsAndSetLocation = (input: string): Promise<void> => {
     return new Promise((resolve) => {
@@ -273,9 +281,16 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     }
     
     // Always try to get the best Google Places match for any typed input
+    // If no fullLocation exists or it matches the typed input, get predictions
     if (!fullLocation || fullLocation === value) {
       console.log('Getting predictions for typed location:', value);
       await getPredictionsAndSetLocation(value);
+    }
+    
+    // If still no fullLocation after predictions, use the typed input
+    if (!fullLocation) {
+      console.log('No predictions found, using typed input as fullLocation:', value);
+      setFullLocation(value);
     }
     
     checkForCompletion();

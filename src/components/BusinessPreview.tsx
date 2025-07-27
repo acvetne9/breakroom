@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { memo } from 'react';
 import { formatTimeAgo } from '../utils/timeAgo';
 
 interface Post {
@@ -27,7 +27,7 @@ interface BusinessPreviewProps {
   onStoriesClick: () => void;
 }
 
-const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, posts, onClose, onShowDetails, onStoriesClick }) => {
+const BusinessPreview: React.FC<BusinessPreviewProps> = memo(({ business, posts, onClose, onShowDetails, onStoriesClick }) => {
   // Get stories (posts) for this business
   const businessStories = posts.filter(post => post.businessId === business.id && post.isStory).slice(0, 3);
 
@@ -118,6 +118,6 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = ({ business, posts, onCl
       </div>
     </div>
   );
-};
+});
 
 export default BusinessPreview;

@@ -46,6 +46,7 @@ interface HomePageProps {
   onBusinessStoriesClick?: (businessId: string) => void;
   onPostClick?: (post: Post) => void;
   onRoleVote?: (businessId: string, roleIndex: number, voteType: 'up' | 'down') => void;
+  onLocationSave?: (location: string, fullLocation: string) => void; // New prop for saving location
 }
 
 const HomePage: React.FC<HomePageProps> = ({ 
@@ -57,7 +58,8 @@ const HomePage: React.FC<HomePageProps> = ({
   posts,
   onBusinessStoriesClick,
   onPostClick,
-  onRoleVote
+  onRoleVote,
+  onLocationSave
 }) => {
   const [searchValue, setSearchValue] = useState('');
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
@@ -136,6 +138,13 @@ const HomePage: React.FC<HomePageProps> = ({
     onBusinessSelect?.(business);
     setShowBusinessDetails(false);
     setSearchResults([]);
+    
+    // Save the clicked business location
+    if (onLocationSave && business.name) {
+      // Use business name as location, and try to construct a fuller address if available
+      const fullLocation = business.formatted_address || business.vicinity || business.name;
+      onLocationSave(business.name, fullLocation);
+    }
   };
 
   const handleShowBusinessDetails = () => {

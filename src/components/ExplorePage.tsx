@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, memo } from 'react';
 import { Eye } from 'lucide-react';
 import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
@@ -30,7 +30,7 @@ interface ExplorePageProps {
   onBackToAllPosts?: () => void;
   onPostVote?: (postId: string, voteType: 'up' | 'down') => void;
 }
-const ExplorePage: React.FC<ExplorePageProps> = ({
+const ExplorePage: React.FC<ExplorePageProps> = memo(({
   posts,
   filteredBusinessId,
   filteredUserStories = false,
@@ -100,8 +100,14 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     onPostVote?.(postId, voteType);
   };
 
-  // Filter posts based on business or user stories
-  const displayPosts = filteredBusinessId ? posts.filter(post => post.businessId === filteredBusinessId && !post.isJobUpdate) : filteredUserStories ? posts.filter(post => post.author === 'You' && !post.isJobUpdate) : posts;
+  // Memoized filtered posts for performance
+  const displayPosts = useMemo(() => {
+    return filteredBusinessId 
+      ? posts.filter(post => post.businessId === filteredBusinessId && !post.isJobUpdate)
+      : filteredUserStories 
+      ? posts.filter(post => post.author === 'You' && !post.isJobUpdate)
+      : posts;
+  }, [posts, filteredBusinessId, filteredUserStories]);
   return <div className="relative w-full h-full">
       {/* Header for filtered views */}
       {filteredBusinessId || filteredUserStories}
@@ -199,5 +205,5 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
           </div>}
       </div>
     </div>;
-};
+});
 export default ExplorePage;

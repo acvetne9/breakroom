@@ -1,6 +1,7 @@
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
+import { MarkerClusterer, GridAlgorithm } from '@googlemaps/markerclusterer';
 
 interface GoogleMapProps {
   onMapLoad?: (map: google.maps.Map) => void;
@@ -19,6 +20,24 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [markers, setMarkers] = useState<google.maps.Marker[]>([]);
+  const [markerClusterer, setMarkerClusterer] = useState<MarkerClusterer | null>(null);
+  const [currentZoom, setCurrentZoom] = useState<number>(14);
+  
+  const MARKER_VISIBILITY_ZOOM_THRESHOLD = 13;
+
+  // Throttled zoom change handler for better performance
+  const throttledZoomChange = useCallback(() => {
+    let timeoutId: NodeJS.Timeout;
+    return () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        if (map) {
+          const zoom = map.getZoom() || 14;
+          setCurrentZoom(zoom);
+        }
+      }, 100);
+    };
+  }, [map]);
 
   useEffect(() => {
     const initMap = async () => {
@@ -41,7 +60,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
         
         const mapInstance = new google.maps.Map(mapRef.current, {
           center: { lat: 40.7831, lng: -73.9712 }, // NYC center
-          zoom: 11,
+          zoom: 14,
           restriction: {
             latLngBounds: nycBounds,
             strictBounds: true
@@ -62,6 +81,9 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
           fullscreenControl: false
         });
 
+        // Add throttled zoom change listener
+        mapInstance.addListener('zoom_changed', throttledZoomChange());
+
         setMap(mapInstance);
         onMapLoad?.(mapInstance);
       } catch (error) {
@@ -72,25 +94,39 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
     initMap();
   }, [onMapLoad]);
 
-  // Add business markers
+  // Add business markers with clustering and zoom-based visibility
   useEffect(() => {
     if (!map || !businesses.length) return;
 
-    // Clear existing markers
+    // Clear existing markers and clusterer
+    if (markerClusterer) {
+      markerClusterer.clearMarkers();
+    }
     markers.forEach(marker => marker.setMap(null));
 
-    const newMarkers = businesses.map(business => {
+    // Only show markers if zoom level is above threshold
+    if (currentZoom < MARKER_VISIBILITY_ZOOM_THRESHOLD) {
+      setMarkers([]);
+      return;
+    }
+
+    // Filter businesses to viewport for performance
+    const bounds = map.getBounds();
+    const visibleBusinesses = bounds ? businesses.filter(business => 
+      bounds.contains(new google.maps.LatLng(business.position.lat, business.position.lng))
+    ) : businesses;
+
+    const newMarkers = visibleBusinesses.map(business => {
       const marker = new google.maps.Marker({
         position: business.position,
-        map: map,
         title: business.name,
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
-          scale: 8,
+          scale: 6,
           fillColor: '#FFEB3B',
           fillOpacity: 1,
           strokeColor: '#FFC107',
-          strokeWeight: 2
+          strokeWeight: 1
         }
       });
 
@@ -101,49 +137,22 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
       return marker;
     });
 
+    // Create or update marker clusterer with proper algorithm
+    const clusterer = new MarkerClusterer({ 
+      map, 
+      markers: newMarkers,
+      algorithm: new GridAlgorithm({ maxZoom: 12, gridSize: 80 })
+    });
+
     setMarkers(newMarkers);
+    setMarkerClusterer(clusterer);
 
     return () => {
+      clusterer.clearMarkers();
       newMarkers.forEach(marker => marker.setMap(null));
     };
-  }, [map, businesses, onBusinessClick]);
+  }, [map, businesses, onBusinessClick, currentZoom]);
 
-  // Add occasional confetti bursts
-  useEffect(() => {
-    if (!map) return;
-
-    const addConfettiBurst = () => {
-      const bounds = map.getBounds();
-      if (!bounds) return;
-
-      const ne = bounds.getNorthEast();
-      const sw = bounds.getSouthWest();
-      
-      const randomLat = sw.lat() + Math.random() * (ne.lat() - sw.lat());
-      const randomLng = sw.lng() + Math.random() * (ne.lng() - sw.lng());
-
-      const confettiMarker = new google.maps.Marker({
-        position: { lat: randomLat, lng: randomLng },
-        map: map,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 4,
-          fillColor: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7'][Math.floor(Math.random() * 5)],
-          fillOpacity: 0.8,
-          strokeWeight: 0
-        },
-        animation: google.maps.Animation.DROP
-      });
-
-      // Remove after animation
-      setTimeout(() => {
-        confettiMarker.setMap(null);
-      }, 2000);
-    };
-
-    const interval = setInterval(addConfettiBurst, 8000 + Math.random() * 7000);
-    return () => clearInterval(interval);
-  }, [map]);
 
   // Center map on selected business with proper navigation
   useEffect(() => {
