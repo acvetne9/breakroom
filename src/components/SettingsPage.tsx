@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Minus } from 'lucide-react';
 import JobSearchDropdown from './JobSearchDropdown';
+import LocationSearchInput from './LocationSearchInput';
 import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 
@@ -407,13 +408,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 </div>
 
                 <div className="flex items-center space-x-3">
-                  <input 
-                    type="text" 
-                    value={job.location} 
-                    onChange={e => updatePastJob(job.id, 'location', e.target.value)}
-                    onBlur={() => handlePastJobBlur(job.id, 'location', job.location)} 
-                    className="app-input flex-1" 
-                    placeholder="Movie Theater" 
+                  <LocationSearchInput
+                    value={job.location}
+                    onChange={value => updatePastJob(job.id, 'location', value)}
+                    onBlur={() => handlePastJobBlur(job.id, 'location', job.location)}
+                    className="app-input flex-1"
+                    placeholder="Search NYC locations..."
                   />
                   <button 
                     onClick={() => removePastJob(job.id)} 
