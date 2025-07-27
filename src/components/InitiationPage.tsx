@@ -49,6 +49,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   const [timePeriod, setTimePeriod] = useState('HR');
   const [isComplete, setIsComplete] = useState(false);
   const [isGooglePlacesSelected, setIsGooglePlacesSelected] = useState(false);
+  const [isProcessingLocation, setIsProcessingLocation] = useState(false); // NEW: Track location processing
   const autocompleteRef = useRef<HTMLInputElement>(null);
   const autocompleteInstance = useRef<google.maps.places.Autocomplete | null>(null);
   const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
@@ -104,6 +105,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
             setLocation(placeName);
             setFullLocation(fullAddr);
             setIsGooglePlacesSelected(true);
+            setIsProcessingLocation(false); // Clear processing flag
             
             // Wait a tick before triggering completion check
             setTimeout(() => {
@@ -118,9 +120,9 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     initAutocomplete();
   }, []);
   
-  // Centralized completion effect with proper data validation
+  // FIXED: Enhanced completion effect with location processing check
   useEffect(() => {
-    if (isComplete) {
+    if (isComplete && !isProcessingLocation) { // Don't complete if still processing location
       // Ensure fullLocation has a value - use location as fallback
       const finalFullLocation = fullLocation || location;
       
@@ -143,7 +145,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
         setIsComplete(false); // Reset if validation fails
       }
     }
-  }, [isComplete, salary, role, location, fullLocation, timePeriod, onComplete]);
+  }, [isComplete, isProcessingLocation, salary, role, location, fullLocation, timePeriod, onComplete]);
 
   const getPredictionsAndSetLocation = (input: string): Promise<void> => {
     return new Promise((resolve) => {
@@ -201,12 +203,12 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     });
   };
 
-  // Simplified completion check
+  // FIXED: Enhanced completion check with processing flag
   const checkForCompletion = () => {
     const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
-    console.log('checkForCompletion called:', { salary, role, location, allFilled });
+    console.log('checkForCompletion called:', { salary, role, location, allFilled, isProcessingLocation });
     
-    if (allFilled && !isComplete) {
+    if (allFilled && !isComplete && !isProcessingLocation) { // Don't trigger if processing location
       console.log('Setting isComplete to true');
       setIsComplete(true);
     }
@@ -252,6 +254,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       setLocation('');
       setFullLocation('');
       setIsGooglePlacesSelected(false);
+      setIsProcessingLocation(false);
       checkForCompletion();
       return;
     }
@@ -267,6 +270,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       setLocation('');
       setFullLocation('');
       setIsGooglePlacesSelected(false);
+      setIsProcessingLocation(false);
       if (autocompleteRef.current) {
         autocompleteRef.current.value = '';
       }
@@ -276,9 +280,13 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     // Skip prediction logic if Google Places was already selected
     if (isGooglePlacesSelected) {
       console.log('Skipping predictions - Google Places already selected');
+      setIsProcessingLocation(false);
       checkForCompletion();
       return;
     }
+    
+    // FIXED: Set processing flag before getting predictions
+    setIsProcessingLocation(true);
     
     // Always try to get the best Google Places match for any typed input
     // If no fullLocation exists or it matches the typed input, get predictions
@@ -293,7 +301,13 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       setFullLocation(value);
     }
     
-    checkForCompletion();
+    // Clear processing flag and check completion
+    setIsProcessingLocation(false);
+    
+    // FIXED: Add small delay to ensure state updates are processed
+    setTimeout(() => {
+      checkForCompletion();
+    }, 50);
   };
 
   return (
