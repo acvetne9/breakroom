@@ -49,6 +49,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   const [timePeriod, setTimePeriod] = useState('HR');
   const [isComplete, setIsComplete] = useState(false);
   const [isGooglePlacesSelected, setIsGooglePlacesSelected] = useState(false);
+  const [isProcessingLocation, setIsProcessingLocation] = useState(false); // NEW: Track location processing
   const autocompleteRef = useRef<HTMLInputElement>(null);
   const autocompleteInstance = useRef<google.maps.places.Autocomplete | null>(null);
   const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
@@ -104,6 +105,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
             setLocation(placeName);
             setFullLocation(fullAddr);
             setIsGooglePlacesSelected(true);
+            setIsProcessingLocation(false); // Clear processing flag
             
             // Wait a tick before triggering completion check
             setTimeout(() => {
@@ -118,11 +120,20 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     initAutocomplete();
   }, []);
   
-  // Centralized completion effect with proper data validation
+  // FIXED: Enhanced completion effect with location processing check
   useEffect(() => {
-    if (isComplete) {
-      // Ensure fullLocation has a value - use location as fallback
+    if (isComplete && !isProcessingLocation) { // Don't complete if still processing location
+      // FIXED: Ensure fullLocation has a value - use location as fallback and log the data
       const finalFullLocation = fullLocation || location;
+      
+      console.log('Completion triggered with:', { 
+        salary, 
+        role, 
+        location, 
+        fullLocation, 
+        finalFullLocation,
+        isProcessingLocation 
+      });
       
       // Validate that all required data is present
       const dataToPass = { 
@@ -143,14 +154,14 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
         setIsComplete(false); // Reset if validation fails
       }
     }
-  }, [isComplete, salary, role, location, fullLocation, timePeriod, onComplete]);
+  }, [isComplete, isProcessingLocation, salary, role, location, fullLocation, timePeriod, onComplete]);
 
   const getPredictionsAndSetLocation = (input: string): Promise<void> => {
     return new Promise((resolve) => {
       if (!autocompleteService.current || !placesService.current) {
         // Fallback: just use the typed input
+        console.log('No Google services available, using input as fullLocation:', input);
         setFullLocation(input);
-        console.log('Set fullLocation from manual input (no service):', input);
         resolve();
         return;
       }
@@ -165,48 +176,55 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
         componentRestrictions: { country: 'us' }
       };
 
+      console.log('Requesting predictions for:', input);
+
       autocompleteService.current.getPlacePredictions(request, (predictions, status) => {
+        console.log('Predictions response:', { status, predictions });
+        
         if (status === google.maps.places.PlacesServiceStatus.OK && predictions && predictions.length > 0) {
           const firstPrediction = predictions[0];
-          console.log('Got prediction:', firstPrediction);
+          console.log('Using first prediction:', firstPrediction);
           
           // Get place details for the first prediction
           const detailsRequest = {
             placeId: firstPrediction.place_id,
-            fields: ['name', 'formatted_address']
+            fields: ['name', 'formatted_address', 'place_id']
           };
           
           placesService.current!.getDetails(detailsRequest, (place, detailsStatus) => {
+            console.log('Place details response:', { detailsStatus, place });
+            
             if (detailsStatus === google.maps.places.PlacesServiceStatus.OK && place) {
               const placeName = place.name || firstPrediction.structured_formatting.main_text;
               const fullAddr = place.formatted_address || firstPrediction.description;
               
-              console.log('Set location from prediction:', placeName, 'Full address:', fullAddr);
+              console.log('Setting location from place details:', { placeName, fullAddr });
               setLocation(placeName);
               setFullLocation(fullAddr);
             } else {
               // Fallback to the prediction description
-              setFullLocation(firstPrediction.description);
-              console.log('Set fullLocation from prediction description:', firstPrediction.description);
+              const fallbackLocation = firstPrediction.description;
+              console.log('Using prediction description as fallback:', fallbackLocation);
+              setFullLocation(fallbackLocation);
             }
             resolve();
           });
         } else {
           // No predictions found, use the typed input as fallback
+          console.log('No predictions found, using typed input as fullLocation:', input);
           setFullLocation(input);
-          console.log('Set fullLocation from manual input (no predictions):', input);
           resolve();
         }
       });
     });
   };
 
-  // Simplified completion check
+  // FIXED: Enhanced completion check with processing flag
   const checkForCompletion = () => {
     const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
-    console.log('checkForCompletion called:', { salary, role, location, allFilled });
+    console.log('checkForCompletion called:', { salary, role, location, allFilled, isProcessingLocation });
     
-    if (allFilled && !isComplete) {
+    if (allFilled && !isComplete && !isProcessingLocation) { // Don't trigger if processing location
       console.log('Setting isComplete to true');
       setIsComplete(true);
     }
@@ -252,6 +270,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       setLocation('');
       setFullLocation('');
       setIsGooglePlacesSelected(false);
+      setIsProcessingLocation(false);
       checkForCompletion();
       return;
     }
@@ -267,33 +286,43 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       setLocation('');
       setFullLocation('');
       setIsGooglePlacesSelected(false);
+      setIsProcessingLocation(false);
       if (autocompleteRef.current) {
         autocompleteRef.current.value = '';
       }
       return;
     }
     
-    // Skip prediction logic if Google Places was already selected
-    if (isGooglePlacesSelected) {
-      console.log('Skipping predictions - Google Places already selected');
-      checkForCompletion();
-      return;
-    }
+    console.log('Location blur with value:', value);
+    console.log('Current state:', { location, fullLocation, isGooglePlacesSelected });
     
-    // Always try to get the best Google Places match for any typed input
-    // If no fullLocation exists or it matches the typed input, get predictions
-    if (!fullLocation || fullLocation === value) {
+    // FIXED: Set processing flag before getting predictions
+    setIsProcessingLocation(true);
+    
+    // Always try to get predictions unless we already have a fullLocation that matches
+    if (!fullLocation || fullLocation === location || !isGooglePlacesSelected) {
       console.log('Getting predictions for typed location:', value);
       await getPredictionsAndSetLocation(value);
     }
     
-    // If still no fullLocation after predictions, use the typed input
-    if (!fullLocation) {
-      console.log('No predictions found, using typed input as fullLocation:', value);
-      setFullLocation(value);
-    }
-    
-    checkForCompletion();
+    // FIXED: Use a callback to ensure we get the latest state
+    setTimeout(() => {
+      setIsProcessingLocation(false);
+      // Use the value directly since state updates might be pending
+      const currentFullLocation = fullLocation || value;
+      console.log('Final location data:', { displayName: value, fullLocation: currentFullLocation });
+      
+      // Ensure fullLocation is set
+      if (!fullLocation) {
+        console.log('Setting fallback fullLocation to:', value);
+        setFullLocation(value);
+      }
+      
+      // Trigger completion check after a small delay to ensure state updates
+      setTimeout(() => {
+        checkForCompletion();
+      }, 100);
+    }, 200); // Give more time for Google Places to respond
   };
 
   return (

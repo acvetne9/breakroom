@@ -381,6 +381,10 @@ const MobileApp: React.FC = () => {
             initialData={userData} 
             userPosts={posts.filter(post => post.author === 'You')}
             onStoriesClick={handleUserStoriesClick}
+            onPostClick={(post) => {
+              setExpandedPost(post.id);
+              setCurrentSlide(2); // Navigate to explore page
+            }}
             onJobUpdate={handleJobUpdate}
           />
         </motion.div>

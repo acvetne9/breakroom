@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Minus } from 'lucide-react';
 import JobSearchDropdown from './JobSearchDropdown';
+import LocationSearchInput from './LocationSearchInput';
 import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 
@@ -56,6 +57,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     location: initialData.fullLocation || initialData.location,
     isHiring: false
   });
+
+  // Store the full location separately to preserve Google Places data
+  const [currentJobFullLocation, setCurrentJobFullLocation] = useState<string>(
+    initialData.fullLocation || initialData.location
+  );
   
   const [currentTimePeriod, setCurrentTimePeriod] = useState(initialData.timePeriod || 'HR');
   const [pastJobs, setPastJobs] = useState<PastJob[]>([{
@@ -85,9 +91,15 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const hasCreatedPostsRef = useRef(false);
 
   // Update refs whenever state changes
+  const currentJobFullLocationRef = useRef(currentJobFullLocation);
+  
   useEffect(() => {
     currentJobRef.current = currentJob;
   }, [currentJob]);
+
+  useEffect(() => {
+    currentJobFullLocationRef.current = currentJobFullLocation;
+  }, [currentJobFullLocation]);
 
   useEffect(() => {
     currentTimePeriodRef.current = currentTimePeriod;
@@ -171,7 +183,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         onJobUpdate({
           salary: currentJobRef.current.salary,
           role: currentJobRef.current.role,
-          location: currentJobRef.current.location,
+          location: currentJobFullLocationRef.current || currentJobRef.current.location, // Use full location if available
           timePeriod: currentTimePeriodRef.current
         });
       }
@@ -254,12 +266,16 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     setCurrentJobChanged(true);
   };
 
-  const handleCurrentJobLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+  // FIXED: Enhanced location change handler to preserve full location data
+  const handleCurrentJobLocationChange = (value: string, fullLocation?: string) => {
     setCurrentJob({
       ...currentJob,
       location: value
     });
+    // Store the full location if provided by Google Places
+    if (fullLocation) {
+      setCurrentJobFullLocation(fullLocation);
+    }
     setCurrentJobChanged(true);
   };
 
@@ -341,13 +357,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             </div>
 
             <div className="flex items-center space-x-3">
-              <input 
-                type="text" 
-                value={currentJob.location} 
+              {/* FIXED: Replace regular input with LocationSearchInput */}
+              <LocationSearchInput
+                value={currentJob.location}
                 onChange={handleCurrentJobLocationChange}
-                onBlur={handleCurrentJobLocationBlur} 
-                className="app-input flex-1" 
-                placeholder="Starbucks" 
+                onBlur={handleCurrentJobLocationBlur}
+                className="app-input flex-1"
+                placeholder="Search NYC locations..."
               />
               <div className="w-6"></div>
             </div>
@@ -407,13 +423,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 </div>
 
                 <div className="flex items-center space-x-3">
-                  <input 
-                    type="text" 
-                    value={job.location} 
-                    onChange={e => updatePastJob(job.id, 'location', e.target.value)}
-                    onBlur={() => handlePastJobBlur(job.id, 'location', job.location)} 
-                    className="app-input flex-1" 
-                    placeholder="Movie Theater" 
+                  <LocationSearchInput
+                    value={job.location}
+                    onChange={value => updatePastJob(job.id, 'location', value)}
+                    onBlur={() => handlePastJobBlur(job.id, 'location', job.location)}
+                    className="app-input flex-1"
+                    placeholder="Search NYC locations..."
                   />
                   <button 
                     onClick={() => removePastJob(job.id)} 
