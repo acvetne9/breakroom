@@ -68,14 +68,8 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
   const businessStories = posts.filter(post => post.businessId === business.id && post.isStory);
 
   const handleCardClick = (e: React.MouseEvent) => {
-    // Check if click is on stories, compass, or voting - if so, don't close
-    const target = e.target as HTMLElement;
-    const isStoryClick = target.closest('.story-item');
-    const isCompassClick = target.closest('.compass-button');
-    const isVotingClick = target.closest('[data-voting-component]');
-    if (!isStoryClick && !isCompassClick && !isVotingClick) {
-      onClose();
-    }
+    // Stop propagation to prevent the background click handler from firing
+    e.stopPropagation();
   };
 
   const handleStoryClick = (post: Post) => {
