@@ -14,6 +14,92 @@ export type Database = {
   }
   public: {
     Tables: {
+      business_roles: {
+        Row: {
+          business_id: string
+          created_at: string
+          downvotes: number | null
+          id: string
+          role: string
+          salary: string
+          updated_at: string
+          upvotes: number | null
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          downvotes?: number | null
+          id?: string
+          role: string
+          salary: string
+          updated_at?: string
+          upvotes?: number | null
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          downvotes?: number | null
+          id?: string
+          role?: string
+          salary?: string
+          updated_at?: string
+          upvotes?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_roles_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      businesses: {
+        Row: {
+          atmosphere: string[] | null
+          business_type: string | null
+          created_at: string
+          id: string
+          lat: number
+          lng: number
+          name: string
+          place_id: string | null
+          salary: string | null
+          updated_at: string
+          url: string | null
+          website: string | null
+        }
+        Insert: {
+          atmosphere?: string[] | null
+          business_type?: string | null
+          created_at?: string
+          id?: string
+          lat: number
+          lng: number
+          name: string
+          place_id?: string | null
+          salary?: string | null
+          updated_at?: string
+          url?: string | null
+          website?: string | null
+        }
+        Update: {
+          atmosphere?: string[] | null
+          business_type?: string | null
+          created_at?: string
+          id?: string
+          lat?: number
+          lng?: number
+          name?: string
+          place_id?: string | null
+          salary?: string | null
+          updated_at?: string
+          url?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
       current_jobs: {
         Row: {
           created_at: string | null
@@ -145,6 +231,38 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      role_votes: {
+        Row: {
+          business_role_id: string
+          created_at: string
+          id: string
+          user_id: string
+          vote_type: string
+        }
+        Insert: {
+          business_role_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+          vote_type: string
+        }
+        Update: {
+          business_role_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+          vote_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_votes_business_role_id_fkey"
+            columns: ["business_role_id"]
+            isOneToOne: false
+            referencedRelation: "business_roles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       votes: {
         Row: {
