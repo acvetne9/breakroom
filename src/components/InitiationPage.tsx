@@ -120,33 +120,35 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     initAutocomplete();
   }, []);
   
-  // FIXED: Enhanced completion effect with location processing check
+  // FIXED: Enhanced completion effect - use input value directly
   useEffect(() => {
     if (isComplete && !isProcessingLocation) { // Don't complete if still processing location
-      // FIXED: Ensure fullLocation has a value - use location as fallback and log the data
-      const finalFullLocation = fullLocation || location;
+      // FIXED: Get the actual input value directly from the DOM
+      const actualLocationValue = autocompleteRef.current?.value || location;
+      const finalFullLocation = fullLocation || actualLocationValue;
       
       console.log('Completion triggered with:', { 
         salary, 
         role, 
         location, 
+        actualLocationValue,
         fullLocation, 
         finalFullLocation,
         isProcessingLocation 
       });
       
-      // Validate that all required data is present
+      // Validate that all required data is present - use actual input value
       const dataToPass = { 
         salary, 
         role, 
-        location, 
+        location: actualLocationValue, // Use the actual input value
         fullLocation: finalFullLocation, 
         timePeriod 
       };
       console.log('InitiationPage completing with data:', dataToPass);
       
-      // Ensure we have all required fields
-      if (salary.trim() && role.trim() && location.trim()) {
+      // Ensure we have all required fields - check actual input value
+      if (salary.trim() && role.trim() && actualLocationValue.trim()) {
         console.log('All fields validated, calling onComplete');
         onComplete(dataToPass);
       } else {
@@ -219,10 +221,20 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     });
   };
 
-  // FIXED: Enhanced completion check with processing flag
+  // FIXED: Enhanced completion check - use actual input value
   const checkForCompletion = () => {
-    const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
-    console.log('checkForCompletion called:', { salary, role, location, allFilled, isProcessingLocation });
+    // Get the actual input value directly from the DOM
+    const actualLocationValue = autocompleteRef.current?.value || location;
+    const allFilled = salary.trim() !== '' && role.trim() !== '' && actualLocationValue.trim() !== '';
+    
+    console.log('checkForCompletion called:', { 
+      salary, 
+      role, 
+      location, 
+      actualLocationValue,
+      allFilled, 
+      isProcessingLocation 
+    });
     
     if (allFilled && !isComplete && !isProcessingLocation) { // Don't trigger if processing location
       console.log('Setting isComplete to true');
@@ -294,35 +306,25 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     }
     
     console.log('Location blur with value:', value);
-    console.log('Current state:', { location, fullLocation, isGooglePlacesSelected });
     
-    // FIXED: Set processing flag before getting predictions
-    setIsProcessingLocation(true);
+    // FIXED: Always update the location state to match the input
+    setLocation(value);
     
-    // Always try to get predictions unless we already have a fullLocation that matches
-    if (!fullLocation || fullLocation === location || !isGooglePlacesSelected) {
-      console.log('Getting predictions for typed location:', value);
-      await getPredictionsAndSetLocation(value);
+    // Try to get Google Places data in the background, but don't block completion
+    if (!isGooglePlacesSelected) {
+      // Don't set processing flag - let completion happen immediately
+      getPredictionsAndSetLocation(value).then(() => {
+        console.log('Background Google Places lookup completed');
+      }).catch((error) => {
+        console.log('Google Places lookup failed, using typed value:', error);
+        setFullLocation(value);
+      });
     }
     
-    // FIXED: Use a callback to ensure we get the latest state
+    // FIXED: Check for completion immediately without waiting for Google Places
     setTimeout(() => {
-      setIsProcessingLocation(false);
-      // Use the value directly since state updates might be pending
-      const currentFullLocation = fullLocation || value;
-      console.log('Final location data:', { displayName: value, fullLocation: currentFullLocation });
-      
-      // Ensure fullLocation is set
-      if (!fullLocation) {
-        console.log('Setting fallback fullLocation to:', value);
-        setFullLocation(value);
-      }
-      
-      // Trigger completion check after a small delay to ensure state updates
-      setTimeout(() => {
-        checkForCompletion();
-      }, 100);
-    }, 200); // Give more time for Google Places to respond
+      checkForCompletion();
+    }, 10);
   };
 
   return (
