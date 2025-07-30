@@ -25,18 +25,12 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
   
   const MARKER_VISIBILITY_ZOOM_THRESHOLD = 13;
 
-  // Throttled zoom change handler for better performance
-  const throttledZoomChange = useCallback(() => {
-    let timeoutId: NodeJS.Timeout;
-    return () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        if (map) {
-          const zoom = map.getZoom() || 14;
-          setCurrentZoom(zoom);
-        }
-      }, 100);
-    };
+  // Simpler zoom change handler for better performance
+  const handleZoomChange = useCallback(() => {
+    if (map) {
+      const zoom = map.getZoom() || 14;
+      setCurrentZoom(zoom);
+    }
   }, [map]);
 
   useEffect(() => {
@@ -81,8 +75,8 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
           fullscreenControl: false
         });
 
-        // Add throttled zoom change listener
-        mapInstance.addListener('zoom_changed', throttledZoomChange());
+        // Add zoom change listener
+        mapInstance.addListener('zoom_changed', handleZoomChange);
 
         setMap(mapInstance);
         onMapLoad?.(mapInstance);
@@ -109,21 +103,12 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
     }
     markers.forEach(marker => marker.setMap(null));
 
-    // Only show markers if zoom level is above threshold
-    if (currentZoom < MARKER_VISIBILITY_ZOOM_THRESHOLD) {
-      setMarkers([]);
-      return;
-    }
-
-    // Filter businesses to viewport for performance
-    const bounds = map.getBounds();
-    const visibleBusinesses = bounds ? businesses.filter(business => 
-      bounds.contains(new google.maps.LatLng(business.position.lat, business.position.lng))
-    ) : businesses;
+    // Show all markers regardless of zoom level for better UX
+    // Remove viewport filtering to show all businesses consistently
+    const visibleBusinesses = businesses;
     
     console.log('GoogleMap: total businesses:', businesses.length);
     console.log('GoogleMap: visible businesses:', visibleBusinesses.length);
-    console.log('GoogleMap: map bounds:', bounds?.toString());
 
     const newMarkers = visibleBusinesses.map(business => {
       const marker = new google.maps.Marker({
@@ -160,7 +145,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
       clusterer.clearMarkers();
       newMarkers.forEach(marker => marker.setMap(null));
     };
-  }, [map, businesses, onBusinessClick, currentZoom]);
+  }, [map, businesses, onBusinessClick]);
 
 
   // Center map on selected business with proper navigation
