@@ -96,7 +96,12 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
 
   // Add business markers with clustering and zoom-based visibility
   useEffect(() => {
-    if (!map || !businesses.length) return;
+    console.log('GoogleMap: businesses data:', businesses.length, businesses);
+    console.log('GoogleMap: current zoom:', currentZoom);
+    if (!map || !businesses.length) {
+      console.log('GoogleMap: No map or no businesses');
+      return;
+    }
 
     // Clear existing markers and clusterer
     if (markerClusterer) {
@@ -115,6 +120,10 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ onMapLoad, businesses = [], onBus
     const visibleBusinesses = bounds ? businesses.filter(business => 
       bounds.contains(new google.maps.LatLng(business.position.lat, business.position.lng))
     ) : businesses;
+    
+    console.log('GoogleMap: total businesses:', businesses.length);
+    console.log('GoogleMap: visible businesses:', visibleBusinesses.length);
+    console.log('GoogleMap: map bounds:', bounds?.toString());
 
     const newMarkers = visibleBusinesses.map(business => {
       const marker = new google.maps.Marker({

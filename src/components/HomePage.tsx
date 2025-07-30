@@ -76,7 +76,9 @@ const HomePage: React.FC<HomePageProps> = ({
     if (!isSearchActive) {
       setFilteredBusinesses(businesses);
     }
-  }, [businesses, isSearchActive]);
+    console.log('HomePage: businesses prop:', businesses.length, businesses);
+    console.log('HomePage: filteredBusinesses:', filteredBusinesses.length, filteredBusinesses);
+  }, [businesses, isSearchActive, filteredBusinesses]);
 
   const handleSearchInput = (value: string) => {
     setSearchValue(value);
