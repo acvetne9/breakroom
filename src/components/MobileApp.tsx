@@ -43,7 +43,7 @@ const MobileApp: React.FC = () => {
   const [filteredUserStories, setFilteredUserStories] = useState(false);
   
   const constraintsRef = useRef(null);
-  const { businesses, loading, setBusinesses } = useBusinessesData();
+  const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
 
   const [posts, setPosts] = useState<Post[]>([
     {
@@ -141,19 +141,29 @@ const MobileApp: React.FC = () => {
     setPosts([newPost, ...posts]);
   };
 
-  const handleBusinessClick = (business: any) => {
-    setSelectedBusiness(business);
-    // When selecting a business, we're not filtering posts by business
-    setFilteredBusinessId(null);
-    
-    // NEW: Save the clicked business location
-    if (business.name) {
-      // Try to get the most complete location information available
-      const fullLocation = business.formatted_address || 
-                          business.vicinity || 
-                          `${business.name}${business.address ? ', ' + business.address : ''}` ||
-                          business.name;
-      handleLocationSave(business.name, fullLocation);
+  const handleBusinessClick = async (business: any) => {
+    // Check if we need to fetch full details
+    if (!business.atmosphere?.length && !business.roles?.length) {
+      const fullBusiness = await fetchFullBusinessDetails(business.id);
+      if (fullBusiness) {
+        setSelectedBusiness(fullBusiness);
+        // When selecting a business, we're not filtering posts by business
+        setFilteredBusinessId(null);
+        
+        // Save the clicked business location
+        if (fullBusiness.name) {
+          handleLocationSave(fullBusiness.name, fullBusiness.name);
+        }
+      }
+    } else {
+      setSelectedBusiness(business);
+      // When selecting a business, we're not filtering posts by business
+      setFilteredBusinessId(null);
+      
+      // Save the clicked business location
+      if (business.name) {
+        handleLocationSave(business.name, business.name);
+      }
     }
   };
 
