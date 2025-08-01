@@ -1,6 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Loader } from '@googlemaps/js-api-loader';
 import JobSearchDropdown from './JobSearchDropdown';
 import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
@@ -48,12 +47,6 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   const [fullLocation, setFullLocation] = useState('');
   const [timePeriod, setTimePeriod] = useState('HR');
   const [isComplete, setIsComplete] = useState(false);
-  const [isGooglePlacesSelected, setIsGooglePlacesSelected] = useState(false);
-  const [isProcessingLocation, setIsProcessingLocation] = useState(false); // NEW: Track location processing
-  const autocompleteRef = useRef<HTMLInputElement>(null);
-  const autocompleteInstance = useRef<google.maps.places.Autocomplete | null>(null);
-  const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
-  const placesService = useRef<google.maps.places.PlacesService | null>(null);
   const { toast } = useToast();
 
   const handleSalaryChange = (value: string) => {
@@ -61,184 +54,32 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     setSalary(cleanValue ? `$${cleanValue}` : '');
   };
 
-  useEffect(() => {
-    const initAutocomplete = async () => {
-      if (!autocompleteRef.current) return;
-      const loader = new Loader({
-        apiKey: 'AIzaSyCkLj9I2chNXHkMTbBO0k-KkEmnc_jAqyQ',
-        version: 'weekly',
-        libraries: ['places']
-      });
-      try {
-        await loader.load();
-
-        // Initialize services
-        autocompleteService.current = new google.maps.places.AutocompleteService();
-        
-        // Create a map for PlacesService (hidden)
-        const mapDiv = document.createElement('div');
-        const map = new google.maps.Map(mapDiv, {
-          center: { lat: 40.7128, lng: -74.0060 },
-          zoom: 13
-        });
-        placesService.current = new google.maps.places.PlacesService(map);
-
-        // NYC bounds
-        const nycBounds = new google.maps.LatLngBounds(new google.maps.LatLng(40.4774, -74.2591), new google.maps.LatLng(40.9176, -73.7004));
-        autocompleteInstance.current = new google.maps.places.Autocomplete(autocompleteRef.current, {
-          bounds: nycBounds,
-          strictBounds: true,
-          types: ['establishment', 'geocode'],
-          componentRestrictions: {
-            country: 'us'
-          }
-        });
-        
-        autocompleteInstance.current.addListener('place_changed', () => {
-          const place = autocompleteInstance.current?.getPlace();
-          console.log('Google Places selected:', place);
-          if (place?.name) {
-            const placeName = place.name;
-            const fullAddr = place.formatted_address || place.name;
-            
-            console.log('Setting location from Google Places:', placeName, 'Full address:', fullAddr);
-            setLocation(placeName);
-            setFullLocation(fullAddr);
-            setIsGooglePlacesSelected(true);
-            setIsProcessingLocation(false); // Clear processing flag
-            
-            // Wait a tick before triggering completion check
-            setTimeout(() => {
-              checkForCompletion();
-            }, 10);
-          }
-        });
-      } catch (error) {
-        console.error('Error loading Google Places:', error);
-      }
-    };
-    initAutocomplete();
-  }, []);
-  
-  // FIXED: Enhanced completion effect - use input value directly
-  useEffect(() => {
-    if (isComplete && !isProcessingLocation) { // Don't complete if still processing location
-      // FIXED: Get the actual input value directly from the DOM
-      const actualLocationValue = autocompleteRef.current?.value || location;
-      const finalFullLocation = fullLocation || actualLocationValue;
-      
-      console.log('Completion triggered with:', { 
-        salary, 
-        role, 
-        location, 
-        actualLocationValue,
-        fullLocation, 
-        finalFullLocation,
-        isProcessingLocation 
-      });
-      
-      // Validate that all required data is present - use actual input value
-      const dataToPass = { 
-        salary, 
-        role, 
-        location: actualLocationValue, // Use the actual input value
-        fullLocation: finalFullLocation, 
-        timePeriod 
-      };
-      console.log('InitiationPage completing with data:', dataToPass);
-      
-      // Ensure we have all required fields - check actual input value
-      if (salary.trim() && role.trim() && actualLocationValue.trim()) {
-        console.log('All fields validated, calling onComplete');
-        onComplete(dataToPass);
-      } else {
-        console.log('Missing required fields, not calling onComplete');
-        setIsComplete(false); // Reset if validation fails
-      }
-    }
-  }, [isComplete, isProcessingLocation, salary, role, location, fullLocation, timePeriod, onComplete]);
-
-  const getPredictionsAndSetLocation = (input: string): Promise<void> => {
-    return new Promise((resolve) => {
-      if (!autocompleteService.current || !placesService.current) {
-        // Fallback: just use the typed input
-        console.log('No Google services available, using input as fullLocation:', input);
-        setFullLocation(input);
-        resolve();
-        return;
-      }
-
-      const request = {
-        input: input,
-        bounds: new google.maps.LatLngBounds(
-          new google.maps.LatLng(40.4774, -74.2591), 
-          new google.maps.LatLng(40.9176, -73.7004)
-        ),
-        strictBounds: true,
-        componentRestrictions: { country: 'us' }
-      };
-
-      console.log('Requesting predictions for:', input);
-
-      autocompleteService.current.getPlacePredictions(request, (predictions, status) => {
-        console.log('Predictions response:', { status, predictions });
-        
-        if (status === google.maps.places.PlacesServiceStatus.OK && predictions && predictions.length > 0) {
-          const firstPrediction = predictions[0];
-          console.log('Using first prediction:', firstPrediction);
-          
-          // Get place details for the first prediction
-          const detailsRequest = {
-            placeId: firstPrediction.place_id,
-            fields: ['name', 'formatted_address', 'place_id']
-          };
-          
-          placesService.current!.getDetails(detailsRequest, (place, detailsStatus) => {
-            console.log('Place details response:', { detailsStatus, place });
-            
-            if (detailsStatus === google.maps.places.PlacesServiceStatus.OK && place) {
-              const placeName = place.name || firstPrediction.structured_formatting.main_text;
-              const fullAddr = place.formatted_address || firstPrediction.description;
-              
-              console.log('Setting location from place details:', { placeName, fullAddr });
-              setLocation(placeName);
-              setFullLocation(fullAddr);
-            } else {
-              // Fallback to the prediction description
-              const fallbackLocation = firstPrediction.description;
-              console.log('Using prediction description as fallback:', fallbackLocation);
-              setFullLocation(fallbackLocation);
-            }
-            resolve();
-          });
-        } else {
-          // No predictions found, use the typed input as fallback
-          console.log('No predictions found, using typed input as fullLocation:', input);
-          setFullLocation(input);
-          resolve();
-        }
-      });
-    });
-  };
-
-  // FIXED: Enhanced completion check - use actual input value
   const checkForCompletion = () => {
-    // Get the actual input value directly from the DOM
-    const actualLocationValue = autocompleteRef.current?.value || location;
-    const allFilled = salary.trim() !== '' && role.trim() !== '' && actualLocationValue.trim() !== '';
+    const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
     
     console.log('checkForCompletion called:', { 
       salary, 
       role, 
       location, 
-      actualLocationValue,
-      allFilled, 
-      isProcessingLocation 
+      allFilled
     });
     
-    if (allFilled && !isComplete && !isProcessingLocation) { // Don't trigger if processing location
+    if (allFilled && !isComplete) {
       console.log('Setting isComplete to true');
       setIsComplete(true);
+      
+      // Complete after animation
+      setTimeout(() => {
+        const dataToPass = { 
+          salary, 
+          role, 
+          location, 
+          fullLocation: fullLocation || location, 
+          timePeriod 
+        };
+        console.log('InitiationPage completing with data:', dataToPass);
+        onComplete(dataToPass);
+      }, 500);
     }
   };
 
@@ -265,25 +106,16 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
 
   const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    // Update location state immediately to allow smooth typing
     setLocation(value);
-    // Clear fullLocation when manually typing to indicate it needs to be resolved
-    if (fullLocation && value !== location) {
-      setFullLocation('');
-    }
-    // Reset the Google Places flag when manually typing
-    setIsGooglePlacesSelected(false);
+    setFullLocation(value); // Simple fallback - use same value
   };
 
-  const handleLocationBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
+  const handleLocationBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     const value = e.target.value.trim();
     
     if (!value) {
       setLocation('');
       setFullLocation('');
-      setIsGooglePlacesSelected(false);
-      setIsProcessingLocation(false);
-      checkForCompletion();
       return;
     }
     
@@ -297,31 +129,14 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       // Clear the invalid input
       setLocation('');
       setFullLocation('');
-      setIsGooglePlacesSelected(false);
-      setIsProcessingLocation(false);
-      if (autocompleteRef.current) {
-        autocompleteRef.current.value = '';
-      }
       return;
     }
     
     console.log('Location blur with value:', value);
-    
-    // FIXED: Always update the location state to match the input
     setLocation(value);
+    setFullLocation(value);
     
-    // Try to get Google Places data in the background, but don't block completion
-    if (!isGooglePlacesSelected) {
-      // Don't set processing flag - let completion happen immediately
-      getPredictionsAndSetLocation(value).then(() => {
-        console.log('Background Google Places lookup completed');
-      }).catch((error) => {
-        console.log('Google Places lookup failed, using typed value:', error);
-        setFullLocation(value);
-      });
-    }
-    
-    // FIXED: Check for completion immediately without waiting for Google Places
+    // Check for completion
     setTimeout(() => {
       checkForCompletion();
     }, 10);
@@ -385,11 +200,11 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
 
             <div>
               <input 
-                ref={autocompleteRef} 
                 type="text" 
+                value={location}
                 onChange={handleLocationChange}
                 onBlur={handleLocationBlur} 
-                placeholder="Search NYC locations..." 
+                placeholder="Enter NYC location..." 
                 className="app-input" 
               />
             </div>
