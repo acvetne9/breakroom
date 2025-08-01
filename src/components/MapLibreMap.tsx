@@ -36,7 +36,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const zoom = map.getZoom();
       setCurrentZoom(zoom);
     }
-  }, [map]);
+  }, []);
 
   // Initialize map
   useEffect(() => {
@@ -71,7 +71,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     });
 
     // Add zoom change listener
-    mapInstance.on('zoom', handleZoomChange);
+    const zoomHandler = () => {
+      const zoom = mapInstance.getZoom();
+      setCurrentZoom(zoom);
+    };
+    mapInstance.on('zoom', zoomHandler);
 
     // Hide POI labels by adding custom style
     mapInstance.on('load', () => {
@@ -84,7 +88,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return () => {
       mapInstance.remove();
     };
-  }, [onMapLoad, handleZoomChange]);
+  }, []);
 
   // Create marker clustering
   useEffect(() => {
