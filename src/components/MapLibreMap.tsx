@@ -44,112 +44,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     const mapInstance = new maplibregl.Map({
       container: mapRef.current,
-      style: {
-        version: 8,
-        sources: {
-          'openmaptiles': {
-            type: 'vector',
-            tiles: ['https://api.protomaps.com/tiles/v3/{z}/{x}/{y}.mvt?key=protomaps-demo'],
-            attribution: '© OpenStreetMap contributors'
-          }
-        },
-        layers: [
-          // Background
-          {
-            id: 'background',
-            type: 'background',
-            paint: {
-              'background-color': '#f8f9fa'
-            }
-          },
-          // Water - tech-y blue
-          {
-            id: 'water',
-            type: 'fill',
-            source: 'openmaptiles',
-            'source-layer': 'water',
-            paint: {
-              'fill-color': '#0ea5e9'
-            }
-          },
-          // Parks - rich matte green
-          {
-            id: 'landuse_park',
-            type: 'fill',
-            source: 'openmaptiles',
-            'source-layer': 'landuse',
-            filter: ['in', 'class', 'park', 'recreation_ground', 'cemetery', 'forest', 'wood'],
-            paint: {
-              'fill-color': '#22c55e',
-              'fill-opacity': 0.8
-            }
-          },
-          // Buildings
-          {
-            id: 'building',
-            type: 'fill',
-            source: 'openmaptiles',
-            'source-layer': 'building',
-            paint: {
-              'fill-color': '#e5e7eb',
-              'fill-opacity': 0.7
-            }
-          },
-          // Roads - all very light gray (no trails, highway names, or train tracks)
-          {
-            id: 'road_minor',
-            type: 'line',
-            source: 'openmaptiles',
-            'source-layer': 'transportation',
-            filter: ['in', 'class', 'minor', 'service'],
-            paint: {
-              'line-color': '#f3f4f6',
-              'line-width': [
-                'interpolate',
-                ['exponential', 1.55],
-                ['zoom'],
-                4, 0.25,
-                20, 30
-              ]
-            }
-          },
-          {
-            id: 'road_major',
-            type: 'line',
-            source: 'openmaptiles',
-            'source-layer': 'transportation',
-            filter: ['in', 'class', 'primary', 'secondary', 'tertiary', 'trunk'],
-            paint: {
-              'line-color': '#f3f4f6',
-              'line-width': [
-                'interpolate',
-                ['exponential', 1.4],
-                ['zoom'],
-                6, 0.5,
-                20, 30
-              ]
-            }
-          },
-          {
-            id: 'road_highway',
-            type: 'line',
-            source: 'openmaptiles',
-            'source-layer': 'transportation',
-            filter: ['==', 'class', 'motorway'],
-            paint: {
-              'line-color': '#f3f4f6',
-              'line-width': [
-                'interpolate',
-                ['exponential', 1.4],
-                ['zoom'],
-                8, 1,
-                16, 10
-              ]
-            }
-          }
-          // Explicitly excluding: trails, highway names, hospital markers, train tracks, bridge borders
-        ]
-      },
+      style: 'https://demotiles.maplibre.org/style.json',
       center: [-73.9712, 40.7831], // NYC center
       zoom: 14,
       maxBounds: [
@@ -165,9 +60,48 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
     mapInstance.on('zoom', zoomHandler);
 
-    // Hide POI labels by adding custom style
+    // Apply custom styling when map loads
     mapInstance.on('load', () => {
-      // Style is already minimal with just OSM tiles
+      try {
+        const layers = mapInstance.getStyle().layers;
+        
+        // Update road colors to light gray
+        layers?.forEach(layer => {
+          if (layer.id.includes('road') || layer.id.includes('highway') || layer.id.includes('street')) {
+            mapInstance.setPaintProperty(layer.id, 'line-color', '#f3f4f6');
+          }
+        });
+
+        // Update water to tech-y blue
+        layers?.forEach(layer => {
+          if (layer.id.includes('water')) {
+            mapInstance.setPaintProperty(layer.id, 'fill-color', '#0ea5e9');
+          }
+        });
+
+        // Update parks to rich green
+        layers?.forEach(layer => {
+          if (layer.id.includes('park') || layer.id.includes('forest') || layer.id.includes('wood')) {
+            mapInstance.setPaintProperty(layer.id, 'fill-color', '#22c55e');
+          }
+        });
+
+        // Hide unwanted elements
+        layers?.forEach(layer => {
+          if (layer.id.includes('label') || 
+              layer.id.includes('poi') || 
+              layer.id.includes('place') ||
+              layer.id.includes('rail') ||
+              layer.id.includes('transit') ||
+              layer.id.includes('trail')) {
+            mapInstance.setLayoutProperty(layer.id, 'visibility', 'none');
+          }
+        });
+
+      } catch (error) {
+        console.log('Style customization failed, using default styling:', error);
+      }
+      
       onMapLoad?.(mapInstance);
     });
 
