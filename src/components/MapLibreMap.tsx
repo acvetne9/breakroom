@@ -79,10 +79,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         });
 
-        // Update parks to rich green
+        // Update parks to rich green with proper layering
         layers?.forEach(layer => {
           if (layer.id.includes('park') || layer.id.includes('forest') || layer.id.includes('wood')) {
-            mapInstance.setPaintProperty(layer.id, 'fill-color', '#22c55e');
+            if (layer.type === 'fill') {
+              mapInstance.setPaintProperty(layer.id, 'fill-color', '#22c55e');
+              mapInstance.setPaintProperty(layer.id, 'fill-opacity', 0.6);
+            }
           }
         });
 
