@@ -47,107 +47,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       style: {
         version: 8,
         sources: {
-          'openmaptiles': {
-            type: 'vector',
-            tiles: ['https://api.maptiler.com/tiles/v3/{z}/{x}/{y}.pbf?key=get_your_own_OpIi9ZULNHzrESv6T2vL'],
-            attribution: '© MapTiler © OpenStreetMap contributors'
+          'osm': {
+            type: 'raster',
+            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            tileSize: 256,
+            attribution: '© OpenStreetMap contributors'
           }
         },
         layers: [
-          // Background
           {
-            id: 'background',
-            type: 'background',
-            paint: {
-              'background-color': '#f8f9fa'
-            }
-          },
-          // Water - tech-y blue
-          {
-            id: 'water',
-            type: 'fill',
-            source: 'openmaptiles',
-            'source-layer': 'water',
-            paint: {
-              'fill-color': '#0ea5e9'
-            }
-          },
-          // Parks - rich matte green
-          {
-            id: 'landuse_park',
-            type: 'fill',
-            source: 'openmaptiles',
-            'source-layer': 'landuse',
-            filter: ['in', 'class', 'park', 'recreation_ground', 'cemetery', 'forest', 'wood'],
-            paint: {
-              'fill-color': '#22c55e',
-              'fill-opacity': 0.8
-            }
-          },
-          // Buildings
-          {
-            id: 'building',
-            type: 'fill',
-            source: 'openmaptiles',
-            'source-layer': 'building',
-            paint: {
-              'fill-color': '#e5e7eb',
-              'fill-opacity': 0.7
-            }
-          },
-          // Roads - all very light gray
-          {
-            id: 'road_minor',
-            type: 'line',
-            source: 'openmaptiles',
-            'source-layer': 'transportation',
-            filter: ['in', 'class', 'minor', 'service'],
-            paint: {
-              'line-color': '#f3f4f6',
-              'line-width': [
-                'interpolate',
-                ['exponential', 1.55],
-                ['zoom'],
-                4, 0.25,
-                20, 30
-              ]
-            }
-          },
-          {
-            id: 'road_major',
-            type: 'line',
-            source: 'openmaptiles',
-            'source-layer': 'transportation',
-            filter: ['in', 'class', 'primary', 'secondary', 'tertiary', 'trunk'],
-            paint: {
-              'line-color': '#f3f4f6',
-              'line-width': [
-                'interpolate',
-                ['exponential', 1.4],
-                ['zoom'],
-                6, 0.5,
-                20, 30
-              ]
-            }
-          },
-          {
-            id: 'road_highway',
-            type: 'line',
-            source: 'openmaptiles',
-            'source-layer': 'transportation',
-            filter: ['==', 'class', 'motorway'],
-            paint: {
-              'line-color': '#f3f4f6',
-              'line-width': [
-                'interpolate',
-                ['exponential', 1.4],
-                ['zoom'],
-                8, 1,
-                16, 10
-              ]
-            }
+            id: 'osm',
+            type: 'raster',
+            source: 'osm'
           }
-          // Explicitly excluding: trails, highway names, hospital markers, train tracks, bridge borders
         ]
       },
       center: [-73.9712, 40.7831], // NYC center
