@@ -47,20 +47,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       style: {
         version: 8,
         sources: {
-          'osm-raster': {
-            type: 'raster',
-            tiles: [
-              'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
-              'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-              'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
-            ],
-            tileSize: 256,
-            attribution: '© OpenStreetMap contributors'
-          },
-          'overpass-vector': {
+          'openfreemap': {
             type: 'vector',
             tiles: [
-              'https://tiles.openfreemap.org/styles/liberty/{z}/{x}/{y}.pbf'
+              'https://tiles.openfreemap.org/data/v3/{z}/{x}/{y}.pbf'
             ],
             attribution: '© OpenFreeMap © OpenStreetMap contributors'
           }
@@ -73,28 +63,73 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               'background-color': '#f8f9fa'
             }
           },
+          // Water with custom color
           {
-            id: 'osm-tiles',
-            type: 'raster',
-            source: 'osm-raster',
-            minzoom: 0,
-            maxzoom: 22
-          },
-          // Water overlay with custom color
-          {
-            id: 'water-overlay',
+            id: 'water',
             type: 'fill',
-            source: 'overpass-vector',
+            source: 'openfreemap',
             'source-layer': 'water',
             paint: {
-              'fill-color': '#FFFFFF',
-              'fill-opacity': 0.9
+              'fill-color': '#04AEF6'
             }
           },
+          // Parks and green spaces with custom color
           {
-            id: 'waterway-overlay',
+            id: 'parks',
+            type: 'fill',
+            source: 'openfreemap',
+            'source-layer': 'landuse',
+            filter: ['in', ['get', 'class'], ['literal', ['park', 'cemetery', 'recreation_ground', 'forest', 'grass', 'meadow', 'recreation']]],
+            paint: {
+              'fill-color': '#8BCE64',
+              'fill-opacity': 0.8
+            }
+          },
+          // Additional green areas
+          {
+            id: 'landcover',
+            type: 'fill',
+            source: 'openfreemap',
+            'source-layer': 'landcover',
+            filter: ['in', ['get', 'class'], ['literal', ['grass', 'forest', 'wood']]],
+            paint: {
+              'fill-color': '#8BCE64',
+              'fill-opacity': 0.6
+            }
+          },
+          // Buildings
+          {
+            id: 'buildings',
+            type: 'fill',
+            source: 'openfreemap',
+            'source-layer': 'building',
+            paint: {
+              'fill-color': '#e0e0e0',
+              'fill-opacity': 0.7
+            }
+          },
+          // Roads
+          {
+            id: 'roads-case',
             type: 'line',
-            source: 'overpass-vector',
+            source: 'openfreemap',
+            'source-layer': 'transportation',
+            paint: {
+              'line-color': '#ffffff',
+              'line-width': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                5, 0.4,
+                18, 20
+              ]
+            }
+          },
+          // Waterways
+          {
+            id: 'waterway',
+            type: 'line',
+            source: 'openfreemap',
             'source-layer': 'waterway',
             paint: {
               'line-color': '#04AEF6',
@@ -107,16 +142,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ]
             }
           },
-          // Parks overlay with custom color
+          // Place labels
           {
-            id: 'parks-overlay',
-            type: 'fill',
-            source: 'overpass-vector',
-            'source-layer': 'landuse',
-            filter: ['in', ['get', 'class'], ['literal', ['park', 'cemetery', 'recreation_ground', 'forest', 'grass', 'meadow']]],
+            id: 'place-labels',
+            type: 'symbol',
+            source: 'openfreemap',
+            'source-layer': 'place',
+            filter: ['in', ['get', 'class'], ['literal', ['city', 'town']]],
+            layout: {
+              'text-field': ['get', 'name'],
+              'text-size': 14,
+              'text-offset': [0, 0]
+            },
             paint: {
-              'fill-color': '#FFFFFF', //8BCE64
-              'fill-opacity': 0.8
+              'text-color': '#333',
+              'text-halo-color': '#fff',
+              'text-halo-width': 1
             }
           }
         ]
