@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import GoogleMap from './GoogleMap';
+import MapLibreMap from './MapLibreMap';
 import BusinessPreview from './BusinessPreview';
 import BusinessDetails from './BusinessDetails';
 import { searchBusinesses } from '../utils/searchUtils';
@@ -168,8 +168,8 @@ const HomePage: React.FC<HomePageProps> = ({
 
   return (
     <div className="relative w-full h-full">
-      {/* Google Maps base layer */}
-      <GoogleMap 
+      {/* MapLibre with OpenStreetMap base layer */}
+      <MapLibreMap 
         businesses={filteredBusinesses}
         onBusinessClick={handleBusinessClick}
         selectedBusiness={selectedBusiness}
