@@ -56,6 +56,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             ],
             tileSize: 256,
             attribution: '© OpenStreetMap contributors'
+          },
+          'overpass-vector': {
+            type: 'vector',
+            tiles: [
+              'https://tiles.openfreemap.org/styles/liberty/{z}/{x}/{y}.pbf'
+            ],
+            attribution: '© OpenFreeMap © OpenStreetMap contributors'
           }
         },
         layers: [
@@ -72,6 +79,45 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             source: 'osm-raster',
             minzoom: 0,
             maxzoom: 22
+          },
+          // Water overlay with custom color
+          {
+            id: 'water-overlay',
+            type: 'fill',
+            source: 'overpass-vector',
+            'source-layer': 'water',
+            paint: {
+              'fill-color': '#04AEF6',
+              'fill-opacity': 0.9
+            }
+          },
+          {
+            id: 'waterway-overlay',
+            type: 'line',
+            source: 'overpass-vector',
+            'source-layer': 'waterway',
+            paint: {
+              'line-color': '#04AEF6',
+              'line-width': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                8, 1,
+                16, 4
+              ]
+            }
+          },
+          // Parks overlay with custom color
+          {
+            id: 'parks-overlay',
+            type: 'fill',
+            source: 'overpass-vector',
+            'source-layer': 'landuse',
+            filter: ['in', ['get', 'class'], ['literal', ['park', 'cemetery', 'recreation_ground', 'forest', 'grass', 'meadow']]],
+            paint: {
+              'fill-color': '#8BCE64',
+              'fill-opacity': 0.8
+            }
           }
         ]
       },
@@ -93,6 +139,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     // Apply minimal custom styling when map loads
     mapInstance.on('load', () => {
       onMapLoad?.(mapInstance);
+    });
+
+    // Handle source errors gracefully
+    mapInstance.on('sourcedataabort', (e) => {
+      console.log('Source data loading aborted:', e);
+    });
+
+    mapInstance.on('error', (e) => {
+      console.log('Map error:', e);
     });
 
     setMap(mapInstance);
@@ -277,47 +332,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [map, selectedBusiness]);
 
   return (
-    <>
-      <div 
-        ref={mapRef} 
-        className="absolute inset-0 w-full h-full"
-        style={{ 
-          zIndex: 1,
-          // CSS filter to shift colors: makes water more blue and parks more green
-          filter: 'hue-rotate(20deg) saturate(1.4) contrast(1.1) brightness(1.05)',
-        }}
-      />
-      
-      <style>{`
-        /* Enhanced CSS filters for specific color targeting */
-        .maplibregl-canvas-container canvas {
-          filter: 
-            /* Enhance water to blue */
-            hue-rotate(10deg)
-            /* Enhance parks to green */  
-            saturate(1.3)
-            /* Desaturate yellows/oranges (roads) to make them grayer */
-            contrast(1.2)
-            brightness(1.0)
-            /* This combination makes roads appear more gray while enhancing water/parks */
-            !important;
-        }
-        
-        /* Apply a subtle gray overlay that affects mainly yellow/orange road colors */
-        .maplibregl-canvas-container::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          pointer-events: none;
-          background: rgba(128, 128, 128, 0.1);
-          mix-blend-mode: color;
-          z-index: 1;
-        }
-      `}</style>
-    </>
+    <div 
+      ref={mapRef} 
+      className="absolute inset-0 w-full h-full"
+      style={{ 
+        zIndex: 1,
+      }}
+    />
   );
 };
 
