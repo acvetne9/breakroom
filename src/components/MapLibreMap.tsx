@@ -44,7 +44,28 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     const mapInstance = new maplibregl.Map({
       container: mapRef.current,
-      style: 'https://tiles.stadiamaps.com/styles/alidade_smooth.json',
+      style: {
+        version: 8,
+        sources: {
+          'raster-tiles': {
+            type: 'raster',
+            tiles: [
+              'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+            ],
+            tileSize: 256,
+            attribution: '© OpenStreetMap contributors'
+          }
+        },
+        layers: [
+          {
+            id: 'simple-tiles',
+            type: 'raster',
+            source: 'raster-tiles',
+            minzoom: 0,
+            maxzoom: 22
+          }
+        ]
+      },
       center: [-73.9712, 40.7831], // NYC center
       zoom: 14,
       maxBounds: [
