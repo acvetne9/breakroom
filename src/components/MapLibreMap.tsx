@@ -47,15 +47,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       style: {
         version: 8,
         sources: {
-          'osm-raster': {
-            type: 'raster',
+          'openmaptiles': {
+            type: 'vector',
             tiles: [
-              'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
-              'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-              'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
+              'https://api.maptiler.com/tiles/v3/{z}/{x}/{y}.pbf?key=get_your_own_OpIi9ZULNHzrESv6T2vL'
             ],
-            tileSize: 256,
-            attribution: '© OpenStreetMap contributors'
+            attribution: '© MapTiler © OpenStreetMap contributors'
           }
         },
         layers: [
@@ -66,12 +63,133 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               'background-color': '#f8f9fa'
             }
           },
+          // Water layers with custom color
           {
-            id: 'osm-tiles',
-            type: 'raster',
-            source: 'osm-raster',
-            minzoom: 0,
-            maxzoom: 22
+            id: 'water',
+            type: 'fill',
+            source: 'openmaptiles',
+            'source-layer': 'water',
+            paint: {
+              'fill-color': '#04AEF6'
+            }
+          },
+          {
+            id: 'waterway',
+            type: 'line',
+            source: 'openmaptiles',
+            'source-layer': 'waterway',
+            paint: {
+              'line-color': '#04AEF6',
+              'line-width': {
+                base: 1.4,
+                stops: [[8, 1], [20, 8]]
+              }
+            }
+          },
+          // Parks and green spaces with custom color
+          {
+            id: 'parks',
+            type: 'fill',
+            source: 'openmaptiles',
+            'source-layer': 'landuse',
+            filter: ['in', 'class', 'park', 'cemetery', 'recreation_ground'],
+            paint: {
+              'fill-color': '#8BCE64',
+              'fill-opacity': 0.8
+            }
+          },
+          {
+            id: 'landcover-grass',
+            type: 'fill',
+            source: 'openmaptiles',
+            'source-layer': 'landcover',
+            filter: ['==', 'class', 'grass'],
+            paint: {
+              'fill-color': '#8BCE64',
+              'fill-opacity': 0.6
+            }
+          },
+          // Buildings
+          {
+            id: 'buildings',
+            type: 'fill',
+            source: 'openmaptiles',
+            'source-layer': 'building',
+            paint: {
+              'fill-color': '#e0e0e0',
+              'fill-opacity': 0.7
+            }
+          },
+          {
+            id: 'buildings-outline',
+            type: 'line',
+            source: 'openmaptiles',
+            'source-layer': 'building',
+            paint: {
+              'line-color': '#d0d0d0',
+              'line-width': 1
+            }
+          },
+          // Roads
+          {
+            id: 'roads-minor',
+            type: 'line',
+            source: 'openmaptiles',
+            'source-layer': 'transportation',
+            filter: ['in', 'class', 'minor', 'service'],
+            paint: {
+              'line-color': '#ffffff',
+              'line-width': {
+                base: 1.55,
+                stops: [[4, 0.25], [20, 30]]
+              }
+            }
+          },
+          {
+            id: 'roads-major',
+            type: 'line',
+            source: 'openmaptiles',
+            'source-layer': 'transportation',
+            filter: ['in', 'class', 'primary', 'secondary', 'tertiary', 'trunk'],
+            paint: {
+              'line-color': '#ffffff',
+              'line-width': {
+                base: 1.4,
+                stops: [[6, 0.5], [20, 30]]
+              }
+            }
+          },
+          {
+            id: 'roads-highway',
+            type: 'line',
+            source: 'openmaptiles',
+            'source-layer': 'transportation',
+            filter: ['==', 'class', 'motorway'],
+            paint: {
+              'line-color': '#fc8',
+              'line-width': {
+                base: 1.4,
+                stops: [[8, 1], [16, 10]]
+              }
+            }
+          },
+          // Labels
+          {
+            id: 'place-labels',
+            type: 'symbol',
+            source: 'openmaptiles',
+            'source-layer': 'place',
+            filter: ['==', 'class', 'city'],
+            layout: {
+              'text-field': '{name}',
+              'text-font': ['Open Sans Regular'],
+              'text-size': 16
+            },
+            paint: {
+              'text-color': '#333',
+              'text-halo-color': '#fff',
+              'text-halo-width': 2
+            }
           }
         ]
       },
@@ -311,7 +429,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       className="absolute inset-0 w-full h-full"
       style={{ 
         zIndex: 1,
-        filter: 'hue-rotate(180deg) saturate(1.4) brightness(1.1)',
       }}
     />
   );
