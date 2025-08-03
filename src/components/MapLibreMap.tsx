@@ -277,37 +277,47 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [map, selectedBusiness]);
 
   return (
-    <div className="absolute inset-0 w-full h-full">
+    <>
       <div 
         ref={mapRef} 
         className="absolute inset-0 w-full h-full"
         style={{ 
           zIndex: 1,
-        }}
-      />
-      
-      {/* Custom color overlay using CSS */}
-      <div 
-        className="absolute inset-0 w-full h-full pointer-events-none"
-        style={{
-          zIndex: 2,
-          background: `
-            radial-gradient(circle at 40.7831% 26.0288%, rgba(4, 174, 246, 0.3) 0%, transparent 15%),
-            radial-gradient(circle at 40.7515% 26.0421%, rgba(139, 206, 100, 0.2) 0%, transparent 10%),
-            radial-gradient(circle at 40.7645% 26.0156%, rgba(139, 206, 100, 0.25) 0%, transparent 12%),
-            radial-gradient(circle at 40.7421% 26.0512%, rgba(4, 174, 246, 0.4) 0%, transparent 8%),
-            radial-gradient(circle at 40.7812% 26.0089%, rgba(139, 206, 100, 0.2) 0%, transparent 14%)
-          `,
-          mixBlendMode: 'multiply'
+          // CSS filter to shift colors: makes water more blue and parks more green
+          filter: 'hue-rotate(20deg) saturate(1.4) contrast(1.1) brightness(1.05)',
         }}
       />
       
       <style>{`
+        /* Enhanced CSS filters for specific color targeting */
         .maplibregl-canvas-container canvas {
-          filter: hue-rotate(15deg) saturate(1.3) brightness(1.05) !important;
+          filter: 
+            /* Enhance water to blue */
+            hue-rotate(10deg)
+            /* Enhance parks to green */  
+            saturate(1.3)
+            /* Desaturate yellows/oranges (roads) to make them grayer */
+            contrast(1.2)
+            brightness(1.0)
+            /* This combination makes roads appear more gray while enhancing water/parks */
+            !important;
+        }
+        
+        /* Apply a subtle gray overlay that affects mainly yellow/orange road colors */
+        .maplibregl-canvas-container::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          pointer-events: none;
+          background: rgba(128, 128, 128, 0.1);
+          mix-blend-mode: color;
+          z-index: 1;
         }
       `}</style>
-    </div>
+    </>
   );
 };
 
