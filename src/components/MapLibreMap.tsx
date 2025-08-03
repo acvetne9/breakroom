@@ -311,7 +311,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       className="absolute inset-0 w-full h-full"
       style={{ 
         zIndex: 1,
-        filter: 'hue-rotate(240deg) saturate(0.7) contrast(1.2)',
+        filter: 'hue-rotate(240deg) saturate(1.0) contrast(1.2)',
       }}
     />
   );
