@@ -47,22 +47,72 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       style: {
         version: 8,
         sources: {
-          'raster-tiles': {
-            type: 'raster',
+          'openmaptiles': {
+            type: 'vector',
             tiles: [
-              'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-            ],
-            tileSize: 256,
-            attribution: '© OpenStreetMap contributors'
+              'https://api.maptiler.com/tiles/v3/{z}/{x}/{y}.pbf?key=get_your_own_OpIi9ZULNHzrESv6T2vL'
+            ]
           }
         },
         layers: [
           {
-            id: 'simple-tiles',
-            type: 'raster',
-            source: 'raster-tiles',
-            minzoom: 0,
-            maxzoom: 22
+            id: 'background',
+            type: 'background',
+            paint: {
+              'background-color': '#f8f9fa'
+            }
+          },
+          {
+            id: 'water',
+            type: 'fill',
+            source: 'openmaptiles',
+            'source-layer': 'water',
+            paint: {
+              'fill-color': '#0ea5e9'
+            }
+          },
+          {
+            id: 'landuse',
+            type: 'fill',
+            source: 'openmaptiles',
+            'source-layer': 'landuse',
+            filter: ['==', 'class', 'park'],
+            paint: {
+              'fill-color': '#22c55e',
+              'fill-opacity': 0.6
+            }
+          },
+          {
+            id: 'roads',
+            type: 'line',
+            source: 'openmaptiles',
+            'source-layer': 'transportation',
+            filter: ['in', 'class', 'minor', 'service', 'track'],
+            paint: {
+              'line-color': '#f3f4f6',
+              'line-width': 1
+            }
+          },
+          {
+            id: 'highways',
+            type: 'line',
+            source: 'openmaptiles',
+            'source-layer': 'transportation',
+            filter: ['in', 'class', 'motorway', 'trunk', 'primary', 'secondary'],
+            paint: {
+              'line-color': '#8b5cf6',
+              'line-width': 3
+            }
+          },
+          {
+            id: 'buildings',
+            type: 'fill',
+            source: 'openmaptiles',
+            'source-layer': 'building',
+            paint: {
+              'fill-color': '#e5e7eb',
+              'fill-opacity': 0.7
+            }
           }
         ]
       },
@@ -300,10 +350,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     <div 
       ref={mapRef} 
       className="absolute inset-0 w-full h-full"
-      style={{ 
-        zIndex: 1,
-        filter: 'grayscale(0.3) contrast(1.1) brightness(1.1)'
-      }}
+      style={{ zIndex: 1 }}
     />
   );
 };
