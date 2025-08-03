@@ -142,6 +142,13 @@ const MobileApp: React.FC = () => {
   };
 
   const handleBusinessClick = async (business: any) => {
+    // Handle null business (close action)
+    if (!business) {
+      setSelectedBusiness(null);
+      setFilteredBusinessId(null);
+      return;
+    }
+    
     // Check if we need to fetch full details
     if (!business.atmosphere?.length && !business.roles?.length) {
       const fullBusiness = await fetchFullBusinessDetails(business.id);

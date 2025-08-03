@@ -44,7 +44,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     const mapInstance = new maplibregl.Map({
       container: mapRef.current,
-      style: 'https://demotiles.maplibre.org/style.json',
+      style: 'https://tiles.stadiamaps.com/styles/alidade_smooth.json',
       center: [-73.9712, 40.7831], // NYC center
       zoom: 14,
       maxBounds: [
