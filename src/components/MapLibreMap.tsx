@@ -80,10 +80,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'source-layer': 'waterway',
             paint: {
               'line-color': '#04AEF6',
-              'line-width': {
-                base: 1.4,
-                stops: [[8, 1], [20, 8]]
-              }
+              'line-width': [
+                'interpolate',
+                ['exponential', 1.4],
+                ['zoom'],
+                8, 1,
+                20, 8
+              ]
             }
           },
           // Parks and green spaces with custom color
@@ -139,10 +142,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             filter: ['in', 'class', 'minor', 'service'],
             paint: {
               'line-color': '#ffffff',
-              'line-width': {
-                base: 1.55,
-                stops: [[4, 0.25], [20, 30]]
-              }
+              'line-width': [
+                'interpolate',
+                ['exponential', 1.55],
+                ['zoom'],
+                4, 0.25,
+                20, 30
+              ]
             }
           },
           {
@@ -153,10 +159,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             filter: ['in', 'class', 'primary', 'secondary', 'tertiary', 'trunk'],
             paint: {
               'line-color': '#ffffff',
-              'line-width': {
-                base: 1.4,
-                stops: [[6, 0.5], [20, 30]]
-              }
+              'line-width': [
+                'interpolate',
+                ['exponential', 1.4],
+                ['zoom'],
+                6, 0.5,
+                20, 30
+              ]
             }
           },
           {
@@ -167,10 +176,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             filter: ['==', 'class', 'motorway'],
             paint: {
               'line-color': '#fc8',
-              'line-width': {
-                base: 1.4,
-                stops: [[8, 1], [16, 10]]
-              }
+              'line-width': [
+                'interpolate',
+                ['exponential', 1.4],
+                ['zoom'],
+                8, 1,
+                16, 10
+              ]
             }
           },
           // Labels
