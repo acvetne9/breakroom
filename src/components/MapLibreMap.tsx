@@ -47,11 +47,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       style: {
         version: 8,
         sources: {
-          'openmaptiles': {
+          'protomaps': {
             type: 'vector',
             tiles: [
-              'https://api.maptiler.com/tiles/v3/{z}/{x}/{y}.pbf?key=get_your_own_OpIi9ZULNHzrESv6T2vL'
-            ]
+              'https://cdn.protomaps.com/tiles/v3/{z}/{x}/{y}.mvt'
+            ],
+            maxzoom: 15
           }
         },
         layers: [
@@ -65,50 +66,61 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           {
             id: 'water',
             type: 'fill',
-            source: 'openmaptiles',
+            source: 'protomaps',
             'source-layer': 'water',
             paint: {
               'fill-color': '#0ea5e9'
             }
           },
           {
-            id: 'landuse',
+            id: 'landuse_park',
             type: 'fill',
-            source: 'openmaptiles',
+            source: 'protomaps',
             'source-layer': 'landuse',
-            filter: ['==', 'class', 'park'],
+            filter: ['==', 'pmap:kind', 'park'],
             paint: {
               'fill-color': '#22c55e',
               'fill-opacity': 0.6
             }
           },
           {
-            id: 'roads',
+            id: 'roads_minor',
             type: 'line',
-            source: 'openmaptiles',
-            'source-layer': 'transportation',
-            filter: ['in', 'class', 'minor', 'service', 'track'],
+            source: 'protomaps',
+            'source-layer': 'roads',
+            filter: ['in', 'pmap:kind', 'minor_road', 'other', 'path'],
             paint: {
               'line-color': '#f3f4f6',
               'line-width': 1
             }
           },
           {
+            id: 'roads_major',
+            type: 'line',
+            source: 'protomaps',
+            'source-layer': 'roads',
+            filter: ['in', 'pmap:kind', 'major_road'],
+            paint: {
+              'line-color': '#f3f4f6',
+              'line-width': 2
+            }
+          },
+          {
             id: 'highways',
             type: 'line',
-            source: 'openmaptiles',
-            'source-layer': 'transportation',
-            filter: ['in', 'class', 'motorway', 'trunk', 'primary', 'secondary'],
+            source: 'protomaps',
+            'source-layer': 'roads',
+            filter: ['in', 'pmap:kind', 'highway'],
             paint: {
               'line-color': '#8b5cf6',
-              'line-width': 3
+              'line-width': 4
             }
           },
           {
             id: 'buildings',
             type: 'fill',
-            source: 'openmaptiles',
-            'source-layer': 'building',
+            source: 'protomaps',
+            'source-layer': 'buildings',
             paint: {
               'fill-color': '#e5e7eb',
               'fill-opacity': 0.7
