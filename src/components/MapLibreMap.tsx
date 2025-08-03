@@ -47,12 +47,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       style: {
         version: 8,
         sources: {
-          'openfreemap': {
-            type: 'vector',
+          'osm-raster': {
+            type: 'raster',
             tiles: [
-              'https://tiles.openfreemap.org/data/v3/{z}/{x}/{y}.pbf'
+              'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+              'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+              'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
             ],
-            attribution: '© OpenFreeMap © OpenStreetMap contributors'
+            tileSize: 256,
+            attribution: '© OpenStreetMap contributors'
           }
         },
         layers: [
@@ -63,102 +66,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               'background-color': '#f8f9fa'
             }
           },
-          // Water with custom color
           {
-            id: 'water',
-            type: 'fill',
-            source: 'openfreemap',
-            'source-layer': 'water',
-            paint: {
-              'fill-color': '#04AEF6'
-            }
-          },
-          // Parks and green spaces with custom color
-          {
-            id: 'parks',
-            type: 'fill',
-            source: 'openfreemap',
-            'source-layer': 'landuse',
-            filter: ['in', ['get', 'class'], ['literal', ['park', 'cemetery', 'recreation_ground', 'forest', 'grass', 'meadow', 'recreation']]],
-            paint: {
-              'fill-color': '#8BCE64',
-              'fill-opacity': 0.8
-            }
-          },
-          // Additional green areas
-          {
-            id: 'landcover',
-            type: 'fill',
-            source: 'openfreemap',
-            'source-layer': 'landcover',
-            filter: ['in', ['get', 'class'], ['literal', ['grass', 'forest', 'wood']]],
-            paint: {
-              'fill-color': '#8BCE64',
-              'fill-opacity': 0.6
-            }
-          },
-          // Buildings
-          {
-            id: 'buildings',
-            type: 'fill',
-            source: 'openfreemap',
-            'source-layer': 'building',
-            paint: {
-              'fill-color': '#e0e0e0',
-              'fill-opacity': 0.7
-            }
-          },
-          // Roads
-          {
-            id: 'roads-case',
-            type: 'line',
-            source: 'openfreemap',
-            'source-layer': 'transportation',
-            paint: {
-              'line-color': '#ffffff',
-              'line-width': [
-                'interpolate',
-                ['linear'],
-                ['zoom'],
-                5, 0.4,
-                18, 20
-              ]
-            }
-          },
-          // Waterways
-          {
-            id: 'waterway',
-            type: 'line',
-            source: 'openfreemap',
-            'source-layer': 'waterway',
-            paint: {
-              'line-color': '#04AEF6',
-              'line-width': [
-                'interpolate',
-                ['linear'],
-                ['zoom'],
-                8, 1,
-                16, 4
-              ]
-            }
-          },
-          // Place labels
-          {
-            id: 'place-labels',
-            type: 'symbol',
-            source: 'openfreemap',
-            'source-layer': 'place',
-            filter: ['in', ['get', 'class'], ['literal', ['city', 'town']]],
-            layout: {
-              'text-field': ['get', 'name'],
-              'text-size': 14,
-              'text-offset': [0, 0]
-            },
-            paint: {
-              'text-color': '#333',
-              'text-halo-color': '#fff',
-              'text-halo-width': 1
-            }
+            id: 'osm-tiles',
+            type: 'raster',
+            source: 'osm-raster',
+            minzoom: 0,
+            maxzoom: 22
           }
         ]
       },
@@ -180,15 +93,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     // Apply minimal custom styling when map loads
     mapInstance.on('load', () => {
       onMapLoad?.(mapInstance);
-    });
-
-    // Handle source errors gracefully
-    mapInstance.on('sourcedataabort', (e) => {
-      console.log('Source data loading aborted:', e);
-    });
-
-    mapInstance.on('error', (e) => {
-      console.log('Map error:', e);
     });
 
     setMap(mapInstance);
@@ -373,13 +277,37 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [map, selectedBusiness]);
 
   return (
-    <div 
-      ref={mapRef} 
-      className="absolute inset-0 w-full h-full"
-      style={{ 
-        zIndex: 1,
-      }}
-    />
+    <div className="absolute inset-0 w-full h-full">
+      <div 
+        ref={mapRef} 
+        className="absolute inset-0 w-full h-full"
+        style={{ 
+          zIndex: 1,
+        }}
+      />
+      
+      {/* Custom color overlay using CSS */}
+      <div 
+        className="absolute inset-0 w-full h-full pointer-events-none"
+        style={{
+          zIndex: 2,
+          background: `
+            radial-gradient(circle at 40.7831% 26.0288%, rgba(4, 174, 246, 0.3) 0%, transparent 15%),
+            radial-gradient(circle at 40.7515% 26.0421%, rgba(139, 206, 100, 0.2) 0%, transparent 10%),
+            radial-gradient(circle at 40.7645% 26.0156%, rgba(139, 206, 100, 0.25) 0%, transparent 12%),
+            radial-gradient(circle at 40.7421% 26.0512%, rgba(4, 174, 246, 0.4) 0%, transparent 8%),
+            radial-gradient(circle at 40.7812% 26.0089%, rgba(139, 206, 100, 0.2) 0%, transparent 14%)
+          `,
+          mixBlendMode: 'multiply'
+        }}
+      />
+      
+      <style>{`
+        .maplibregl-canvas-container canvas {
+          filter: hue-rotate(15deg) saturate(1.3) brightness(1.05) !important;
+        }
+      `}</style>
+    </div>
   );
 };
 
