@@ -47,12 +47,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       style: {
         version: 8,
         sources: {
-          'protomaps': {
+          'osm-raster': {
+            type: 'raster',
+            tiles: [
+              'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+              'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+              'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
+            ],
+            tileSize: 256,
+            attribution: '© OpenStreetMap contributors'
+          },
+          'overpass-vector': {
             type: 'vector',
             tiles: [
-              'https://api.protomaps.com/tiles/v3/{z}/{x}/{y}.mvt?key=41392fb7515533a5'
+              'https://tiles.openfreemap.org/styles/liberty/{z}/{x}/{y}.pbf'
             ],
-            attribution: '© Protomaps © OpenStreetMap contributors'
+            attribution: '© OpenFreeMap © OpenStreetMap contributors'
           }
         },
         layers: [
@@ -63,133 +73,50 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               'background-color': '#f8f9fa'
             }
           },
-          // Water layers with custom color
           {
-            id: 'water',
+            id: 'osm-tiles',
+            type: 'raster',
+            source: 'osm-raster',
+            minzoom: 0,
+            maxzoom: 22
+          },
+          // Water overlay with custom color
+          {
+            id: 'water-overlay',
             type: 'fill',
-            source: 'protomaps',
+            source: 'overpass-vector',
             'source-layer': 'water',
             paint: {
-              'fill-color': '#04AEF6'
+              'fill-color': '#04AEF6',
+              'fill-opacity': 0.9
             }
           },
           {
-            id: 'waterway',
+            id: 'waterway-overlay',
             type: 'line',
-            source: 'protomaps',
-            'source-layer': 'water',
-            filter: ['==', ['get', 'pmap:kind'], 'river'],
+            source: 'overpass-vector',
+            'source-layer': 'waterway',
             paint: {
               'line-color': '#04AEF6',
               'line-width': [
                 'interpolate',
-                ['exponential', 1.4],
+                ['linear'],
                 ['zoom'],
                 8, 1,
-                20, 8
+                16, 4
               ]
             }
           },
-          // Parks and green spaces with custom color
+          // Parks overlay with custom color
           {
-            id: 'parks',
+            id: 'parks-overlay',
             type: 'fill',
-            source: 'protomaps',
+            source: 'overpass-vector',
             'source-layer': 'landuse',
-            filter: ['in', ['get', 'pmap:kind'], ['literal', ['park', 'cemetery', 'recreation_ground', 'forest', 'grass']]],
+            filter: ['in', ['get', 'class'], ['literal', ['park', 'cemetery', 'recreation_ground', 'forest', 'grass', 'meadow']]],
             paint: {
               'fill-color': '#8BCE64',
               'fill-opacity': 0.8
-            }
-          },
-          // Buildings
-          {
-            id: 'buildings',
-            type: 'fill',
-            source: 'protomaps',
-            'source-layer': 'buildings',
-            paint: {
-              'fill-color': '#e0e0e0',
-              'fill-opacity': 0.7
-            }
-          },
-          {
-            id: 'buildings-outline',
-            type: 'line',
-            source: 'protomaps',
-            'source-layer': 'buildings',
-            paint: {
-              'line-color': '#d0d0d0',
-              'line-width': 1
-            }
-          },
-          // Roads
-          {
-            id: 'roads-minor',
-            type: 'line',
-            source: 'protomaps',
-            'source-layer': 'roads',
-            filter: ['in', ['get', 'pmap:kind'], ['literal', ['minor_road', 'path']]],
-            paint: {
-              'line-color': '#ffffff',
-              'line-width': [
-                'interpolate',
-                ['exponential', 1.55],
-                ['zoom'],
-                4, 0.25,
-                20, 30
-              ]
-            }
-          },
-          {
-            id: 'roads-major',
-            type: 'line',
-            source: 'protomaps',
-            'source-layer': 'roads',
-            filter: ['in', ['get', 'pmap:kind'], ['literal', ['major_road', 'medium_road']]],
-            paint: {
-              'line-color': '#ffffff',
-              'line-width': [
-                'interpolate',
-                ['exponential', 1.4],
-                ['zoom'],
-                6, 0.5,
-                20, 30
-              ]
-            }
-          },
-          {
-            id: 'roads-highway',
-            type: 'line',
-            source: 'protomaps',
-            'source-layer': 'roads',
-            filter: ['==', ['get', 'pmap:kind'], 'highway'],
-            paint: {
-              'line-color': '#fc8',
-              'line-width': [
-                'interpolate',
-                ['exponential', 1.4],
-                ['zoom'],
-                8, 1,
-                16, 10
-              ]
-            }
-          },
-          // Labels
-          {
-            id: 'place-labels',
-            type: 'symbol',
-            source: 'protomaps',
-            'source-layer': 'places',
-            filter: ['==', ['get', 'pmap:kind'], 'locality'],
-            layout: {
-              'text-field': ['get', 'name'],
-              'text-size': 16
-            },
-            paint: {
-              'text-color': '#333',
-              'text-halo-color': '#fff',
-              'text-halo-width': 2
             }
           }
         ]
@@ -212,6 +139,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     // Apply minimal custom styling when map loads
     mapInstance.on('load', () => {
       onMapLoad?.(mapInstance);
+    });
+
+    // Handle source errors gracefully
+    mapInstance.on('sourcedataabort', (e) => {
+      console.log('Source data loading aborted:', e);
+    });
+
+    mapInstance.on('error', (e) => {
+      console.log('Map error:', e);
     });
 
     setMap(mapInstance);
@@ -265,7 +201,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const [lng, lat] = cluster.geometry.coordinates;
       
       if (cluster.properties.cluster) {
-        // Create cluster marker
+        // Create cluster marker (commented out but can be enabled)
         // const el = document.createElement('div');
         // el.className = 'cluster-marker';
         // el.style.cssText = `
@@ -288,7 +224,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         //   .setLngLat([lng, lat])
         //   .addTo(map);
 
-        // // Zoom to cluster on click
         // el.addEventListener('click', () => {
         //   const expansionZoom = clusterRef.current?.getClusterExpansionZoom(cluster.properties.cluster_id);
         //   map.easeTo({
@@ -309,6 +244,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           width: 12px;
           height: 12px;
           cursor: pointer;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         `;
         
         const marker = new maplibregl.Marker({ element: el })
@@ -346,37 +282,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         const [lng, lat] = cluster.geometry.coordinates;
         
         if (cluster.properties.cluster) {
-          const el = document.createElement('div');
-          el.className = 'cluster-marker';
-          el.style.cssText = `
-            background: hsl(var(--primary));
-            border: 2px solid hsl(var(--primary-foreground));
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: hsl(var(--primary-foreground));
-            font-weight: bold;
-            font-size: 12px;
-            cursor: pointer;
-          `;
-          el.textContent = cluster.properties.point_count_abbreviated;
-          
-          const marker = new maplibregl.Marker({ element: el })
-            .setLngLat([lng, lat])
-            .addTo(map);
-
-          el.addEventListener('click', () => {
-            const expansionZoom = clusterRef.current?.getClusterExpansionZoom(cluster.properties.cluster_id);
-            map.easeTo({
-              center: [lng, lat],
-              zoom: expansionZoom || currentZoom + 2
-            });
-          });
-
-          updatedMarkers.push(marker);
+          // Cluster markers (commented out)
         } else {
           const el = document.createElement('div');
           el.className = 'business-marker';
@@ -387,6 +293,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             width: 12px;
             height: 12px;
             cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
           `;
           
           const marker = new maplibregl.Marker({ element: el })
