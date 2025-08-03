@@ -115,7 +115,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'source-layer': 'landuse',
             filter: ['in', ['get', 'class'], ['literal', ['park', 'cemetery', 'recreation_ground', 'forest', 'grass', 'meadow']]],
             paint: {
-              'fill-color': '#8BCE64',
+              'fill-color': '#FFFFFF', //8BCE64
               'fill-opacity': 0.8
             }
           }
