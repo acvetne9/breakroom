@@ -60,51 +60,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
     mapInstance.on('zoom', zoomHandler);
 
-    // Apply custom styling when map loads
+    // Apply minimal custom styling when map loads
     mapInstance.on('load', () => {
-      try {
-        const layers = mapInstance.getStyle().layers;
-        
-        // Update road colors to light gray
-        layers?.forEach(layer => {
-          if (layer.id.includes('road') || layer.id.includes('highway') || layer.id.includes('street')) {
-            mapInstance.setPaintProperty(layer.id, 'line-color', '#f3f4f6');
-          }
-        });
-
-        // Update water to tech-y blue
-        layers?.forEach(layer => {
-          if (layer.id.includes('water')) {
-            mapInstance.setPaintProperty(layer.id, 'fill-color', '#0ea5e9');
-          }
-        });
-
-        // Update parks to rich green with proper layering
-        layers?.forEach(layer => {
-          if (layer.id.includes('park') || layer.id.includes('forest') || layer.id.includes('wood')) {
-            if (layer.type === 'fill') {
-              mapInstance.setPaintProperty(layer.id, 'fill-color', '#22c55e');
-              mapInstance.setPaintProperty(layer.id, 'fill-opacity', 0.6);
-            }
-          }
-        });
-
-        // Hide unwanted elements
-        layers?.forEach(layer => {
-          if (layer.id.includes('label') || 
-              layer.id.includes('poi') || 
-              layer.id.includes('place') ||
-              layer.id.includes('rail') ||
-              layer.id.includes('transit') ||
-              layer.id.includes('trail')) {
-            mapInstance.setLayoutProperty(layer.id, 'visibility', 'none');
-          }
-        });
-
-      } catch (error) {
-        console.log('Style customization failed, using default styling:', error);
-      }
-      
       onMapLoad?.(mapInstance);
     });
 
