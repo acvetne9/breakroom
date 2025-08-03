@@ -47,12 +47,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       style: {
         version: 8,
         sources: {
-          'openmaptiles': {
+          'protomaps': {
             type: 'vector',
             tiles: [
-              'https://api.maptiler.com/tiles/v3/{z}/{x}/{y}.pbf?key=get_your_own_OpIi9ZULNHzrESv6T2vL'
+              'https://api.protomaps.com/tiles/v3/{z}/{x}/{y}.mvt?key=41392fb7515533a5'
             ],
-            attribution: '© MapTiler © OpenStreetMap contributors'
+            attribution: '© Protomaps © OpenStreetMap contributors'
           }
         },
         layers: [
@@ -67,7 +67,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           {
             id: 'water',
             type: 'fill',
-            source: 'openmaptiles',
+            source: 'protomaps',
             'source-layer': 'water',
             paint: {
               'fill-color': '#04AEF6'
@@ -76,8 +76,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           {
             id: 'waterway',
             type: 'line',
-            source: 'openmaptiles',
-            'source-layer': 'waterway',
+            source: 'protomaps',
+            'source-layer': 'water',
+            filter: ['==', ['get', 'pmap:kind'], 'river'],
             paint: {
               'line-color': '#04AEF6',
               'line-width': [
@@ -93,31 +94,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           {
             id: 'parks',
             type: 'fill',
-            source: 'openmaptiles',
+            source: 'protomaps',
             'source-layer': 'landuse',
-            filter: ['in', 'class', 'park', 'cemetery', 'recreation_ground'],
+            filter: ['in', ['get', 'pmap:kind'], ['literal', ['park', 'cemetery', 'recreation_ground', 'forest', 'grass']]],
             paint: {
               'fill-color': '#8BCE64',
               'fill-opacity': 0.8
-            }
-          },
-          {
-            id: 'landcover-grass',
-            type: 'fill',
-            source: 'openmaptiles',
-            'source-layer': 'landcover',
-            filter: ['==', 'class', 'grass'],
-            paint: {
-              'fill-color': '#8BCE64',
-              'fill-opacity': 0.6
             }
           },
           // Buildings
           {
             id: 'buildings',
             type: 'fill',
-            source: 'openmaptiles',
-            'source-layer': 'building',
+            source: 'protomaps',
+            'source-layer': 'buildings',
             paint: {
               'fill-color': '#e0e0e0',
               'fill-opacity': 0.7
@@ -126,8 +116,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           {
             id: 'buildings-outline',
             type: 'line',
-            source: 'openmaptiles',
-            'source-layer': 'building',
+            source: 'protomaps',
+            'source-layer': 'buildings',
             paint: {
               'line-color': '#d0d0d0',
               'line-width': 1
@@ -137,9 +127,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           {
             id: 'roads-minor',
             type: 'line',
-            source: 'openmaptiles',
-            'source-layer': 'transportation',
-            filter: ['in', 'class', 'minor', 'service'],
+            source: 'protomaps',
+            'source-layer': 'roads',
+            filter: ['in', ['get', 'pmap:kind'], ['literal', ['minor_road', 'path']]],
             paint: {
               'line-color': '#ffffff',
               'line-width': [
@@ -154,9 +144,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           {
             id: 'roads-major',
             type: 'line',
-            source: 'openmaptiles',
-            'source-layer': 'transportation',
-            filter: ['in', 'class', 'primary', 'secondary', 'tertiary', 'trunk'],
+            source: 'protomaps',
+            'source-layer': 'roads',
+            filter: ['in', ['get', 'pmap:kind'], ['literal', ['major_road', 'medium_road']]],
             paint: {
               'line-color': '#ffffff',
               'line-width': [
@@ -171,9 +161,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           {
             id: 'roads-highway',
             type: 'line',
-            source: 'openmaptiles',
-            'source-layer': 'transportation',
-            filter: ['==', 'class', 'motorway'],
+            source: 'protomaps',
+            'source-layer': 'roads',
+            filter: ['==', ['get', 'pmap:kind'], 'highway'],
             paint: {
               'line-color': '#fc8',
               'line-width': [
@@ -189,12 +179,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           {
             id: 'place-labels',
             type: 'symbol',
-            source: 'openmaptiles',
-            'source-layer': 'place',
-            filter: ['==', 'class', 'city'],
+            source: 'protomaps',
+            'source-layer': 'places',
+            filter: ['==', ['get', 'pmap:kind'], 'locality'],
             layout: {
-              'text-field': '{name}',
-              'text-font': ['Open Sans Regular'],
+              'text-field': ['get', 'name'],
               'text-size': 16
             },
             paint: {
