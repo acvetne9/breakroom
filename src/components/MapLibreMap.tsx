@@ -38,43 +38,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, []);
 
-  // Initialize map
+  // Initialize map with MapTiler vector tiles
   useEffect(() => {
     if (!mapRef.current) return;
 
     const mapInstance = new maplibregl.Map({
       container: mapRef.current,
-      style: {
-        version: 8,
-        sources: {
-          'osm-raster': {
-            type: 'raster',
-            tiles: [
-              'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
-              'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-              'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
-            ],
-            tileSize: 256,
-            attribution: '© OpenStreetMap contributors'
-          }
-        },
-        layers: [
-          {
-            id: 'background',
-            type: 'background',
-            paint: {
-              'background-color': '#f8f9fa'
-            }
-          },
-          {
-            id: 'osm-tiles',
-            type: 'raster',
-            source: 'osm-raster',
-            minzoom: 0,
-            maxzoom: 22
-          }
-        ]
-      },
+      // Using MapTiler's basic style with a demo key (replace with your own)
+      style: 'https://api.maptiler.com/maps/streets/style.json?key=cEJj334w22sOY6hoLFL5',
       center: [-73.9712, 40.7831], // NYC center
       zoom: 14,
       maxBounds: [
@@ -90,9 +61,64 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
     mapInstance.on('zoom', zoomHandler);
 
-    // Apply minimal custom styling when map loads
-    mapInstance.on('load', () => {
+    // Customize colors when map loads
+    mapInstance.on('style.load', () => {
+      // Change water color to your desired blue
+      if (mapInstance.getLayer('water')) {
+        mapInstance.setPaintProperty('water', 'fill-color', '#04AEF6');
+      }
+      
+      // Change park colors to your desired green
+      const parkLayers = ['park', 'landuse-park', 'landcover-grass', 'national-park'];
+      parkLayers.forEach(layerId => {
+        if (mapInstance.getLayer(layerId)) {
+          mapInstance.setPaintProperty(layerId, 'fill-color', '#8BCE64');
+        }
+      });
+      
+      // Change road colors to gray
+      const roadLayers = ['road', 'road-primary', 'road-secondary', 'road-tertiary', 'road-trunk', 'road-motorway', 'road-street', 'road-minor'];
+      roadLayers.forEach(layerId => {
+        if (mapInstance.getLayer(layerId)) {
+          mapInstance.setPaintProperty(layerId, 'line-color', '#888888');
+        }
+      });
+      
+      // Additional road layers that might exist
+      const additionalRoadLayers = ['highway', 'primary', 'secondary', 'tertiary', 'trunk', 'motorway'];
+      additionalRoadLayers.forEach(layerId => {
+        if (mapInstance.getLayer(layerId)) {
+          mapInstance.setPaintProperty(layerId, 'line-color', '#888888');
+        }
+      });
+
       onMapLoad?.(mapInstance);
+    });
+
+    // Fallback to load event if style.load doesn't fire
+    mapInstance.on('load', () => {
+      setTimeout(() => {
+        try {
+          // Get all layer IDs to see what's available
+          const layers = mapInstance.getStyle().layers;
+          console.log('Available layers:', layers.map(l => l.id));
+          
+          // Try to change colors on available layers
+          layers.forEach(layer => {
+            if (layer.id.includes('water') && layer.type === 'fill') {
+              mapInstance.setPaintProperty(layer.id, 'fill-color', '#04AEF6');
+            }
+            if ((layer.id.includes('park') || layer.id.includes('grass') || layer.id.includes('forest')) && layer.type === 'fill') {
+              mapInstance.setPaintProperty(layer.id, 'fill-color', '#8BCE64');
+            }
+            if ((layer.id.includes('road') || layer.id.includes('highway') || layer.id.includes('street')) && layer.type === 'line') {
+              mapInstance.setPaintProperty(layer.id, 'line-color', '#888888');
+            }
+          });
+        } catch (e) {
+          console.log('Could not modify layer colors:', e);
+        }
+      }, 1000);
     });
 
     setMap(mapInstance);
@@ -282,8 +308,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       className="absolute inset-0 w-full h-full"
       style={{ 
         zIndex: 1,
-        // Enhanced color filter - this affects the entire map image
-        filter: 'hue-rotate(15deg) saturate(1.2) brightness(1.05)',
       }}
     />
   );
