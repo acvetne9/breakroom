@@ -87,7 +87,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             source: 'overpass-vector',
             'source-layer': 'water',
             paint: {
-              'fill-color': '#04AEF6',
+              'fill-color': '#FFFFFF',
               'fill-opacity': 0.9
             }
           },
