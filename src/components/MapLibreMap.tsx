@@ -300,7 +300,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     <div 
       ref={mapRef} 
       className="absolute inset-0 w-full h-full"
-      style={{ zIndex: 1 }}
+      style={{ 
+        zIndex: 1,
+        filter: 'grayscale(0.3) contrast(1.1) brightness(1.1)'
+      }}
     />
   );
 };
