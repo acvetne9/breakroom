@@ -47,15 +47,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       style: {
         version: 8,
         sources: {
-          'osm-raster': {
-            type: 'raster',
-            tiles: [
-              'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
-              'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-              'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
-            ],
-            tileSize: 256,
-            attribution: '© OpenStreetMap contributors'
+          'protomaps': {
+            type: 'vector',
+            tiles: ['https://api.protomaps.com/tiles/v3/{z}/{x}/{y}.mvt'],
+            attribution: '© <a href="https://protomaps.com">Protomaps</a> © <a href="https://openstreetmap.org">OpenStreetMap</a>'
           }
         },
         layers: [
@@ -67,11 +62,55 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             }
           },
           {
-            id: 'osm-tiles',
-            type: 'raster',
-            source: 'osm-raster',
-            minzoom: 0,
-            maxzoom: 22
+            id: 'water',
+            type: 'fill',
+            source: 'protomaps',
+            'source-layer': 'water',
+            paint: {
+              'fill-color': '#04AEF6'
+            }
+          },
+          {
+            id: 'parks',
+            type: 'fill',
+            source: 'protomaps',
+            'source-layer': 'landuse',
+            filter: ['in', 'pmap:kind', 'park', 'forest', 'nature_reserve', 'recreation_ground'],
+            paint: {
+              'fill-color': '#8BCE64'
+            }
+          },
+          {
+            id: 'buildings',
+            type: 'fill',
+            source: 'protomaps',
+            'source-layer': 'buildings',
+            paint: {
+              'fill-color': '#e0e0e0',
+              'fill-opacity': 0.8
+            }
+          },
+          {
+            id: 'roads-major',
+            type: 'line',
+            source: 'protomaps',
+            'source-layer': 'roads',
+            filter: ['in', 'pmap:kind', 'highway', 'major_road'],
+            paint: {
+              'line-color': '#ffffff',
+              'line-width': 3
+            }
+          },
+          {
+            id: 'roads-minor',
+            type: 'line',
+            source: 'protomaps',
+            'source-layer': 'roads',
+            filter: ['in', 'pmap:kind', 'minor_road', 'other'],
+            paint: {
+              'line-color': '#f0f0f0',
+              'line-width': 1
+            }
           }
         ]
       },
@@ -311,7 +350,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       className="absolute inset-0 w-full h-full"
       style={{ 
         zIndex: 1,
-        filter: 'hue-rotate(240deg) saturate(1.0) contrast(1.2)',
       }}
     />
   );
