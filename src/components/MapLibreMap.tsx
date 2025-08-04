@@ -46,12 +46,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, []);
 
   // Create a simple map style with static image background
-  const createStaticImageStyle = () => {
+  const createStaticImageStyle = (): maplibregl.StyleSpecification => {
     return {
-      version: 8,
+      version: 8 as const,
       sources: {
         'nyc-raster': {
-          type: 'raster',
+          type: 'raster' as const,
           tiles: [
             // You can use OpenStreetMap tiles (no API key needed)
             'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
@@ -63,7 +63,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       layers: [
         {
           id: 'nyc-background',
-          type: 'raster',
+          type: 'raster' as const,
           source: 'nyc-raster',
           minzoom: 0,
           maxzoom: 22,
@@ -81,12 +81,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   };
 
   // Alternative: Use a completely custom style with your own image
-  const createCustomImageStyle = (imageUrl: string) => {
+  const createCustomImageStyle = (imageUrl: string): maplibregl.StyleSpecification => {
     return {
-      version: 8,
+      version: 8 as const,
       sources: {
         'nyc-image': {
-          type: 'image',
+          type: 'image' as const,
           url: imageUrl,
           coordinates: [
             [NYC_BOUNDS.southwest[0], NYC_BOUNDS.northeast[1]], // top-left
@@ -99,7 +99,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       layers: [
         {
           id: 'nyc-image-layer',
-          type: 'raster',
+          type: 'raster' as const,
           source: 'nyc-image',
           paint: {
             // Apply color filters to make roads #CCCCCC
