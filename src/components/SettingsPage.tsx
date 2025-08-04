@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Minus } from 'lucide-react';
+import { Plus, Minus, LogOut, User } from 'lucide-react';
 import JobSearchDropdown from './JobSearchDropdown';
 import LocationSearchInput from './LocationSearchInput';
 import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
 
 interface UserInfo {
   salary: string;
@@ -50,6 +52,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   onJobUpdate,
   onPageLeave
 }) => {
+  const { user, signOut } = useAuth();
+  const { toast } = useToast();
+
   // Use fullLocation if available, otherwise fall back to location
   const [currentJob, setCurrentJob] = useState<UserInfo>({
     salary: initialData.salary,
@@ -72,7 +77,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   }]);
   const [pastJobTimePeriods, setPastJobTimePeriods] = useState<{[id: string]: string}>({ '1': 'HR' });
   const [isStoriesExpanded, setIsStoriesExpanded] = useState(false);
-  const { toast } = useToast();
 
   // Track initial values to detect changes
   const [initialCurrentJob] = useState(currentJob);
@@ -308,10 +312,50 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     }
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Signed out",
+        description: "You have been successfully signed out.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to sign out. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="relative w-full h-full flex items-center justify-center">
       <div className="app-card p-6 overflow-y-auto">
         <h1 className="text-xl font-medium text-app-black mb-8">Your Info.</h1>
+        
+        {/* User Account Section */}
+        <div className="mb-8 p-4 border border-border rounded-lg bg-muted/20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                <User className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium text-foreground">Account</p>
+                <p className="text-sm text-muted-foreground">{user?.email}</p>
+              </div>
+            </div>
+            <Button 
+              onClick={handleSignOut}
+              variant="outline" 
+              size="sm"
+              className="flex items-center space-x-2"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Sign Out</span>
+            </Button>
+          </div>
+        </div>
         
         {/* Current Job Section */}
         <div className="mb-8">
