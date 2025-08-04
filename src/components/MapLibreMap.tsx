@@ -14,13 +14,17 @@ interface MapLibreMapProps {
   }>;
   onBusinessClick?: (business: any) => void;
   selectedBusiness?: { position: { lat: number; lng: number } } | null;
+  supabaseUrl: string;
+  supabaseKey: string;
 }
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({ 
   onMapLoad, 
   businesses = [], 
   onBusinessClick, 
-  selectedBusiness 
+  selectedBusiness,
+  supabaseUrl,
+  supabaseKey
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
@@ -30,52 +34,113 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   
   const MARKER_VISIBILITY_ZOOM_THRESHOLD = 13;
 
-  // Enhanced road color modification function
-  const updateRoadColors = useCallback((mapInstance: maplibregl.Map) => {
+  // Function to fetch NYC GeoJSON from Supabase
+  const fetchNYCGeoJSON = useCallback(async () => {
     try {
-      const layers = mapInstance.getStyle().layers;
-      let roadLayersUpdated = 0;
-      
-      // Comprehensive road layer keywords
-      const roadKeywords = [
-        'road', 'highway', 'street', 'bridge', 'tunnel',
-        'motorway', 'trunk', 'primary', 'secondary', 'tertiary',
-        'residential', 'service', 'track', 'path', 'footway',
-        'cycleway', 'steps', 'pedestrian', 'living_street',
-        'unclassified', 'link', 'ferry', 'rail', 'railway'
-      ];
-      
-      layers.forEach(layer => {
-        const layerId = layer.id.toLowerCase();
-        const isRoadLayer = roadKeywords.some(keyword => layerId.includes(keyword));
-        
-        if (isRoadLayer && layer.type === 'line') {
-          try {
-            // Set main road colors to #CCCCCC
-            mapInstance.setPaintProperty(layer.id, 'line-color', '#CCCCCC');
-            
-            // Handle casing (road outlines) with slightly darker color
-            if (layerId.includes('casing') || layerId.includes('outline')) {
-              mapInstance.setPaintProperty(layer.id, 'line-color', '#AAAAAA');
-            }
-            
-            // Handle bridges specifically
-            if (layerId.includes('bridge')) {
-              mapInstance.setPaintProperty(layer.id, 'line-color', '#CCCCCC');
-            }
-            
-            roadLayersUpdated++;
-          } catch (layerError) {
-            console.log(`Could not update layer ${layer.id}:`, layerError);
-          }
+      const response = await fetch(`${supabaseUrl}/storage/v1/object/public/nyc-map-storage-files/nyc.geojson`, {
+        headers: {
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json'
         }
       });
       
-      console.log(`Updated ${roadLayersUpdated} road/bridge layers to #CCCCCC`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch GeoJSON: ${response.statusText}`);
+      }
       
-    } catch (e) {
-      console.log('Could not modify road colors:', e);
+      const geojsonData = await response.json();
+      return geojsonData;
+    } catch (error) {
+      console.error('Error fetching NYC GeoJSON from Supabase:', error);
+      return null;
     }
+  }, [supabaseUrl, supabaseKey]);
+
+  // Create a basic style with the GeoJSON data
+  const createMapStyle = useCallback((geojsonData: any) => {
+    return {
+      version: 8,
+      sources: {
+        'nyc-data': {
+          type: 'geojson',
+          data: geojsonData
+        },
+        'osm': {
+          type: 'raster',
+          tiles: [
+            'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+          ],
+          tileSize: 256,
+          attribution: '© OpenStreetMap contributors'
+        }
+      },
+      layers: [
+        {
+          id: 'osm-tiles',
+          type: 'raster',
+          source: 'osm',
+          minzoom: 0,
+          maxzoom: 19
+        },
+        {
+          id: 'nyc-fill',
+          type: 'fill',
+          source: 'nyc-data',
+          filter: ['==', '$type', 'Polygon'],
+          paint: {
+            'fill-color': [
+              'case',
+              ['==', ['get', 'natural'], 'water'], '#04AEF6',
+              ['==', ['get', 'leisure'], 'park'], '#8BCE64',
+              ['==', ['get', 'landuse'], 'forest'], '#8BCE64',
+              ['==', ['get', 'landuse'], 'grass'], '#8BCE64',
+              'rgba(0,0,0,0)'
+            ],
+            'fill-opacity': 0.8
+          }
+        },
+        {
+          id: 'nyc-line',
+          type: 'line',
+          source: 'nyc-data',
+          filter: ['==', '$type', 'LineString'],
+          paint: {
+            'line-color': [
+              'case',
+              ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk', 'primary']]], '#CCCCCC',
+              ['in', ['get', 'highway'], ['literal', ['secondary', 'tertiary', 'residential']]], '#CCCCCC',
+              ['==', ['get', 'natural'], 'coastline'], '#04AEF6',
+              '#CCCCCC'
+            ],
+            'line-width': [
+              'case',
+              ['==', ['get', 'highway'], 'motorway'], 3,
+              ['==', ['get', 'highway'], 'trunk'], 2.5,
+              ['==', ['get', 'highway'], 'primary'], 2,
+              ['==', ['get', 'highway'], 'secondary'], 1.5,
+              1
+            ]
+          }
+        },
+        {
+          id: 'nyc-symbol',
+          type: 'symbol',
+          source: 'nyc-data',
+          filter: ['==', '$type', 'Point'],
+          layout: {
+            'text-field': ['get', 'name'],
+            'text-font': ['Open Sans Regular'],
+            'text-size': 12,
+            'text-anchor': 'center'
+          },
+          paint: {
+            'text-color': '#333333',
+            'text-halo-color': '#ffffff',
+            'text-halo-width': 1
+          }
+        }
+      ]
+    };
   }, []);
 
   // Handle zoom change
@@ -84,85 +149,89 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const zoom = map.getZoom();
       setCurrentZoom(zoom);
     }
-  }, []);
+  }, [map]);
 
-  // Initialize map with MapTiler vector tiles
+  // Initialize map with Supabase GeoJSON data
   useEffect(() => {
     if (!mapRef.current) return;
 
-    const mapInstance = new maplibregl.Map({
-      container: mapRef.current,
-      // Using MapTiler's basic style with a demo key (replace with your own)
-      style: 'https://api.maptiler.com/maps/streets/style.json?key=cEJj334w22sOY6hoLFL5',
-      center: [-73.9712, 40.7831], // NYC center
-      zoom: 14,
-      maxBounds: [
-        [-74.2557, 40.4960], // Southwest corner (Staten Island)
-        [-73.7004, 40.9152]  // Northeast corner (Bronx)
-      ]
-    });
-
-    // Add zoom change listener
-    const zoomHandler = () => {
-      const zoom = mapInstance.getZoom();
-      setCurrentZoom(zoom);
-    };
-    mapInstance.on('zoom', zoomHandler);
-
-    // Customize colors when map loads
-    mapInstance.on('style.load', () => {
-      // Change water color to your desired blue
-      if (mapInstance.getLayer('water')) {
-        mapInstance.setPaintProperty('water', 'fill-color', '#04AEF6');
+    const initializeMap = async () => {
+      // Fetch GeoJSON data from Supabase
+      const geojsonData = await fetchNYCGeoJSON();
+      
+      if (!geojsonData) {
+        console.error('Failed to load NYC GeoJSON data from Supabase');
+        // Fallback to basic OSM tiles
+        const mapInstance = new maplibregl.Map({
+          container: mapRef.current!,
+          style: {
+            version: 8,
+            sources: {
+              'osm': {
+                type: 'raster',
+                tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                tileSize: 256,
+                attribution: '© OpenStreetMap contributors'
+              }
+            },
+            layers: [
+              {
+                id: 'osm-tiles',
+                type: 'raster',
+                source: 'osm'
+              }
+            ]
+          },
+          center: [-73.9712, 40.7831],
+          zoom: 14,
+          maxBounds: [
+            [-74.2557, 40.4960],
+            [-73.7004, 40.9152]
+          ]
+        });
+        
+        setMap(mapInstance);
+        onMapLoad?.(mapInstance);
+        return;
       }
-      
-      // Change park colors to your desired green
-      const parkLayers = ['park', 'landuse-park', 'landcover-grass', 'national-park'];
-      parkLayers.forEach(layerId => {
-        if (mapInstance.getLayer(layerId)) {
-          mapInstance.setPaintProperty(layerId, 'fill-color', '#8BCE64');
-        }
+
+      // Create map with GeoJSON style
+      const mapInstance = new maplibregl.Map({
+        container: mapRef.current!,
+        style: createMapStyle(geojsonData),
+        center: [-73.9712, 40.7831], // NYC center
+        zoom: 14,
+        maxBounds: [
+          [-74.2557, 40.4960], // Southwest corner (Staten Island)
+          [-73.7004, 40.9152]  // Northeast corner (Bronx)
+        ]
       });
-      
-      // Use enhanced road color updating
-      updateRoadColors(mapInstance);
 
-      onMapLoad?.(mapInstance);
-    });
+      // Add zoom change listener
+      mapInstance.on('zoom', handleZoomChange);
 
-    // Fallback to load event if style.load doesn't fire
-    mapInstance.on('load', () => {
-      setTimeout(() => {
-        try {
-          // Get all layer IDs to see what's available
-          const layers = mapInstance.getStyle().layers;
-          console.log('Available layers:', layers.map(l => ({ id: l.id, type: l.type })));
-          
-          // Try to change colors on available layers
-          layers.forEach(layer => {
-            if (layer.id.includes('water') && layer.type === 'fill') {
-              mapInstance.setPaintProperty(layer.id, 'fill-color', '#04AEF6');
-            }
-            if ((layer.id.includes('park') || layer.id.includes('grass') || layer.id.includes('forest')) && layer.type === 'fill') {
-              mapInstance.setPaintProperty(layer.id, 'fill-color', '#8BCE64');
-            }
-          });
-          
-          // Apply enhanced road color updating as fallback
-          updateRoadColors(mapInstance);
-          
-        } catch (e) {
-          console.log('Could not modify layer colors:', e);
-        }
-      }, 1000);
-    });
+      // Map load event
+      mapInstance.on('load', () => {
+        console.log('Map loaded with NYC GeoJSON from Supabase');
+        onMapLoad?.(mapInstance);
+      });
 
-    setMap(mapInstance);
+      // Error handling
+      mapInstance.on('error', (e) => {
+        console.error('Map error:', e);
+      });
+
+      setMap(mapInstance);
+    };
+
+    initializeMap();
 
     return () => {
-      mapInstance.remove();
+      if (map) {
+        map.remove();
+      }
     };
-  }, [onMapLoad, updateRoadColors]);
+  }, [fetchNYCGeoJSON, createMapStyle, onMapLoad, handleZoomChange]);
 
   // Create marker clustering
   useEffect(() => {
@@ -326,7 +395,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       map.off('zoomend', updateMarkers);
       newMarkers.forEach(marker => marker.remove());
     };
-  }, [map, businesses, onBusinessClick]);
+  }, [map, businesses, onBusinessClick, currentZoom]);
 
   // Center map on selected business
   useEffect(() => {

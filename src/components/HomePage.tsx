@@ -169,10 +169,13 @@ const HomePage: React.FC<HomePageProps> = ({
   return (
     <div className="relative w-full h-full">
       {/* MapLibre with OpenStreetMap base layer */}
-      <MapLibreMap 
-        businesses={filteredBusinesses}
+      <MapLibreMap
+        supabaseUrl="https://hyygpxhwkvyxtbjnnpqk.supabase.co"
+        supabaseKey="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5eWdweGh3a3Z5eHRiam5ucHFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1NDM2ODMsImV4cCI6MjA2OTExOTY4M30.if9FMeGAPS4ke3H8orSwli-3dkHx7dE2QifGDCNTPzU"
+        businesses={businesses}
         onBusinessClick={handleBusinessClick}
         selectedBusiness={selectedBusiness}
+        onMapLoad={handleMapLoad}
       />
       
       {/* Search results dropdown */}
