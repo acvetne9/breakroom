@@ -154,6 +154,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // Initialize map with Supabase GeoJSON data
   useEffect(() => {
     if (!mapRef.current) return;
+    
+    let mapInstance: maplibregl.Map | null = null;
 
     const initializeMap = async () => {
       // Fetch GeoJSON data from Supabase
@@ -162,7 +164,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       if (!geojsonData) {
         console.error('Failed to load NYC GeoJSON data from Supabase');
         // Fallback to basic OSM tiles
-        const mapInstance = new maplibregl.Map({
+        mapInstance = new maplibregl.Map({
           container: mapRef.current!,
           style: {
             version: 8,
@@ -196,7 +198,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
 
       // Create map with GeoJSON style
-      const mapInstance = new maplibregl.Map({
+      mapInstance = new maplibregl.Map({
         container: mapRef.current!,
         style: createMapStyle(geojsonData) as any,
         center: [-73.9712, 40.7831], // NYC center
@@ -227,9 +229,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     initializeMap();
 
     return () => {
-      if (map) {
-        map.remove();
+      // Cleanup function - use the local mapInstance variable
+      try {
+        if (mapInstance && mapInstance.getContainer()) {
+          mapInstance.remove();
+        }
+      } catch (error) {
+        console.warn('Error cleaning up map:', error);
       }
+      mapInstance = null;
+      setMap(null);
     };
   }, [fetchNYCGeoJSON, createMapStyle, onMapLoad, handleZoomChange]);
 
