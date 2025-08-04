@@ -59,14 +59,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // Create a basic style with the GeoJSON data
   const createMapStyle = useCallback((geojsonData: any) => {
     return {
-      version: 8,
+      version: 8 as const,
       sources: {
         'nyc-data': {
-          type: 'geojson',
+          type: 'geojson' as const,
           data: geojsonData
         },
         'osm': {
-          type: 'raster',
+          type: 'raster' as const,
           tiles: [
             'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
           ],
@@ -77,14 +77,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       layers: [
         {
           id: 'osm-tiles',
-          type: 'raster',
+          type: 'raster' as const,
           source: 'osm',
           minzoom: 0,
           maxzoom: 19
         },
         {
           id: 'nyc-fill',
-          type: 'fill',
+          type: 'fill' as const,
           source: 'nyc-data',
           filter: ['==', '$type', 'Polygon'],
           paint: {
@@ -101,7 +101,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         },
         {
           id: 'nyc-line',
-          type: 'line',
+          type: 'line' as const,
           source: 'nyc-data',
           filter: ['==', '$type', 'LineString'],
           paint: {
@@ -124,7 +124,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         },
         {
           id: 'nyc-symbol',
-          type: 'symbol',
+          type: 'symbol' as const,
           source: 'nyc-data',
           filter: ['==', '$type', 'Point'],
           layout: {
@@ -198,7 +198,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       // Create map with GeoJSON style
       const mapInstance = new maplibregl.Map({
         container: mapRef.current!,
-        style: createMapStyle(geojsonData),
+        style: createMapStyle(geojsonData) as any,
         center: [-73.9712, 40.7831], // NYC center
         zoom: 14,
         maxBounds: [

@@ -175,7 +175,6 @@ const HomePage: React.FC<HomePageProps> = ({
         businesses={businesses}
         onBusinessClick={handleBusinessClick}
         selectedBusiness={selectedBusiness}
-        onMapLoad={handleMapLoad}
       />
       
       {/* Search results dropdown */}
