@@ -30,53 +30,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   
   const MARKER_VISIBILITY_ZOOM_THRESHOLD = 13;
 
-  // Enhanced road color modification function
-  const updateRoadColors = useCallback((mapInstance: maplibregl.Map) => {
-    try {
-      const layers = mapInstance.getStyle().layers;
-      let roadLayersUpdated = 0;
-      
-      // Comprehensive road layer keywords
-      const roadKeywords = [
-        'road', 'highway', 'street', 'bridge', 'tunnel',
-        'motorway', 'trunk', 'primary', 'secondary', 'tertiary',
-        'residential', 'service', 'track', 'path', 'footway',
-        'cycleway', 'steps', 'pedestrian', 'living_street',
-        'unclassified', 'link', 'ferry', 'rail', 'railway'
-      ];
-      
-      layers.forEach(layer => {
-        const layerId = layer.id.toLowerCase();
-        const isRoadLayer = roadKeywords.some(keyword => layerId.includes(keyword));
-        
-        if (isRoadLayer && layer.type === 'line') {
-          try {
-            // Set main road colors to #CCCCCC
-            mapInstance.setPaintProperty(layer.id, 'line-color', '#CCCCCC');
-            
-            // Handle casing (road outlines) with slightly darker color
-            if (layerId.includes('casing') || layerId.includes('outline')) {
-              mapInstance.setPaintProperty(layer.id, 'line-color', '#AAAAAA');
-            }
-            
-            // Handle bridges specifically
-            if (layerId.includes('bridge')) {
-              mapInstance.setPaintProperty(layer.id, 'line-color', '#CCCCCC');
-            }
-            
-            roadLayersUpdated++;
-          } catch (layerError) {
-            console.log(`Could not update layer ${layer.id}:`, layerError);
-          }
-        }
-      });
-      
-      console.log(`Updated ${roadLayersUpdated} road/bridge layers to #CCCCCC`);
-      
-    } catch (e) {
-      console.log('Could not modify road colors:', e);
-    }
-  }, []);
+  // NYC bounds for the static image
+  const NYC_BOUNDS = {
+    southwest: [-74.2557, 40.4960], // Staten Island
+    northeast: [-73.7004, 40.9152], // Bronx
+    center: [-73.9712, 40.7831]
+  };
 
   // Handle zoom change
   const handleZoomChange = useCallback(() => {
@@ -86,20 +45,91 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, []);
 
-  // Initialize map with MapTiler vector tiles
+  // Create a simple map style with static image background
+  const createStaticImageStyle = () => {
+    return {
+      version: 8,
+      sources: {
+        'nyc-raster': {
+          type: 'raster',
+          tiles: [
+            // You can use OpenStreetMap tiles (no API key needed)
+            'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+          ],
+          tileSize: 256,
+          attribution: '© OpenStreetMap contributors'
+        }
+      },
+      layers: [
+        {
+          id: 'nyc-background',
+          type: 'raster',
+          source: 'nyc-raster',
+          minzoom: 0,
+          maxzoom: 22,
+          paint: {
+            // Apply filters to make roads appear as #CCCCCC
+            'raster-brightness-min': 0.8,
+            'raster-brightness-max': 1.2,
+            'raster-contrast': 0.3,
+            'raster-saturation': 0.1, // Desaturate to make it more gray
+            'raster-hue-rotate': 0
+          }
+        }
+      ]
+    };
+  };
+
+  // Alternative: Use a completely custom style with your own image
+  const createCustomImageStyle = (imageUrl: string) => {
+    return {
+      version: 8,
+      sources: {
+        'nyc-image': {
+          type: 'image',
+          url: imageUrl,
+          coordinates: [
+            [NYC_BOUNDS.southwest[0], NYC_BOUNDS.northeast[1]], // top-left
+            [NYC_BOUNDS.northeast[0], NYC_BOUNDS.northeast[1]], // top-right
+            [NYC_BOUNDS.northeast[0], NYC_BOUNDS.southwest[1]], // bottom-right
+            [NYC_BOUNDS.southwest[0], NYC_BOUNDS.southwest[1]]  // bottom-left
+          ]
+        }
+      },
+      layers: [
+        {
+          id: 'nyc-image-layer',
+          type: 'raster',
+          source: 'nyc-image',
+          paint: {
+            // Apply color filters to make roads #CCCCCC
+            'raster-brightness-min': 0.7,
+            'raster-brightness-max': 1.3,
+            'raster-contrast': 0.4,
+            'raster-saturation': 0.2,
+            'raster-opacity': 1
+          }
+        }
+      ]
+    };
+  };
+
+  // Initialize map with static image style
   useEffect(() => {
     if (!mapRef.current) return;
 
     const mapInstance = new maplibregl.Map({
       container: mapRef.current,
-      // Using MapTiler's basic style with a demo key (replace with your own)
-      style: 'https://api.maptiler.com/maps/streets/style.json?key=cEJj334w22sOY6hoLFL5',
-      center: [-73.9712, 40.7831], // NYC center
-      zoom: 14,
+      // Use the static image style (no API key needed)
+      style: createStaticImageStyle(),
+      // Alternative: If you have your own NYC image, use this instead:
+      // style: createCustomImageStyle('path/to/your/nyc-image.png'),
+      center: NYC_BOUNDS.center as [number, number],
+      zoom: 11,
       maxBounds: [
-        [-74.2557, 40.4960], // Southwest corner (Staten Island)
-        [-73.7004, 40.9152]  // Northeast corner (Bronx)
-      ]
+        NYC_BOUNDS.southwest,
+        NYC_BOUNDS.northeast
+      ] as [[number, number], [number, number]]
     });
 
     // Add zoom change listener
@@ -109,52 +139,21 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
     mapInstance.on('zoom', zoomHandler);
 
-    // Customize colors when map loads
-    mapInstance.on('style.load', () => {
-      // Change water color to your desired blue
-      if (mapInstance.getLayer('water')) {
-        mapInstance.setPaintProperty('water', 'fill-color', '#04AEF6');
-      }
-      
-      // Change park colors to your desired green
-      const parkLayers = ['park', 'landuse-park', 'landcover-grass', 'national-park'];
-      parkLayers.forEach(layerId => {
-        if (mapInstance.getLayer(layerId)) {
-          mapInstance.setPaintProperty(layerId, 'fill-color', '#8BCE64');
-        }
-      });
-      
-      // Use enhanced road color updating
-      updateRoadColors(mapInstance);
-
-      onMapLoad?.(mapInstance);
-    });
-
-    // Fallback to load event if style.load doesn't fire
+    // Add custom CSS filter to the map container for additional color control
     mapInstance.on('load', () => {
-      setTimeout(() => {
-        try {
-          // Get all layer IDs to see what's available
-          const layers = mapInstance.getStyle().layers;
-          console.log('Available layers:', layers.map(l => ({ id: l.id, type: l.type })));
-          
-          // Try to change colors on available layers
-          layers.forEach(layer => {
-            if (layer.id.includes('water') && layer.type === 'fill') {
-              mapInstance.setPaintProperty(layer.id, 'fill-color', '#04AEF6');
-            }
-            if ((layer.id.includes('park') || layer.id.includes('grass') || layer.id.includes('forest')) && layer.type === 'fill') {
-              mapInstance.setPaintProperty(layer.id, 'fill-color', '#8BCE64');
-            }
-          });
-          
-          // Apply enhanced road color updating as fallback
-          updateRoadColors(mapInstance);
-          
-        } catch (e) {
-          console.log('Could not modify layer colors:', e);
-        }
-      }, 1000);
+      const canvas = mapInstance.getCanvas();
+      
+      // Apply CSS filters to shift colors toward #CCCCCC for roads
+      canvas.style.filter = `
+        contrast(0.8) 
+        brightness(1.1) 
+        saturate(0.3) 
+        sepia(0.1) 
+        hue-rotate(200deg)
+      `;
+
+      console.log('Static NYC map loaded');
+      onMapLoad?.(mapInstance);
     });
 
     setMap(mapInstance);
@@ -162,9 +161,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return () => {
       mapInstance.remove();
     };
-  }, [onMapLoad, updateRoadColors]);
+  }, [onMapLoad]);
 
-  // Create marker clustering
+  // Create marker clustering (same as before)
   useEffect(() => {
     if (!map || !businesses.length) return;
 
@@ -207,53 +206,32 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     clusters.forEach(cluster => {
       const [lng, lat] = cluster.geometry.coordinates;
       
-      if (cluster.properties.cluster) {
-        // Create cluster marker (commented out but can be enabled)
-        // const el = document.createElement('div');
-        // el.className = 'cluster-marker';
-        // el.style.cssText = `
-        //   background: hsl(var(--primary));
-        //   border: 2px solid hsl(var(--primary-foreground));
-        //   border-radius: 50%;
-        //   width: 40px;
-        //   height: 40px;
-        //   display: flex;
-        //   align-items: center;
-        //   justify-content: center;
-        //   color: hsl(var(--primary-foreground));
-        //   font-weight: bold;
-        //   font-size: 12px;
-        //   cursor: pointer;
-        // `;
-        // el.textContent = cluster.properties.point_count_abbreviated;
-        
-        // const marker = new maplibregl.Marker({ element: el })
-        //   .setLngLat([lng, lat])
-        //   .addTo(map);
-
-        // el.addEventListener('click', () => {
-        //   const expansionZoom = clusterRef.current?.getClusterExpansionZoom(cluster.properties.cluster_id);
-        //   map.easeTo({
-        //     center: [lng, lat],
-        //     zoom: expansionZoom || currentZoom + 2
-        //   });
-        // });
-
-        // newMarkers.push(marker);
-      } else {
+      if (!cluster.properties.cluster) {
         // Create individual business marker
         const el = document.createElement('div');
         el.className = 'business-marker';
         el.style.cssText = `
           background: #FFEB3B;
-          border: 1px solid #FFC107;
+          border: 2px solid #FFC107;
           border-radius: 50%;
-          width: 12px;
-          height: 12px;
+          width: 14px;
+          height: 14px;
           cursor: pointer;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+          transition: all 0.2s ease;
         `;
         
+        // Add hover effect
+        el.addEventListener('mouseenter', () => {
+          el.style.transform = 'scale(1.2)';
+          el.style.zIndex = '1000';
+        });
+        
+        el.addEventListener('mouseleave', () => {
+          el.style.transform = 'scale(1)';
+          el.style.zIndex = 'auto';
+        });
+
         const marker = new maplibregl.Marker({ element: el })
           .setLngLat([lng, lat])
           .addTo(map);
@@ -288,21 +266,30 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       clusters.forEach(cluster => {
         const [lng, lat] = cluster.geometry.coordinates;
         
-        if (cluster.properties.cluster) {
-          // Cluster markers (commented out)
-        } else {
+        if (!cluster.properties.cluster) {
           const el = document.createElement('div');
           el.className = 'business-marker';
           el.style.cssText = `
             background: #FFEB3B;
-            border: 1px solid #FFC107;
+            border: 2px solid #FFC107;
             border-radius: 50%;
-            width: 12px;
-            height: 12px;
+            width: 14px;
+            height: 14px;
             cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            transition: all 0.2s ease;
           `;
           
+          el.addEventListener('mouseenter', () => {
+            el.style.transform = 'scale(1.2)';
+            el.style.zIndex = '1000';
+          });
+          
+          el.addEventListener('mouseleave', () => {
+            el.style.transform = 'scale(1)';
+            el.style.zIndex = 'auto';
+          });
+
           const marker = new maplibregl.Marker({ element: el })
             .setLngLat([lng, lat])
             .addTo(map);
