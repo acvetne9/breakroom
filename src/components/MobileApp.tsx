@@ -71,8 +71,9 @@ const MobileApp: React.FC = () => {
   const handleInitiationComplete = (data: UserData) => {
     console.log('MobileApp: handleInitiationComplete called with:', data);
     setUserData(data);
-    console.log('MobileApp: Setting currentView to main');
+    console.log('MobileApp: Setting currentView to main and currentSlide to 1');
     setCurrentView('main');
+    setCurrentSlide(1); // Ensure we land on the home view (slide 1) where map is visible
     
     // Create automatic job update post
     const jobUpdatePost: Post = {
