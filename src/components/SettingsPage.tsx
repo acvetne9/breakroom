@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Minus } from 'lucide-react';
+import { Plus, Minus, Smartphone } from 'lucide-react';
 import JobSearchDropdown from './JobSearchDropdown';
 import LocationSearchInput from './LocationSearchInput';
 import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
+import { useDevice } from '@/contexts/DeviceContext';
 
 interface UserInfo {
   salary: string;
@@ -50,6 +51,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   onJobUpdate,
   onPageLeave
 }) => {
+  const { deviceId } = useDevice();
+  const { toast } = useToast();
+
   // Use fullLocation if available, otherwise fall back to location
   const [currentJob, setCurrentJob] = useState<UserInfo>({
     salary: initialData.salary,
@@ -72,7 +76,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   }]);
   const [pastJobTimePeriods, setPastJobTimePeriods] = useState<{[id: string]: string}>({ '1': 'HR' });
   const [isStoriesExpanded, setIsStoriesExpanded] = useState(false);
-  const { toast } = useToast();
 
   // Track initial values to detect changes
   const [initialCurrentJob] = useState(currentJob);
@@ -312,6 +315,20 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     <div className="relative w-full h-full flex items-center justify-center">
       <div className="app-card p-6 overflow-y-auto">
         <h1 className="text-xl font-medium text-app-black mb-8">Your Info.</h1>
+        
+        {/* Device Info Section */}
+        <div className="mb-8 p-4 border border-border rounded-lg bg-muted/20">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+              <Smartphone className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Device ID</p>
+              <p className="text-sm text-muted-foreground font-mono">{deviceId.substring(0, 20)}...</p>
+              <p className="text-xs text-muted-foreground mt-1">Unique identifier for this device</p>
+            </div>
+          </div>
+        </div>
         
         {/* Current Job Section */}
         <div className="mb-8">
