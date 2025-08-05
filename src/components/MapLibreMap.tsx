@@ -18,6 +18,36 @@ interface MapLibreMapProps {
   supabaseKey: string;
 }
 
+function debugGeoJSONProperties(geojsonData: any) {
+  console.log('=== GeoJSON Debug Info ===');
+  
+  if (geojsonData?.features) {
+    const lineFeatures = geojsonData.features.filter((f: any) => 
+      f.geometry.type === 'LineString' || f.geometry.type === 'MultiLineString'
+    );
+    
+    console.log(`Found ${lineFeatures.length} line features`);
+    
+    // Sample the first few features to see their properties
+    lineFeatures.slice(0, 5).forEach((feature: any, index: number) => {
+      console.log(`Feature ${index}:`, {
+        type: feature.geometry.type,
+        properties: Object.keys(feature.properties || {}),
+        sampleProps: feature.properties
+      });
+    });
+    
+    // Check for common road properties
+    const roadProperties = ['highway', 'road', 'street', 'bridge', 'tunnel', 'railway'];
+    roadProperties.forEach(prop => {
+      const withProp = lineFeatures.filter((f: any) => f.properties?.[prop]);
+      console.log(`Features with '${prop}' property: ${withProp.length}`);
+    });
+  } else {
+    console.log('No features found in GeoJSON data');
+  }
+}
+
 const MapLibreMap: React.FC<MapLibreMapProps> = ({ 
   onMapLoad, 
   businesses = [], 
@@ -49,6 +79,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
       
       const geojsonData = await response.json();
+      debugGeoJSONProperties(geojsonData)
       return geojsonData;
     } catch (error) {
       console.error('Error fetching NYC GeoJSON from Supabase:', error);
