@@ -108,17 +108,57 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           paint: {
             'line-color': [
               'case',
-              ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk', 'primary']]], '#CCCCCC',
-              ['in', ['get', 'highway'], ['literal', ['secondary', 'tertiary', 'residential']]], '#CCCCCC',
+              // All highway types - bridges, tunnels, and regular roads
+              ['in', ['get', 'highway'], ['literal', [
+                'motorway', 'motorway_link',
+                'trunk', 'trunk_link', 
+                'primary', 'primary_link',
+                'secondary', 'secondary_link',
+                'tertiary', 'tertiary_link',
+                'residential', 'living_street',
+                'service', 'unclassified',
+                'road', 'track', 'path',
+                'footway', 'cycleway', 'bridleway',
+                'steps', 'pedestrian'
+              ]]], '#CCCCCC',
+              // Bridge structures
+              ['==', ['get', 'man_made'], 'bridge'], '#CCCCCC',
+              ['==', ['get', 'bridge'], 'yes'], '#CCCCCC',
+              // Tunnel structures  
+              ['==', ['get', 'tunnel'], 'yes'], '#CCCCCC',
+              // Railway lines (also transportation infrastructure)
+              ['in', ['get', 'railway'], ['literal', ['rail', 'subway', 'light_rail', 'tram']]], '#CCCCCC',
+              // Natural coastlines keep their blue color
               ['==', ['get', 'natural'], 'coastline'], '#04AEF6',
+              // Default to #CCCCCC for any other linear features that might be roads
               '#CCCCCC'
             ],
             'line-width': [
               'case',
-              ['==', ['get', 'highway'], 'motorway'], 3,
-              ['==', ['get', 'highway'], 'trunk'], 2.5,
-              ['==', ['get', 'highway'], 'primary'], 2,
-              ['==', ['get', 'highway'], 'secondary'], 1.5,
+              ['==', ['get', 'highway'], 'motorway'], 4,
+              ['in', ['get', 'highway'], ['literal', ['motorway_link', 'trunk']]], 3,
+              ['in', ['get', 'highway'], ['literal', ['trunk_link', 'primary']]], 2.5,
+              ['in', ['get', 'highway'], ['literal', ['primary_link', 'secondary']]], 2,
+              ['in', ['get', 'highway'], ['literal', ['secondary_link', 'tertiary']]], 1.5,
+              ['in', ['get', 'highway'], ['literal', ['tertiary_link', 'residential', 'living_street']]], 1.2,
+              ['in', ['get', 'railway'], ['literal', ['rail', 'subway', 'light_rail']]], 2,
+              ['==', ['get', 'railway'], 'tram'], 1,
+              // Bridge and tunnel width adjustments
+              ['==', ['get', 'bridge'], 'yes'], ['+', ['case', 
+                ['==', ['get', 'highway'], 'motorway'], 4,
+                ['in', ['get', 'highway'], ['literal', ['trunk', 'primary']]], 2.5,
+                1.2
+              ], 0.5],
+              ['==', ['get', 'tunnel'], 'yes'], ['-', ['case',
+                ['==', ['get', 'highway'], 'motorway'], 4,
+                ['in', ['get', 'highway'], ['literal', ['trunk', 'primary']]], 2.5,
+                1.2
+              ], 0.3],
+              1
+            ],
+            'line-opacity': [
+              'case',
+              ['==', ['get', 'tunnel'], 'yes'], 0.7, // Make tunnels slightly transparent
               1
             ]
           }
