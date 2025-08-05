@@ -323,38 +323,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const [lng, lat] = cluster.geometry.coordinates;
       
       if (cluster.properties.cluster) {
-        // Create cluster marker (commented out but can be enabled)
-        // const el = document.createElement('div');
-        // el.className = 'cluster-marker';
-        // el.style.cssText = `
-        //   background: hsl(var(--primary));
-        //   border: 2px solid hsl(var(--primary-foreground));
-        //   border-radius: 50%;
-        //   width: 40px;
-        //   height: 40px;
-        //   display: flex;
-        //   align-items: center;
-        //   justify-content: center;
-        //   color: hsl(var(--primary-foreground));
-        //   font-weight: bold;
-        //   font-size: 12px;
-        //   cursor: pointer;
-        // `;
-        // el.textContent = cluster.properties.point_count_abbreviated;
-        
-        // const marker = new maplibregl.Marker({ element: el })
-        //   .setLngLat([lng, lat])
-        //   .addTo(map);
 
-        // el.addEventListener('click', () => {
-        //   const expansionZoom = clusterRef.current?.getClusterExpansionZoom(cluster.properties.cluster_id);
-        //   map.easeTo({
-        //     center: [lng, lat],
-        //     zoom: expansionZoom || currentZoom + 2
-        //   });
-        // });
-
-        // newMarkers.push(marker);
       } else {
         // Create individual business marker
         const el = document.createElement('div');
