@@ -132,10 +132,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         },
         {
-          id: 'nyc-line-all',
+          id: 'nyc-line-multi',
           type: 'line' as const,
           source: 'nyc-data',
-          // NO FILTER - will attempt to render all geometries as lines
+          filter: [
+            'in', 
+            ['geometry-type'], 
+            ['literal', ['LineString', 'MultiLineString', 'Polygon']]
+          ],
           paint: {
             'line-color': '#CCCCCC',
             'line-width': 2,
