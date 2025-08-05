@@ -240,6 +240,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             container: mapRef.current!,
             style: {
               version: 8,
+              glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
               sources: {
                 'osm': {
                   type: 'raster',
