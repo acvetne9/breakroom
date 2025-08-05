@@ -184,7 +184,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Initialize map with Supabase GeoJSON data
   useEffect(() => {
-    if (!mapRef.current) return;
+    console.log('MapLibre: useEffect called, mapRef.current:', mapRef.current);
+    if (!mapRef.current) {
+      console.log('MapLibre: mapRef.current is null, returning');
+      return;
+    }
     
     console.log('MapLibre: Initializing map...');
     let mapInstance: maplibregl.Map | null = null;
