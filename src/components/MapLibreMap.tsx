@@ -479,7 +479,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           .addTo(map);
 
         // Add click handler
-        el.addEventListener('click', () => {
+        el.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('Business marker clicked:', cluster.properties.business);
           onBusinessClick?.(cluster.properties.business);
         });
 
@@ -538,7 +541,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             .setLngLat([lng, lat])
             .addTo(map);
 
-          el.addEventListener('click', () => {
+          el.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Business marker clicked (updated):', cluster.properties.business);
             onBusinessClick?.(cluster.properties.business);
           });
 
