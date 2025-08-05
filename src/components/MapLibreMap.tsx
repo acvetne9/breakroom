@@ -34,36 +34,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   
   const MARKER_VISIBILITY_ZOOM_THRESHOLD = 13;
 
-  function debugGeoJSONProperties(geojsonData: any) {
-    console.log('=== GeoJSON Debug Info ===');
-  
-    if (geojsonData?.features) {
-      const lineFeatures = geojsonData.features.filter((f: any) => 
-        f.geometry.type === 'LineString' || f.geometry.type === 'MultiLineString'
-      );
-      
-      console.log(`Found ${lineFeatures.length} line features`);
-      
-      // Sample the first few features to see their properties
-      lineFeatures.slice(0, 5).forEach((feature: any, index: number) => {
-        console.log(`Feature ${index}:`, {
-          type: feature.geometry.type,
-          properties: Object.keys(feature.properties || {}),
-          sampleProps: feature.properties
-        });
-      });
-      
-      // Check for common road properties
-      const roadProperties = ['highway', 'road', 'street', 'bridge', 'tunnel', 'railway'];
-      roadProperties.forEach(prop => {
-        const withProp = lineFeatures.filter((f: any) => f.properties?.[prop]);
-        console.log(`Features with '${prop}' property: ${withProp.length}`);
-      });
-    } else {
-      console.log('No features found in GeoJSON data');
-    }
-  }
-
   // Function to fetch NYC GeoJSON from Supabase
   const fetchNYCGeoJSON = useCallback(async () => {
     try {
@@ -79,7 +49,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
       
       const geojsonData = await response.json();
-      debugGeoJSONProperties(geojsonData)
       return geojsonData;
     } catch (error) {
       console.error('Error fetching NYC GeoJSON from Supabase:', error);
@@ -132,6 +101,43 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         },
         {
+          id: 'nyc-line',
+          type: 'line' as const,
+          source: 'nyc-data',
+          filter: ['==', '$type', 'LineString'],
+          paint: {
+            'line-color': '#CCCCCC', // Force all lines to be this color
+            'line-width': [
+              'case',
+              ['==', ['get', 'highway'], 'motorway'], 4,
+              ['in', ['get', 'highway'], ['literal', ['motorway_link', 'trunk']]], 3,
+              ['in', ['get', 'highway'], ['literal', ['trunk_link', 'primary']]], 2.5,
+              ['in', ['get', 'highway'], ['literal', ['primary_link', 'secondary']]], 2,
+              ['in', ['get', 'highway'], ['literal', ['secondary_link', 'tertiary']]], 1.5,
+              ['in', ['get', 'highway'], ['literal', ['tertiary_link', 'residential', 'living_street']]], 1.2,
+              ['in', ['get', 'railway'], ['literal', ['rail', 'subway', 'light_rail']]], 2,
+              ['==', ['get', 'railway'], 'tram'], 1,
+              // Bridge and tunnel width adjustments
+              ['==', ['get', 'bridge'], 'yes'], ['+', ['case', 
+                ['==', ['get', 'highway'], 'motorway'], 4,
+                ['in', ['get', 'highway'], ['literal', ['trunk', 'primary']]], 2.5,
+                1.2
+              ], 0.5],
+              ['==', ['get', 'tunnel'], 'yes'], ['-', ['case',
+                ['==', ['get', 'highway'], 'motorway'], 4,
+                ['in', ['get', 'highway'], ['literal', ['trunk', 'primary']]], 2.5,
+                1.2
+              ], 0.3],
+              1
+            ],
+            'line-opacity': [
+              'case',
+              ['==', ['get', 'tunnel'], 'yes'], 0.7, // Make tunnels slightly transparent
+              1
+            ]
+          }
+        },
+        {
           id: 'nyc-symbol',
           type: 'symbol' as const,
           source: 'nyc-data',
@@ -146,28 +152,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'text-color': '#333333',
             'text-halo-color': '#ffffff',
             'text-halo-width': 1
-          }
-        },
-        {
-          id: 'nyc-line-simple',
-          type: 'line' as const,
-          source: 'nyc-data',
-          filter: [
-            'any',
-            ['==', '$type', 'LineString'],
-            ['==', '$type', 'MultiLineString']
-          ],
-          paint: {
-            'line-color': '#CCCCCC', // Gray color
-            'line-width': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              10, 0.5,  // Thin lines at low zoom
-              14, 1,    // Medium lines at medium zoom
-              18, 2     // Thicker lines at high zoom
-            ],
-            'line-opacity': 0.8
           }
         }
       ]
@@ -184,17 +168,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Initialize map with Supabase GeoJSON data
   useEffect(() => {
-    console.log('MapLibre: useEffect called, mapRef.current:', mapRef.current);
-    if (!mapRef.current) {
-      console.log('MapLibre: mapRef.current is null, returning');
-      return;
-    }
-    
-    // Add a small delay to ensure the container is properly visible
-    const initTimer = setTimeout(() => {
-      console.log('MapLibre: Starting delayed initialization...');
-      initializeMap();
-    }, 100);
+    if (!mapRef.current) return;
     
     console.log('MapLibre: Initializing map...');
     let mapInstance: maplibregl.Map | null = null;
@@ -202,20 +176,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     const initializeMap = async () => {
       try {
-        // Check if container is visible
-        const rect = mapRef.current!.getBoundingClientRect();
-        console.log('MapLibre: Container dimensions:', rect);
-        
-        if (rect.width === 0 || rect.height === 0) {
-          console.log('MapLibre: Container has zero dimensions, retrying in 500ms');
-          setTimeout(() => {
-            if (!isCleanedUp) {
-              initializeMap();
-            }
-          }, 500);
-          return;
-        }
-
         // Fetch GeoJSON data from Supabase
         const geojsonData = await fetchNYCGeoJSON();
         
@@ -299,9 +259,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     };
 
+    initializeMap();
+
     return () => {
       console.log('MapLibre: Cleanup function called');
-      clearTimeout(initTimer);
       isCleanedUp = true;
       
       // Cleanup function - use the local mapInstance variable

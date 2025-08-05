@@ -69,11 +69,8 @@ const MobileApp: React.FC = () => {
   ]);
 
   const handleInitiationComplete = (data: UserData) => {
-    console.log('MobileApp: handleInitiationComplete called with:', data);
     setUserData(data);
-    console.log('MobileApp: Setting currentView to main and currentSlide to 1');
     setCurrentView('main');
-    setCurrentSlide(1); // Ensure we land on the home view (slide 1) where map is visible
     
     // Create automatic job update post
     const jobUpdatePost: Post = {
@@ -357,10 +354,8 @@ const MobileApp: React.FC = () => {
     }
   };
 
-  console.log('MobileApp: Rendering with currentView:', currentView);
-
   return (
-    <div className="fixed inset-0 overflow-hidden bg-gray-100">
+    <div className="fixed inset-0 overflow-hidden">
       {/* Map is always the background */}
       <HomePage 
         businesses={businesses} 
@@ -389,7 +384,7 @@ const MobileApp: React.FC = () => {
           animate={{ x: 0 }}
           exit={{ x: '-100%' }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          className="absolute inset-0 z-10 bg-black/20 flex items-center justify-center"
+          className="absolute inset-0 z-20"
           drag="x"
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.1}
@@ -399,18 +394,16 @@ const MobileApp: React.FC = () => {
             }
           }}
         >
-          <div className="w-full max-w-sm mx-4">
-            <SettingsPage 
-              initialData={userData} 
-              userPosts={posts.filter(post => post.author === 'You')}
-              onStoriesClick={handleUserStoriesClick}
-              onPostClick={(post) => {
-                setExpandedPost(post.id);
-                setCurrentSlide(2); // Navigate to explore page
-              }}
-              onJobUpdate={handleJobUpdate}
-            />
-          </div>
+          <SettingsPage 
+            initialData={userData} 
+            userPosts={posts.filter(post => post.author === 'You')}
+            onStoriesClick={handleUserStoriesClick}
+            onPostClick={(post) => {
+              setExpandedPost(post.id);
+              setCurrentSlide(2); // Navigate to explore page
+            }}
+            onJobUpdate={handleJobUpdate}
+          />
         </motion.div>
       )}
 
@@ -421,7 +414,7 @@ const MobileApp: React.FC = () => {
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          className="absolute inset-0 z-10 bg-black/20 flex items-center justify-center"
+          className="absolute inset-0 z-20"
           drag="x"
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.1}
@@ -431,32 +424,30 @@ const MobileApp: React.FC = () => {
             }
           }}
         >
-          <div className="w-full max-w-sm mx-4">
-            <ExplorePage 
-              posts={posts}
-              filteredBusinessId={filteredBusinessId || undefined}
-              filteredUserStories={filteredUserStories}
-              onBusinessView={(businessId) => {
-                const business = businesses.find(b => b.id === businessId);
-                if (business) {
-                  setSelectedBusiness(business);
-                  setCurrentSlide(1); // Navigate to home page
-                }
-              }}
-              onExpandedPostChange={(postId) => {
-                setExpandedPost(postId);
-              }}
-              onCommentSubmit={(postId, comment) => {
-                setComments({
-                  ...comments,
-                  [postId]: [...(comments[postId] || []), comment]
-                });
-              }}
-              onPostSubmit={handlePostSubmit}
-              onBackToAllPosts={handleBackToAllPosts}
-              onPostVote={handlePostVote}
-            />
-          </div>
+          <ExplorePage 
+            posts={posts}
+            filteredBusinessId={filteredBusinessId || undefined}
+            filteredUserStories={filteredUserStories}
+            onBusinessView={(businessId) => {
+              const business = businesses.find(b => b.id === businessId);
+              if (business) {
+                setSelectedBusiness(business);
+                setCurrentSlide(1); // Navigate to home page
+              }
+            }}
+            onExpandedPostChange={(postId) => {
+              setExpandedPost(postId);
+            }}
+            onCommentSubmit={(postId, comment) => {
+              setComments({
+                ...comments,
+                [postId]: [...(comments[postId] || []), comment]
+              });
+            }}
+            onPostSubmit={handlePostSubmit}
+            onBackToAllPosts={handleBackToAllPosts}
+            onPostVote={handlePostVote}
+          />
         </motion.div>
       )}
 
