@@ -166,6 +166,8 @@ const HomePage: React.FC<HomePageProps> = ({
     setShowBusinessDetails(false);
   };
 
+  console.log('HomePage: Rendering with currentView:', currentView, 'currentSlide:', currentSlide);
+  
   return (
     <div className="relative w-full h-full">
       {/* MapLibre with OpenStreetMap base layer */}
@@ -175,6 +177,7 @@ const HomePage: React.FC<HomePageProps> = ({
         businesses={businesses}
         onBusinessClick={handleBusinessClick}
         selectedBusiness={selectedBusiness}
+        key={currentView} // Force re-mount when view changes
       />
       
       {/* Search results dropdown */}

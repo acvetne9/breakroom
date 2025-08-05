@@ -69,7 +69,9 @@ const MobileApp: React.FC = () => {
   ]);
 
   const handleInitiationComplete = (data: UserData) => {
+    console.log('MobileApp: handleInitiationComplete called with:', data);
     setUserData(data);
+    console.log('MobileApp: Setting currentView to main');
     setCurrentView('main');
     
     // Create automatic job update post
@@ -354,8 +356,10 @@ const MobileApp: React.FC = () => {
     }
   };
 
+  console.log('MobileApp: Rendering with currentView:', currentView);
+
   return (
-    <div className="fixed inset-0 overflow-hidden">
+    <div className="fixed inset-0 overflow-hidden bg-gray-100">
       {/* Map is always the background */}
       <HomePage 
         businesses={businesses} 

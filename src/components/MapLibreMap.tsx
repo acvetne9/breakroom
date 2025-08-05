@@ -190,12 +190,32 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return;
     }
     
+    // Add a small delay to ensure the container is properly visible
+    const initTimer = setTimeout(() => {
+      console.log('MapLibre: Starting delayed initialization...');
+      initializeMap();
+    }, 100);
+    
     console.log('MapLibre: Initializing map...');
     let mapInstance: maplibregl.Map | null = null;
     let isCleanedUp = false;
 
     const initializeMap = async () => {
       try {
+        // Check if container is visible
+        const rect = mapRef.current!.getBoundingClientRect();
+        console.log('MapLibre: Container dimensions:', rect);
+        
+        if (rect.width === 0 || rect.height === 0) {
+          console.log('MapLibre: Container has zero dimensions, retrying in 500ms');
+          setTimeout(() => {
+            if (!isCleanedUp) {
+              initializeMap();
+            }
+          }, 500);
+          return;
+        }
+
         // Fetch GeoJSON data from Supabase
         const geojsonData = await fetchNYCGeoJSON();
         
@@ -279,10 +299,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     };
 
-    initializeMap();
-
     return () => {
       console.log('MapLibre: Cleanup function called');
+      clearTimeout(initTimer);
       isCleanedUp = true;
       
       // Cleanup function - use the local mapInstance variable
