@@ -60,6 +60,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const createMapStyle = useCallback((geojsonData: any) => {
     return {
       version: 8 as const,
+      glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
       sources: {
         'nyc-data': {
           type: 'geojson' as const,
