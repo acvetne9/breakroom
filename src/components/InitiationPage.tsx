@@ -147,7 +147,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       initial={{ y: 0 }} 
       animate={{ y: isComplete ? '-100vh' : 0 }} 
       transition={{ duration: 0.5, ease: 'easeInOut' }} 
-      className="absolute inset-0 z-50 flex items-center justify-center"
+      className="absolute inset-0 z-10 flex items-center justify-center bg-black/20"
     >
       <div className="app-card flex flex-col justify-center px-8 py-12">
         <div className="space-y-6">

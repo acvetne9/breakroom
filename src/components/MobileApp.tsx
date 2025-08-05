@@ -389,7 +389,7 @@ const MobileApp: React.FC = () => {
           animate={{ x: 0 }}
           exit={{ x: '-100%' }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          className="absolute inset-0 z-20"
+          className="absolute inset-0 z-10 bg-black/20 flex items-center justify-center"
           drag="x"
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.1}
@@ -399,16 +399,18 @@ const MobileApp: React.FC = () => {
             }
           }}
         >
-          <SettingsPage 
-            initialData={userData} 
-            userPosts={posts.filter(post => post.author === 'You')}
-            onStoriesClick={handleUserStoriesClick}
-            onPostClick={(post) => {
-              setExpandedPost(post.id);
-              setCurrentSlide(2); // Navigate to explore page
-            }}
-            onJobUpdate={handleJobUpdate}
-          />
+          <div className="w-full max-w-sm mx-4">
+            <SettingsPage 
+              initialData={userData} 
+              userPosts={posts.filter(post => post.author === 'You')}
+              onStoriesClick={handleUserStoriesClick}
+              onPostClick={(post) => {
+                setExpandedPost(post.id);
+                setCurrentSlide(2); // Navigate to explore page
+              }}
+              onJobUpdate={handleJobUpdate}
+            />
+          </div>
         </motion.div>
       )}
 
@@ -419,7 +421,7 @@ const MobileApp: React.FC = () => {
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          className="absolute inset-0 z-20"
+          className="absolute inset-0 z-10 bg-black/20 flex items-center justify-center"
           drag="x"
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.1}
@@ -429,30 +431,32 @@ const MobileApp: React.FC = () => {
             }
           }}
         >
-          <ExplorePage 
-            posts={posts}
-            filteredBusinessId={filteredBusinessId || undefined}
-            filteredUserStories={filteredUserStories}
-            onBusinessView={(businessId) => {
-              const business = businesses.find(b => b.id === businessId);
-              if (business) {
-                setSelectedBusiness(business);
-                setCurrentSlide(1); // Navigate to home page
-              }
-            }}
-            onExpandedPostChange={(postId) => {
-              setExpandedPost(postId);
-            }}
-            onCommentSubmit={(postId, comment) => {
-              setComments({
-                ...comments,
-                [postId]: [...(comments[postId] || []), comment]
-              });
-            }}
-            onPostSubmit={handlePostSubmit}
-            onBackToAllPosts={handleBackToAllPosts}
-            onPostVote={handlePostVote}
-          />
+          <div className="w-full max-w-sm mx-4">
+            <ExplorePage 
+              posts={posts}
+              filteredBusinessId={filteredBusinessId || undefined}
+              filteredUserStories={filteredUserStories}
+              onBusinessView={(businessId) => {
+                const business = businesses.find(b => b.id === businessId);
+                if (business) {
+                  setSelectedBusiness(business);
+                  setCurrentSlide(1); // Navigate to home page
+                }
+              }}
+              onExpandedPostChange={(postId) => {
+                setExpandedPost(postId);
+              }}
+              onCommentSubmit={(postId, comment) => {
+                setComments({
+                  ...comments,
+                  [postId]: [...(comments[postId] || []), comment]
+                });
+              }}
+              onPostSubmit={handlePostSubmit}
+              onBackToAllPosts={handleBackToAllPosts}
+              onPostVote={handlePostVote}
+            />
+          </div>
         </motion.div>
       )}
 
