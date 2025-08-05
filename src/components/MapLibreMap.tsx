@@ -156,92 +156,114 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (!mapRef.current) return;
     
+    console.log('MapLibre: Initializing map...');
     let mapInstance: maplibregl.Map | null = null;
+    let isCleanedUp = false;
 
     const initializeMap = async () => {
-      // Fetch GeoJSON data from Supabase
-      const geojsonData = await fetchNYCGeoJSON();
-      
-      if (!geojsonData) {
-        console.error('Failed to load NYC GeoJSON data from Supabase');
-        // Fallback to basic OSM tiles
+      try {
+        // Fetch GeoJSON data from Supabase
+        const geojsonData = await fetchNYCGeoJSON();
+        
+        if (isCleanedUp) {
+          console.log('MapLibre: Initialization cancelled due to cleanup');
+          return;
+        }
+        
+        if (!geojsonData) {
+          console.error('Failed to load NYC GeoJSON data from Supabase');
+          // Fallback to basic OSM tiles
+          mapInstance = new maplibregl.Map({
+            container: mapRef.current!,
+            style: {
+              version: 8,
+              sources: {
+                'osm': {
+                  type: 'raster',
+                  tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                  tileSize: 256,
+                  attribution: '© OpenStreetMap contributors'
+                }
+              },
+              layers: [
+                {
+                  id: 'osm-tiles',
+                  type: 'raster',
+                  source: 'osm'
+                }
+              ]
+            },
+            center: [-73.9712, 40.7831],
+            zoom: 14,
+            maxBounds: [
+              [-74.2557, 40.4960],
+              [-73.7004, 40.9152]
+            ]
+          });
+          
+          if (!isCleanedUp) {
+            setMap(mapInstance);
+            onMapLoad?.(mapInstance);
+          }
+          return;
+        }
+
+        // Create map with GeoJSON style
         mapInstance = new maplibregl.Map({
           container: mapRef.current!,
-          style: {
-            version: 8,
-            sources: {
-              'osm': {
-                type: 'raster',
-                tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-                tileSize: 256,
-                attribution: '© OpenStreetMap contributors'
-              }
-            },
-            layers: [
-              {
-                id: 'osm-tiles',
-                type: 'raster',
-                source: 'osm'
-              }
-            ]
-          },
-          center: [-73.9712, 40.7831],
+          style: createMapStyle(geojsonData) as any,
+          center: [-73.9712, 40.7831], // NYC center
           zoom: 14,
           maxBounds: [
-            [-74.2557, 40.4960],
-            [-73.7004, 40.9152]
+            [-74.2557, 40.4960], // Southwest corner (Staten Island)
+            [-73.7004, 40.9152]  // Northeast corner (Bronx)
           ]
         });
-        
-        setMap(mapInstance);
-        onMapLoad?.(mapInstance);
-        return;
+
+        // Add zoom change listener
+        mapInstance.on('zoom', handleZoomChange);
+
+        // Map load event
+        mapInstance.on('load', () => {
+          console.log('MapLibre: Map loaded with NYC GeoJSON from Supabase');
+          if (!isCleanedUp) {
+            onMapLoad?.(mapInstance);
+          }
+        });
+
+        // Error handling
+        mapInstance.on('error', (e) => {
+          console.error('MapLibre: Map error:', e);
+        });
+
+        if (!isCleanedUp) {
+          setMap(mapInstance);
+          console.log('MapLibre: Map instance set to state');
+        }
+      } catch (error) {
+        console.error('MapLibre: Error during initialization:', error);
       }
-
-      // Create map with GeoJSON style
-      mapInstance = new maplibregl.Map({
-        container: mapRef.current!,
-        style: createMapStyle(geojsonData) as any,
-        center: [-73.9712, 40.7831], // NYC center
-        zoom: 14,
-        maxBounds: [
-          [-74.2557, 40.4960], // Southwest corner (Staten Island)
-          [-73.7004, 40.9152]  // Northeast corner (Bronx)
-        ]
-      });
-
-      // Add zoom change listener
-      mapInstance.on('zoom', handleZoomChange);
-
-      // Map load event
-      mapInstance.on('load', () => {
-        console.log('Map loaded with NYC GeoJSON from Supabase');
-        onMapLoad?.(mapInstance);
-      });
-
-      // Error handling
-      mapInstance.on('error', (e) => {
-        console.error('Map error:', e);
-      });
-
-      setMap(mapInstance);
     };
 
     initializeMap();
 
     return () => {
+      console.log('MapLibre: Cleanup function called');
+      isCleanedUp = true;
+      
       // Cleanup function - use the local mapInstance variable
       try {
         if (mapInstance && mapInstance.getContainer()) {
+          console.log('MapLibre: Removing map instance');
           mapInstance.remove();
         }
       } catch (error) {
-        console.warn('Error cleaning up map:', error);
+        console.warn('MapLibre: Error cleaning up map:', error);
       }
       mapInstance = null;
       setMap(null);
     };
-  }, [fetchNYCGeoJSON, createMapStyle, onMapLoad, handleZoomChange]);
+  }, [supabaseUrl, supabaseKey]); // Only depend on the actual data we need
 
   // Create marker clustering
   useEffect(() => {
