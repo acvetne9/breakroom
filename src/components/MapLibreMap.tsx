@@ -65,24 +65,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         'nyc-data': {
           type: 'geojson' as const,
           data: geojsonData
-        },
-        'osm': {
-          type: 'raster' as const,
-          tiles: [
-            'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-          ],
-          tileSize: 256,
-          attribution: '© OpenStreetMap contributors'
         }
       },
       layers: [
+        // Background layer
         {
-          id: 'osm-tiles',
-          type: 'raster' as const,
-          source: 'osm',
-          minzoom: 0,
-          maxzoom: 19
+          id: 'background',
+          type: 'background' as const,
+          paint: {
+            'background-color': '#f8f8f8'
+          }
         },
+        // Fill layers for areas
         {
           id: 'nyc-fill',
           type: 'fill' as const,
@@ -95,11 +89,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ['==', ['get', 'leisure'], 'park'], '#8BCE64',
               ['==', ['get', 'landuse'], 'forest'], '#8BCE64',
               ['==', ['get', 'landuse'], 'grass'], '#8BCE64',
-              'rgba(0,0,0,0)'
+              ['==', ['get', 'landuse'], 'residential'], '#f0f0f0',
+              ['==', ['get', 'landuse'], 'commercial'], '#f5f5f5',
+              ['==', ['get', 'landuse'], 'industrial'], '#e8e8e8',
+              '#f8f8f8'
             ],
             'fill-opacity': 0.8
           }
         },
+        // Line layers for roads - ALL ROADS WILL BE #CCCCCC
         {
           id: 'nyc-line',
           type: 'line' as const,
@@ -108,61 +106,28 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           paint: {
             'line-color': [
               'case',
-              // All highway types - bridges, tunnels, and regular roads
-              ['in', ['get', 'highway'], ['literal', [
-                'motorway', 'motorway_link',
-                'trunk', 'trunk_link', 
-                'primary', 'primary_link',
-                'secondary', 'secondary_link',
-                'tertiary', 'tertiary_link',
-                'residential', 'living_street',
-                'service', 'unclassified',
-                'road', 'track', 'path',
-                'footway', 'cycleway', 'bridleway',
-                'steps', 'pedestrian'
-              ]]], '#CCCCCC',
-              // Bridge structures
-              ['==', ['get', 'man_made'], 'bridge'], '#CCCCCC',
-              ['==', ['get', 'bridge'], 'yes'], '#CCCCCC',
-              // Tunnel structures  
-              ['==', ['get', 'tunnel'], 'yes'], '#CCCCCC',
-              // Railway lines (also transportation infrastructure)
-              ['in', ['get', 'railway'], ['literal', ['rail', 'subway', 'light_rail', 'tram']]], '#CCCCCC',
-              // Natural coastlines keep their blue color
+              // Keep water features blue
               ['==', ['get', 'natural'], 'coastline'], '#04AEF6',
-              // Default to #CCCCCC for any other linear features that might be roads
+              ['==', ['get', 'waterway'], 'river'], '#04AEF6',
+              ['==', ['get', 'waterway'], 'canal'], '#04AEF6',
+              ['==', ['get', 'waterway'], 'stream'], '#04AEF6',
+              // ALL OTHER LINES (roads, highways, bridges, tunnels) = #CCCCCC
               '#CCCCCC'
             ],
             'line-width': [
               'case',
               ['==', ['get', 'highway'], 'motorway'], 4,
-              ['in', ['get', 'highway'], ['literal', ['motorway_link', 'trunk']]], 3,
-              ['in', ['get', 'highway'], ['literal', ['trunk_link', 'primary']]], 2.5,
-              ['in', ['get', 'highway'], ['literal', ['primary_link', 'secondary']]], 2,
-              ['in', ['get', 'highway'], ['literal', ['secondary_link', 'tertiary']]], 1.5,
-              ['in', ['get', 'highway'], ['literal', ['tertiary_link', 'residential', 'living_street']]], 1.2,
-              ['in', ['get', 'railway'], ['literal', ['rail', 'subway', 'light_rail']]], 2,
-              ['==', ['get', 'railway'], 'tram'], 1,
-              // Bridge and tunnel width adjustments
-              ['==', ['get', 'bridge'], 'yes'], ['+', ['case', 
-                ['==', ['get', 'highway'], 'motorway'], 4,
-                ['in', ['get', 'highway'], ['literal', ['trunk', 'primary']]], 2.5,
-                1.2
-              ], 0.5],
-              ['==', ['get', 'tunnel'], 'yes'], ['-', ['case',
-                ['==', ['get', 'highway'], 'motorway'], 4,
-                ['in', ['get', 'highway'], ['literal', ['trunk', 'primary']]], 2.5,
-                1.2
-              ], 0.3],
-              1
-            ],
-            'line-opacity': [
-              'case',
-              ['==', ['get', 'tunnel'], 'yes'], 0.7, // Make tunnels slightly transparent
+              ['==', ['get', 'highway'], 'trunk'], 3,
+              ['==', ['get', 'highway'], 'primary'], 2.5,
+              ['==', ['get', 'highway'], 'secondary'], 2,
+              ['==', ['get', 'highway'], 'tertiary'], 1.5,
+              ['has', 'highway'], 1.2,
+              ['has', 'railway'], 2,
               1
             ]
           }
         },
+        // Symbol layers for labels
         {
           id: 'nyc-symbol',
           type: 'symbol' as const,
@@ -212,24 +177,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         
         if (!geojsonData) {
           console.error('Failed to load NYC GeoJSON data from Supabase');
-          // Fallback to basic OSM tiles
+          // Fallback to basic style without external tiles
           mapInstance = new maplibregl.Map({
             container: mapRef.current!,
             style: {
               version: 8,
-              sources: {
-                'osm': {
-                  type: 'raster',
-                  tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-                  tileSize: 256,
-                  attribution: '© OpenStreetMap contributors'
-                }
-              },
+              sources: {},
               layers: [
                 {
-                  id: 'osm-tiles',
-                  type: 'raster',
-                  source: 'osm'
+                  id: 'background',
+                  type: 'background',
+                  paint: {
+                    'background-color': '#f8f8f8'
+                  }
                 }
               ]
             },
