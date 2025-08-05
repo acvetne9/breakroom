@@ -118,69 +118,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         },
         {
-          id: 'nyc-line',
+          id: 'nyc-line-simple',
           type: 'line' as const,
           source: 'nyc-data',
           filter: [
             'any',
             ['==', '$type', 'LineString'],
-            ['==', '$type', 'MultiLineString'] // Include MultiLineString geometries
+            ['==', '$type', 'MultiLineString']
           ],
           paint: {
-            'line-color': '#CCCCCC', // Force gray color for ALL lines
+            'line-color': '#CCCCCC', // Gray color
             'line-width': [
-              'case',
-              // Highway classifications
-              ['==', ['get', 'highway'], 'motorway'], 4,
-              ['in', ['get', 'highway'], ['literal', ['motorway_link', 'trunk']]], 3,
-              ['in', ['get', 'highway'], ['literal', ['trunk_link', 'primary']]], 2.5,
-              ['in', ['get', 'highway'], ['literal', ['primary_link', 'secondary']]], 2,
-              ['in', ['get', 'highway'], ['literal', ['secondary_link', 'tertiary']]], 1.5,
-              ['in', ['get', 'highway'], ['literal', ['tertiary_link', 'residential', 'living_street']]], 1.2,
-              
-              // Railway classifications
-              ['in', ['get', 'railway'], ['literal', ['rail', 'subway', 'light_rail']]], 2,
-              ['==', ['get', 'railway'], 'tram'], 1,
-              
-              // Bridge width adjustments (add extra width)
-              ['==', ['get', 'bridge'], 'yes'], 
-              ['+', 
-                ['case', 
-                  ['==', ['get', 'highway'], 'motorway'], 4,
-                  ['in', ['get', 'highway'], ['literal', ['trunk', 'primary']]], 2.5,
-                  ['has', 'highway'], 1.2, // Default for any highway
-                  1 // Default for non-highways
-                ], 
-                0.5 // Extra width for bridges
-              ],
-              
-              // Tunnel width adjustments (reduce width)
-              ['==', ['get', 'tunnel'], 'yes'], 
-              ['-', 
-                ['case',
-                  ['==', ['get', 'highway'], 'motorway'], 4,
-                  ['in', ['get', 'highway'], ['literal', ['trunk', 'primary']]], 2.5,
-                  ['has', 'highway'], 1.2, // Default for any highway
-                  1 // Default for non-highways
-                ], 
-                0.3 // Reduce width for tunnels
-              ],
-              
-              // Default width for any line
-              1
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              10, 0.5,  // Thin lines at low zoom
+              14, 1,    // Medium lines at medium zoom
+              18, 2     // Thicker lines at high zoom
             ],
-            'line-opacity': [
-              'case',
-              ['==', ['get', 'tunnel'], 'yes'], 0.5, // Make tunnels more transparent
-              ['==', ['get', 'bridge'], 'yes'], 1.0,  // Keep bridges fully opaque
-              0.8 // Default opacity for regular roads
-            ],
-            // Add dashed pattern for tunnels
-            'line-dasharray': [
-              'case',
-              ['==', ['get', 'tunnel'], 'yes'], ['literal', [2, 2]], // Dashed line for tunnels
-              ['literal', []] // Solid line for everything else
-            ]
+            'line-opacity': 0.8
           }
         }
       ]
