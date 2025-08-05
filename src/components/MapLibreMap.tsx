@@ -100,13 +100,61 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'fill-opacity': 0.8
           }
         },
+        // Road outlines (darker background)
+        {
+          id: 'nyc-line-outline',
+          type: 'line' as const,
+          source: 'nyc-data',
+          filter: [
+            'all',
+            ['==', '$type', 'LineString'],
+            [
+              'any',
+              ['has', 'highway'],
+              ['has', 'railway'],
+              ['==', ['get', 'bridge'], 'yes'],
+              ['==', ['get', 'tunnel'], 'yes']
+            ]
+          ],
+          paint: {
+            'line-color': '#888888', // Darker outline
+            'line-width': [
+              'case',
+              ['==', ['get', 'highway'], 'motorway'], 5,
+              ['in', ['get', 'highway'], ['literal', ['motorway_link', 'trunk']]], 4,
+              ['in', ['get', 'highway'], ['literal', ['trunk_link', 'primary']]], 3.5,
+              ['in', ['get', 'highway'], ['literal', ['primary_link', 'secondary']]], 3,
+              ['in', ['get', 'highway'], ['literal', ['secondary_link', 'tertiary']]], 2.5,
+              ['in', ['get', 'highway'], ['literal', ['tertiary_link', 'residential', 'living_street']]], 2.2,
+              ['in', ['get', 'railway'], ['literal', ['rail', 'subway', 'light_rail']]], 3,
+              ['==', ['get', 'railway'], 'tram'], 2,
+              2
+            ],
+            'line-opacity': [
+              'case',
+              ['==', ['get', 'tunnel'], 'yes'], 0.5,
+              0.8
+            ]
+          }
+        },
+        // Main road lines (light gray on top)
         {
           id: 'nyc-line',
           type: 'line' as const,
           source: 'nyc-data',
-          filter: ['==', '$type', 'LineString'],
+          filter: [
+            'all',
+            ['==', '$type', 'LineString'],
+            [
+              'any',
+              ['has', 'highway'],
+              ['has', 'railway'],
+              ['==', ['get', 'bridge'], 'yes'],
+              ['==', ['get', 'tunnel'], 'yes']
+            ]
+          ],
           paint: {
-            'line-color': '#CCCCCC', // Force all lines to be this color
+            'line-color': '#CCCCCC', // Light gray roads
             'line-width': [
               'case',
               ['==', ['get', 'highway'], 'motorway'], 4,
@@ -117,12 +165,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ['in', ['get', 'highway'], ['literal', ['tertiary_link', 'residential', 'living_street']]], 1.2,
               ['in', ['get', 'railway'], ['literal', ['rail', 'subway', 'light_rail']]], 2,
               ['==', ['get', 'railway'], 'tram'], 1,
-              // Bridge and tunnel width adjustments
+              // Bridge width adjustments
               ['==', ['get', 'bridge'], 'yes'], ['+', ['case', 
                 ['==', ['get', 'highway'], 'motorway'], 4,
                 ['in', ['get', 'highway'], ['literal', ['trunk', 'primary']]], 2.5,
                 1.2
               ], 0.5],
+              // Tunnel width adjustments
               ['==', ['get', 'tunnel'], 'yes'], ['-', ['case',
                 ['==', ['get', 'highway'], 'motorway'], 4,
                 ['in', ['get', 'highway'], ['literal', ['trunk', 'primary']]], 2.5,
@@ -132,7 +181,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             ],
             'line-opacity': [
               'case',
-              ['==', ['get', 'tunnel'], 'yes'], 0.7, // Make tunnels slightly transparent
+              ['==', ['get', 'tunnel'], 'yes'], 0.7,
               1
             ]
           }
@@ -323,38 +372,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const [lng, lat] = cluster.geometry.coordinates;
       
       if (cluster.properties.cluster) {
-        // Create cluster marker (commented out but can be enabled)
-        // const el = document.createElement('div');
-        // el.className = 'cluster-marker';
-        // el.style.cssText = `
-        //   background: hsl(var(--primary));
-        //   border: 2px solid hsl(var(--primary-foreground));
-        //   border-radius: 50%;
-        //   width: 40px;
-        //   height: 40px;
-        //   display: flex;
-        //   align-items: center;
-        //   justify-content: center;
-        //   color: hsl(var(--primary-foreground));
-        //   font-weight: bold;
-        //   font-size: 12px;
-        //   cursor: pointer;
-        // `;
-        // el.textContent = cluster.properties.point_count_abbreviated;
-        
-        // const marker = new maplibregl.Marker({ element: el })
-        //   .setLngLat([lng, lat])
-        //   .addTo(map);
 
-        // el.addEventListener('click', () => {
-        //   const expansionZoom = clusterRef.current?.getClusterExpansionZoom(cluster.properties.cluster_id);
-        //   map.easeTo({
-        //     center: [lng, lat],
-        //     zoom: expansionZoom || currentZoom + 2
-        //   });
-        // });
-
-        // newMarkers.push(marker);
       } else {
         // Create individual business marker
         const el = document.createElement('div');
