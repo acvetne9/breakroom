@@ -132,12 +132,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         },
         {
-          id: 'nyc-line',
+          id: 'nyc-line-all',
           type: 'line' as const,
           source: 'nyc-data',
-          filter: ['==', '$type', 'LineString'], // Start with just LineString
+          // NO FILTER - will attempt to render all geometries as lines
           paint: {
-            'line-color': '#CCCCCC', // Gray
+            'line-color': '#CCCCCC',
             'line-width': 2,
             'line-opacity': 1
           }
