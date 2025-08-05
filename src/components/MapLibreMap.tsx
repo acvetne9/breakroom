@@ -76,86 +76,37 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         }
       },
       layers: [
-        // Base OSM layer - but only show water and land, not roads
         {
           id: 'osm-tiles',
           type: 'raster' as const,
           source: 'osm',
           minzoom: 0,
-          maxzoom: 19,
-          paint: {
-            'raster-opacity': 0.3 // Make OSM more subtle as background
-          }
+          maxzoom: 19
         },
-        // Water areas from NYC data
         {
-          id: 'nyc-water',
+          id: 'nyc-fill',
           type: 'fill' as const,
           source: 'nyc-data',
-          filter: [
-            'all',
-            ['==', '$type', 'Polygon'],
-            ['==', ['get', 'natural'], 'water']
-          ],
+          filter: ['==', '$type', 'Polygon'],
           paint: {
-            'fill-color': '#04AEF6',
+            'fill-color': [
+              'case',
+              ['==', ['get', 'natural'], 'water'], '#04AEF6',
+              ['==', ['get', 'leisure'], 'park'], '#8BCE64',
+              ['==', ['get', 'landuse'], 'forest'], '#8BCE64',
+              ['==', ['get', 'landuse'], 'grass'], '#8BCE64',
+              'rgba(0,0,0,0)'
+            ],
             'fill-opacity': 0.8
           }
         },
-        // Parks and green spaces
         {
-          id: 'nyc-parks',
-          type: 'fill' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['==', '$type', 'Polygon'],
-            [
-              'any',
-              ['==', ['get', 'leisure'], 'park'],
-              ['==', ['get', 'landuse'], 'forest'],
-              ['==', ['get', 'landuse'], 'grass']
-            ]
-          ],
-          paint: {
-            'fill-color': '#8BCE64',
-            'fill-opacity': 0.8
-          }
-        },
-        // Roads and transportation infrastructure - this layer will override OSM roads
-        {
-          id: 'nyc-roads',
+          id: 'nyc-line',
           type: 'line' as const,
           source: 'nyc-data',
-          filter: [
-            'all',
-            ['==', '$type', 'LineString'],
-            [
-              'any',
-              // All highway types
-              ['in', ['get', 'highway'], ['literal', [
-                'motorway', 'motorway_link',
-                'trunk', 'trunk_link', 
-                'primary', 'primary_link',
-                'secondary', 'secondary_link',
-                'tertiary', 'tertiary_link',
-                'residential', 'living_street',
-                'service', 'unclassified',
-                'road', 'track', 'path',
-                'footway', 'cycleway', 'bridleway',
-                'steps', 'pedestrian'
-              ]]],
-              // Bridge structures
-              ['==', ['get', 'man_made'], 'bridge'],
-              ['==', ['get', 'bridge'], 'yes'],
-              // Tunnel structures  
-              ['==', ['get', 'tunnel'], 'yes'],
-              // Railway lines
-              ['in', ['get', 'railway'], ['literal', ['rail', 'subway', 'light_rail', 'tram']]]
-            ]
-          ],
+          filter: ['==', '$type', 'LineString'],
           paint: {
-            'line-color': '#CCCCCC', // All roads, bridges, tunnels will be this color
+            'line-color': '#CCCCCC', // Force all lines to be this color
             'line-width': [
               'case',
               ['==', ['get', 'highway'], 'motorway'], 4,
@@ -166,13 +117,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ['in', ['get', 'highway'], ['literal', ['tertiary_link', 'residential', 'living_street']]], 1.2,
               ['in', ['get', 'railway'], ['literal', ['rail', 'subway', 'light_rail']]], 2,
               ['==', ['get', 'railway'], 'tram'], 1,
-              // Bridge width adjustments
+              // Bridge and tunnel width adjustments
               ['==', ['get', 'bridge'], 'yes'], ['+', ['case', 
                 ['==', ['get', 'highway'], 'motorway'], 4,
                 ['in', ['get', 'highway'], ['literal', ['trunk', 'primary']]], 2.5,
                 1.2
               ], 0.5],
-              // Tunnel width adjustments
               ['==', ['get', 'tunnel'], 'yes'], ['-', ['case',
                 ['==', ['get', 'highway'], 'motorway'], 4,
                 ['in', ['get', 'highway'], ['literal', ['trunk', 'primary']]], 2.5,
@@ -187,24 +137,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             ]
           }
         },
-        // Coastlines and water boundaries
         {
-          id: 'nyc-coastline',
-          type: 'line' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['==', '$type', 'LineString'],
-            ['==', ['get', 'natural'], 'coastline']
-          ],
-          paint: {
-            'line-color': '#04AEF6',
-            'line-width': 1
-          }
-        },
-        // Labels and points of interest
-        {
-          id: 'nyc-labels',
+          id: 'nyc-symbol',
           type: 'symbol' as const,
           source: 'nyc-data',
           filter: ['==', '$type', 'Point'],
