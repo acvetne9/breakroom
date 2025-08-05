@@ -8,12 +8,14 @@ interface MapLibreMapProps {
   businesses?: Array<{
     id: string;
     name: string;
-    position: { lat: number; lng: number };
-    atmosphere: string[];
+    position?: { lat: number; lng: number };
+    lat?: number;
+    lng?: number;
+    atmosphere?: string[];
     salary?: string;
   }>;
   onBusinessClick?: (business: any) => void;
-  selectedBusiness?: { position: { lat: number; lng: number } } | null;
+  selectedBusiness?: { position?: { lat: number; lng: number }; lat?: number; lng?: number } | null;
   supabaseUrl: string;
   supabaseKey: string;
 }
@@ -422,7 +424,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       },
       geometry: {
         type: 'Point' as const,
-        coordinates: [business.position.lng, business.position.lat]
+        coordinates: [business.lng || business.position?.lng || 0, business.lat || business.position?.lat || 0]
       }
     }));
 
@@ -564,10 +566,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Center map on selected business
   useEffect(() => {
-    if (!map || !selectedBusiness?.position) return;
+    if (!map || !selectedBusiness) return;
     
     map.easeTo({
-      center: [selectedBusiness.position.lng, selectedBusiness.position.lat],
+      center: [selectedBusiness.lng || selectedBusiness.position?.lng || 0, selectedBusiness.lat || selectedBusiness.position?.lat || 0],
       zoom: 16
     });
   }, [map, selectedBusiness]);
