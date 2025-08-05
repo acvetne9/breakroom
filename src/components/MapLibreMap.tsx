@@ -19,40 +19,54 @@ interface MapLibreMapProps {
 }
 
 function debugGeoJSONProperties(geojsonData: any) {
-  console.log('=== GeoJSON Debug Info ===');
+  console.log('=== COMPREHENSIVE GeoJSON Debug Info ===');
   
   if (geojsonData?.features) {
-    const polygonFeatures = geojsonData.features.filter((f: any) => 
-      f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'
-    );
+    console.log(`Total features: ${geojsonData.features.length}`);
     
-    const lineFeatures = geojsonData.features.filter((f: any) => 
-      f.geometry.type === 'LineString' || f.geometry.type === 'MultiLineString'
-    );
+    // Group by geometry type
+    const geometryTypes = geojsonData.features.reduce((acc: any, f: any) => {
+      const type = f.geometry.type;
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {});
     
-    console.log(`Found ${polygonFeatures.length} polygon features`);
-    console.log(`Found ${lineFeatures.length} line features`);
+    console.log('Geometry type breakdown:', geometryTypes);
     
-    // Sample polygon features to see their properties
-    polygonFeatures.slice(0, 5).forEach((feature: any, index: number) => {
-      console.log(`Polygon Feature ${index}:`, {
-        type: feature.geometry.type,
-        properties: Object.keys(feature.properties || {}),
-        sampleProps: feature.properties
+    // Sample features by type
+    Object.keys(geometryTypes).forEach(geomType => {
+      const featuresOfType = geojsonData.features.filter((f: any) => f.geometry.type === geomType);
+      console.log(`\n--- ${geomType} Features (${featuresOfType.length} total) ---`);
+      
+      // Show first 3 features of each type
+      featuresOfType.slice(0, 3).forEach((feature: any, index: number) => {
+        console.log(`${geomType} Feature ${index}:`, {
+          properties: feature.properties,
+          propertyKeys: Object.keys(feature.properties || {}),
+          hasCoordinates: !!feature.geometry.coordinates,
+          coordinateLength: Array.isArray(feature.geometry.coordinates) ? feature.geometry.coordinates.length : 0
+        });
+      });
+      
+      // Get all unique property keys for this geometry type
+      const allProps = new Set();
+      featuresOfType.forEach((f: any) => {
+        if (f.properties) {
+          Object.keys(f.properties).forEach(key => allProps.add(key));
+        }
+      });
+      console.log(`All property keys for ${geomType}:`, Array.from(allProps));
+      
+      // Check for specific property values
+      ['natural', 'leisure', 'landuse', 'highway', 'waterway', 'building', 'amenity'].forEach(prop => {
+        const withProp = featuresOfType.filter((f: any) => f.properties?.[prop]);
+        if (withProp.length > 0) {
+          const uniqueValues = [...new Set(withProp.map((f: any) => f.properties[prop]))];
+          console.log(`  ${geomType} features with '${prop}': ${withProp.length}, values:`, uniqueValues.slice(0, 10));
+        }
       });
     });
     
-    // Check for common properties used in styling
-    const commonProperties = ['natural', 'leisure', 'landuse', 'highway', 'waterway', 'building', 'amenity'];
-    commonProperties.forEach(prop => {
-      const withProp = geojsonData.features.filter((f: any) => f.properties?.[prop]);
-      if (withProp.length > 0) {
-        console.log(`Features with '${prop}' property: ${withProp.length}`);
-        // Show unique values for this property
-        const uniqueValues = [...new Set(withProp.map((f: any) => f.properties[prop]))];
-        console.log(`  Unique values for '${prop}':`, uniqueValues.slice(0, 10));
-      }
-    });
   } else {
     console.log('No features found in GeoJSON data');
   }
@@ -74,7 +88,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   
   const MARKER_VISIBILITY_ZOOM_THRESHOLD = 13;
 
-  // Function to fetch NYC GeoJSON from Supabase - memoized with empty deps to prevent reinitialization
+  // Function to fetch NYC GeoJSON from Supabase
   const fetchNYCGeoJSON = useCallback(async () => {
     try {
       const response = await fetch(`${supabaseUrl}/storage/v1/object/public/nyc-map-storage-files/nyc.geojson`, {
@@ -95,9 +109,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.error('Error fetching NYC GeoJSON from Supabase:', error);
       return null;
     }
-  }, []);
+  }, [supabaseUrl, supabaseKey]);
 
-  // Create a basic style with the GeoJSON data - memoized with empty deps
+  // Create a more aggressive diagnostic style
   const createMapStyle = useCallback((geojsonData: any) => {
     return {
       version: 8 as const,
@@ -124,183 +138,65 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           minzoom: 0,
           maxzoom: 19
         },
-        // Water areas (polygons)
+        // DIAGNOSTIC: Show ALL polygons in bright red (should be very visible)
         {
-          id: 'water-polygons',
+          id: 'all-polygons-diagnostic',
           type: 'fill' as const,
           source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-            ['==', ['get', 'natural'], 'water']
-          ],
+          filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
           paint: {
-            'fill-color': '#4A90E2',
-            'fill-opacity': 0.8
+            'fill-color': '#FF0000', // Bright red - impossible to miss
+            'fill-opacity': 0.7,
+            'fill-outline-color': '#000000'
           }
         },
-        // Parks and green spaces
+        // DIAGNOSTIC: Show ALL lines in bright green
         {
-          id: 'parks-polygons',
-          type: 'fill' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-            ['any',
-              ['==', ['get', 'leisure'], 'park'],
-              ['==', ['get', 'landuse'], 'forest'],
-              ['==', ['get', 'landuse'], 'grass'],
-              ['==', ['get', 'natural'], 'wood']
-            ]
-          ],
-          paint: {
-            'fill-color': '#7CB342',
-            'fill-opacity': 0.7
-          }
-        },
-        // Buildings
-        {
-          id: 'buildings-polygons',
-          type: 'fill' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-            ['has', 'building']
-          ],
-          paint: {
-            'fill-color': '#D4D4D4',
-            'fill-opacity': 0.8,
-            'fill-outline-color': '#AAAAAA'
-          }
-        },
-        // All other polygons with a default style
-        {
-          id: 'other-polygons',
-          type: 'fill' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-            ['!', ['has', 'building']],
-            ['!=', ['get', 'natural'], 'water'],
-            ['!=', ['get', 'leisure'], 'park'],
-            ['!=', ['get', 'landuse'], 'forest'],
-            ['!=', ['get', 'landuse'], 'grass'],
-            ['!=', ['get', 'natural'], 'wood']
-          ],
-          paint: {
-            'fill-color': 'rgba(200,200,200,0.3)',
-            'fill-opacity': 0.5
-          }
-        },
-        // Major roads
-        {
-          id: 'major-roads',
+          id: 'all-lines-diagnostic',
           type: 'line' as const,
           source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-            ['in', ['get', 'highway'], ['literal', ['primary', 'secondary', 'trunk', 'motorway']]]
-          ],
+          filter: ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
           paint: {
-            'line-color': '#FF6B35',
-            'line-width': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              10, 2,
-              15, 4,
-              18, 8
-            ],
+            'line-color': '#00FF00', // Bright green
+            'line-width': 3,
             'line-opacity': 0.8
           }
         },
-        // Minor roads
+        // DIAGNOSTIC: Show ALL points in bright blue
         {
-          id: 'minor-roads',
-          type: 'line' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-            ['in', ['get', 'highway'], ['literal', ['residential', 'tertiary', 'unclassified']]]
-          ],
-          paint: {
-            'line-color': '#FFA726',
-            'line-width': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              12, 1,
-              15, 2,
-              18, 4
-            ],
-            'line-opacity': 0.6
-          }
-        },
-        // All other lines (fallback)
-        {
-          id: 'other-lines',
-          type: 'line' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-            ['!', ['has', 'highway']]
-          ],
-          paint: {
-            'line-color': '#CCCCCC',
-            'line-width': 1,
-            'line-opacity': 0.5
-          }
-        },
-        // Points with labels
-        {
-          id: 'nyc-points',
+          id: 'all-points-diagnostic',
           type: 'circle' as const,
           source: 'nyc-data',
           filter: ['==', ['geometry-type'], 'Point'],
           paint: {
-            'circle-color': '#E91E63',
-            'circle-radius': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              10, 3,
-              15, 6,
-              18, 10
-            ],
+            'circle-color': '#0000FF', // Bright blue
+            'circle-radius': 8,
             'circle-opacity': 0.8,
             'circle-stroke-color': '#FFFFFF',
-            'circle-stroke-width': 1
+            'circle-stroke-width': 2
           }
         },
-        // Point labels
+        // DIAGNOSTIC: Add labels to see what we're actually looking at
         {
-          id: 'nyc-labels',
+          id: 'diagnostic-labels',
           type: 'symbol' as const,
           source: 'nyc-data',
-          filter: ['==', ['geometry-type'], 'Point'],
           layout: {
-            'text-field': ['get', 'name'],
-            'text-font': ['Open Sans Regular'],
-            'text-size': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              10, 10,
-              15, 14,
-              18, 18
+            'text-field': [
+              'case',
+              ['has', 'name'], ['get', 'name'],
+              ['has', 'highway'], ['concat', 'Road: ', ['get', 'highway']],
+              ['has', 'natural'], ['concat', 'Natural: ', ['get', 'natural']],
+              ['has', 'building'], 'Building',
+              ['geometry-type']
             ],
-            'text-anchor': 'top',
-            'text-offset': [0, 1]
+            'text-font': ['Open Sans Regular'],
+            'text-size': 12,
+            'text-anchor': 'center'
           },
           paint: {
-            'text-color': '#333333',
-            'text-halo-color': '#FFFFFF',
+            'text-color': '#FFFFFF',
+            'text-halo-color': '#000000',
             'text-halo-width': 2
           }
         }
@@ -308,13 +204,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, []);
 
-  // Handle zoom change - memoized with empty deps since map is accessed from closure
+  // Handle zoom change
   const handleZoomChange = useCallback(() => {
     if (map) {
       const zoom = map.getZoom();
       setCurrentZoom(zoom);
     }
-  }, []);
+  }, [map]);
 
   // Initialize map with Supabase GeoJSON data
   useEffect(() => {
@@ -326,21 +222,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     const initializeMap = async () => {
       try {
-        // Fetch GeoJSON data from Supabase using current prop values
-        const response = await fetch(`${supabaseUrl}/storage/v1/object/public/nyc-map-storage-files/nyc.geojson`, {
-          headers: {
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        let geojsonData = null;
-        if (response.ok) {
-          geojsonData = await response.json();
-          debugGeoJSONProperties(geojsonData);
-        } else {
-          console.error('Failed to fetch GeoJSON:', response.statusText);
-        }
+        // Fetch GeoJSON data from Supabase
+        const geojsonData = await fetchNYCGeoJSON();
         
         if (isCleanedUp) {
           console.log('MapLibre: Initialization cancelled due to cleanup');
@@ -385,218 +268,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           return;
         }
 
-        // Create map with GeoJSON style
-        const mapStyle = {
-          version: 8 as const,
-          glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
-          sources: {
-            'nyc-data': {
-              type: 'geojson' as const,
-              data: geojsonData
-            },
-            'osm': {
-              type: 'raster' as const,
-              tiles: [
-                'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-              ],
-              tileSize: 256,
-              attribution: '© OpenStreetMap contributors'
-            }
-          },
-          layers: [
-            {
-              id: 'osm-tiles',
-              type: 'raster' as const,
-              source: 'osm',
-              minzoom: 0,
-              maxzoom: 19
-            },
-            // Water areas (polygons)
-            {
-              id: 'water-polygons',
-              type: 'fill' as const,
-              source: 'nyc-data',
-              filter: [
-                'all',
-                ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-                ['==', ['get', 'natural'], 'water']
-              ],
-              paint: {
-                'fill-color': '#4A90E2',
-                'fill-opacity': 0.8
-              }
-            },
-            // Parks and green spaces
-            {
-              id: 'parks-polygons',
-              type: 'fill' as const,
-              source: 'nyc-data',
-              filter: [
-                'all',
-                ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-                ['any',
-                  ['==', ['get', 'leisure'], 'park'],
-                  ['==', ['get', 'landuse'], 'forest'],
-                  ['==', ['get', 'landuse'], 'grass'],
-                  ['==', ['get', 'natural'], 'wood']
-                ]
-              ],
-              paint: {
-                'fill-color': '#7CB342',
-                'fill-opacity': 0.7
-              }
-            },
-            // Buildings
-            {
-              id: 'buildings-polygons',
-              type: 'fill' as const,
-              source: 'nyc-data',
-              filter: [
-                'all',
-                ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-                ['has', 'building']
-              ],
-              paint: {
-                'fill-color': '#D4D4D4',
-                'fill-opacity': 0.8,
-                'fill-outline-color': '#AAAAAA'
-              }
-            },
-            // All other polygons with a default style
-            {
-              id: 'other-polygons',
-              type: 'fill' as const,
-              source: 'nyc-data',
-              filter: [
-                'all',
-                ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-                ['!', ['has', 'building']],
-                ['!=', ['get', 'natural'], 'water'],
-                ['!=', ['get', 'leisure'], 'park'],
-                ['!=', ['get', 'landuse'], 'forest'],
-                ['!=', ['get', 'landuse'], 'grass'],
-                ['!=', ['get', 'natural'], 'wood']
-              ],
-              paint: {
-                'fill-color': 'rgba(200,200,200,0.3)',
-                'fill-opacity': 0.5
-              }
-            },
-            // Major roads
-            {
-              id: 'major-roads',
-              type: 'line' as const,
-              source: 'nyc-data',
-              filter: [
-                'all',
-                ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-                ['in', ['get', 'highway'], ['literal', ['primary', 'secondary', 'trunk', 'motorway']]]
-              ],
-              paint: {
-                'line-color': '#FF6B35',
-                'line-width': [
-                  'interpolate',
-                  ['linear'],
-                  ['zoom'],
-                  10, 2,
-                  15, 4,
-                  18, 8
-                ],
-                'line-opacity': 0.8
-              }
-            },
-            // Minor roads
-            {
-              id: 'minor-roads',
-              type: 'line' as const,
-              source: 'nyc-data',
-              filter: [
-                'all',
-                ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-                ['in', ['get', 'highway'], ['literal', ['residential', 'tertiary', 'unclassified']]]
-              ],
-              paint: {
-                'line-color': '#FFA726',
-                'line-width': [
-                  'interpolate',
-                  ['linear'],
-                  ['zoom'],
-                  12, 1,
-                  15, 2,
-                  18, 4
-                ],
-                'line-opacity': 0.6
-              }
-            },
-            // All other lines (fallback)
-            {
-              id: 'other-lines',
-              type: 'line' as const,
-              source: 'nyc-data',
-              filter: [
-                'all',
-                ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-                ['!', ['has', 'highway']]
-              ],
-              paint: {
-                'line-color': '#CCCCCC',
-                'line-width': 1,
-                'line-opacity': 0.5
-              }
-            },
-            // Points with labels
-            {
-              id: 'nyc-points',
-              type: 'circle' as const,
-              source: 'nyc-data',
-              filter: ['==', ['geometry-type'], 'Point'],
-              paint: {
-                'circle-color': '#E91E63',
-                'circle-radius': [
-                  'interpolate',
-                  ['linear'],
-                  ['zoom'],
-                  10, 3,
-                  15, 6,
-                  18, 10
-                ],
-                'circle-opacity': 0.8,
-                'circle-stroke-color': '#FFFFFF',
-                'circle-stroke-width': 1
-              }
-            },
-            // Point labels
-            {
-              id: 'nyc-labels',
-              type: 'symbol' as const,
-              source: 'nyc-data',
-              filter: ['==', ['geometry-type'], 'Point'],
-              layout: {
-                'text-field': ['get', 'name'],
-                'text-font': ['Open Sans Regular'],
-                'text-size': [
-                  'interpolate',
-                  ['linear'],
-                  ['zoom'],
-                  10, 10,
-                  15, 14,
-                  18, 18
-                ],
-                'text-anchor': 'top',
-                'text-offset': [0, 1]
-              },
-              paint: {
-                'text-color': '#333333',
-                'text-halo-color': '#FFFFFF',
-                'text-halo-width': 2
-              }
-            }
-          ]
-        };
-        
+        // Create map with diagnostic style
         mapInstance = new maplibregl.Map({
           container: mapRef.current!,
-          style: mapStyle as any,
+          style: createMapStyle(geojsonData) as any,
           center: [-73.9712, 40.7831], // NYC center
           zoom: 14,
           maxBounds: [
@@ -614,12 +289,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           
           // Debug: Log what layers are loaded
           const style = mapInstance!.getStyle();
-          console.log('Loaded layers:', style.layers.map(l => l.id));
+          console.log('Loaded layers:', style.layers.map(l => ({ id: l.id, type: l.type })));
           
-          // Debug: Check if source has data
+          // Debug: Check if source has data and count features
           const source = mapInstance!.getSource('nyc-data') as maplibregl.GeoJSONSource;
           if (source) {
             console.log('NYC data source loaded successfully');
+            // Try to query rendered features
+            setTimeout(() => {
+              try {
+                const features = mapInstance!.querySourceFeatures('nyc-data');
+                console.log(`Queried ${features.length} features from source`);
+                if (features.length > 0) {
+                  console.log('Sample queried feature:', features[0]);
+                }
+              } catch (error) {
+                console.warn('Could not query source features:', error);
+              }
+            }, 1000);
           }
           
           if (!isCleanedUp) {
@@ -635,6 +322,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         // Debug: Log style errors
         mapInstance.on('styleimagemissing', (e) => {
           console.warn('MapLibre: Missing style image:', e.id);
+        });
+
+        // Debug: Log when data is loaded
+        mapInstance.on('sourcedata', (e) => {
+          if (e.sourceId === 'nyc-data' && e.isSourceLoaded) {
+            console.log('NYC data source finished loading');
+          }
         });
 
         if (!isCleanedUp) {
@@ -664,7 +358,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       mapInstance = null;
       setMap(null);
     };
-  }, []); // Empty dependency array to prevent re-initialization
+  }, [supabaseUrl, supabaseKey, fetchNYCGeoJSON, createMapStyle, handleZoomChange, onMapLoad]);
 
   // Create marker clustering
   useEffect(() => {
