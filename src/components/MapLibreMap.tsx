@@ -49,7 +49,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
       
       const geojsonData = await response.json();
-      console.log('GeoJSON data loaded:', geojsonData); // Debug log
       return geojsonData;
     } catch (error) {
       console.error('Error fetching NYC GeoJSON from Supabase:', error);
@@ -57,7 +56,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [supabaseUrl, supabaseKey]);
 
-  // Create a basic style with the GeoJSON data and enhanced colors
+  // Create a basic style with the GeoJSON data
   const createMapStyle = useCallback((geojsonData: any) => {
     return {
       version: 8 as const,
@@ -82,184 +81,77 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: 'raster' as const,
           source: 'osm',
           minzoom: 0,
-          maxzoom: 19,
-          paint: {
-            'raster-opacity': 0.7 // Make base tiles more transparent to show colors better
-          }
+          maxzoom: 19
         },
-        // Water areas - more vibrant blue
         {
-          id: 'nyc-water',
+          id: 'nyc-fill',
           type: 'fill' as const,
           source: 'nyc-data',
-          filter: [
-            'any',
-            ['==', ['get', 'natural'], 'water'],
-            ['==', ['get', 'waterway'], 'river'],
-            ['==', ['get', 'waterway'], 'canal'],
-            ['==', ['get', 'landuse'], 'reservoir']
-          ],
+          filter: ['==', '$type', 'Polygon'],
           paint: {
-            'fill-color': '#1E88E5', // Brighter blue
-            'fill-opacity': 0.9
-          }
-        },
-        // Parks and green spaces - vibrant green
-        {
-          id: 'nyc-parks',
-          type: 'fill' as const,
-          source: 'nyc-data',
-          filter: [
-            'any',
-            ['==', ['get', 'leisure'], 'park'],
-            ['==', ['get', 'landuse'], 'forest'],
-            ['==', ['get', 'landuse'], 'grass'],
-            ['==', ['get', 'natural'], 'wood']
-          ],
-          paint: {
-            'fill-color': '#43A047', // Vibrant green
+            'fill-color': [
+              'case',
+              ['==', ['get', 'natural'], 'water'], '#04AEF6',
+              ['==', ['get', 'leisure'], 'park'], '#8BCE64',
+              ['==', ['get', 'landuse'], 'forest'], '#8BCE64',
+              ['==', ['get', 'landuse'], 'grass'], '#8BCE64',
+              'rgba(0,0,0,0)'
+            ],
             'fill-opacity': 0.8
           }
         },
-        // Buildings - light gray with outline
         {
-          id: 'nyc-buildings',
-          type: 'fill' as const,
-          source: 'nyc-data',
-          filter: ['==', ['get', 'building'], 'yes'],
-          paint: {
-            'fill-color': '#E8EAF6', // Light purple-gray
-            'fill-opacity': 0.6,
-            'fill-outline-color': '#9C27B0'
-          }
-        },
-        // Residential areas - warm beige
-        {
-          id: 'nyc-residential',
-          type: 'fill' as const,
-          source: 'nyc-data',
-          filter: [
-            'any',
-            ['==', ['get', 'landuse'], 'residential'],
-            ['==', ['get', 'place'], 'neighbourhood']
-          ],
-          paint: {
-            'fill-color': '#FFF3E0', // Warm beige
-            'fill-opacity': 0.6
-          }
-        },
-        // Commercial areas - light purple
-        {
-          id: 'nyc-commercial',
-          type: 'fill' as const,
-          source: 'nyc-data',
-          filter: [
-            'any',
-            ['==', ['get', 'landuse'], 'commercial'],
-            ['==', ['get', 'landuse'], 'retail']
-          ],
-          paint: {
-            'fill-color': '#F3E5F5', // Light purple
-            'fill-opacity': 0.7
-          }
-        },
-        // Industrial areas - light orange
-        {
-          id: 'nyc-industrial',
-          type: 'fill' as const,
-          source: 'nyc-data',
-          filter: ['==', ['get', 'landuse'], 'industrial'],
-          paint: {
-            'fill-color': '#FFE0B2', // Light orange
-            'fill-opacity': 0.7
-          }
-        },
-        // Roads, tunnels, and bridges - all gray
-        {
-          id: 'nyc-roads',
+          id: 'nyc-line',
           type: 'line' as const,
           source: 'nyc-data',
-          filter: [
-            'any',
-            ['has', 'highway'],
-            ['==', ['get', 'tunnel'], 'yes'],
-            ['==', ['get', 'bridge'], 'yes']
-          ],
+          filter: ['==', '$type', 'LineString'],
           paint: {
-            'line-color': '#CCCCCC', // All roads, tunnels, and bridges are now gray
+            'line-color': '#CCCCCC', // Force all lines to be this color
             'line-width': [
               'case',
-              ['==', ['get', 'highway'], 'motorway'], 6,
-              ['==', ['get', 'highway'], 'trunk'], 4,
-              ['==', ['get', 'highway'], 'primary'], 3,
-              ['==', ['get', 'highway'], 'secondary'], 2.5,
-              ['==', ['get', 'highway'], 'tertiary'], 2,
-              1.5
+              ['==', ['get', 'highway'], 'motorway'], 4,
+              ['in', ['get', 'highway'], ['literal', ['motorway_link', 'trunk']]], 3,
+              ['in', ['get', 'highway'], ['literal', ['trunk_link', 'primary']]], 2.5,
+              ['in', ['get', 'highway'], ['literal', ['primary_link', 'secondary']]], 2,
+              ['in', ['get', 'highway'], ['literal', ['secondary_link', 'tertiary']]], 1.5,
+              ['in', ['get', 'highway'], ['literal', ['tertiary_link', 'residential', 'living_street']]], 1.2,
+              ['in', ['get', 'railway'], ['literal', ['rail', 'subway', 'light_rail']]], 2,
+              ['==', ['get', 'railway'], 'tram'], 1,
+              // Bridge and tunnel width adjustments
+              ['==', ['get', 'bridge'], 'yes'], ['+', ['case', 
+                ['==', ['get', 'highway'], 'motorway'], 4,
+                ['in', ['get', 'highway'], ['literal', ['trunk', 'primary']]], 2.5,
+                1.2
+              ], 0.5],
+              ['==', ['get', 'tunnel'], 'yes'], ['-', ['case',
+                ['==', ['get', 'highway'], 'motorway'], 4,
+                ['in', ['get', 'highway'], ['literal', ['trunk', 'primary']]], 2.5,
+                1.2
+              ], 0.3],
+              1
             ],
-            'line-opacity': 0.8
-          }
-        },
-        // Railways - purple lines
-        {
-          id: 'nyc-railways',
-          type: 'line' as const,
-          source: 'nyc-data',
-          filter: ['has', 'railway'],
-          paint: {
-            'line-color': [
+            'line-opacity': [
               'case',
-              ['==', ['get', 'railway'], 'subway'], '#673AB7', // Deep purple for subway
-              ['==', ['get', 'railway'], 'rail'], '#9C27B0', // Purple for rail
-              '#BA68C8' // Light purple for other railways
-            ],
-            'line-width': [
-              'case',
-              ['==', ['get', 'railway'], 'subway'], 3,
-              ['==', ['get', 'railway'], 'rail'], 2.5,
-              2
-            ],
-            'line-opacity': 0.9
+              ['==', ['get', 'tunnel'], 'yes'], 0.7, // Make tunnels slightly transparent
+              1
+            ]
           }
         },
-        // Borough boundaries - bold lines
         {
-          id: 'nyc-boundaries',
-          type: 'line' as const,
-          source: 'nyc-data',
-          filter: [
-            'any',
-            ['==', ['get', 'admin_level'], '6'],
-            ['==', ['get', 'boundary'], 'administrative']
-          ],
-          paint: {
-            'line-color': '#E91E63', // Pink for boundaries
-            'line-width': 3,
-            'line-opacity': 0.8,
-            'line-dasharray': [2, 2]
-          }
-        },
-        // Labels
-        {
-          id: 'nyc-labels',
+          id: 'nyc-symbol',
           type: 'symbol' as const,
           source: 'nyc-data',
-          filter: ['has', 'name'],
+          filter: ['==', '$type', 'Point'],
           layout: {
             'text-field': ['get', 'name'],
             'text-font': ['Open Sans Regular'],
-            'text-size': [
-              'case',
-              ['==', ['get', 'place'], 'borough'], 16,
-              ['==', ['get', 'place'], 'neighbourhood'], 14,
-              12
-            ],
-            'text-anchor': 'center',
-            'text-offset': [0, 1]
+            'text-size': 12,
+            'text-anchor': 'center'
           },
           paint: {
-            'text-color': '#212121',
-            'text-halo-color': '#FFFFFF',
-            'text-halo-width': 2
+            'text-color': '#333333',
+            'text-halo-color': '#ffffff',
+            'text-halo-width': 1
           }
         }
       ]
@@ -276,7 +168,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Initialize map with Supabase GeoJSON data
   useEffect(() => {
-    if (!mapRef.current || map) return; // Prevent re-initialization if map already exists
+    if (!mapRef.current) return;
     
     console.log('MapLibre: Initializing map...');
     let mapInstance: maplibregl.Map | null = null;
@@ -330,7 +222,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           return;
         }
 
-        // Create map with enhanced GeoJSON style
+        // Create map with GeoJSON style
         mapInstance = new maplibregl.Map({
           container: mapRef.current!,
           style: createMapStyle(geojsonData) as any,
@@ -347,12 +239,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
         // Map load event
         mapInstance.on('load', () => {
-          console.log('MapLibre: Map loaded with enhanced NYC styling');
-          
-          // Debug: Log what layers are loaded
-          const style = mapInstance!.getStyle();
-          console.log('Loaded layers:', style.layers.map(l => l.id));
-          
+          console.log('MapLibre: Map loaded with NYC GeoJSON from Supabase');
           if (!isCleanedUp) {
             onMapLoad?.(mapInstance);
           }
@@ -361,17 +248,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         // Error handling
         mapInstance.on('error', (e) => {
           console.error('MapLibre: Map error:', e);
-        });
-
-        // Debug: Log style loading events
-        mapInstance.on('styledata', () => {
-          console.log('Style data loaded');
-        });
-
-        mapInstance.on('sourcedata', (e) => {
-          if (e.sourceId === 'nyc-data' && e.isSourceLoaded) {
-            console.log('NYC GeoJSON source loaded successfully');
-          }
         });
 
         if (!isCleanedUp) {
@@ -401,9 +277,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       mapInstance = null;
       setMap(null);
     };
-  }, [supabaseUrl, supabaseKey]);
+  }, [supabaseUrl, supabaseKey]); // Only depend on the actual data we need
 
-  // Create marker clustering (unchanged)
+  // Create marker clustering
   useEffect(() => {
     if (!map || !businesses.length) return;
 
@@ -447,42 +323,58 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const [lng, lat] = cluster.geometry.coordinates;
       
       if (cluster.properties.cluster) {
-        // Could add cluster markers here
+        // Create cluster marker (commented out but can be enabled)
+        // const el = document.createElement('div');
+        // el.className = 'cluster-marker';
+        // el.style.cssText = `
+        //   background: hsl(var(--primary));
+        //   border: 2px solid hsl(var(--primary-foreground));
+        //   border-radius: 50%;
+        //   width: 40px;
+        //   height: 40px;
+        //   display: flex;
+        //   align-items: center;
+        //   justify-content: center;
+        //   color: hsl(var(--primary-foreground));
+        //   font-weight: bold;
+        //   font-size: 12px;
+        //   cursor: pointer;
+        // `;
+        // el.textContent = cluster.properties.point_count_abbreviated;
+        
+        // const marker = new maplibregl.Marker({ element: el })
+        //   .setLngLat([lng, lat])
+        //   .addTo(map);
+
+        // el.addEventListener('click', () => {
+        //   const expansionZoom = clusterRef.current?.getClusterExpansionZoom(cluster.properties.cluster_id);
+        //   map.easeTo({
+        //     center: [lng, lat],
+        //     zoom: expansionZoom || currentZoom + 2
+        //   });
+        // });
+
+        // newMarkers.push(marker);
       } else {
-        // Create individual business marker with enhanced styling
+        // Create individual business marker
         const el = document.createElement('div');
         el.className = 'business-marker';
         el.style.cssText = `
-          background: #FF4081;
-          border: 2px solid #E91E63;
+          background: #FFEB3B;
+          border: 1px solid #FFC107;
           border-radius: 50%;
-          width: 16px;
-          height: 16px;
+          width: 12px;
+          height: 12px;
           cursor: pointer;
-          box-shadow: 0 3px 6px rgba(233, 30, 99, 0.4);
-          transition: all 0.2s ease;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         `;
-        
-        // Add hover effect
-        el.addEventListener('mouseenter', () => {
-          el.style.transform = 'scale(1.2)';
-          el.style.boxShadow = '0 4px 8px rgba(233, 30, 99, 0.6)';
-        });
-        
-        el.addEventListener('mouseleave', () => {
-          el.style.transform = 'scale(1)';
-          el.style.boxShadow = '0 3px 6px rgba(233, 30, 99, 0.4)';
-        });
         
         const marker = new maplibregl.Marker({ element: el })
           .setLngLat([lng, lat])
           .addTo(map);
 
         // Add click handler
-        el.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          console.log('Business marker clicked:', cluster.properties.business);
+        el.addEventListener('click', () => {
           onBusinessClick?.(cluster.properties.business);
         });
 
@@ -512,39 +404,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         const [lng, lat] = cluster.geometry.coordinates;
         
         if (cluster.properties.cluster) {
-          // Cluster markers (could be implemented)
+          // Cluster markers (commented out)
         } else {
           const el = document.createElement('div');
           el.className = 'business-marker';
           el.style.cssText = `
-            background: #FF4081;
-            border: 2px solid #E91E63;
+            background: #FFEB3B;
+            border: 1px solid #FFC107;
             border-radius: 50%;
-            width: 16px;
-            height: 16px;
+            width: 12px;
+            height: 12px;
             cursor: pointer;
-            box-shadow: 0 3px 6px rgba(233, 30, 99, 0.4);
-            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
           `;
           
-          el.addEventListener('mouseenter', () => {
-            el.style.transform = 'scale(1.2)';
-            el.style.boxShadow = '0 4px 8px rgba(233, 30, 99, 0.6)';
-          });
-          
-          el.addEventListener('mouseleave', () => {
-            el.style.transform = 'scale(1)';
-            el.style.boxShadow = '0 3px 6px rgba(233, 30, 99, 0.4)';
-          });
-
           const marker = new maplibregl.Marker({ element: el })
             .setLngLat([lng, lat])
             .addTo(map);
 
-          el.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('Business marker clicked (updated):', cluster.properties.business);
+          el.addEventListener('click', () => {
             onBusinessClick?.(cluster.properties.business);
           });
 
