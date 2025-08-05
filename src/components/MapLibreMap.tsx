@@ -8,14 +8,12 @@ interface MapLibreMapProps {
   businesses?: Array<{
     id: string;
     name: string;
-    position?: { lat: number; lng: number };
-    lat?: number;
-    lng?: number;
-    atmosphere?: string[];
+    position: { lat: number; lng: number };
+    atmosphere: string[];
     salary?: string;
   }>;
   onBusinessClick?: (business: any) => void;
-  selectedBusiness?: { position?: { lat: number; lng: number }; lat?: number; lng?: number } | null;
+  selectedBusiness?: { position: { lat: number; lng: number } } | null;
   supabaseUrl: string;
   supabaseKey: string;
 }
@@ -176,22 +174,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'fill-opacity': 0.7
           }
         },
-        // Roads with color coding
+        // Roads, tunnels, and bridges - all gray
         {
           id: 'nyc-roads',
           type: 'line' as const,
           source: 'nyc-data',
-          filter: ['has', 'highway'],
+          filter: [
+            'any',
+            ['has', 'highway'],
+            ['==', ['get', 'tunnel'], 'yes'],
+            ['==', ['get', 'bridge'], 'yes']
+          ],
           paint: {
-            'line-color': [
-              'case',
-              ['==', ['get', 'highway'], 'motorway'], '#FF5722', // Red-orange for highways
-              ['==', ['get', 'highway'], 'trunk'], '#FF9800', // Orange for trunk roads
-              ['==', ['get', 'highway'], 'primary'], '#FFC107', // Amber for primary roads
-              ['==', ['get', 'highway'], 'secondary'], '#FFEB3B', // Yellow for secondary
-              ['==', ['get', 'highway'], 'tertiary'], '#CDDC39', // Light green for tertiary
-              '#E0E0E0' // Light gray for other roads
-            ],
+            'line-color': '#CCCCCC', // All roads, tunnels, and bridges are now gray
             'line-width': [
               'case',
               ['==', ['get', 'highway'], 'motorway'], 6,
@@ -424,7 +419,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       },
       geometry: {
         type: 'Point' as const,
-        coordinates: [business.lng || business.position?.lng || 0, business.lat || business.position?.lat || 0]
+        coordinates: [business.position.lng, business.position.lat]
       }
     }));
 
@@ -566,10 +561,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Center map on selected business
   useEffect(() => {
-    if (!map || !selectedBusiness) return;
+    if (!map || !selectedBusiness?.position) return;
     
     map.easeTo({
-      center: [selectedBusiness.lng || selectedBusiness.position?.lng || 0, selectedBusiness.lat || selectedBusiness.position?.lat || 0],
+      center: [selectedBusiness.position.lng, selectedBusiness.position.lat],
       zoom: 16
     });
   }, [map, selectedBusiness]);
