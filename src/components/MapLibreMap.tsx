@@ -111,7 +111,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [supabaseUrl, supabaseKey]);
 
-  // Create proper NYC map style
+  // Create a more aggressive diagnostic style
   const createMapStyle = useCallback((geojsonData: any) => {
     return {
       version: 8 as const,
@@ -138,231 +138,66 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           minzoom: 0,
           maxzoom: 19
         },
-        // Water areas (polygons) - Blue
+        // DIAGNOSTIC: Show ALL polygons in bright red (should be very visible)
         {
-          id: 'water-polygons',
+          id: 'all-polygons-diagnostic',
           type: 'fill' as const,
           source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-            ['any',
-              ['==', ['get', 'natural'], 'water'],
-              ['==', ['get', 'waterway'], 'riverbank'],
-              ['==', ['get', 'landuse'], 'reservoir']
-            ]
-          ],
+          filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
           paint: {
-            'fill-color': '#4A90E2',
-            'fill-opacity': 0.8
+            'fill-color': '#FF0000', // Bright red - impossible to miss
+            'fill-opacity': 0.7,
+            'fill-outline-color': '#000000'
           }
         },
-        // Parks and green spaces - Green
+        // DIAGNOSTIC: Show ALL lines in bright green
         {
-          id: 'parks-polygons',
-          type: 'fill' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-            ['any',
-              ['==', ['get', 'leisure'], 'park'],
-              ['==', ['get', 'landuse'], 'forest'],
-              ['==', ['get', 'landuse'], 'grass'],
-              ['==', ['get', 'natural'], 'wood'],
-              ['==', ['get', 'leisure'], 'recreation_ground'],
-              ['==', ['get', 'leisure'], 'garden']
-            ]
-          ],
-          paint: {
-            'fill-color': '#7CB342',
-            'fill-opacity': 0.7
-          }
-        },
-        // Buildings - Light gray
-        {
-          id: 'buildings-polygons',
-          type: 'fill' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-            ['any',
-              ['has', 'building'],
-              ['==', ['get', 'landuse'], 'residential'],
-              ['==', ['get', 'landuse'], 'commercial'],
-              ['==', ['get', 'landuse'], 'industrial']
-            ]
-          ],
-          paint: {
-            'fill-color': '#E0E0E0',
-            'fill-opacity': 0.6,
-            'fill-outline-color': '#CCCCCC'
-          }
-        },
-        // All other polygons - Very light gray
-        {
-          id: 'other-polygons',
-          type: 'fill' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-            ['!', ['has', 'building']],
-            ['!=', ['get', 'natural'], 'water'],
-            ['!=', ['get', 'waterway'], 'riverbank'],
-            ['!=', ['get', 'landuse'], 'reservoir'],
-            ['!=', ['get', 'leisure'], 'park'],
-            ['!=', ['get', 'landuse'], 'forest'],
-            ['!=', ['get', 'landuse'], 'grass'],
-            ['!=', ['get', 'natural'], 'wood'],
-            ['!=', ['get', 'leisure'], 'recreation_ground'],
-            ['!=', ['get', 'leisure'], 'garden'],
-            ['!=', ['get', 'landuse'], 'residential'],
-            ['!=', ['get', 'landuse'], 'commercial'],
-            ['!=', ['get', 'landuse'], 'industrial']
-          ],
-          paint: {
-            'fill-color': 'rgba(240,240,240,0.4)',
-            'fill-opacity': 0.3
-          }
-        },
-        // ALL ROADS, TUNNELS, BRIDGES - SAME GRAY COLOR
-        {
-          id: 'all-roads-gray',
+          id: 'all-lines-diagnostic',
           type: 'line' as const,
           source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-            ['any',
-              ['has', 'highway'],
-              ['==', ['get', 'man_made'], 'bridge'],
-              ['==', ['get', 'tunnel'], 'yes'],
-              ['==', ['get', 'bridge'], 'yes'],
-              ['has', 'road'],
-              ['has', 'street']
-            ]
-          ],
+          filter: ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
           paint: {
-            'line-color': '#888888', // Same gray for all roads/bridges/tunnels
-            'line-width': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              10, 1,
-              14, 2,
-              16, 3,
-              18, 5
-            ],
+            'line-color': '#00FF00', // Bright green
+            'line-width': 3,
             'line-opacity': 0.8
           }
         },
-        // Water lines (rivers, streams) - Blue
+        // DIAGNOSTIC: Show ALL points in bright blue
         {
-          id: 'water-lines',
-          type: 'line' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-            ['any',
-              ['==', ['get', 'waterway'], 'river'],
-              ['==', ['get', 'waterway'], 'stream'],
-              ['==', ['get', 'waterway'], 'canal'],
-              ['==', ['get', 'natural'], 'water']
-            ]
-          ],
-          paint: {
-            'line-color': '#4A90E2',
-            'line-width': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              10, 2,
-              14, 3,
-              16, 4,
-              18, 6
-            ],
-            'line-opacity': 0.8
-          }
-        },
-        // All other lines - Light gray
-        {
-          id: 'other-lines',
-          type: 'line' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-            ['!', ['has', 'highway']],
-            ['!=', ['get', 'man_made'], 'bridge'],
-            ['!=', ['get', 'tunnel'], 'yes'],
-            ['!=', ['get', 'bridge'], 'yes'],
-            ['!', ['has', 'road']],
-            ['!', ['has', 'street']],
-            ['!=', ['get', 'waterway'], 'river'],
-            ['!=', ['get', 'waterway'], 'stream'],
-            ['!=', ['get', 'waterway'], 'canal'],
-            ['!=', ['get', 'natural'], 'water']
-          ],
-          paint: {
-            'line-color': '#CCCCCC',
-            'line-width': 1,
-            'line-opacity': 0.5
-          }
-        },
-        // Points - Small circles
-        {
-          id: 'nyc-points',
+          id: 'all-points-diagnostic',
           type: 'circle' as const,
           source: 'nyc-data',
           filter: ['==', ['geometry-type'], 'Point'],
           paint: {
-            'circle-color': '#E91E63',
-            'circle-radius': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              10, 2,
-              14, 4,
-              16, 6,
-              18, 8
-            ],
-            'circle-opacity': 0.7,
+            'circle-color': '#0000FF', // Bright blue
+            'circle-radius': 8,
+            'circle-opacity': 0.8,
             'circle-stroke-color': '#FFFFFF',
-            'circle-stroke-width': 1
+            'circle-stroke-width': 2
           }
         },
-        // Point labels
+        // DIAGNOSTIC: Add labels to see what we're actually looking at
         {
-          id: 'nyc-labels',
+          id: 'diagnostic-labels',
           type: 'symbol' as const,
           source: 'nyc-data',
-          filter: [
-            'all',
-            ['==', ['geometry-type'], 'Point'],
-            ['has', 'name']
-          ],
           layout: {
-            'text-field': ['get', 'name'],
-            'text-font': ['Open Sans Regular'],
-            'text-size': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              10, 8,
-              14, 12,
-              16, 14,
-              18, 16
+            'text-field': [
+              'case',
+              ['has', 'name'], ['get', 'name'],
+              ['has', 'highway'], ['concat', 'Road: ', ['get', 'highway']],
+              ['has', 'natural'], ['concat', 'Natural: ', ['get', 'natural']],
+              ['has', 'building'], 'Building',
+              ['geometry-type']
             ],
-            'text-anchor': 'top',
-            'text-offset': [0, 1.2]
+            'text-font': ['Open Sans Regular'],
+            'text-size': 12,
+            'text-anchor': 'center'
           },
           paint: {
-            'text-color': '#333333',
-            'text-halo-color': '#FFFFFF',
-            'text-halo-width': 1.5
+            'text-color': '#FFFFFF',
+            'text-halo-color': '#000000',
+            'text-halo-width': 2
           }
         }
       ]
