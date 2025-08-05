@@ -523,7 +523,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       mapInstance = null;
       setMap(null);
     };
-  }, [supabaseUrl, supabaseKey, fetchNYCGeoJSON, createMapStyle, handleZoomChange, onMapLoad]);
+  }, [supabaseUrl, supabaseKey]);
 
   // Create marker clustering
   useEffect(() => {
