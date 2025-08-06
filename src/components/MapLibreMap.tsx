@@ -135,19 +135,21 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: 'raster' as const,
           source: 'osm'
         },
-        // Show ALL lines - we'll see what we get
+        // Show ALL lines in GRAY - roads, bridges, tunnels, everything
         {
-          id: 'all-lines-first',
+          id: 'all-lines-gray',
           type: 'line' as const,
           source: 'nyc-data',
           filter: ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
           paint: {
-            'line-color': [
+            'line-color': '#808080', // Gray for ALL lines
+            'line-width': [
               'case',
-              ['has', 'highway'], '#808080', // Gray for highways
-              '#FF00FF' // Magenta for everything else
+              // Make highways a bit thicker
+              ['has', 'highway'], 3,
+              // Default width for all other lines
+              2
             ],
-            'line-width': 2,
             'line-opacity': 0.8
           }
         },
