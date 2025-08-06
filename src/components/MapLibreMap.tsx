@@ -135,22 +135,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: 'raster' as const,
           source: 'osm'
         },
-
-        {
-          id: 'gray-roads',
-          type: 'line' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-            ['has', 'highway']
-          ],
-          paint: {
-            'line-color': '#808080',
-            'line-width': 2,
-            'line-opacity': 1.0
-          }
-        },
         {
           id: 'all-roads-gray',
           type: 'line' as const,
