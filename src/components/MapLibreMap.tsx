@@ -139,17 +139,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           maxzoom: 19
         },
         // NYC area in red (polygons)
-        // {
-        //   id: 'nyc-area',
-        //   type: 'fill' as const,
-        //   source: 'nyc-data',
-        //   filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-        //   paint: {
-        //     'fill-color': '#FF0000',
-        //     'fill-opacity': 0.7,
-        //     'fill-outline-color': '#000000'
-        //   }
-        // },
+        {
+          id: 'nyc-area',
+          type: 'fill' as const,
+          source: 'nyc-data',
+          filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+          paint: {
+            'fill-color': '#FF0000',
+            'fill-opacity': 0.0,
+            'fill-outline-color': '#000000'
+          }
+        },
         // ALL transportation infrastructure in gray
         {
           id: 'transportation-lines',
