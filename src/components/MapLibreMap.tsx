@@ -144,9 +144,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           paint: {
             'line-color': [
               'case',
-              ['has', 'highway'], '#808080', // Gray for highways
-              ['has', 'tunnel'], '#808080', // Gray for highways
-              '#FF00FF' // Magenta for everything else
+              ['any',
+                ['has', 'highway'],
+                ['has', 'tunnel'],
+                ['has', 'bridge'],
+                ['has', 'road'],
+                ['has', 'surface'],
+                ['has', 'junction'],
+                ['has', 'lanes'],
+                ['has', 'tracktype'],
+                ['has', 'service'],
+                ['has', 'access']
+              ],
+              '#808080', // Gray for anything road-like
+              '#00000000' // Transparent for everything else
             ],
             'line-width': 2,
             'line-opacity': 0.8
@@ -166,6 +177,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               "#00000000"
             ],
             'fill-opacity': 0.0
+          }
+        },
+        // Points
+        {
+          id: 'points',
+          type: 'circle' as const,
+          source: 'nyc-data',
+          filter: ['==', ['geometry-type'], 'Point'],
+          paint: {
+            'circle-color': '#0000FF',
+            'circle-radius': 4
           }
         }
       ]
