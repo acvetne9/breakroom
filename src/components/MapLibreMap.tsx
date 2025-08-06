@@ -144,7 +144,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
             ['!', ['has', 'railway']],
             ['!', ['has', 'footway']],
-          ]
+          ],
           paint: {
             'line-color': '#808080',
             'line-width': 2,
