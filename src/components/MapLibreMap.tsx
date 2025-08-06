@@ -139,7 +139,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           id: 'all-roads-gray',
           type: 'line' as const,
           source: 'nyc-data',
-          filter: ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+          filter: [
+            'all',
+            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+            ['!', ['has', 'railway']],
+            ['!', ['has', 'footway']],
+          ]
           paint: {
             'line-color': '#808080',
             'line-width': 2,
