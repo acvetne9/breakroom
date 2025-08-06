@@ -152,34 +152,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         },
         {
-          id: 'gray-tunnels',
+          id: 'all-roads-gray',
           type: 'line' as const,
           source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-            ['has', 'tunnel']
-          ],
+          filter: ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
           paint: {
             'line-color': '#808080',
             'line-width': 2,
-            'line-dasharray': [2, 2],
-            'line-opacity': 0.8
-          }
-        },
-        {
-          id: 'gray-bridges',
-          type: 'line' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-            ['has', 'bridge']
-          ],
-          paint: {
-            'line-color': '#808080',
-            'line-width': 2,
-            'line-opacity': 0.9
+            'line-opacity': 1.0
           }
         },
         // Show some polygons (not all red)
