@@ -223,7 +223,7 @@ const HomePage: React.FC<HomePageProps> = ({
         <BusinessDetails 
           business={selectedBusiness}
           posts={posts}
-          onClose={handleBackToPreview}
+          onClose={handleClosePreview}
           onStoriesClick={() => onBusinessStoriesClick?.(selectedBusiness.id)}
           onPostClick={onPostClick}
           onRoleVote={onRoleVote}
