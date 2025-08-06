@@ -163,7 +163,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ['has', 'natural'], '#228B22', // Green for natural
               ['has', 'building'], '#4169E1', // Blue for buildings
               ['has', 'landuse'], '#32CD32', // Light green for landuse
-              '#FF000040' // Semi-transparent red for others
             ],
             'fill-opacity': 0.5
           }
