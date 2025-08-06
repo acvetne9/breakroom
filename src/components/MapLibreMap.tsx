@@ -178,7 +178,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'line-width': 2,
             'line-opacity': 1.0
           }
-        }
+        },
         // Show some polygons (not all red)
         {
           id: 'some-polygons',
