@@ -144,23 +144,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           paint: {
             'line-color': [
               'case',
-              ['any',
+              ['all',
                 ['has', 'highway'],
-                ['has', 'tunnel'],
-                ['has', 'bridge'],
-                ['has', 'road'],
-                ['has', 'surface'],
-                ['has', 'junction'],
-                ['has', 'lanes'],
-                ['has', 'tracktype'],
-                ['has', 'service'],
-                ['has', 'access']
+                ['in', ['get', 'highway'],
+                  'motorway', 'motorway_link',
+                  'trunk', 'trunk_link',
+                  'primary', 'primary_link',
+                  'secondary', 'secondary_link',
+                  'tertiary', 'tertiary_link',
+                  'unclassified', 'residential',
+                  'living_street', 'service',
+                  'road', 'track', 'construction',
+                  'raceway', 'busway', 'bus_guideway',
+                  'escape', 'rest_area', 'services', 'parking_aisle'
+                ]
               ],
-              '#808080', // Gray for anything road-like
+              '#808080', // Gray for drivable roads
               '#00000000' // Transparent for everything else
             ],
-            'line-width': 2,
-            'line-opacity': 0.8
           }
         },
         // Show some polygons (not all red)
