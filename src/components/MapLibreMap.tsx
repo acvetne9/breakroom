@@ -111,11 +111,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [supabaseUrl, supabaseKey]);
 
-  // Create a simpler diagnostic style with gray roads
+  // Super simple diagnostic style - show everything first
   const createMapStyle = useCallback((geojsonData: any) => {
     return {
       version: 8 as const,
-      glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
       sources: {
         'nyc-data': {
           type: 'geojson' as const,
@@ -134,117 +133,50 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         {
           id: 'osm-tiles',
           type: 'raster' as const,
-          source: 'osm',
-          minzoom: 0,
-          maxzoom: 19
+          source: 'osm'
         },
-        // All polygons in red (keeping your NYC area red)
+        // Show ALL lines - we'll see what we get
         {
-          id: 'all-polygons',
-          type: 'fill' as const,
-          source: 'nyc-data',
-          filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-          paint: {
-            'fill-color': '#FF0000', // Red
-            'fill-opacity': 0.7,
-            'fill-outline-color': '#000000'
-          }
-        },
-        // Roads, bridges, tunnels in GRAY
-        {
-          id: 'roads-gray',
+          id: 'all-lines-first',
           type: 'line' as const,
           source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-            ['has', 'highway'] // Start simple - just roads with highway tag
-          ],
+          filter: ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
           paint: {
-            'line-color': '#808080', // Gray
-            'line-width': 3,
-            'line-opacity': 0.9
-          }
-        },
-        // Bridges in GRAY (if they exist as separate features)
-        {
-          id: 'bridges-gray',
-          type: 'line' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-            ['has', 'bridge']
-          ],
-          paint: {
-            'line-color': '#808080', // Gray
-            'line-width': 4,
-            'line-opacity': 0.9
-          }
-        },
-        // Tunnels in GRAY (if they exist as separate features)
-        {
-          id: 'tunnels-gray',
-          type: 'line' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-            ['has', 'tunnel']
-          ],
-          paint: {
-            'line-color': '#808080', // Gray
-            'line-width': 4,
-            'line-opacity': 0.9
-          }
-        },
-        // Railways in GRAY
-        {
-          id: 'railways-gray',
-          type: 'line' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-            ['has', 'railway']
-          ],
-          paint: {
-            'line-color': '#808080', // Gray
-            'line-width': 3,
-            'line-opacity': 0.9
-          }
-        },
-        // All OTHER lines in green (for debugging what's not transportation)
-        {
-          id: 'other-lines-green',
-          type: 'line' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-            ['!', ['has', 'highway']],
-            ['!', ['has', 'bridge']],
-            ['!', ['has', 'tunnel']],
-            ['!', ['has', 'railway']]
-          ],
-          paint: {
-            'line-color': '#00FF00', // Green for debugging
+            'line-color': [
+              'case',
+              ['has', 'highway'], '#808080', // Gray for highways
+              '#FF00FF' // Magenta for everything else
+            ],
             'line-width': 2,
             'line-opacity': 0.8
           }
         },
-        // Points in blue
+        // Show some polygons (not all red)
         {
-          id: 'all-points',
+          id: 'some-polygons',
+          type: 'fill' as const,
+          source: 'nyc-data',
+          filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+          paint: {
+            'fill-color': [
+              'case',
+              ['has', 'natural'], '#228B22', // Green for natural
+              ['has', 'building'], '#4169E1', // Blue for buildings
+              ['has', 'landuse'], '#32CD32', // Light green for landuse
+              '#FF000040' // Semi-transparent red for others
+            ],
+            'fill-opacity': 0.5
+          }
+        },
+        // Points
+        {
+          id: 'points',
           type: 'circle' as const,
           source: 'nyc-data',
           filter: ['==', ['geometry-type'], 'Point'],
           paint: {
             'circle-color': '#0000FF',
-            'circle-radius': 6,
-            'circle-opacity': 0.8,
-            'circle-stroke-color': '#FFFFFF',
-            'circle-stroke-width': 1
+            'circle-radius': 4
           }
         }
       ]
