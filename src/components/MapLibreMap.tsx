@@ -197,17 +197,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             ],
             'fill-opacity': 0.0
           }
-        },
-        // Points
-        {
-          id: 'points',
-          type: 'circle' as const,
-          source: 'nyc-data',
-          filter: ['==', ['geometry-type'], 'Point'],
-          paint: {
-            'circle-color': '#0000FF',
-            'circle-radius': 4
-          }
         }
       ]
     };
