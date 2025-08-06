@@ -147,6 +147,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         },
         {
+          id: 'gray-road-polygons',
+          type: 'fill' as const,
+          source: 'nyc-data',
+          filter: [
+            'all',
+            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+            ['has', 'highway']
+          ],
+          paint: {
+            'fill-color': '#808080',
+            'fill-opacity': 1.0
+          }
+        },
+        {
           id: 'some-polygons',
           type: 'fill' as const,
           source: 'nyc-data',
