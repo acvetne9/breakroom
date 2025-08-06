@@ -58,7 +58,7 @@ function debugGeoJSONProperties(geojsonData: any) {
       console.log(`All property keys for ${geomType}:`, Array.from(allProps));
       
       // Check for specific property values
-      ['natural', 'leisure', 'landuse', 'highway', 'waterway', 'building', 'amenity'].forEach(prop => {
+      ['natural', 'leisure', 'landuse', 'highway', 'waterway', 'building', 'amenity', 'bridge', 'tunnel', 'man_made'].forEach(prop => {
         const withProp = featuresOfType.filter((f: any) => f.properties?.[prop]);
         if (withProp.length > 0) {
           const uniqueValues = [...new Set(withProp.map((f: any) => f.properties[prop]))];
@@ -111,7 +111,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [supabaseUrl, supabaseKey]);
 
-  // Create a more aggressive diagnostic style
+  // Create map style with gray roads/bridges/tunnels
   const createMapStyle = useCallback((geojsonData: any) => {
     return {
       version: 8 as const,
@@ -138,66 +138,202 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           minzoom: 0,
           maxzoom: 19
         },
-        // DIAGNOSTIC: Show ALL polygons in bright red (should be very visible)
+        // NYC area in red (polygons)
         {
-          id: 'all-polygons-diagnostic',
+          id: 'nyc-area',
           type: 'fill' as const,
           source: 'nyc-data',
           filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
           paint: {
-            'fill-color': '#FF0000', // Bright red - impossible to miss
+            'fill-color': '#FF0000',
             'fill-opacity': 0.7,
             'fill-outline-color': '#000000'
           }
         },
-        // DIAGNOSTIC: Show ALL lines in bright green
+        // ALL transportation infrastructure in gray
         {
-          id: 'all-lines-diagnostic',
+          id: 'transportation-lines',
           type: 'line' as const,
           source: 'nyc-data',
-          filter: ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+          filter: [
+            'any',
+            // Roads and highways
+            ['has', 'highway'],
+            // Bridges
+            ['==', ['get', 'bridge'], 'yes'],
+            ['has', 'bridge'],
+            // Tunnels  
+            ['==', ['get', 'tunnel'], 'yes'],
+            ['has', 'tunnel'],
+            // Railway/subway
+            ['has', 'railway'],
+            // Man-made transportation structures
+            ['in', ['get', 'man_made'], ['literal', ['bridge', 'tunnel']]],
+            // Any line that might be transportation
+            [
+              'all',
+              ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+              [
+                'any',
+                ['has', 'highway'],
+                ['has', 'bridge'],
+                ['has', 'tunnel'],
+                ['has', 'railway']
+              ]
+            ]
+          ],
           paint: {
-            'line-color': '#00FF00', // Bright green
-            'line-width': 3,
+            'line-color': '#808080', // Gray color
+            'line-width': [
+              'case',
+              // Highways and major roads - thicker
+              ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk', 'primary', 'motorway_link', 'trunk_link', 'primary_link']]], 4,
+              // Secondary roads
+              ['in', ['get', 'highway'], ['literal', ['secondary', 'tertiary', 'secondary_link', 'tertiary_link']]], 3,
+              // Residential and smaller roads
+              ['in', ['get', 'highway'], ['literal', ['residential', 'unclassified', 'service', 'living_street']]], 2,
+              // Railways
+              ['has', 'railway'], 3,
+              // Bridges and tunnels - slightly thicker
+              [
+                'any',
+                ['==', ['get', 'bridge'], 'yes'],
+                ['==', ['get', 'tunnel'], 'yes'],
+                ['has', 'bridge'],
+                ['has', 'tunnel']
+              ], 3,
+              // Default
+              2
+            ],
+            'line-opacity': 0.9
+          }
+        },
+        // Transportation polygons (like bridge decks, tunnel entrances) in gray
+        {
+          id: 'transportation-polygons',
+          type: 'fill' as const,
+          source: 'nyc-data',
+          filter: [
+            'all',
+            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+            [
+              'any',
+              ['has', 'highway'],
+              ['==', ['get', 'bridge'], 'yes'],
+              ['==', ['get', 'tunnel'], 'yes'],
+              ['has', 'bridge'],
+              ['has', 'tunnel'],
+              ['has', 'railway'],
+              ['in', ['get', 'man_made'], ['literal', ['bridge', 'tunnel']]]
+            ]
+          ],
+          paint: {
+            'fill-color': '#808080', // Same gray as lines
+            'fill-opacity': 0.8,
+            'fill-outline-color': '#606060' // Slightly darker gray for outline
+          }
+        },
+        // Non-transportation features in their diagnostic colors
+        {
+          id: 'other-polygons',
+          type: 'fill' as const,
+          source: 'nyc-data',
+          filter: [
+            'all',
+            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+            [
+              'none',
+              ['has', 'highway'],
+              ['==', ['get', 'bridge'], 'yes'],
+              ['==', ['get', 'tunnel'], 'yes'],
+              ['has', 'bridge'],
+              ['has', 'tunnel'],
+              ['has', 'railway'],
+              ['in', ['get', 'man_made'], ['literal', ['bridge', 'tunnel']]]
+            ]
+          ],
+          paint: {
+            'fill-color': [
+              'case',
+              ['has', 'natural'], '#228B22', // Green for natural features
+              ['has', 'leisure'], '#32CD32',  // Light green for leisure
+              ['has', 'landuse'], '#9ACD32', // Yellow-green for land use
+              ['has', 'building'], '#4169E1', // Blue for buildings
+              '#FF1493' // Hot pink for everything else
+            ],
+            'fill-opacity': 0.6,
+            'fill-outline-color': '#000000'
+          }
+        },
+        // Non-transportation lines in green
+        {
+          id: 'other-lines',
+          type: 'line' as const,
+          source: 'nyc-data',
+          filter: [
+            'all',
+            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+            [
+              'none',
+              ['has', 'highway'],
+              ['==', ['get', 'bridge'], 'yes'],
+              ['==', ['get', 'tunnel'], 'yes'],
+              ['has', 'bridge'],
+              ['has', 'tunnel'],
+              ['has', 'railway'],
+              ['in', ['get', 'man_made'], ['literal', ['bridge', 'tunnel']]]
+            ]
+          ],
+          paint: {
+            'line-color': '#00FF00', // Bright green for non-transportation lines
+            'line-width': 2,
             'line-opacity': 0.8
           }
         },
-        // DIAGNOSTIC: Show ALL points in bright blue
+        // Points in blue
         {
-          id: 'all-points-diagnostic',
+          id: 'points',
           type: 'circle' as const,
           source: 'nyc-data',
           filter: ['==', ['geometry-type'], 'Point'],
           paint: {
-            'circle-color': '#0000FF', // Bright blue
-            'circle-radius': 8,
+            'circle-color': '#0000FF',
+            'circle-radius': 6,
             'circle-opacity': 0.8,
             'circle-stroke-color': '#FFFFFF',
-            'circle-stroke-width': 2
+            'circle-stroke-width': 1
           }
         },
-        // DIAGNOSTIC: Add labels to see what we're actually looking at
+        // Labels for transportation features
         {
-          id: 'diagnostic-labels',
+          id: 'transportation-labels',
           type: 'symbol' as const,
           source: 'nyc-data',
+          filter: [
+            'any',
+            ['has', 'highway'],
+            ['has', 'bridge'],
+            ['has', 'tunnel'],
+            ['has', 'railway']
+          ],
           layout: {
             'text-field': [
               'case',
               ['has', 'name'], ['get', 'name'],
               ['has', 'highway'], ['concat', 'Road: ', ['get', 'highway']],
-              ['has', 'natural'], ['concat', 'Natural: ', ['get', 'natural']],
-              ['has', 'building'], 'Building',
-              ['geometry-type']
+              ['==', ['get', 'bridge'], 'yes'], 'Bridge',
+              ['==', ['get', 'tunnel'], 'yes'], 'Tunnel',
+              ['has', 'railway'], 'Railway',
+              'Transportation'
             ],
             'text-font': ['Open Sans Regular'],
-            'text-size': 12,
+            'text-size': 10,
             'text-anchor': 'center'
           },
           paint: {
-            'text-color': '#FFFFFF',
-            'text-halo-color': '#000000',
-            'text-halo-width': 2
+            'text-color': '#333333',
+            'text-halo-color': '#FFFFFF',
+            'text-halo-width': 1
           }
         }
       ]
@@ -268,7 +404,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           return;
         }
 
-        // Create map with diagnostic style
+        // Create map with updated style
         mapInstance = new maplibregl.Map({
           container: mapRef.current!,
           style: createMapStyle(geojsonData) as any,
