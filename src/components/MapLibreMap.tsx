@@ -163,8 +163,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ['has', 'natural'], '#228B22', // Green for natural
               ['has', 'building'], '#4169E1', // Blue for buildings
               ['has', 'landuse'], '#32CD32', // Light green for landuse
+              "#00000000"
             ],
-            'fill-opacity': 0.5
+            'fill-opacity': 1.0
           }
         },
         // Points
