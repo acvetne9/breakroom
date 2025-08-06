@@ -145,6 +145,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'line-color': [
               'case',
               ['has', 'highway'], '#808080', // Gray for highways
+              ['has', 'tunnel'], '#808080', // Gray for highways
               '#FF00FF' // Magenta for everything else
             ],
             'line-width': 2,
