@@ -153,21 +153,21 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         },
         // Show some polygons (not all red)
-        {
-          id: 'some-polygons',
-          type: 'fill' as const,
-          source: 'nyc-data',
-          filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-          paint: {
-            'fill-color': [
-              'case',
-              ['has', 'natural'], '#228B22', // Green for natural
-              ['has', 'landuse'], '#32CD32', // Light green for landuse
-              "#00000000"
-            ],
-            'fill-opacity': 0.0
-          }
-        },
+        // {
+        //   id: 'some-polygons',
+        //   type: 'fill' as const,
+        //   source: 'nyc-data',
+        //   filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+        //   paint: {
+        //     'fill-color': [
+        //       'case',
+        //       ['has', 'natural'], '#228B22', // Green for natural
+        //       ['has', 'landuse'], '#32CD32', // Light green for landuse
+        //       "#00000000"
+        //     ],
+        //     'fill-opacity': 0.0
+        //   }
+        // },
         // Points
         {
           id: 'points',
