@@ -18,6 +18,60 @@ interface MapLibreMapProps {
   supabaseKey: string;
 }
 
+function debugGeoJSONProperties(geojsonData: any) {
+  console.log('=== COMPREHENSIVE GeoJSON Debug Info ===');
+  
+  if (geojsonData?.features) {
+    console.log(`Total features: ${geojsonData.features.length}`);
+    
+    // Group by geometry type
+    const geometryTypes = geojsonData.features.reduce((acc: any, f: any) => {
+      const type = f.geometry.type;
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {});
+    
+    console.log('Geometry type breakdown:', geometryTypes);
+    
+    // Sample features by type
+    Object.keys(geometryTypes).forEach(geomType => {
+      const featuresOfType = geojsonData.features.filter((f: any) => f.geometry.type === geomType);
+      console.log(`\n--- ${geomType} Features (${featuresOfType.length} total) ---`);
+      
+      // Show first 3 features of each type
+      featuresOfType.slice(0, 3).forEach((feature: any, index: number) => {
+        console.log(`${geomType} Feature ${index}:`, {
+          properties: feature.properties,
+          propertyKeys: Object.keys(feature.properties || {}),
+          hasCoordinates: !!feature.geometry.coordinates,
+          coordinateLength: Array.isArray(feature.geometry.coordinates) ? feature.geometry.coordinates.length : 0
+        });
+      });
+      
+      // Get all unique property keys for this geometry type
+      const allProps = new Set();
+      featuresOfType.forEach((f: any) => {
+        if (f.properties) {
+          Object.keys(f.properties).forEach(key => allProps.add(key));
+        }
+      });
+      console.log(`All property keys for ${geomType}:`, Array.from(allProps));
+      
+      // Check for specific property values
+      ['natural', 'leisure', 'landuse', 'highway', 'waterway', 'building', 'amenity'].forEach(prop => {
+        const withProp = featuresOfType.filter((f: any) => f.properties?.[prop]);
+        if (withProp.length > 0) {
+          const uniqueValues = [...new Set(withProp.map((f: any) => f.properties[prop]))];
+          console.log(`  ${geomType} features with '${prop}': ${withProp.length}, values:`, uniqueValues.slice(0, 10));
+        }
+      });
+    });
+    
+  } else {
+    console.log('No features found in GeoJSON data');
+  }
+}
+
 const MapLibreMap: React.FC<MapLibreMapProps> = ({ 
   onMapLoad, 
   businesses = [], 
@@ -49,6 +103,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
       
       const geojsonData = await response.json();
+      debugGeoJSONProperties(geojsonData);
       return geojsonData;
     } catch (error) {
       console.error('Error fetching NYC GeoJSON from Supabase:', error);
@@ -56,10 +111,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [supabaseUrl, supabaseKey]);
 
-  // Create a basic style with the GeoJSON data
+  // Create a more aggressive diagnostic style
   const createMapStyle = useCallback((geojsonData: any) => {
     return {
       version: 8 as const,
+      glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
       sources: {
         'nyc-data': {
           type: 'geojson' as const,
@@ -82,61 +138,66 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           minzoom: 0,
           maxzoom: 19
         },
+        // DIAGNOSTIC: Show ALL polygons in bright red (should be very visible)
         {
-          id: 'nyc-fill',
+          id: 'all-polygons-diagnostic',
           type: 'fill' as const,
           source: 'nyc-data',
-          filter: ['==', '$type', 'Polygon'],
+          filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
           paint: {
-            'fill-color': [
-              'case',
-              ['==', ['get', 'natural'], 'water'], '#04AEF6',
-              ['==', ['get', 'leisure'], 'park'], '#8BCE64',
-              ['==', ['get', 'landuse'], 'forest'], '#8BCE64',
-              ['==', ['get', 'landuse'], 'grass'], '#8BCE64',
-              'rgba(0,0,0,0)'
-            ],
-            'fill-opacity': 0.8
+            'fill-color': '#FF0000', // Bright red - impossible to miss
+            'fill-opacity': 0.7,
+            'fill-outline-color': '#000000'
           }
         },
+        // DIAGNOSTIC: Show ALL lines in bright green
         {
-          id: 'nyc-line',
+          id: 'all-lines-diagnostic',
           type: 'line' as const,
           source: 'nyc-data',
-          filter: ['==', '$type', 'LineString'],
+          filter: ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
           paint: {
-            'line-color': [
-              'case',
-              ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk', 'primary']]], '#CCCCCC',
-              ['in', ['get', 'highway'], ['literal', ['secondary', 'tertiary', 'residential']]], '#CCCCCC',
-              ['==', ['get', 'natural'], 'coastline'], '#04AEF6',
-              '#CCCCCC'
-            ],
-            'line-width': [
-              'case',
-              ['==', ['get', 'highway'], 'motorway'], 3,
-              ['==', ['get', 'highway'], 'trunk'], 2.5,
-              ['==', ['get', 'highway'], 'primary'], 2,
-              ['==', ['get', 'highway'], 'secondary'], 1.5,
-              1
-            ]
+            'line-color': '#00FF00', // Bright green
+            'line-width': 3,
+            'line-opacity': 0.8
           }
         },
+        // DIAGNOSTIC: Show ALL points in bright blue
         {
-          id: 'nyc-symbol',
+          id: 'all-points-diagnostic',
+          type: 'circle' as const,
+          source: 'nyc-data',
+          filter: ['==', ['geometry-type'], 'Point'],
+          paint: {
+            'circle-color': '#0000FF', // Bright blue
+            'circle-radius': 8,
+            'circle-opacity': 0.8,
+            'circle-stroke-color': '#FFFFFF',
+            'circle-stroke-width': 2
+          }
+        },
+        // DIAGNOSTIC: Add labels to see what we're actually looking at
+        {
+          id: 'diagnostic-labels',
           type: 'symbol' as const,
           source: 'nyc-data',
-          filter: ['==', '$type', 'Point'],
           layout: {
-            'text-field': ['get', 'name'],
+            'text-field': [
+              'case',
+              ['has', 'name'], ['get', 'name'],
+              ['has', 'highway'], ['concat', 'Road: ', ['get', 'highway']],
+              ['has', 'natural'], ['concat', 'Natural: ', ['get', 'natural']],
+              ['has', 'building'], 'Building',
+              ['geometry-type']
+            ],
             'text-font': ['Open Sans Regular'],
             'text-size': 12,
             'text-anchor': 'center'
           },
           paint: {
-            'text-color': '#333333',
-            'text-halo-color': '#ffffff',
-            'text-halo-width': 1
+            'text-color': '#FFFFFF',
+            'text-halo-color': '#000000',
+            'text-halo-width': 2
           }
         }
       ]
@@ -155,92 +216,149 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (!mapRef.current) return;
     
+    console.log('MapLibre: Initializing map...');
     let mapInstance: maplibregl.Map | null = null;
+    let isCleanedUp = false;
 
     const initializeMap = async () => {
-      // Fetch GeoJSON data from Supabase
-      const geojsonData = await fetchNYCGeoJSON();
-      
-      if (!geojsonData) {
-        console.error('Failed to load NYC GeoJSON data from Supabase');
-        // Fallback to basic OSM tiles
+      try {
+        // Fetch GeoJSON data from Supabase
+        const geojsonData = await fetchNYCGeoJSON();
+        
+        if (isCleanedUp) {
+          console.log('MapLibre: Initialization cancelled due to cleanup');
+          return;
+        }
+        
+        if (!geojsonData) {
+          console.error('Failed to load NYC GeoJSON data from Supabase');
+          // Fallback to basic OSM tiles
+          mapInstance = new maplibregl.Map({
+            container: mapRef.current!,
+            style: {
+              version: 8,
+              sources: {
+                'osm': {
+                  type: 'raster',
+                  tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                  tileSize: 256,
+                  attribution: '© OpenStreetMap contributors'
+                }
+              },
+              layers: [
+                {
+                  id: 'osm-tiles',
+                  type: 'raster',
+                  source: 'osm'
+                }
+              ]
+            },
+            center: [-73.9712, 40.7831],
+            zoom: 14,
+            maxBounds: [
+              [-74.2557, 40.4960],
+              [-73.7004, 40.9152]
+            ]
+          });
+          
+          if (!isCleanedUp) {
+            setMap(mapInstance);
+            onMapLoad?.(mapInstance);
+          }
+          return;
+        }
+
+        // Create map with diagnostic style
         mapInstance = new maplibregl.Map({
           container: mapRef.current!,
-          style: {
-            version: 8,
-            sources: {
-              'osm': {
-                type: 'raster',
-                tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-                tileSize: 256,
-                attribution: '© OpenStreetMap contributors'
-              }
-            },
-            layers: [
-              {
-                id: 'osm-tiles',
-                type: 'raster',
-                source: 'osm'
-              }
-            ]
-          },
-          center: [-73.9712, 40.7831],
+          style: createMapStyle(geojsonData) as any,
+          center: [-73.9712, 40.7831], // NYC center
           zoom: 14,
           maxBounds: [
-            [-74.2557, 40.4960],
-            [-73.7004, 40.9152]
+            [-74.2557, 40.4960], // Southwest corner (Staten Island)
+            [-73.7004, 40.9152]  // Northeast corner (Bronx)
           ]
         });
-        
-        setMap(mapInstance);
-        onMapLoad?.(mapInstance);
-        return;
+
+        // Add zoom change listener
+        mapInstance.on('zoom', handleZoomChange);
+
+        // Map load event
+        mapInstance.on('load', () => {
+          console.log('MapLibre: Map loaded with NYC GeoJSON from Supabase');
+          
+          // Debug: Log what layers are loaded
+          const style = mapInstance!.getStyle();
+          console.log('Loaded layers:', style.layers.map(l => ({ id: l.id, type: l.type })));
+          
+          // Debug: Check if source has data and count features
+          const source = mapInstance!.getSource('nyc-data') as maplibregl.GeoJSONSource;
+          if (source) {
+            console.log('NYC data source loaded successfully');
+            // Try to query rendered features
+            setTimeout(() => {
+              try {
+                const features = mapInstance!.querySourceFeatures('nyc-data');
+                console.log(`Queried ${features.length} features from source`);
+                if (features.length > 0) {
+                  console.log('Sample queried feature:', features[0]);
+                }
+              } catch (error) {
+                console.warn('Could not query source features:', error);
+              }
+            }, 1000);
+          }
+          
+          if (!isCleanedUp) {
+            onMapLoad?.(mapInstance);
+          }
+        });
+
+        // Error handling
+        mapInstance.on('error', (e) => {
+          console.error('MapLibre: Map error:', e);
+        });
+
+        // Debug: Log style errors
+        mapInstance.on('styleimagemissing', (e) => {
+          console.warn('MapLibre: Missing style image:', e.id);
+        });
+
+        // Debug: Log when data is loaded
+        mapInstance.on('sourcedata', (e) => {
+          if (e.sourceId === 'nyc-data' && e.isSourceLoaded) {
+            console.log('NYC data source finished loading');
+          }
+        });
+
+        if (!isCleanedUp) {
+          setMap(mapInstance);
+          console.log('MapLibre: Map instance set to state');
+        }
+      } catch (error) {
+        console.error('MapLibre: Error during initialization:', error);
       }
-
-      // Create map with GeoJSON style
-      mapInstance = new maplibregl.Map({
-        container: mapRef.current!,
-        style: createMapStyle(geojsonData) as any,
-        center: [-73.9712, 40.7831], // NYC center
-        zoom: 14,
-        maxBounds: [
-          [-74.2557, 40.4960], // Southwest corner (Staten Island)
-          [-73.7004, 40.9152]  // Northeast corner (Bronx)
-        ]
-      });
-
-      // Add zoom change listener
-      mapInstance.on('zoom', handleZoomChange);
-
-      // Map load event
-      mapInstance.on('load', () => {
-        console.log('Map loaded with NYC GeoJSON from Supabase');
-        onMapLoad?.(mapInstance);
-      });
-
-      // Error handling
-      mapInstance.on('error', (e) => {
-        console.error('Map error:', e);
-      });
-
-      setMap(mapInstance);
     };
 
     initializeMap();
 
     return () => {
+      console.log('MapLibre: Cleanup function called');
+      isCleanedUp = true;
+      
       // Cleanup function - use the local mapInstance variable
       try {
         if (mapInstance && mapInstance.getContainer()) {
+          console.log('MapLibre: Removing map instance');
           mapInstance.remove();
         }
       } catch (error) {
-        console.warn('Error cleaning up map:', error);
+        console.warn('MapLibre: Error cleaning up map:', error);
       }
       mapInstance = null;
       setMap(null);
     };
-  }, [fetchNYCGeoJSON, createMapStyle, onMapLoad, handleZoomChange]);
+  }, [supabaseUrl, supabaseKey]);
 
   // Create marker clustering
   useEffect(() => {
@@ -286,50 +404,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const [lng, lat] = cluster.geometry.coordinates;
       
       if (cluster.properties.cluster) {
-        // Create cluster marker (commented out but can be enabled)
-        // const el = document.createElement('div');
-        // el.className = 'cluster-marker';
-        // el.style.cssText = `
-        //   background: hsl(var(--primary));
-        //   border: 2px solid hsl(var(--primary-foreground));
-        //   border-radius: 50%;
-        //   width: 40px;
-        //   height: 40px;
-        //   display: flex;
-        //   align-items: center;
-        //   justify-content: center;
-        //   color: hsl(var(--primary-foreground));
-        //   font-weight: bold;
-        //   font-size: 12px;
-        //   cursor: pointer;
-        // `;
-        // el.textContent = cluster.properties.point_count_abbreviated;
-        
-        // const marker = new maplibregl.Marker({ element: el })
-        //   .setLngLat([lng, lat])
-        //   .addTo(map);
-
-        // el.addEventListener('click', () => {
-        //   const expansionZoom = clusterRef.current?.getClusterExpansionZoom(cluster.properties.cluster_id);
-        //   map.easeTo({
-        //     center: [lng, lat],
-        //     zoom: expansionZoom || currentZoom + 2
-        //   });
-        // });
-
-        // newMarkers.push(marker);
+        // Could add cluster markers here if needed
       } else {
         // Create individual business marker
         const el = document.createElement('div');
         el.className = 'business-marker';
         el.style.cssText = `
           background: #FFEB3B;
-          border: 1px solid #FFC107;
+          border: 2px solid #FFC107;
           border-radius: 50%;
-          width: 12px;
-          height: 12px;
+          width: 16px;
+          height: 16px;
           cursor: pointer;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+          z-index: 1000;
         `;
         
         const marker = new maplibregl.Marker({ element: el })
@@ -366,19 +454,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       clusters.forEach(cluster => {
         const [lng, lat] = cluster.geometry.coordinates;
         
-        if (cluster.properties.cluster) {
-          // Cluster markers (commented out)
-        } else {
+        if (!cluster.properties.cluster) {
           const el = document.createElement('div');
           el.className = 'business-marker';
           el.style.cssText = `
             background: #FFEB3B;
-            border: 1px solid #FFC107;
+            border: 2px solid #FFC107;
             border-radius: 50%;
-            width: 12px;
-            height: 12px;
+            width: 16px;
+            height: 16px;
             cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            z-index: 1000;
           `;
           
           const marker = new maplibregl.Marker({ element: el })
