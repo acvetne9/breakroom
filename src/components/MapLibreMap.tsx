@@ -136,35 +136,34 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           source: 'osm'
         },
         {
-          id: 'all-roads-gray',
+          id: 'gray-all-lines',
           type: 'line' as const,
           source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-            ['!', ['has', 'railway']],
-            ['!', ['has', 'footway']],
-          ],
+          filter: ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
           paint: {
             'line-color': '#808080',
             'line-width': 2,
             'line-opacity': 1.0
           }
         },
-        // Show some polygons (not all red)
         {
           id: 'some-polygons',
           type: 'fill' as const,
           source: 'nyc-data',
           filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
           paint: {
-            'fill-color': [
-              'case',
-              ['has', 'natural'], '#228B22', // Green for natural
-              ['has', 'landuse'], '#32CD32', // Light green for landuse
-              "#00000000"
-            ],
-            'fill-opacity': 0.0
+            'fill-color': '#00000000',
+            'fill-opacity': 0
+          }
+        },
+        {
+          id: 'points',
+          type: 'circle' as const,
+          source: 'nyc-data',
+          filter: ['==', ['geometry-type'], 'Point'],
+          paint: {
+            'circle-color': '#0000FF',
+            'circle-radius': 4
           }
         }
       ]
