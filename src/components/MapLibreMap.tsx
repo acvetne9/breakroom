@@ -412,7 +412,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           filter: [
             'all',
             ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-            ['!=', ['get', 'is_road_polygon'], true,
+            ['!=', ['get', 'is_road_polygon'], true],
             ['!has', 'highway'],
             ['!has', 'bridge'],
             ['!has', 'tunnel']
