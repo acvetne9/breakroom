@@ -165,7 +165,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ['has', 'landuse'], '#32CD32', // Light green for landuse
               "#00000000"
             ],
-            'fill-opacity': 1.0
+            'fill-opacity': 0.0
           }
         },
         // Points
