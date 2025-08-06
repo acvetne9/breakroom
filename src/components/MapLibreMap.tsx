@@ -152,8 +152,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           source: 'nyc-data',
           filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
           paint: {
-            'fill-color': '#00000000',
-            'fill-opacity': 0
+            'fill-color': '#808080',
+            'fill-opacity': 1
           }
         },
         {
