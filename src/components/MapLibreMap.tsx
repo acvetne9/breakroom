@@ -135,17 +135,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: 'raster' as const,
           source: 'osm'
         },
-        {
-          id: 'all-roads-gray',
-          type: 'line' as const,
-          source: 'nyc-data',
-          filter: ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-          paint: {
-            'line-color': '#808080',
-            'line-width': 2,
-            'line-opacity': 1.0
-          }
-        },
+
         {
           id: 'gray-roads',
           type: 'line' as const,
@@ -159,6 +149,37 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'line-color': '#808080',
             'line-width': 2,
             'line-opacity': 1.0
+          }
+        },
+        {
+          id: 'gray-tunnels',
+          type: 'line' as const,
+          source: 'nyc-data',
+          filter: [
+            'all',
+            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+            ['has', 'tunnel']
+          ],
+          paint: {
+            'line-color': '#808080',
+            'line-width': 2,
+            'line-dasharray': [2, 2],
+            'line-opacity': 0.8
+          }
+        },
+        {
+          id: 'gray-bridges',
+          type: 'line' as const,
+          source: 'nyc-data',
+          filter: [
+            'all',
+            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+            ['has', 'bridge']
+          ],
+          paint: {
+            'line-color': '#808080',
+            'line-width': 2,
+            'line-opacity': 0.9
           }
         },
         // Show some polygons (not all red)
@@ -175,6 +196,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               "#00000000"
             ],
             'fill-opacity': 0.0
+          }
+        },
+        // Points
+        {
+          id: 'points',
+          type: 'circle' as const,
+          source: 'nyc-data',
+          filter: ['==', ['geometry-type'], 'Point'],
+          paint: {
+            'circle-color': '#0000FF',
+            'circle-radius': 4
           }
         }
       ]
