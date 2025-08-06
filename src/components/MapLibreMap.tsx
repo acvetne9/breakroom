@@ -136,34 +136,49 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           source: 'osm'
         },
         // Show ALL lines - we'll see what we get
+        // {
+        //   id: 'all-lines-first',
+        //   type: 'line' as const,
+        //   source: 'nyc-data',
+        //   filter: ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+        //   paint: {
+        //     'line-color': [
+        //       'case',
+        //       ['all',
+        //         ['has', 'highway'],
+        //         ['in', ['get', 'highway'],
+        //           'motorway', 'motorway_link',
+        //           'trunk', 'trunk_link',
+        //           'primary', 'primary_link',
+        //           'secondary', 'secondary_link',
+        //           'tertiary', 'tertiary_link',
+        //           'unclassified', 'residential',
+        //           'living_street', 'service',
+        //           'road', 'track', 'construction',
+        //           'raceway', 'busway', 'bus_guideway',
+        //           'escape', 'rest_area', 'services', 'parking_aisle'
+        //         ]
+        //       ],
+        //       '#808080', // Gray for drivable roads
+        //       '#00000000' // Transparent for everything else
+        //     ],
+        //   }
+        // },
         {
-          id: 'all-lines-first',
+          id: 'gray-roads',
           type: 'line' as const,
           source: 'nyc-data',
-          filter: ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+          filter: [
+            'all',
+            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+            ['has', 'highway']
+          ],
           paint: {
-            'line-color': [
-              'case',
-              ['all',
-                ['has', 'highway'],
-                ['in', ['get', 'highway'],
-                  'motorway', 'motorway_link',
-                  'trunk', 'trunk_link',
-                  'primary', 'primary_link',
-                  'secondary', 'secondary_link',
-                  'tertiary', 'tertiary_link',
-                  'unclassified', 'residential',
-                  'living_street', 'service',
-                  'road', 'track', 'construction',
-                  'raceway', 'busway', 'bus_guideway',
-                  'escape', 'rest_area', 'services', 'parking_aisle'
-                ]
-              ],
-              '#808080', // Gray for drivable roads
-              '#00000000' // Transparent for everything else
-            ],
+            'line-color': '#808080',
+            'line-width': 2,
+            'line-opacity': 1.0
           }
-        },
+        }
         // Show some polygons (not all red)
         {
           id: 'some-polygons',
