@@ -464,7 +464,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               }
             });
 
-            console.log('All transportation layers added successfully!');
+            console.log('All debug layers added successfully!');
             
             // Debug: Check what was actually added
             setTimeout(() => {
