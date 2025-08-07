@@ -130,9 +130,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             }
           });
 
-
-
-
           console.log('All GeoJSON layers added successfully!');
           
           if (!isCleanedUp) {
