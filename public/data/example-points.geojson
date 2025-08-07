@@ -1,0 +1,41 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.9857, 40.7484]
+      },
+      "properties": {
+        "name": "Times Square",
+        "type": "landmark",
+        "description": "Famous commercial intersection"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.9442, 40.8176]
+      },
+      "properties": {
+        "name": "Yankee Stadium",
+        "type": "stadium",
+        "description": "Home of the New York Yankees"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.9735, 40.7505]
+      },
+      "properties": {
+        "name": "Empire State Building",
+        "type": "landmark",
+        "description": "Iconic Art Deco skyscraper"
+      }
+    }
+  ]
+}
