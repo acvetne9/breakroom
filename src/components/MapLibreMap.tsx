@@ -75,29 +75,29 @@ function debugGeoJSONProperties(geojsonData: any) {
 
 // Since the roads are already merged and processed, we can simplify this function
 const processRoadGeometry = (geojsonData: any) => {
-  console.log('Processing merged road geometry...');
-  
-  try {
-    // The merged_roads.geojson.gz should already contain processed road polygons
-    // so we may not need to do much processing here
-    console.log(`Total features in merged roads: ${geojsonData.features?.length || 0}`);
-    
-    // Check what types of geometries we have
-    const geometryTypes = geojsonData.features?.reduce((acc: any, f: any) => {
-      const type = f.geometry.type;
-      acc[type] = (acc[type] || 0) + 1;
-      return acc;
-    }, {}) || {};
-    
-    console.log('Geometry types in merged roads:', geometryTypes);
-    
-    // If the roads are already polygons, just return as-is
-    return geojsonData;
-    
-  } catch (error) {
-    console.error('Error processing merged road geometry:', error);
-    return geojsonData;
-  }
+  console.log('Buffering MultiLineString roads into polygons...');
+
+  const bufferedFeatures = geojsonData.features
+    .filter((f: any) => f.geometry?.type === 'MultiLineString')
+    .map((feature: any) => {
+      try {
+        const buffered = turf.buffer(feature, 5, { units: 'meters' }); // Adjust width
+        buffered.properties = {
+          name: feature.properties?.name || '',
+          original: 'buffered-line'
+        };
+        return buffered;
+      } catch (err) {
+        console.warn('Buffer failed for feature:', err);
+        return null;
+      }
+    })
+    .filter((f: any) => f !== null);
+
+  return {
+    type: 'FeatureCollection',
+    features: bufferedFeatures
+  };
 };
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({ 
