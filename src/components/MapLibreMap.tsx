@@ -12,7 +12,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ onMapLoad }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
 
-  // Load GeoJSON from public directory
+  // Load GeoJSON file
   const loadGeoJSONData = useCallback(async (): Promise<FeatureCollection | null> => {
     try {
       const response = await fetch('/data/example-points.geojson');
@@ -20,8 +20,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ onMapLoad }) => {
         console.error('Failed to load GeoJSON:', response.statusText);
         return null;
       }
-      const data = await response.json();
-      console.log(`Loaded ${data.features?.length || 0} features`);
+      const data: FeatureCollection = await response.json();
       return data;
     } catch (error) {
       console.error('Error loading GeoJSON:', error);
@@ -33,99 +32,118 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ onMapLoad }) => {
     if (!mapRef.current) return;
 
     let mapInstance: maplibregl.Map | null = null;
-    let isCleanedUp = false;
+    let cleanedUp = false;
 
-    const initMap = async () => {
-      mapInstance = new maplibregl.Map({
-        container: mapRef.current!,
-        style: 'https://demotiles.maplibre.org/style.json',
-        center: [-73.9712, 40.7831],
-        zoom: 13
-      });
-
-      mapInstance.on('load', async () => {
-        const geoData = await loadGeoJSONData();
-        if (!geoData || isCleanedUp) return;
-
-        // Add GeoJSON source
-        mapInstance!.addSource('geojson-data', {
-          type: 'geojson',
-          data: geoData
+    const initializeMap = async () => {
+      try {
+        mapInstance = new maplibregl.Map({
+          container: mapRef.current!,
+          style: {
+            version: 8,
+            sources: {},
+            layers: [
+              {
+                id: 'background',
+                type: 'background',
+                paint: {
+                  'background-color': '#f0f0f0'
+                }
+              }
+            ]
+          },
+          center: [-73.9712, 40.7831], // NYC approx center
+          zoom: 12
         });
 
-        // Parks
-        mapInstance!.addLayer({
-          id: 'parks',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: ['all', ['==', '$type', 'Polygon'], ['==', ['get', 'leisure'], 'park']],
-          paint: {
-            'fill-color': '#81C784',
-            'fill-opacity': 0.5
-          }
+        mapInstance.on('load', async () => {
+          if (cleanedUp) return;
+
+          const geoData = await loadGeoJSONData();
+          if (!geoData) return;
+
+          // Add GeoJSON source
+          mapInstance!.addSource('geojson-data', {
+            type: 'geojson',
+            data: geoData
+          });
+
+          // Parks layer
+          mapInstance!.addLayer({
+            id: 'parks',
+            type: 'fill',
+            source: 'geojson-data',
+            filter: ['all', ['==', '$type', 'Polygon'], ['==', ['get', 'leisure'], 'park']],
+            paint: {
+              'fill-color': '#81C784',
+              'fill-opacity': 0.5
+            }
+          });
+
+          // Water layer
+          mapInstance!.addLayer({
+            id: 'water',
+            type: 'fill',
+            source: 'geojson-data',
+            filter: ['all', ['==', '$type', 'Polygon'], ['==', ['get', 'natural'], 'water']],
+            paint: {
+              'fill-color': '#64B5F6',
+              'fill-opacity': 0.6
+            }
+          });
+
+          // Roads layer (filter by highway property)
+          mapInstance!.addLayer({
+            id: 'roads',
+            type: 'line',
+            source: 'geojson-data',
+            filter: ['all', ['==', '$type', 'LineString'], ['has', 'highway']],
+            paint: {
+              'line-color': '#888888',
+              'line-width': 1.5
+            }
+          });
+
+          // Optional: Debug all polygons (uncomment to see all polygons)
+          /*
+          mapInstance!.addLayer({
+            id: 'debug-polygons',
+            type: 'fill',
+            source: 'geojson-data',
+            filter: ['==', '$type', 'Polygon'],
+            paint: {
+              'fill-color': '#e91e63',
+              'fill-opacity': 0.2,
+              'fill-outline-color': '#000000'
+            }
+          });
+          */
+
+          // Fit map to bounds of all features with padding
+          const bbox = turf.bbox(geoData);
+          mapInstance!.fitBounds(bbox as [number, number, number, number], {
+            padding: 100,
+            linear: true,
+            duration: 1500,
+          });
+
+          setMap(mapInstance);
+          onMapLoad?.(mapInstance);
         });
 
-        // Water
-        mapInstance!.addLayer({
-          id: 'water',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: ['all', ['==', '$type', 'Polygon'], ['==', ['get', 'natural'], 'water']],
-          paint: {
-            'fill-color': '#64B5F6',
-            'fill-opacity': 0.6
-          }
+        mapInstance.on('error', e => {
+          console.error('Map error:', e.error);
         });
-
-        // Roads (LineStrings)
-        mapInstance!.addLayer({
-          id: 'roads',
-          type: 'line',
-          source: 'geojson-data',
-          filter: ['==', '$type', 'LineString'],
-          paint: {
-            'line-color': '#888888',
-            'line-width': 1.5
-          }
-        });
-
-        // Debug: Show all polygons (optional)
-        /*
-        mapInstance!.addLayer({
-          id: 'all-polygons',
-          type: 'fill',
-          source: 'geojson-data',
-          paint: {
-            'fill-color': '#e91e63',
-            'fill-opacity': 0.4,
-            'fill-outline-color': '#000'
-          }
-        });
-        */
-
-        // Fit to bounds
-        const bbox = turf.bbox(geoData);
-        mapInstance!.fitBounds(bbox as [number, number, number, number], { padding: 40 });
-
-        if (!isCleanedUp) {
-          setMap(mapInstance!);
-          onMapLoad?.(mapInstance!);
-        }
-      });
-
-      mapInstance.on('error', (e) => {
-        console.error('Map error:', e);
-      });
+      } catch (error) {
+        console.error('Error initializing map:', error);
+      }
     };
 
-    initMap();
+    initializeMap();
 
     return () => {
-      isCleanedUp = true;
-      try {
-        mapInstance?.remove();
-      } catch (e) {
-        console.warn('Map cleanup error:', e);
+      cleanedUp = true;
+      if (mapInstance) {
+        mapInstance.remove();
       }
       setMap(null);
     };
