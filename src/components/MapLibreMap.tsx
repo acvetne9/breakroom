@@ -96,55 +96,57 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             data: geoData
           });
 
-          // Add polygon fill layer
+          // Roads (LineStrings with highway tag)
           mapInstance!.addLayer({
-            id: 'polygons',
+            id: 'roads',
+            type: 'line',
+            source: 'geojson-data',
+            filter: ['all', ['==', '$type', 'LineString'], ['has', 'highway']],
+            paint: {
+              'line-color': '#999999',
+              'line-width': 1.5
+            }
+          });
+          
+          // Water (Polygons tagged as natural=water or water=*)
+          mapInstance!.addLayer({
+            id: 'water',
             type: 'fill',
             source: 'geojson-data',
-            filter: ['==', '$type', 'Polygon'],
+            filter: ['all', ['==', '$type', 'Polygon'], ['any',
+              ['==', ['get', 'natural'], 'water'],
+              ['has', 'water']
+            ]],
             paint: {
-              'fill-color': '#4CAF50',
+              'fill-color': '#64B5F6',
+              'fill-opacity': 0.7
+            }
+          });
+          
+          // Parks (Polygons tagged as leisure=park)
+          mapInstance!.addLayer({
+            id: 'parks',
+            type: 'fill',
+            source: 'geojson-data',
+            filter: ['all', ['==', '$type', 'Polygon'], ['==', ['get', 'leisure'], 'park']],
+            paint: {
+              'fill-color': '#81C784',
               'fill-opacity': 0.6
             }
           });
-
-          // Add polygon outline layer
+          
+          // Optional: Outlines for parks
           mapInstance!.addLayer({
-            id: 'polygon-outlines',
+            id: 'park-outlines',
             type: 'line',
             source: 'geojson-data',
-            filter: ['==', '$type', 'Polygon'],
+            filter: ['all', ['==', '$type', 'Polygon'], ['==', ['get', 'leisure'], 'park']],
             paint: {
-              'line-color': '#2E7D32',
+              'line-color': '#4CAF50',
               'line-width': 1
             }
           });
 
-          // Add line layer
-          mapInstance!.addLayer({
-            id: 'lines',
-            type: 'line',
-            source: 'geojson-data',
-            filter: ['==', '$type', 'LineString'],
-            paint: {
-              'line-color': '#2196F3',
-              'line-width': 2
-            }
-          });
-
-          // Add point layer
-          mapInstance!.addLayer({
-            id: 'points',
-            type: 'circle',
-            source: 'geojson-data',
-            filter: ['==', '$type', 'Point'],
-            paint: {
-              'circle-color': '#FF5722',
-              'circle-radius': 4,
-              'circle-stroke-color': '#D84315',
-              'circle-stroke-width': 1
-            }
-          });
 
           console.log('All GeoJSON layers added successfully!');
           
