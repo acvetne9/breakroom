@@ -263,14 +263,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       try {
         console.log('=== MAP INITIALIZATION START ===');
         
-        // Create a map with transparent background and no base tiles
-        console.log('Creating map with transparent background...');
+        // Create a map with OSM base tiles (same as before)
+        console.log('Creating map with OSM base tiles...');
         mapInstance = new maplibregl.Map({
           container: mapRef.current!,
           style: {
             version: 8,
-            sources: {},
-            layers: []
+            sources: {
+              'osm': {
+                type: 'raster',
+                tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                tileSize: 256,
+                attribution: '© OpenStreetMap contributors'
+              }
+            },
+            layers: [
+              {
+                id: 'osm-tiles',
+                type: 'raster',
+                source: 'osm'
+              }
+            ]
           },
           center: [-73.9712, 40.7831],
           zoom: 14,
@@ -286,33 +299,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           console.log('Basic map loaded successfully!');
           
           try {
-            // First, add the NYC boundary mask to hide non-NYC areas
+            // First, add the NYC boundary mask source
             console.log('Creating NYC boundary mask...');
             const nycMask = createNYCMask();
             
             mapInstance!.addSource('nyc-mask', {
               type: 'geojson',
               data: nycMask
-            });
-
-            // Add mask layer to hide everything outside NYC
-            mapInstance!.addLayer({
-              id: 'non-nyc-mask',
-              type: 'fill',
-              source: 'nyc-mask',
-              paint: {
-                'fill-color': 'rgba(0, 0, 0, 0)', // Transparent
-                'fill-opacity': 0
-              }
-            });
-
-            // Add a subtle NYC area background
-            mapInstance!.addLayer({
-              id: 'nyc-background',
-              type: 'background',
-              paint: {
-                'background-color': '#f8f8f8' // Light gray background for NYC area
-              }
             });
 
             // Load and process roads GeoJSON data
@@ -383,13 +376,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               }
             });
 
-            // Finally, add the mask layer on top to create the cutout effect
+            // Finally, add the mask layer on top to hide non-NYC areas
             mapInstance!.addLayer({
               id: 'non-nyc-overlay',
               type: 'fill',
               source: 'nyc-mask',
               paint: {
-                'fill-color': 'rgba(255, 255, 255, 0.95)', // Near-white overlay
+                'fill-color': 'rgba(255, 255, 255, 1.0)', // Solid white overlay to hide non-NYC
                 'fill-opacity': 1.0
               }
             });
@@ -596,7 +589,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       className="absolute inset-0 w-full h-full"
       style={{ 
         zIndex: 1,
-        backgroundColor: 'transparent' // Make sure container background is transparent
+        backgroundColor: 'white' // White background for negative space areas
       }}
     />
   );
