@@ -190,7 +190,7 @@ const processRoadGeometry = (geojsonData: any): FeatureCollection<Polygon> => {
   };
 };
 
-// Process parks and green spaces
+// Process parks and green spaces with more comprehensive detection
 const processParksGeometry = (geojsonData: any): FeatureCollection<Polygon> => {
   console.log('Processing parks and green spaces...');
   
@@ -207,18 +207,30 @@ const processParksGeometry = (geojsonData: any): FeatureCollection<Polygon> => {
       const leisure = feature.properties?.leisure;
       const landuse = feature.properties?.landuse;
       const natural = feature.properties?.natural;
+      const amenity = feature.properties?.amenity;
       
-      // Check if this is a park/green space
+      // More comprehensive park detection
       const isPark = leisure === 'park' || 
+                     leisure === 'garden' ||
+                     leisure === 'golf_course' ||
+                     leisure === 'pitch' ||
+                     leisure === 'playground' ||
                      landuse === 'forest' || 
                      landuse === 'grass' || 
+                     landuse === 'meadow' ||
                      landuse === 'recreation_ground' ||
+                     landuse === 'village_green' ||
                      natural === 'wood' ||
                      natural === 'grassland' ||
-                     leisure === 'garden' ||
-                     leisure === 'golf_course';
+                     natural === 'scrub' ||
+                     amenity === 'grave_yard' ||
+                     feature.properties?.name?.toLowerCase().includes('park') ||
+                     feature.properties?.name?.toLowerCase().includes('garden') ||
+                     feature.properties?.name?.toLowerCase().includes('green');
       
       if (isPark) {
+        console.log(`Found park feature ${index}: ${leisure || landuse || natural || 'unnamed'}`);
+        
         if (geomType === 'Polygon') {
           parkFeatures.push({
             type: 'Feature',
@@ -258,7 +270,7 @@ const processParksGeometry = (geojsonData: any): FeatureCollection<Polygon> => {
   };
 };
 
-// Process water features
+// Process water features with more comprehensive detection
 const processWaterGeometry = (geojsonData: any): FeatureCollection<Polygon> => {
   console.log('Processing water features...');
   
@@ -275,16 +287,28 @@ const processWaterGeometry = (geojsonData: any): FeatureCollection<Polygon> => {
       const natural = feature.properties?.natural;
       const waterway = feature.properties?.waterway;
       const landuse = feature.properties?.landuse;
+      const water = feature.properties?.water;
       
-      // Check if this is a water feature
+      // More comprehensive water feature detection
       const isWater = natural === 'water' || 
+                      natural === 'coastline' ||
                       waterway === 'river' || 
                       waterway === 'stream' ||
                       waterway === 'canal' ||
+                      waterway === 'dock' ||
                       landuse === 'reservoir' ||
-                      feature.properties?.water;
+                      landuse === 'basin' ||
+                      water === 'lake' ||
+                      water === 'pond' ||
+                      water === 'river' ||
+                      feature.properties?.place === 'sea' ||
+                      feature.properties?.name?.toLowerCase().includes('river') ||
+                      feature.properties?.name?.toLowerCase().includes('lake') ||
+                      feature.properties?.name?.toLowerCase().includes('pond');
       
       if (isWater) {
+        console.log(`Found water feature ${index}: ${natural || waterway || landuse || 'unnamed'}`);
+        
         if (geomType === 'Polygon') {
           waterFeatures.push({
             type: 'Feature',
@@ -311,7 +335,14 @@ const processWaterGeometry = (geojsonData: any): FeatureCollection<Polygon> => {
           });
         } else if (geomType === 'LineString' || geomType === 'MultiLineString') {
           // Buffer water lines (rivers, streams) to create polygons
-          const buffered = turf.buffer(feature, 5, { units: 'meters' }); // 5m buffer for waterways
+          let bufferWidth = 5; // Default 5m buffer
+          
+          // Adjust buffer width based on waterway type
+          if (waterway === 'river') bufferWidth = 10;
+          else if (waterway === 'canal') bufferWidth = 8;
+          else if (waterway === 'stream') bufferWidth = 3;
+          
+          const buffered = turf.buffer(feature, bufferWidth, { units: 'meters' });
           
           if (buffered && buffered.geometry) {
             if (buffered.geometry.type === 'Polygon') {
@@ -383,8 +414,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
       
       if (!response.ok) {
-        console.error(`Failed to load GeoJSON ${filename}:`, response.statusText);
-        return null;
+        console.warn(`Failed to load GeoJSON ${filename}:`, response.statusText);
+        return null; // Return null instead of throwing to continue with other data
       }
       
       // Simple decompression for .gz files
@@ -413,8 +444,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       
       return null;
     } catch (error) {
-      console.error(`Error loading GeoJSON ${filename}:`, error);
-      return null;
+      console.warn(`Error loading GeoJSON ${filename}:`, error);
+      return null; // Return null to continue with other data
     }
   }, []);
 
@@ -483,7 +514,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               type: 'fill',
               source: 'background',
               paint: {
-                'fill-color': '#f5f5f5', // Light gray background for non-covered areas
+                'fill-color': '#f8f8f8', // Very light gray background
                 'fill-opacity': 1.0
               }
             });
@@ -492,8 +523,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             console.log('Loading GeoJSON data files...');
             const [roadsData, parksData, waterData] = await Promise.all([
               loadGeoJSONData('merged_roads.geojson.gz'),
-              loadGeoJSONData('parks.geojson'), // Assuming you have parks data
-              loadGeoJSONData('water.geojson')  // Assuming you have water data
+              loadGeoJSONData('merged_roads.geojson.gz'),
+              loadGeoJSONData('merged_roads.geojson.gz'),
             ]);
             
             if (isCleanedUp) {
@@ -517,8 +548,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                   type: 'fill',
                   source: 'water-features',
                   paint: {
-                    'fill-color': '#4A90E2', // Blue for water
-                    'fill-opacity': 1.0
+                    'fill-color': '#4A90E2', // Bright blue for water
+                    'fill-opacity': 0.9
                   }
                 });
 
@@ -527,14 +558,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                   type: 'line',
                   source: 'water-features',
                   paint: {
-                    'line-color': '#357ABD',
+                    'line-color': '#357ABD', // Darker blue outline
                     'line-width': 1,
                     'line-opacity': 0.8
                   }
                 });
 
-                console.log(`Added ${processedWaterData.features.length} water features`);
+                console.log(`Added ${processedWaterData.features.length} water features with blue color`);
+              } else {
+                console.log('No water features to add');
               }
+            } else {
+              console.log('No water data loaded');
             }
 
             // Process and add parks (middle layer)
@@ -553,8 +588,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                   type: 'fill',
                   source: 'parks-features',
                   paint: {
-                    'fill-color': '#4CAF50', // Green for parks
-                    'fill-opacity': 1.0
+                    'fill-color': '#4CAF50', // Bright green for parks
+                    'fill-opacity': 0.9
                   }
                 });
 
@@ -563,14 +598,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                   type: 'line',
                   source: 'parks-features',
                   paint: {
-                    'line-color': '#388E3C',
+                    'line-color': '#388E3C', // Darker green outline
                     'line-width': 1,
                     'line-opacity': 0.6
                   }
                 });
 
-                console.log(`Added ${processedParksData.features.length} park features`);
+                console.log(`Added ${processedParksData.features.length} park features with green color`);
+              } else {
+                console.log('No park features to add');
               }
+            } else {
+              console.log('No parks data loaded');
             }
 
             // Process and add roads (top layer)
@@ -589,8 +628,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                   type: 'fill',
                   source: 'buffered-roads',
                   paint: {
-                    'fill-color': '#777777', // Gray for roads
-                    'fill-opacity': 1.0
+                    'fill-color': '#666666', // Medium gray for roads
+                    'fill-opacity': 0.8
                   }
                 });
 
@@ -599,21 +638,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                   type: 'line',
                   source: 'buffered-roads',
                   paint: {
-                    'line-color': '#444444',
+                    'line-color': '#444444', // Darker gray outline
                     'line-width': [
                       'interpolate',
                       ['linear'],
                       ['zoom'],
-                      10, 0.5,
-                      15, 1.0,
-                      18, 1.5
+                      10, 0.3,
+                      15, 0.8,
+                      18, 1.2
                     ],
-                    'line-opacity': 0.8
+                    'line-opacity': 0.6
                   }
                 });
 
                 console.log(`Added ${bufferedRoadsData.features.length} road features`);
               }
+            } else {
+              console.log('No roads data loaded');
             }
 
             // Finally, add the NYC boundary mask to hide non-NYC areas
@@ -630,12 +671,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               type: 'fill',
               source: 'nyc-mask',
               paint: {
-                'fill-color': '#999999', // Gray color for non-NYC land
+                'fill-color': 'rgba(255, 255, 255, 1.0)', // Solid white overlay to hide non-NYC
                 'fill-opacity': 1.0
               }
             });
 
-            console.log('All layers added successfully!');
+            console.log('All layers added successfully! Parks should be green, water should be blue.');
 
           } catch (dataError) {
             console.error('Error adding feature data to map:', dataError);
@@ -837,7 +878,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       className="absolute inset-0 w-full h-full"
       style={{ 
         zIndex: 1,
-        backgroundColor: '#f5f5f5' // Light gray background for loading state
+        backgroundColor: '#f8f8f8' // Light gray background for loading state
       }}
     />
   );
