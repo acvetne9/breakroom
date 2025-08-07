@@ -6,9 +6,30 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 
 interface MapLibreMapProps {
   onMapLoad?: (map: maplibregl.Map) => void;
+  businesses?: Array<{
+    id: string;
+    name: string;
+    position: { lat: number; lng: number };
+    atmosphere: string[];
+    salary?: string;
+    stories?: Array<{ id: string; text: string; author: string }>;
+    businessType?: string;
+    roles?: Array<{ 
+      role: string; 
+      salary: string; 
+      upvotes?: number; 
+      downvotes?: number; 
+      userVote?: 'up' | 'down' | null; 
+    }>;
+    place_id?: string;
+    website?: string;
+    url?: string;
+  }>;
+  onBusinessClick?: (business: any) => void;
+  selectedBusiness?: any;
 }
 
-const MapLibreMap: React.FC<MapLibreMapProps> = ({ onMapLoad }) => {
+const MapLibreMap: React.FC<MapLibreMapProps> = ({ onMapLoad, businesses = [], onBusinessClick, selectedBusiness }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
 
