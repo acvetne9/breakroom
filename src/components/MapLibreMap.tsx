@@ -368,13 +368,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [supabaseUrl, supabaseKey]);
 
-  // Handle zoom change
-  const handleZoomChange = useCallback(() => {
-    if (map) {
-      const zoom = map.getZoom();
-      setCurrentZoom(zoom);
-    }
-  }, [map]);
+  // Handle zoom change - removed as it was causing re-renders
 
   // Initialize map with merged roads GeoJSON data
   useEffect(() => {
@@ -450,14 +444,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               data: bufferedRoadsData
             });
 
-            // Add the main gray road polygons layer
+            // Add a debug layer first with bright colors to verify roads are rendering
+            mapInstance!.addLayer({
+              id: 'buffered-roads-debug',
+              type: 'fill',
+              source: 'buffered-roads',
+              paint: {
+                'fill-color': '#ff0000', // Bright red for debugging
+                'fill-opacity': 0.7
+              }
+            });
+
+            // Add the main gray road polygons layer ON TOP of OSM tiles
             mapInstance!.addLayer({
               id: 'buffered-roads-fill',
               type: 'fill',
               source: 'buffered-roads',
               paint: {
                 'fill-color': '#777777', // Gray color for all roads
-                'fill-opacity': 0.8
+                'fill-opacity': 1.0 // Make it fully opaque so it covers OSM roads
               }
             });
 
@@ -467,18 +472,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               type: 'line',
               source: 'buffered-roads',
               paint: {
-                'line-color': '#555555', // Darker gray for outlines
+                'line-color': '#444444', // Even darker gray for contrast
                 'line-width': [
                   'interpolate',
                   ['linear'],
                   ['zoom'],
-                  10, 0.3,
-                  15, 0.8,
-                  18, 1.2
+                  10, 0.5,
+                  15, 1.0,
+                  18, 1.5
                 ],
-                'line-opacity': 0.6
+                'line-opacity': 0.8
               }
             });
+
+            console.log('All road layers added - you should see red debug roads first, then gray roads on top');
 
             console.log('Buffered road layers added successfully!');
             
@@ -487,15 +494,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               try {
                 console.log('=== DEBUGGING RENDERED ROAD FEATURES ===');
                 
+                const debugFeatures = mapInstance!.queryRenderedFeatures(undefined, { 
+                  layers: ['buffered-roads-debug'] 
+                });
                 const roadFeatures = mapInstance!.queryRenderedFeatures(undefined, { 
                   layers: ['buffered-roads-fill'] 
                 });
-                console.log(`Rendered buffered road features: ${roadFeatures.length}`);
+                console.log(`Rendered debug road features (red): ${debugFeatures.length}`);
+                console.log(`Rendered buffered road features (gray): ${roadFeatures.length}`);
                 
+                if (debugFeatures.length > 0) {
+                  console.log('Sample debug feature:', debugFeatures[0]);
+                  console.log('Debug feature properties:', debugFeatures[0].properties);
+                }
                 if (roadFeatures.length > 0) {
                   console.log('Sample road feature:', roadFeatures[0]);
                   console.log('Road feature properties:', roadFeatures[0].properties);
                 }
+                
+                // Also check the source data directly
+                const source = mapInstance!.getSource('buffered-roads');
+                console.log('Road source:', source);
                 
                 // Check map bounds and zoom
                 const bounds = mapInstance!.getBounds();
