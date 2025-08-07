@@ -294,7 +294,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           id: 'merged-road-polygons',
           type: 'fill' as const,
           source: 'merged-roads',
-          filter: ['==', ['geometry-type'], 'Polygon'],
+          filter: ['all'],
           paint: {
             'fill-color': '#777777',
             'fill-opacity': 0.9
@@ -452,7 +452,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               id: 'merged-road-polygons',
               type: 'fill',
               source: 'merged-roads',
-              filter: ['==', ['geometry-type'], 'Polygon'],
+              filter: ['all'],
               paint: {
                 'fill-color': '#777777',
                 'fill-opacity': 0.9
