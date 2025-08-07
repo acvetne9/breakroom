@@ -204,7 +204,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
                 value={location}
                 onChange={handleLocationChange}
                 onBlur={handleLocationBlur} 
-                placeholder="Enter NYC location..." 
+                placeholder="Where'd you work?..." 
                 className="app-input" 
               />
             </div>
