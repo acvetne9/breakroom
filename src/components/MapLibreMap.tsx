@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import maplibregl from 'maplibre-gl';
 import Supercluster from 'supercluster';
+import * as turf from '@turf/turf';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 interface MapLibreMapProps {
@@ -58,7 +59,7 @@ function debugGeoJSONProperties(geojsonData: any) {
       console.log(`All property keys for ${geomType}:`, Array.from(allProps));
       
       // Check for specific property values
-      ['natural', 'leisure', 'landuse', 'highway', 'waterway', 'building', 'amenity'].forEach(prop => {
+      ['natural', 'leisure', 'landuse', 'highway', 'waterway', 'building', 'amenity', 'bridge', 'tunnel', 'man_made'].forEach(prop => {
         const withProp = featuresOfType.filter((f: any) => f.properties?.[prop]);
         if (withProp.length > 0) {
           const uniqueValues = [...new Set(withProp.map((f: any) => f.properties[prop]))];
@@ -71,6 +72,141 @@ function debugGeoJSONProperties(geojsonData: any) {
     console.log('No features found in GeoJSON data');
   }
 }
+
+// Enhanced function to convert road lines to polygons using Turf.js
+const processRoadGeometry = (geojsonData: any) => {
+  console.log('Processing road geometry...');
+  
+  try {
+    const processedFeatures: any[] = [];
+    let successCount = 0;
+    let errorCount = 0;
+    let roadCount = 0;
+    
+    geojsonData.features.forEach((feature: any, index: number) => {
+      // More comprehensive road detection
+      const isRoad = feature.properties?.highway || 
+                    feature.properties?.bridge || 
+                    feature.properties?.tunnel ||
+                    (feature.properties?.man_made && ['bridge_support', 'pier'].includes(feature.properties.man_made)) ||
+                    (feature.properties?.type === 'route') ||
+                    (feature.properties?.route === 'road');
+      
+      if (isRoad && (feature.geometry.type === 'LineString' || feature.geometry.type === 'MultiLineString')) {
+        roadCount++;
+        console.log(`Processing road ${roadCount} (index ${index}):`, {
+          highway: feature.properties?.highway,
+          bridge: feature.properties?.bridge,
+          tunnel: feature.properties?.tunnel,
+          geometryType: feature.geometry.type,
+          coordinateCount: feature.geometry.coordinates?.length
+        });
+        
+        try {
+          // Determine buffer width based on road type (in meters, converted to degrees approximately)
+          let bufferWidthMeters = 5; // Default 5 meters
+          
+          if (feature.properties?.highway) {
+            const roadType = feature.properties.highway;
+            switch (roadType) {
+              case 'motorway':
+              case 'trunk':
+                bufferWidthMeters = 15;
+                break;
+              case 'primary':
+                bufferWidthMeters = 12;
+                break;
+              case 'secondary':
+                bufferWidthMeters = 10;
+                break;
+              case 'tertiary':
+              case 'residential':
+                bufferWidthMeters = 8;
+                break;
+              case 'service':
+                bufferWidthMeters = 4;
+                break;
+              case 'footway':
+              case 'path':
+                bufferWidthMeters = 2;
+                break;
+              default:
+                bufferWidthMeters = 6;
+            }
+          }
+          
+          // Buffer the line to create a polygon - using meters for more accurate results
+          const buffered = turf.buffer(feature, bufferWidthMeters, { units: 'meters' });
+          
+          if (buffered && buffered.geometry && buffered.geometry.coordinates && buffered.geometry.coordinates.length > 0) {
+            // Preserve original properties and add road indicator
+            const processedFeature = {
+              ...buffered,
+              properties: {
+                ...feature.properties,
+                original_geometry_type: feature.geometry.type,
+                is_road_polygon: true,
+                buffer_width_meters: bufferWidthMeters,
+                road_type: feature.properties?.highway || 'unknown'
+              }
+            };
+            
+            processedFeatures.push(processedFeature);
+            successCount++;
+            
+            // Log first few successful conversions for debugging
+            if (successCount <= 3) {
+              console.log(`Successfully buffered road ${successCount}:`, {
+                original: feature.geometry.type,
+                new: processedFeature.geometry.type,
+                roadType: feature.properties?.highway,
+                bufferWidth: bufferWidthMeters
+              });
+            }
+          } else {
+            console.warn(`Buffer returned invalid result for road at index ${index}`);
+            // Keep original feature if buffering returns invalid result
+            processedFeatures.push(feature);
+            errorCount++;
+          }
+        } catch (error) {
+          console.warn(`Failed to buffer road feature at index ${index}:`, error);
+          // Keep original feature if buffering fails
+          processedFeatures.push(feature);
+          errorCount++;
+        }
+      } else {
+        // Keep non-road features as-is
+        processedFeatures.push(feature);
+      }
+    });
+    
+    console.log(`Road processing complete: 
+      - Total roads found: ${roadCount}
+      - Successfully converted: ${successCount}
+      - Errors: ${errorCount}
+      - Total processed features: ${processedFeatures.length}`);
+    
+    // Verify we have road polygons
+    const roadPolygons = processedFeatures.filter(f => f.properties?.is_road_polygon === true);
+    console.log(`Final road polygons in processed data: ${roadPolygons.length}`);
+    
+    if (roadPolygons.length > 0) {
+      console.log('Sample road polygon properties:', roadPolygons[0].properties);
+      console.log('Sample road polygon geometry type:', roadPolygons[0].geometry.type);
+    }
+    
+    return {
+      ...geojsonData,
+      features: processedFeatures
+    };
+    
+  } catch (error) {
+    console.error('Critical error in processRoadGeometry:', error);
+    // Return original data if processing fails completely
+    return geojsonData;
+  }
+};
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({ 
   onMapLoad, 
@@ -91,6 +227,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // Function to fetch NYC GeoJSON from Supabase
   const fetchNYCGeoJSON = useCallback(async () => {
     try {
+      console.log('Fetching NYC GeoJSON from Supabase...');
       const response = await fetch(`${supabaseUrl}/storage/v1/object/public/nyc-map-storage-files/nyc.geojson`, {
         headers: {
           'Authorization': `Bearer ${supabaseKey}`,
@@ -103,19 +240,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
       
       const geojsonData = await response.json();
+      console.log('GeoJSON fetched successfully, starting debug...');
       debugGeoJSONProperties(geojsonData);
-      return geojsonData;
+      
+      console.log('Starting road geometry processing...');
+      // Process road geometry to convert lines to polygons
+      const processedData = processRoadGeometry(geojsonData);
+      console.log('Road geometry processing complete');
+      
+      return processedData;
     } catch (error) {
       console.error('Error fetching NYC GeoJSON from Supabase:', error);
       return null;
     }
   }, [supabaseUrl, supabaseKey]);
 
-  // Create a more aggressive diagnostic style
+  // Enhanced map style with improved gray road styling
   const createMapStyle = useCallback((geojsonData: any) => {
     return {
       version: 8 as const,
-      glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
       sources: {
         'nyc-data': {
           type: 'geojson' as const,
@@ -134,70 +277,162 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         {
           id: 'osm-tiles',
           type: 'raster' as const,
-          source: 'osm',
-          minzoom: 0,
-          maxzoom: 19
+          source: 'osm'
         },
-        // DIAGNOSTIC: Show ALL polygons in bright red (should be very visible)
+        // Road polygons (converted from lines) - Main gray roads
         {
-          id: 'all-polygons-diagnostic',
+          id: 'road-polygons',
           type: 'fill' as const,
           source: 'nyc-data',
-          filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+          filter: [
+            'all',
+            ['==', ['get', 'is_road_polygon'], true],
+            ['==', ['geometry-type'], 'Polygon']
+          ],
           paint: {
-            'fill-color': '#FF0000', // Bright red - impossible to miss
-            'fill-opacity': 0.7,
-            'fill-outline-color': '#000000'
+            'fill-color': [
+              'case',
+              ['==', ['get', 'road_type'], 'motorway'], '#555555',
+              ['==', ['get', 'road_type'], 'trunk'], '#555555',
+              ['==', ['get', 'road_type'], 'primary'], '#666666',
+              ['==', ['get', 'road_type'], 'secondary'], '#777777',
+              ['==', ['get', 'road_type'], 'tertiary'], '#777777',
+              ['==', ['get', 'road_type'], 'residential'], '#888888',
+              ['==', ['get', 'road_type'], 'service'], '#999999',
+              ['has', 'tunnel'], '#444444',
+              ['has', 'bridge'], '#888888',
+              '#777777' // default gray
+            ],
+            'fill-opacity': 0.9
           }
         },
-        // DIAGNOSTIC: Show ALL lines in bright green
+        // Road polygon outlines for better definition
         {
-          id: 'all-lines-diagnostic',
+          id: 'road-polygon-outlines',
           type: 'line' as const,
           source: 'nyc-data',
-          filter: ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+          filter: [
+            'all',
+            ['==', ['get', 'is_road_polygon'], true],
+            ['==', ['geometry-type'], 'Polygon']
+          ],
           paint: {
-            'line-color': '#00FF00', // Bright green
-            'line-width': 3,
-            'line-opacity': 0.8
+            'line-color': '#555555',
+            'line-width': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              10, 0.5,
+              15, 1,
+              18, 1.5
+            ],
+            'line-opacity': 0.6
           }
         },
-        // DIAGNOSTIC: Show ALL points in bright blue
+        // MultiPolygon road features
         {
-          id: 'all-points-diagnostic',
+          id: 'road-multipolygons',
+          type: 'fill' as const,
+          source: 'nyc-data',
+          filter: [
+            'all',
+            ['==', ['get', 'is_road_polygon'], true],
+            ['==', ['geometry-type'], 'MultiPolygon']
+          ],
+          paint: {
+            'fill-color': '#777777',
+            'fill-opacity': 0.9
+          }
+        },
+        // Fallback for any remaining road lines that weren't converted
+        {
+          id: 'remaining-road-lines',
+          type: 'line' as const,
+          source: 'nyc-data',
+          filter: [
+            'all',
+            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+            ['!=', ['get', 'is_road_polygon'], true],
+            ['any',
+              ['has', 'highway'],
+              ['has', 'bridge'],
+              ['has', 'tunnel']
+            ]
+          ],
+          paint: {
+            'line-color': [
+              'case',
+              ['==', ['get', 'highway'], 'motorway'], '#555555',
+              ['==', ['get', 'highway'], 'trunk'], '#555555',
+              ['==', ['get', 'highway'], 'primary'], '#666666',
+              ['==', ['get', 'highway'], 'secondary'], '#777777',
+              ['==', ['get', 'highway'], 'tertiary'], '#777777',
+              ['==', ['get', 'highway'], 'residential'], '#888888',
+              ['has', 'tunnel'], '#444444',
+              ['has', 'bridge'], '#888888',
+              '#777777'
+            ],
+            'line-width': [
+              'case',
+              ['==', ['get', 'highway'], 'motorway'], 8,
+              ['==', ['get', 'highway'], 'trunk'], 6,
+              ['==', ['get', 'highway'], 'primary'], 5,
+              ['==', ['get', 'highway'], 'secondary'], 4,
+              ['==', ['get', 'highway'], 'tertiary'], 3,
+              ['==', ['get', 'highway'], 'residential'], 3,
+              ['==', ['get', 'highway'], 'service'], 2,
+              ['==', ['get', 'highway'], 'footway'], 1,
+              ['==', ['get', 'highway'], 'path'], 1,
+              2
+            ],
+            'line-opacity': 0.9
+          }
+        },
+        // Other polygon features (buildings, etc.) - keep transparent
+        {
+          id: 'other-polygons',
+          type: 'fill' as const,
+          source: 'nyc-data',
+          filter: [
+            'all',
+            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+            ['!=', ['get', 'is_road_polygon'], true],
+            ['!has', 'highway']
+          ],
+          paint: {
+            'fill-color': '#00000000',
+            'fill-opacity': 0
+          }
+        },
+        // Other lines (non-roads) - light gray
+        {
+          id: 'other-lines',
+          type: 'line' as const,
+          source: 'nyc-data',
+          filter: [
+            'all',
+            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+            ['!=', ['get', 'is_road_polygon'], true],
+            ['!has', 'highway'],
+            ['!has', 'bridge'],
+            ['!has', 'tunnel']
+          ],
+          paint: {
+            'line-color': '#cccccc',
+            'line-width': 1,
+            'line-opacity': 0.3
+          }
+        },
+        // Points
+        {
+          id: 'points',
           type: 'circle' as const,
           source: 'nyc-data',
           filter: ['==', ['geometry-type'], 'Point'],
           paint: {
-            'circle-color': '#0000FF', // Bright blue
-            'circle-radius': 8,
-            'circle-opacity': 0.8,
-            'circle-stroke-color': '#FFFFFF',
-            'circle-stroke-width': 2
-          }
-        },
-        // DIAGNOSTIC: Add labels to see what we're actually looking at
-        {
-          id: 'diagnostic-labels',
-          type: 'symbol' as const,
-          source: 'nyc-data',
-          layout: {
-            'text-field': [
-              'case',
-              ['has', 'name'], ['get', 'name'],
-              ['has', 'highway'], ['concat', 'Road: ', ['get', 'highway']],
-              ['has', 'natural'], ['concat', 'Natural: ', ['get', 'natural']],
-              ['has', 'building'], 'Building',
-              ['geometry-type']
-            ],
-            'text-font': ['Open Sans Regular'],
-            'text-size': 12,
-            'text-anchor': 'center'
-          },
-          paint: {
-            'text-color': '#FFFFFF',
-            'text-halo-color': '#000000',
-            'text-halo-width': 2
+            'circle-color': '#aaaaaa',
+            'circle-radius': 2,
+            'circle-opacity': 0.5
           }
         }
       ]
@@ -222,119 +457,194 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     const initializeMap = async () => {
       try {
-        // Fetch GeoJSON data from Supabase
-        const geojsonData = await fetchNYCGeoJSON();
+        console.log('=== MAP INITIALIZATION START ===');
         
-        if (isCleanedUp) {
-          console.log('MapLibre: Initialization cancelled due to cleanup');
-          return;
-        }
-        
-        if (!geojsonData) {
-          console.error('Failed to load NYC GeoJSON data from Supabase');
-          // Fallback to basic OSM tiles
-          mapInstance = new maplibregl.Map({
-            container: mapRef.current!,
-            style: {
-              version: 8,
-              sources: {
-                'osm': {
-                  type: 'raster',
-                  tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-                  tileSize: 256,
-                  attribution: '© OpenStreetMap contributors'
-                }
-              },
-              layers: [
-                {
-                  id: 'osm-tiles',
-                  type: 'raster',
-                  source: 'osm'
-                }
-              ]
-            },
-            center: [-73.9712, 40.7831],
-            zoom: 14,
-            maxBounds: [
-              [-74.2557, 40.4960],
-              [-73.7004, 40.9152]
-            ]
-          });
-          
-          if (!isCleanedUp) {
-            setMap(mapInstance);
-            onMapLoad?.(mapInstance);
-          }
-          return;
-        }
-
-        // Create map with diagnostic style
+        // First, create a basic map to test if MapLibre is working
+        console.log('Creating basic OSM map first...');
         mapInstance = new maplibregl.Map({
           container: mapRef.current!,
-          style: createMapStyle(geojsonData) as any,
-          center: [-73.9712, 40.7831], // NYC center
+          style: {
+            version: 8,
+            sources: {
+              'osm': {
+                type: 'raster',
+                tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                tileSize: 256,
+                attribution: '© OpenStreetMap contributors'
+              }
+            },
+            layers: [
+              {
+                id: 'osm-tiles',
+                type: 'raster',
+                source: 'osm'
+              }
+            ]
+          },
+          center: [-73.9712, 40.7831],
           zoom: 14,
           maxBounds: [
-            [-74.2557, 40.4960], // Southwest corner (Staten Island)
-            [-73.7004, 40.9152]  // Northeast corner (Bronx)
+            [-74.2557, 40.4960],
+            [-73.7004, 40.9152]
           ]
+        });
+
+        console.log('Basic map created, waiting for load...');
+
+        mapInstance.on('load', async () => {
+          console.log('Basic map loaded successfully!');
+          
+          try {
+            // Now fetch and add the GeoJSON data
+            console.log('Fetching GeoJSON data...');
+            const geojsonData = await fetchNYCGeoJSON();
+            
+            if (isCleanedUp) {
+              console.log('MapLibre: Initialization cancelled due to cleanup');
+              return;
+            }
+            
+            if (!geojsonData) {
+              console.warn('No GeoJSON data available, keeping basic OSM map');
+              if (!isCleanedUp) {
+                setMap(mapInstance);
+                onMapLoad?.(mapInstance);
+              }
+              return;
+            }
+
+            console.log('Adding NYC data source to map...');
+            // Add the processed GeoJSON as a source
+            mapInstance!.addSource('nyc-data', {
+              type: 'geojson',
+              data: geojsonData
+            });
+
+            console.log('Adding road polygon layers...');
+            // Add road polygon fill layer
+            mapInstance!.addLayer({
+              id: 'road-polygons',
+              type: 'fill',
+              source: 'nyc-data',
+              filter: [
+                'all',
+                ['==', ['get', 'is_road_polygon'], true],
+                ['==', ['geometry-type'], 'Polygon']
+              ],
+              paint: {
+                'fill-color': [
+                  'case',
+                  ['==', ['get', 'road_type'], 'motorway'], '#555555',
+                  ['==', ['get', 'road_type'], 'trunk'], '#555555',
+                  ['==', ['get', 'road_type'], 'primary'], '#666666',
+                  ['==', ['get', 'road_type'], 'secondary'], '#777777',
+                  ['==', ['get', 'road_type'], 'tertiary'], '#777777',
+                  ['==', ['get', 'road_type'], 'residential'], '#888888',
+                  ['==', ['get', 'road_type'], 'service'], '#999999',
+                  ['has', 'tunnel'], '#444444',
+                  ['has', 'bridge'], '#888888',
+                  '#777777'
+                ],
+                'fill-opacity': 0.9
+              }
+            });
+
+            // Add road polygon outline layer
+            mapInstance!.addLayer({
+              id: 'road-polygon-outlines',
+              type: 'line',
+              source: 'nyc-data',
+              filter: [
+                'all',
+                ['==', ['get', 'is_road_polygon'], true],
+                ['==', ['geometry-type'], 'Polygon']
+              ],
+              paint: {
+                'line-color': '#555555',
+                'line-width': 0.8,
+                'line-opacity': 0.6
+              }
+            });
+
+            // Add MultiPolygon road features
+            mapInstance!.addLayer({
+              id: 'road-multipolygons',
+              type: 'fill',
+              source: 'nyc-data',
+              filter: [
+                'all',
+                ['==', ['get', 'is_road_polygon'], true],
+                ['==', ['geometry-type'], 'MultiPolygon']
+              ],
+              paint: {
+                'fill-color': '#777777',
+                'fill-opacity': 0.9
+              }
+            });
+
+            console.log('Adding fallback road lines layer...');
+            // Add remaining road lines (fallback)
+            mapInstance!.addLayer({
+              id: 'remaining-road-lines',
+              type: 'line',
+              source: 'nyc-data',
+              filter: [
+                'all',
+                ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+                ['!=', ['get', 'is_road_polygon'], true],
+                ['any',
+                  ['has', 'highway'],
+                  ['has', 'bridge'],
+                  ['has', 'tunnel']
+                ]
+              ],
+              paint: {
+                'line-color': '#777777',
+                'line-width': 3,
+                'line-opacity': 0.8
+              }
+            });
+
+            console.log('All layers added successfully!');
+            
+            // Debug: Check what was actually added
+            setTimeout(() => {
+              try {
+                const roadPolygons = mapInstance!.queryRenderedFeatures(undefined, { layers: ['road-polygons'] });
+                const roadMultiPolygons = mapInstance!.queryRenderedFeatures(undefined, { layers: ['road-multipolygons'] });
+                const roadLines = mapInstance!.queryRenderedFeatures(undefined, { layers: ['remaining-road-lines'] });
+                console.log(`Rendered features: ${roadPolygons.length} polygons, ${roadMultiPolygons.length} multipolygons, ${roadLines.length} lines`);
+                
+                if (roadPolygons.length > 0) {
+                  console.log('Sample road polygon feature:', roadPolygons[0]);
+                }
+              } catch (error) {
+                console.warn('Could not query rendered features:', error);
+              }
+            }, 2000);
+
+          } catch (dataError) {
+            console.error('Error adding GeoJSON data to map:', dataError);
+          }
+          
+          if (!isCleanedUp) {
+            onMapLoad?.(mapInstance);
+          }
         });
 
         // Add zoom change listener
         mapInstance.on('zoom', handleZoomChange);
-
-        // Map load event
-        mapInstance.on('load', () => {
-          console.log('MapLibre: Map loaded with NYC GeoJSON from Supabase');
-          
-          // Debug: Log what layers are loaded
-          const style = mapInstance!.getStyle();
-          console.log('Loaded layers:', style.layers.map(l => ({ id: l.id, type: l.type })));
-          
-          // Debug: Check if source has data and count features
-          const source = mapInstance!.getSource('nyc-data') as maplibregl.GeoJSONSource;
-          if (source) {
-            console.log('NYC data source loaded successfully');
-            // Try to query rendered features
-            setTimeout(() => {
-              try {
-                const features = mapInstance!.querySourceFeatures('nyc-data');
-                console.log(`Queried ${features.length} features from source`);
-                if (features.length > 0) {
-                  console.log('Sample queried feature:', features[0]);
-                }
-              } catch (error) {
-                console.warn('Could not query source features:', error);
-              }
-            }, 1000);
-          }
-          
-          if (!isCleanedUp) {
-            onMapLoad?.(mapInstance);
-          }
-        });
 
         // Error handling
         mapInstance.on('error', (e) => {
           console.error('MapLibre: Map error:', e);
         });
 
-        // Debug: Log style errors
-        mapInstance.on('styleimagemissing', (e) => {
-          console.warn('MapLibre: Missing style image:', e.id);
-        });
-
-        // Debug: Log when data is loaded
-        mapInstance.on('sourcedata', (e) => {
-          if (e.sourceId === 'nyc-data' && e.isSourceLoaded) {
-            console.log('NYC data source finished loading');
-          }
-        });
-
         if (!isCleanedUp) {
           setMap(mapInstance);
           console.log('MapLibre: Map instance set to state');
         }
+
       } catch (error) {
         console.error('MapLibre: Error during initialization:', error);
       }
@@ -360,7 +670,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, [supabaseUrl, supabaseKey]);
 
-  // Create marker clustering
+  // Create marker clustering (unchanged)
   useEffect(() => {
     if (!map || !businesses.length) return;
 
