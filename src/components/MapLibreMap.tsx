@@ -459,11 +459,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 'fill-opacity': 0.7
               }
             });
-            const boundstest = bbox(safeBufferedData);
-            mapInstance.fitBounds(boundstest, {
-              padding: 20,
-              duration: 1000
-            });
+            const boundstest = bbox(safeBufferedData); // returns [minX, minY, maxX, maxY]
+            mapInstance.fitBounds(
+              [[boundstest[0], boundstest[1]], [boundstest[2], boundstest[3]]], // southwest and northeast corners
+              {
+                padding: 20,
+                duration: 1000
+              }
+            );
 
             // Add the main gray road polygons layer ON TOP of OSM tiles
             mapInstance!.addLayer({
