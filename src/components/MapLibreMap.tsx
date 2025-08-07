@@ -17,7 +17,7 @@ interface MapLibreMapProps {
   selectedBusiness?: { position: { lat: number; lng: number } } | null;
   supabaseUrl: string;
   supabaseKey: string;
-}x
+}
 
 function debugGeoJSONProperties(geojsonData: any) {
   console.log('=== COMPREHENSIVE GeoJSON Debug Info ===');
