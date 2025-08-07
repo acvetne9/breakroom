@@ -73,137 +73,29 @@ function debugGeoJSONProperties(geojsonData: any) {
   }
 }
 
-// Enhanced function to convert road lines to polygons using Turf.js
+// Since the roads are already merged and processed, we can simplify this function
 const processRoadGeometry = (geojsonData: any) => {
-  console.log('Processing road geometry...');
+  console.log('Processing merged road geometry...');
   
   try {
-    const processedFeatures: any[] = [];
-    let successCount = 0;
-    let errorCount = 0;
-    let roadCount = 0;
+    // The merged_roads.geojson.gz should already contain processed road polygons
+    // so we may not need to do much processing here
+    console.log(`Total features in merged roads: ${geojsonData.features?.length || 0}`);
     
-    geojsonData.features.forEach((feature: any, index: number) => {
-      // More comprehensive road detection
-      const isRoad = feature.properties?.highway || 
-                    feature.properties?.bridge || 
-                    feature.properties?.tunnel ||
-                    (feature.properties?.man_made && ['bridge_support', 'pier'].includes(feature.properties.man_made)) ||
-                    (feature.properties?.type === 'route') ||
-                    (feature.properties?.route === 'road');
-      
-      if (isRoad && (feature.geometry.type === 'LineString' || feature.geometry.type === 'MultiLineString')) {
-        roadCount++;
-        console.log(`Processing road ${roadCount} (index ${index}):`, {
-          highway: feature.properties?.highway,
-          bridge: feature.properties?.bridge,
-          tunnel: feature.properties?.tunnel,
-          geometryType: feature.geometry.type,
-          coordinateCount: feature.geometry.coordinates?.length
-        });
-        
-        try {
-          // Determine buffer width based on road type (in meters, converted to degrees approximately)
-          let bufferWidthMeters = 5; // Default 5 meters
-          
-          if (feature.properties?.highway) {
-            const roadType = feature.properties.highway;
-            switch (roadType) {
-              case 'motorway':
-              case 'trunk':
-                bufferWidthMeters = 15;
-                break;
-              case 'primary':
-                bufferWidthMeters = 12;
-                break;
-              case 'secondary':
-                bufferWidthMeters = 10;
-                break;
-              case 'tertiary':
-              case 'residential':
-                bufferWidthMeters = 8;
-                break;
-              case 'service':
-                bufferWidthMeters = 4;
-                break;
-              case 'footway':
-              case 'path':
-                bufferWidthMeters = 2;
-                break;
-              default:
-                bufferWidthMeters = 6;
-            }
-          }
-          
-          // Buffer the line to create a polygon - using meters for more accurate results
-          const buffered = turf.buffer(feature, bufferWidthMeters, { units: 'meters' });
-          
-          if (buffered && buffered.geometry && buffered.geometry.coordinates && buffered.geometry.coordinates.length > 0) {
-            // Preserve original properties and add road indicator
-            const processedFeature = {
-              ...buffered,
-              properties: {
-                ...feature.properties,
-                original_geometry_type: feature.geometry.type,
-                is_road_polygon: true,
-                buffer_width_meters: bufferWidthMeters,
-                road_type: feature.properties?.highway || 'unknown'
-              }
-            };
-            
-            processedFeatures.push(processedFeature);
-            successCount++;
-            
-            // Log first few successful conversions for debugging
-            if (successCount <= 3) {
-              console.log(`Successfully buffered road ${successCount}:`, {
-                original: feature.geometry.type,
-                new: processedFeature.geometry.type,
-                roadType: feature.properties?.highway,
-                bufferWidth: bufferWidthMeters
-              });
-            }
-          } else {
-            console.warn(`Buffer returned invalid result for road at index ${index}`);
-            // Keep original feature if buffering returns invalid result
-            processedFeatures.push(feature);
-            errorCount++;
-          }
-        } catch (error) {
-          console.warn(`Failed to buffer road feature at index ${index}:`, error);
-          // Keep original feature if buffering fails
-          processedFeatures.push(feature);
-          errorCount++;
-        }
-      } else {
-        // Keep non-road features as-is
-        processedFeatures.push(feature);
-      }
-    });
+    // Check what types of geometries we have
+    const geometryTypes = geojsonData.features?.reduce((acc: any, f: any) => {
+      const type = f.geometry.type;
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {}) || {};
     
-    console.log(`Road processing complete: 
-      - Total roads found: ${roadCount}
-      - Successfully converted: ${successCount}
-      - Errors: ${errorCount}
-      - Total processed features: ${processedFeatures.length}`);
+    console.log('Geometry types in merged roads:', geometryTypes);
     
-    // Verify we have road polygons
-    const roadPolygons = processedFeatures.filter(f => f.properties?.is_road_polygon === true);
-    console.log(`Final road polygons in processed data: ${roadPolygons.length}`);
-    
-    if (roadPolygons.length > 0) {
-      console.log('Sample road polygon properties:', roadPolygons[0].properties);
-      console.log('Sample road polygon geometry type:', roadPolygons[0].geometry.type);
-    }
-    
-    return {
-      ...geojsonData,
-      features: processedFeatures
-    };
+    // If the roads are already polygons, just return as-is
+    return geojsonData;
     
   } catch (error) {
-    console.error('Critical error in processRoadGeometry:', error);
-    // Return original data if processing fails completely
+    console.error('Error processing merged road geometry:', error);
     return geojsonData;
   }
 };
@@ -224,14 +116,49 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   
   const MARKER_VISIBILITY_ZOOM_THRESHOLD = 13;
 
-  // Function to fetch NYC GeoJSON from Supabase
-  const fetchNYCGeoJSON = useCallback(async () => {
+  // Function to decompress gzipped content
+  const decompressGzip = async (response: Response): Promise<any> => {
     try {
-      console.log('Fetching NYC GeoJSON from Supabase...');
-      const response = await fetch(`${supabaseUrl}/storage/v1/object/public/nyc-map-storage-files/nyc.geojson`, {
+      // Check if the browser supports CompressionStream (modern browsers)
+      if ('DecompressionStream' in window) {
+        console.log('Using browser native decompression...');
+        const stream = new ReadableStream({
+          start(controller) {
+            response.body?.getReader().read().then(function pump({ done, value }): any {
+              if (done) {
+                controller.close();
+                return;
+              }
+              controller.enqueue(value);
+              return response.body?.getReader().read().then(pump);
+            });
+          }
+        });
+        
+        const decompressedStream = stream.pipeThrough(new (window as any).DecompressionStream('gzip'));
+        const decompressedResponse = new Response(decompressedStream);
+        return await decompressedResponse.json();
+      } else {
+        console.log('Browser native decompression not available, trying direct JSON parse...');
+        // Fallback: try to parse directly (in case the server auto-decompresses)
+        return await response.json();
+      }
+    } catch (error) {
+      console.warn('Decompression failed, trying direct JSON parse:', error);
+      // Final fallback
+      return await response.json();
+    }
+  };
+
+  // Function to fetch merged roads GeoJSON from Supabase
+  const fetchMergedRoadsGeoJSON = useCallback(async () => {
+    try {
+      console.log('Fetching merged roads GeoJSON from Supabase...');
+      const response = await fetch(`${supabaseUrl}/storage/v1/object/public/nyc-map-storage-files/merged_roads.geojson.gz`, {
         headers: {
           'Authorization': `Bearer ${supabaseKey}`,
-          'Content-Type': 'application/json'
+          'Accept': 'application/json, application/gzip',
+          'Accept-Encoding': 'gzip'
         }
       });
       
@@ -239,28 +166,29 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         throw new Error(`Failed to fetch GeoJSON: ${response.statusText}`);
       }
       
-      const geojsonData = await response.json();
-      console.log('GeoJSON fetched successfully, starting debug...');
+      console.log('Response received, attempting to decompress...');
+      const geojsonData = await decompressGzip(response);
+      
+      console.log('Merged roads GeoJSON loaded successfully, starting debug...');
       debugGeoJSONProperties(geojsonData);
       
-      console.log('Starting road geometry processing...');
-      // Process road geometry to convert lines to polygons
+      console.log('Processing merged road geometry...');
       const processedData = processRoadGeometry(geojsonData);
-      console.log('Road geometry processing complete');
+      console.log('Merged road geometry processing complete');
       
       return processedData;
     } catch (error) {
-      console.error('Error fetching NYC GeoJSON from Supabase:', error);
+      console.error('Error fetching merged roads GeoJSON from Supabase:', error);
       return null;
     }
   }, [supabaseUrl, supabaseKey]);
 
-  // Enhanced map style with improved gray road styling
+  // Enhanced map style for merged roads
   const createMapStyle = useCallback((geojsonData: any) => {
     return {
       version: 8 as const,
       sources: {
-        'nyc-data': {
+        'merged-roads': {
           type: 'geojson' as const,
           data: geojsonData
         },
@@ -279,26 +207,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: 'raster' as const,
           source: 'osm'
         },
-        // Road polygons (converted from lines) - Main gray roads
+        // Main road polygons from merged data
         {
-          id: 'road-polygons',
+          id: 'merged-road-polygons',
           type: 'fill' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['==', ['get', 'is_road_polygon'], true],
-            ['==', ['geometry-type'], 'Polygon']
-          ],
+          source: 'merged-roads',
+          filter: ['==', ['geometry-type'], 'Polygon'],
           paint: {
             'fill-color': [
               'case',
-              ['==', ['get', 'road_type'], 'motorway'], '#555555',
-              ['==', ['get', 'road_type'], 'trunk'], '#555555',
-              ['==', ['get', 'road_type'], 'primary'], '#666666',
-              ['==', ['get', 'road_type'], 'secondary'], '#777777',
-              ['==', ['get', 'road_type'], 'tertiary'], '#777777',
-              ['==', ['get', 'road_type'], 'residential'], '#888888',
-              ['==', ['get', 'road_type'], 'service'], '#999999',
+              ['==', ['get', 'highway'], 'motorway'], '#555555',
+              ['==', ['get', 'highway'], 'trunk'], '#555555',
+              ['==', ['get', 'highway'], 'primary'], '#666666',
+              ['==', ['get', 'highway'], 'secondary'], '#777777',
+              ['==', ['get', 'highway'], 'tertiary'], '#777777',
+              ['==', ['get', 'highway'], 'residential'], '#888888',
+              ['==', ['get', 'highway'], 'service'], '#999999',
               ['has', 'tunnel'], '#444444',
               ['has', 'bridge'], '#888888',
               '#777777' // default gray
@@ -306,16 +230,35 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'fill-opacity': 0.9
           }
         },
-        // Road polygon outlines for better definition
+        // MultiPolygon roads from merged data
         {
-          id: 'road-polygon-outlines',
+          id: 'merged-road-multipolygons',
+          type: 'fill' as const,
+          source: 'merged-roads',
+          filter: ['==', ['geometry-type'], 'MultiPolygon'],
+          paint: {
+            'fill-color': [
+              'case',
+              ['==', ['get', 'highway'], 'motorway'], '#555555',
+              ['==', ['get', 'highway'], 'trunk'], '#555555',
+              ['==', ['get', 'highway'], 'primary'], '#666666',
+              ['==', ['get', 'highway'], 'secondary'], '#777777',
+              ['==', ['get', 'highway'], 'tertiary'], '#777777',
+              ['==', ['get', 'highway'], 'residential'], '#888888',
+              ['==', ['get', 'highway'], 'service'], '#999999',
+              ['has', 'tunnel'], '#444444',
+              ['has', 'bridge'], '#888888',
+              '#777777'
+            ],
+            'fill-opacity': 0.9
+          }
+        },
+        // Road outlines for better definition
+        {
+          id: 'merged-road-outlines',
           type: 'line' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['==', ['get', 'is_road_polygon'], true],
-            ['==', ['geometry-type'], 'Polygon']
-          ],
+          source: 'merged-roads',
+          filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
           paint: {
             'line-color': '#555555',
             'line-width': [
@@ -329,36 +272,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'line-opacity': 0.6
           }
         },
-        // MultiPolygon road features
+        // Fallback for any line strings that might still exist
         {
-          id: 'road-multipolygons',
-          type: 'fill' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['==', ['get', 'is_road_polygon'], true],
-            ['==', ['geometry-type'], 'MultiPolygon']
-          ],
-          paint: {
-            'fill-color': '#777777',
-            'fill-opacity': 0.9
-          }
-        },
-        // Fallback for any remaining road lines that weren't converted
-        {
-          id: 'remaining-road-lines',
+          id: 'merged-road-lines',
           type: 'line' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-            ['!=', ['get', 'is_road_polygon'], true],
-            ['any',
-              ['has', 'highway'],
-              ['has', 'bridge'],
-              ['has', 'tunnel']
-            ]
-          ],
+          source: 'merged-roads',
+          filter: ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
           paint: {
             'line-color': [
               'case',
@@ -368,8 +287,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ['==', ['get', 'highway'], 'secondary'], '#777777',
               ['==', ['get', 'highway'], 'tertiary'], '#777777',
               ['==', ['get', 'highway'], 'residential'], '#888888',
-              ['has', 'tunnel'], '#444444',
-              ['has', 'bridge'], '#888888',
               '#777777'
             ],
             'line-width': [
@@ -381,58 +298,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ['==', ['get', 'highway'], 'tertiary'], 3,
               ['==', ['get', 'highway'], 'residential'], 3,
               ['==', ['get', 'highway'], 'service'], 2,
-              ['==', ['get', 'highway'], 'footway'], 1,
-              ['==', ['get', 'highway'], 'path'], 1,
               2
             ],
             'line-opacity': 0.9
-          }
-        },
-        // Other polygon features (buildings, etc.) - keep transparent
-        {
-          id: 'other-polygons',
-          type: 'fill' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-            ['!=', ['get', 'is_road_polygon'], true],
-            ['!has', 'highway']
-          ],
-          paint: {
-            'fill-color': '#00000000',
-            'fill-opacity': 0
-          }
-        },
-        // Other lines (non-roads) - light gray
-        {
-          id: 'other-lines',
-          type: 'line' as const,
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-            ['!=', ['get', 'is_road_polygon'], true],
-            ['!has', 'highway'],
-            ['!has', 'bridge'],
-            ['!has', 'tunnel']
-          ],
-          paint: {
-            'line-color': '#cccccc',
-            'line-width': 1,
-            'line-opacity': 0.3
-          }
-        },
-        // Points
-        {
-          id: 'points',
-          type: 'circle' as const,
-          source: 'nyc-data',
-          filter: ['==', ['geometry-type'], 'Point'],
-          paint: {
-            'circle-color': '#aaaaaa',
-            'circle-radius': 2,
-            'circle-opacity': 0.5
           }
         }
       ]
@@ -447,11 +315,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [map]);
 
-  // Initialize map with Supabase GeoJSON data
+  // Initialize map with merged roads GeoJSON data
   useEffect(() => {
     if (!mapRef.current) return;
     
-    console.log('MapLibre: Initializing map...');
+    console.log('MapLibre: Initializing map with merged roads...');
     let mapInstance: maplibregl.Map | null = null;
     let isCleanedUp = false;
 
@@ -459,7 +327,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       try {
         console.log('=== MAP INITIALIZATION START ===');
         
-        // First, create a basic map to test if MapLibre is working
+        // Create a basic map first
         console.log('Creating basic OSM map first...');
         mapInstance = new maplibregl.Map({
           container: mapRef.current!,
@@ -495,9 +363,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           console.log('Basic map loaded successfully!');
           
           try {
-            // Now fetch and add the GeoJSON data
-            console.log('Fetching GeoJSON data...');
-            const geojsonData = await fetchNYCGeoJSON();
+            // Fetch and add the merged roads GeoJSON data
+            console.log('Fetching merged roads GeoJSON data...');
+            const geojsonData = await fetchMergedRoadsGeoJSON();
             
             if (isCleanedUp) {
               console.log('MapLibre: Initialization cancelled due to cleanup');
@@ -505,7 +373,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             }
             
             if (!geojsonData) {
-              console.warn('No GeoJSON data available, keeping basic OSM map');
+              console.warn('No merged roads GeoJSON data available, keeping basic OSM map');
               if (!isCleanedUp) {
                 setMap(mapInstance);
                 onMapLoad?.(mapInstance);
@@ -513,34 +381,54 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               return;
             }
 
-            console.log('Adding NYC data source to map...');
-            // Add the processed GeoJSON as a source
-            mapInstance!.addSource('nyc-data', {
+            console.log('Adding merged roads data source to map...');
+            // Add the merged roads GeoJSON as a source
+            mapInstance!.addSource('merged-roads', {
               type: 'geojson',
               data: geojsonData
             });
 
-            console.log('Adding road polygon layers...');
+            console.log('Adding merged road polygon layers...');
             // Add road polygon fill layer
             mapInstance!.addLayer({
-              id: 'road-polygons',
+              id: 'merged-road-polygons',
               type: 'fill',
-              source: 'nyc-data',
-              filter: [
-                'all',
-                ['==', ['get', 'is_road_polygon'], true],
-                ['==', ['geometry-type'], 'Polygon']
-              ],
+              source: 'merged-roads',
+              filter: ['==', ['geometry-type'], 'Polygon'],
               paint: {
                 'fill-color': [
                   'case',
-                  ['==', ['get', 'road_type'], 'motorway'], '#555555',
-                  ['==', ['get', 'road_type'], 'trunk'], '#555555',
-                  ['==', ['get', 'road_type'], 'primary'], '#666666',
-                  ['==', ['get', 'road_type'], 'secondary'], '#777777',
-                  ['==', ['get', 'road_type'], 'tertiary'], '#777777',
-                  ['==', ['get', 'road_type'], 'residential'], '#888888',
-                  ['==', ['get', 'road_type'], 'service'], '#999999',
+                  ['==', ['get', 'highway'], 'motorway'], '#555555',
+                  ['==', ['get', 'highway'], 'trunk'], '#555555',
+                  ['==', ['get', 'highway'], 'primary'], '#666666',
+                  ['==', ['get', 'highway'], 'secondary'], '#777777',
+                  ['==', ['get', 'highway'], 'tertiary'], '#777777',
+                  ['==', ['get', 'highway'], 'residential'], '#888888',
+                  ['==', ['get', 'highway'], 'service'], '#999999',
+                  ['has', 'tunnel'], '#444444',
+                  ['has', 'bridge'], '#888888',
+                  '#777777'
+                ],
+                'fill-opacity': 0.9
+              }
+            });
+
+            // Add MultiPolygon road features
+            mapInstance!.addLayer({
+              id: 'merged-road-multipolygons',
+              type: 'fill',
+              source: 'merged-roads',
+              filter: ['==', ['geometry-type'], 'MultiPolygon'],
+              paint: {
+                'fill-color': [
+                  'case',
+                  ['==', ['get', 'highway'], 'motorway'], '#555555',
+                  ['==', ['get', 'highway'], 'trunk'], '#555555',
+                  ['==', ['get', 'highway'], 'primary'], '#666666',
+                  ['==', ['get', 'highway'], 'secondary'], '#777777',
+                  ['==', ['get', 'highway'], 'tertiary'], '#777777',
+                  ['==', ['get', 'highway'], 'residential'], '#888888',
+                  ['==', ['get', 'highway'], 'service'], '#999999',
                   ['has', 'tunnel'], '#444444',
                   ['has', 'bridge'], '#888888',
                   '#777777'
@@ -551,14 +439,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
             // Add road polygon outline layer
             mapInstance!.addLayer({
-              id: 'road-polygon-outlines',
+              id: 'merged-road-outlines',
               type: 'line',
-              source: 'nyc-data',
-              filter: [
-                'all',
-                ['==', ['get', 'is_road_polygon'], true],
-                ['==', ['geometry-type'], 'Polygon']
-              ],
+              source: 'merged-roads',
+              filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
               paint: {
                 'line-color': '#555555',
                 'line-width': 0.8,
@@ -566,38 +450,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               }
             });
 
-            // Add MultiPolygon road features
-            mapInstance!.addLayer({
-              id: 'road-multipolygons',
-              type: 'fill',
-              source: 'nyc-data',
-              filter: [
-                'all',
-                ['==', ['get', 'is_road_polygon'], true],
-                ['==', ['geometry-type'], 'MultiPolygon']
-              ],
-              paint: {
-                'fill-color': '#777777',
-                'fill-opacity': 0.9
-              }
-            });
-
             console.log('Adding fallback road lines layer...');
-            // Add remaining road lines (fallback)
+            // Add any remaining road lines (fallback)
             mapInstance!.addLayer({
-              id: 'remaining-road-lines',
+              id: 'merged-road-lines',
               type: 'line',
-              source: 'nyc-data',
-              filter: [
-                'all',
-                ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-                ['!=', ['get', 'is_road_polygon'], true],
-                ['any',
-                  ['has', 'highway'],
-                  ['has', 'bridge'],
-                  ['has', 'tunnel']
-                ]
-              ],
+              source: 'merged-roads',
+              filter: ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
               paint: {
                 'line-color': '#777777',
                 'line-width': 3,
@@ -605,18 +464,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               }
             });
 
-            console.log('All layers added successfully!');
+            console.log('All merged road layers added successfully!');
             
             // Debug: Check what was actually added
             setTimeout(() => {
               try {
-                const roadPolygons = mapInstance!.queryRenderedFeatures(undefined, { layers: ['road-polygons'] });
-                const roadMultiPolygons = mapInstance!.queryRenderedFeatures(undefined, { layers: ['road-multipolygons'] });
-                const roadLines = mapInstance!.queryRenderedFeatures(undefined, { layers: ['remaining-road-lines'] });
-                console.log(`Rendered features: ${roadPolygons.length} polygons, ${roadMultiPolygons.length} multipolygons, ${roadLines.length} lines`);
+                const roadPolygons = mapInstance!.queryRenderedFeatures(undefined, { layers: ['merged-road-polygons'] });
+                const roadMultiPolygons = mapInstance!.queryRenderedFeatures(undefined, { layers: ['merged-road-multipolygons'] });
+                const roadLines = mapInstance!.queryRenderedFeatures(undefined, { layers: ['merged-road-lines'] });
+                console.log(`Rendered merged road features: ${roadPolygons.length} polygons, ${roadMultiPolygons.length} multipolygons, ${roadLines.length} lines`);
                 
                 if (roadPolygons.length > 0) {
-                  console.log('Sample road polygon feature:', roadPolygons[0]);
+                  console.log('Sample merged road polygon feature:', roadPolygons[0]);
                 }
               } catch (error) {
                 console.warn('Could not query rendered features:', error);
@@ -624,7 +483,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             }, 2000);
 
           } catch (dataError) {
-            console.error('Error adding GeoJSON data to map:', dataError);
+            console.error('Error adding merged roads GeoJSON data to map:', dataError);
           }
           
           if (!isCleanedUp) {
