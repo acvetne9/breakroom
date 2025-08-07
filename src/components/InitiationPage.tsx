@@ -5,29 +5,7 @@ import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 
 // Import the predefined job options to check against
-const JOB_OPTIONS = [
-  'Barista',
-  'Server', 
-  'Cook',
-  'Cashier',
-  'Security Guard',
-  'Retail Associate',
-  'Delivery Driver',
-  'Host/Hostess',
-  'Cleaner',
-  'Stock Associate',
-  'Customer Service',
-  'Manager',
-  'Waiter/Waitress',
-  'Receptionist',
-  'Sales Associate',
-  'Food Service Worker',
-  'Maintenance',
-  'Supervisor',
-  'Shift Leader',
-  'Assistant Manager'
-];
-
+const JOB_OPTIONS = ['Barista', 'Server', 'Cook', 'Cashier', 'Security Guard', 'Retail Associate', 'Delivery Driver', 'Host/Hostess', 'Cleaner', 'Stock Associate', 'Customer Service', 'Manager', 'Waiter/Waitress', 'Receptionist', 'Sales Associate', 'Food Service Worker', 'Maintenance', 'Supervisor', 'Shift Leader', 'Assistant Manager'];
 interface InitiationPageProps {
   onComplete: (data: {
     salary: string;
@@ -37,7 +15,6 @@ interface InitiationPageProps {
     timePeriod: string;
   }) => void;
 }
-
 const InitiationPage: React.FC<InitiationPageProps> = ({
   onComplete
 }) => {
@@ -47,48 +24,45 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   const [fullLocation, setFullLocation] = useState('');
   const [timePeriod, setTimePeriod] = useState('HR');
   const [isComplete, setIsComplete] = useState(false);
-  const { toast } = useToast();
-
+  const {
+    toast
+  } = useToast();
   const handleSalaryChange = (value: string) => {
     const cleanValue = value.replace(/[^0-9.]/g, '');
     setSalary(cleanValue ? `$${cleanValue}` : '');
   };
-
   const checkForCompletion = () => {
     const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
-    
-    console.log('checkForCompletion called:', { 
-      salary, 
-      role, 
-      location, 
+    console.log('checkForCompletion called:', {
+      salary,
+      role,
+      location,
       allFilled
     });
-    
     if (allFilled && !isComplete) {
       console.log('Setting isComplete to true');
       setIsComplete(true);
-      
+
       // Complete after animation
       setTimeout(() => {
-        const dataToPass = { 
-          salary, 
-          role, 
-          location, 
-          fullLocation: fullLocation || location, 
-          timePeriod 
+        const dataToPass = {
+          salary,
+          role,
+          location,
+          fullLocation: fullLocation || location,
+          timePeriod
         };
         console.log('InitiationPage completing with data:', dataToPass);
         onComplete(dataToPass);
       }, 500);
     }
   };
-
   const handleRoleChange = (value: string) => {
     console.log('handleRoleChange called with:', value);
-    
+
     // Check if this is a predefined job option (safe to use)
     const isPredefinedOption = JOB_OPTIONS.includes(value);
-    
+
     // Only validate for profanity if it's NOT a predefined option
     if (!isPredefinedOption && value && isProfane(value)) {
       console.log('Profanity detected in manual role input:', value);
@@ -99,26 +73,22 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       });
       return; // Don't set the value if it's profane
     }
-    
     console.log('Setting role:', value, 'isPredefined:', isPredefinedOption);
     setRole(value);
   };
-
   const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setLocation(value);
     setFullLocation(value); // Simple fallback - use same value
   };
-
   const handleLocationBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     const value = e.target.value.trim();
-    
     if (!value) {
       setLocation('');
       setFullLocation('');
       return;
     }
-    
+
     // Only validate for profanity on blur for manual input
     if (value && isProfane(value)) {
       toast({
@@ -131,48 +101,34 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       setFullLocation('');
       return;
     }
-    
     console.log('Location blur with value:', value);
     setLocation(value);
     setFullLocation(value);
-    
+
     // Check for completion
     setTimeout(() => {
       checkForCompletion();
     }, 10);
   };
-
-  return (
-    <motion.div 
-      initial={{ y: 0 }} 
-      animate={{ y: isComplete ? '-100vh' : 0 }} 
-      transition={{ duration: 0.5, ease: 'easeInOut' }} 
-      className="absolute inset-0 z-50 flex items-center justify-center"
-    >
+  return <motion.div initial={{
+    y: 0
+  }} animate={{
+    y: isComplete ? '-100vh' : 0
+  }} transition={{
+    duration: 0.5,
+    ease: 'easeInOut'
+  }} className="absolute inset-0 z-50 flex items-center justify-center">
       <div className="app-card flex flex-col justify-center px-8 py-12">
         <div className="space-y-6">
           <div className="text-center">
-            <h1 className="text-app-black mb-6 font-normal text-lg">
-              Real Info. Real Fast.
-            </h1>
+            <h1 className="text-app-black mb-6 font-normal text-lg">Add Your Past/Current Job</h1>
           </div>
 
           <div className="space-y-6">
             <div>
               <div className="flex items-center space-x-3">
-                <input 
-                  type="text" 
-                  value={salary} 
-                  onChange={e => handleSalaryChange(e.target.value)} 
-                  onBlur={checkForCompletion} 
-                  placeholder="$14" 
-                  className="app-input text-center text-lg flex-1 !py-0 h-12" 
-                />
-                <select 
-                  value={timePeriod} 
-                  onChange={(e) => setTimePeriod(e.target.value)}
-                  className="app-input text-lg w-auto !py-0 h-12"
-                >
+                <input type="text" value={salary} onChange={e => handleSalaryChange(e.target.value)} onBlur={checkForCompletion} placeholder="$14" className="app-input text-center text-lg flex-1 !py-0 h-12" />
+                <select value={timePeriod} onChange={e => setTimePeriod(e.target.value)} className="app-input text-lg w-auto !py-0 h-12">
                   <option value="HR">HR</option>
                   <option value="MO">MO</option>
                   <option value="YR">YR</option>
@@ -185,13 +141,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
             </div>
 
             <div>
-              <JobSearchDropdown 
-                value={role} 
-                onChange={handleRoleChange}
-                onBlur={checkForCompletion} 
-                placeholder="Search or select a job role..." 
-                className="app-input" 
-              />
+              <JobSearchDropdown value={role} onChange={handleRoleChange} onBlur={checkForCompletion} placeholder="Search or select a job role..." className="app-input" />
             </div>
 
             <div className="text-center">
@@ -199,14 +149,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
             </div>
 
             <div>
-              <input 
-                type="text" 
-                value={location}
-                onChange={handleLocationChange}
-                onBlur={handleLocationBlur} 
-                placeholder="Where'd you work?..." 
-                className="app-input" 
-              />
+              <input type="text" value={location} onChange={handleLocationChange} onBlur={handleLocationBlur} placeholder="Where'd you work?..." className="app-input" />
             </div>
 
             <div className="text-center mt-8">
@@ -215,8 +158,6 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
           </div>
         </div>
       </div>
-    </motion.div>
-  );
+    </motion.div>;
 };
-
 export default InitiationPage;
