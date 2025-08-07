@@ -1,48 +1,27 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import type { FeatureCollection, Polygon, Feature } from 'geojson';
+import type { FeatureCollection } from 'geojson';
 import maplibregl from 'maplibre-gl';
-import Supercluster from 'supercluster';
+import * as turf from '@turf/turf';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 interface MapLibreMapProps {
   onMapLoad?: (map: maplibregl.Map) => void;
-  businesses?: Array<{
-    id: string;
-    name: string;
-    position: { lat: number; lng: number };
-    atmosphere: string[];
-    salary?: string;
-  }>;
-  onBusinessClick?: (business: any) => void;
-  selectedBusiness?: { position: { lat: number; lng: number } } | null;
 }
 
-const MapLibreMap: React.FC<MapLibreMapProps> = ({ 
-  onMapLoad, 
-  businesses = [], 
-  onBusinessClick, 
-  selectedBusiness
-}) => {
+const MapLibreMap: React.FC<MapLibreMapProps> = ({ onMapLoad }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
-  const [markers, setMarkers] = useState<maplibregl.Marker[]>([]);
-  const clusterRef = useRef<Supercluster | null>(null);
 
-  // Load GeoJSON file
-  const loadGeoJSONData = useCallback(async (): Promise<any> => {
+  // Load GeoJSON from public directory
+  const loadGeoJSONData = useCallback(async (): Promise<FeatureCollection | null> => {
     try {
-      console.log('Loading GeoJSON data from example-points.geojson...');
-      
       const response = await fetch('/data/example-points.geojson');
-      
       if (!response.ok) {
         console.error('Failed to load GeoJSON:', response.statusText);
         return null;
       }
-      
       const data = await response.json();
-      console.log(`Loaded ${data.features?.length || 0} features from example-points.geojson`);
-      
+      console.log(`Loaded ${data.features?.length || 0} features`);
       return data;
     } catch (error) {
       console.error('Error loading GeoJSON:', error);
@@ -50,181 +29,111 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, []);
 
-  // Initialize map
   useEffect(() => {
     if (!mapRef.current) return;
-    
-    console.log('Initializing map...');
+
     let mapInstance: maplibregl.Map | null = null;
     let isCleanedUp = false;
 
-    const initializeMap = async () => {
-      try {
-        // Create basic map
-        mapInstance = new maplibregl.Map({
-          container: mapRef.current!,
-          style: {
-            version: 8,
-            sources: {},
-            layers: [
-              {
-                id: 'background',
-                type: 'background',
-                paint: {
-                  'background-color': '#f0f0f0'
-                }
-              }
-            ]
-          },
-          center: [-73.9712, 40.7831],
-          zoom: 14
+    const initMap = async () => {
+      mapInstance = new maplibregl.Map({
+        container: mapRef.current!,
+        style: 'https://demotiles.maplibre.org/style.json',
+        center: [-73.9712, 40.7831],
+        zoom: 13
+      });
+
+      mapInstance.on('load', async () => {
+        const geoData = await loadGeoJSONData();
+        if (!geoData || isCleanedUp) return;
+
+        // Add GeoJSON source
+        mapInstance!.addSource('geojson-data', {
+          type: 'geojson',
+          data: geoData
         });
 
-        mapInstance.on('load', async () => {
-          console.log('Map loaded, adding GeoJSON data...');
-          
-          // Load GeoJSON data
-          const geoData = await loadGeoJSONData();
-          
-          if (isCleanedUp || !geoData?.features) {
-            return;
-          }
-
-          // Add GeoJSON source
-          mapInstance!.addSource('geojson-data', {
-            type: 'geojson',
-            data: geoData
-          });
-          
-          // Water polygons (name contains water words)
-          mapInstance.addLayer({
-            id: 'parks',
-            type: 'fill',
-            source: 'geojson-data',
-            filter: ['all',
-              ['in', ['geometry-type'], 'Polygon', 'MultiPolygon'],
-              ['==', ['get', 'leisure'], 'park']
-            ] as any,
-            paint: {
-              'fill-color': '#81C784',
-              'fill-opacity': 0.5
-            }
-          });
-
-          mapInstance.addLayer({
-            id: 'water',
-            type: 'fill',
-            source: 'geojson-data',
-            filter: ['all',
-              ['in', ['geometry-type'], 'Polygon', 'MultiPolygon'],
-              ['==', ['get', 'natural'], 'water']
-            ] as any,
-            paint: {
-              'fill-color': '#64B5F6',
-              'fill-opacity': 0.6
-            }
-          });
-
-
-          
-          // Add roads after (to render on top)
-          mapInstance.addLayer({
-            id: 'roads',
-            type: 'line',
-            source: 'geojson-data',
-            filter: ['==', '$type', 'LineString'],
-            paint: {
-              'line-color': '#888888',
-              'line-width': 1.5
-            }
-          });
-
-          console.log('All GeoJSON layers added successfully!');
-          
-          if (!isCleanedUp) {
-            setMap(mapInstance);
-            onMapLoad?.(mapInstance);
+        // Parks
+        mapInstance!.addLayer({
+          id: 'parks',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['all', ['==', '$type', 'Polygon'], ['==', ['get', 'leisure'], 'park']],
+          paint: {
+            'fill-color': '#81C784',
+            'fill-opacity': 0.5
           }
         });
 
-        mapInstance.on('error', (e) => {
-          console.error('Map error:', e);
+        // Water
+        mapInstance!.addLayer({
+          id: 'water',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['all', ['==', '$type', 'Polygon'], ['==', ['get', 'natural'], 'water']],
+          paint: {
+            'fill-color': '#64B5F6',
+            'fill-opacity': 0.6
+          }
         });
 
-      } catch (error) {
-        console.error('Error during map initialization:', error);
-      }
+        // Roads (LineStrings)
+        mapInstance!.addLayer({
+          id: 'roads',
+          type: 'line',
+          source: 'geojson-data',
+          filter: ['==', '$type', 'LineString'],
+          paint: {
+            'line-color': '#888888',
+            'line-width': 1.5
+          }
+        });
+
+        // Debug: Show all polygons (optional)
+        /*
+        mapInstance!.addLayer({
+          id: 'all-polygons',
+          type: 'fill',
+          source: 'geojson-data',
+          paint: {
+            'fill-color': '#e91e63',
+            'fill-opacity': 0.4,
+            'fill-outline-color': '#000'
+          }
+        });
+        */
+
+        // Fit to bounds
+        const bbox = turf.bbox(geoData);
+        mapInstance!.fitBounds(bbox as [number, number, number, number], { padding: 40 });
+
+        if (!isCleanedUp) {
+          setMap(mapInstance!);
+          onMapLoad?.(mapInstance!);
+        }
+      });
+
+      mapInstance.on('error', (e) => {
+        console.error('Map error:', e);
+      });
     };
 
-    initializeMap();
+    initMap();
 
     return () => {
-      console.log('Cleaning up map...');
       isCleanedUp = true;
-      
       try {
-        if (mapInstance && mapInstance.getContainer()) {
-          mapInstance.remove();
-        }
-      } catch (error) {
-        console.warn('Error cleaning up map:', error);
+        mapInstance?.remove();
+      } catch (e) {
+        console.warn('Map cleanup error:', e);
       }
-      mapInstance = null;
       setMap(null);
     };
   }, [loadGeoJSONData, onMapLoad]);
 
-  // Handle business markers
-  useEffect(() => {
-    if (!map || !businesses.length) return;
-
-    // Clear existing markers
-    markers.forEach(marker => marker.remove());
-
-    // Create new markers
-    const newMarkers = businesses.map(business => {
-      const el = document.createElement('div');
-      el.style.cssText = `
-        background: #FFEB3B;
-        border: 2px solid #FFC107;
-        border-radius: 50%;
-        width: 16px;
-        height: 16px;
-        cursor: pointer;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-      `;
-      
-      const marker = new maplibregl.Marker({ element: el })
-        .setLngLat([business.position.lng, business.position.lat])
-        .addTo(map);
-
-      el.addEventListener('click', () => {
-        onBusinessClick?.(business);
-      });
-
-      return marker;
-    });
-
-    setMarkers(newMarkers);
-
-    return () => {
-      newMarkers.forEach(marker => marker.remove());
-    };
-  }, [map, businesses, onBusinessClick]);
-
-  // Center map on selected business
-  useEffect(() => {
-    if (!map || !selectedBusiness?.position) return;
-    
-    map.easeTo({
-      center: [selectedBusiness.position.lng, selectedBusiness.position.lat],
-      zoom: 16
-    });
-  }, [map, selectedBusiness]);
-
   return (
-    <div 
-      ref={mapRef} 
+    <div
+      ref={mapRef}
       className="absolute inset-0 w-full h-full"
       style={{ backgroundColor: '#f0f0f0' }}
     />
