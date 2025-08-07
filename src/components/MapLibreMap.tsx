@@ -97,28 +97,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           });
 
           // Roads (LineStrings with highway tag)
-          mapInstance.addLayer({
-            id: 'roads',
-            type: 'line',
-            source: 'geojson-data',
-            filter: ['==', '$type', 'LineString'],
-            paint: {
-              'line-color': '#888888',
-              'line-width': 1.5
-            }
-          });
-          
+          // Add Polygons First (parks/water/etc.)
           mapInstance.addLayer({
             id: 'polygons',
             type: 'fill',
             source: 'geojson-data',
             filter: ['==', '$type', 'Polygon'],
             paint: {
-              'fill-color': '#AEDFF7', // light blue-green
+              'fill-color': '#AEDFF7', // blueish fill
               'fill-opacity': 0.6
             }
           });
-
+          
+          // Optional polygon outlines
           mapInstance.addLayer({
             id: 'polygon-outline',
             type: 'line',
@@ -127,6 +118,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             paint: {
               'line-color': '#4A90E2',
               'line-width': 1
+            }
+          });
+          
+          // Add roads after (to render on top)
+          mapInstance.addLayer({
+            id: 'roads',
+            type: 'line',
+            source: 'geojson-data',
+            filter: ['==', '$type', 'LineString'],
+            paint: {
+              'line-color': '#888888',
+              'line-width': 1.5
             }
           });
 
