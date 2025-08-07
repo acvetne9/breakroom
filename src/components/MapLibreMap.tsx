@@ -97,55 +97,40 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           });
 
           // Roads (LineStrings with highway tag)
-          mapInstance!.addLayer({
+          mapInstance.addLayer({
             id: 'roads',
             type: 'line',
             source: 'geojson-data',
-            filter: ['all', ['==', '$type', 'LineString'], ['has', 'highway']],
+            filter: ['==', '$type', 'LineString'],
             paint: {
-              'line-color': '#999999',
+              'line-color': '#888888',
               'line-width': 1.5
             }
           });
           
-          // Water (Polygons tagged as natural=water or water=*)
-          mapInstance!.addLayer({
-            id: 'water',
+          mapInstance.addLayer({
+            id: 'polygons',
             type: 'fill',
             source: 'geojson-data',
-            filter: ['all', ['==', '$type', 'Polygon'], ['any',
-              ['==', ['get', 'natural'], 'water'],
-              ['has', 'water']
-            ]],
+            filter: ['==', '$type', 'Polygon'],
             paint: {
-              'fill-color': '#64B5F6',
-              'fill-opacity': 0.7
-            }
-          });
-          
-          // Parks (Polygons tagged as leisure=park)
-          mapInstance!.addLayer({
-            id: 'parks',
-            type: 'fill',
-            source: 'geojson-data',
-            filter: ['all', ['==', '$type', 'Polygon'], ['==', ['get', 'leisure'], 'park']],
-            paint: {
-              'fill-color': '#81C784',
+              'fill-color': '#AEDFF7', // light blue-green
               'fill-opacity': 0.6
             }
           });
-          
-          // Optional: Outlines for parks
-          mapInstance!.addLayer({
-            id: 'park-outlines',
+
+          mapInstance.addLayer({
+            id: 'polygon-outline',
             type: 'line',
             source: 'geojson-data',
-            filter: ['all', ['==', '$type', 'Polygon'], ['==', ['get', 'leisure'], 'park']],
+            filter: ['==', '$type', 'Polygon'],
             paint: {
-              'line-color': '#4CAF50',
+              'line-color': '#4A90E2',
               'line-width': 1
             }
           });
+
+
 
 
           console.log('All GeoJSON layers added successfully!');
