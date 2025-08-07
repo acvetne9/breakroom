@@ -453,19 +453,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               source: 'merged-roads',
               filter: ['==', ['geometry-type'], 'Polygon'],
               paint: {
-                'fill-color': [
-                  'case',
-                  ['==', ['get', 'highway'], 'motorway'], '#555555',
-                  ['==', ['get', 'highway'], 'trunk'], '#555555',
-                  ['==', ['get', 'highway'], 'primary'], '#666666',
-                  ['==', ['get', 'highway'], 'secondary'], '#777777',
-                  ['==', ['get', 'highway'], 'tertiary'], '#777777',
-                  ['==', ['get', 'highway'], 'residential'], '#888888',
-                  ['==', ['get', 'highway'], 'service'], '#999999',
-                  ['has', 'tunnel'], '#444444',
-                  ['has', 'bridge'], '#888888',
-                  '#777777'
-                ],
+                'fill-color': '#777777',
                 'fill-opacity': 0.9
               }
             });
@@ -477,19 +465,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               source: 'merged-roads',
               filter: ['==', ['geometry-type'], 'MultiPolygon'],
               paint: {
-                'fill-color': [
-                  'case',
-                  ['==', ['get', 'highway'], 'motorway'], '#555555',
-                  ['==', ['get', 'highway'], 'trunk'], '#555555',
-                  ['==', ['get', 'highway'], 'primary'], '#666666',
-                  ['==', ['get', 'highway'], 'secondary'], '#777777',
-                  ['==', ['get', 'highway'], 'tertiary'], '#777777',
-                  ['==', ['get', 'highway'], 'residential'], '#888888',
-                  ['==', ['get', 'highway'], 'service'], '#999999',
-                  ['has', 'tunnel'], '#444444',
-                  ['has', 'bridge'], '#888888',
-                  '#777777'
-                ],
+                'fill-color': '#777777',
                 'fill-opacity': 0.9
               }
             });
