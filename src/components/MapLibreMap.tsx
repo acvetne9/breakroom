@@ -98,16 +98,26 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           
           // Water polygons (name contains water words)
           mapInstance.addLayer({
+            id: 'parks',
+            type: 'fill',
+            source: 'geojson-data',
+            filter: ['all',
+              ['in', '$type', 'Polygon', 'MultiPolygon'],
+              ['==', ['get', 'leisure'], 'park']
+            ],
+            paint: {
+              'fill-color': '#81C784',
+              'fill-opacity': 0.5
+            }
+          });
+
+          mapInstance.addLayer({
             id: 'water',
             type: 'fill',
             source: 'geojson-data',
             filter: ['all',
               ['in', '$type', 'Polygon', 'MultiPolygon'],
-              ['match', ['downcase', ['get', 'name']],
-                ['blue heron pond', 'clove lake', 'prospect park lake', 'turtle pond'],
-                true,
-                false
-              ]
+              ['==', ['get', 'natural'], 'water']
             ],
             paint: {
               'fill-color': '#64B5F6',
@@ -115,23 +125,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             }
           });
 
-          mapInstance.addLayer({
-            id: 'parks',
-            type: 'fill',
-            source: 'geojson-data',
-            filter: ['all',
-              ['in', '$type', 'Polygon', 'MultiPolygon'],
-              ['match', ['downcase', ['get', 'name']],
-                ['fdr boardwalk and beach', 'central park'],
-                true,
-                false
-              ]
-            ],
-            paint: {
-              'fill-color': '#81C784',
-              'fill-opacity': 0.5
-            }
-          });
 
           
           // Add roads after (to render on top)
