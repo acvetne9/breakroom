@@ -630,7 +630,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               type: 'fill',
               source: 'nyc-mask',
               paint: {
-                'fill-color': '#999999', // Gray color for non-NYC land
+                'fill-color': 'rgba(255, 255, 255, 1.0)', // Solid white overlay to hide non-NYC
                 'fill-opacity': 1.0
               }
             });
