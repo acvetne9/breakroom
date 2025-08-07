@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import type { FeatureCollection, Polygon, Feature } from 'geojson';
-import bbox from '@turf/bbox';
+import { bbox } from '@turf/turf';
 import maplibregl from 'maplibre-gl';
 import Supercluster from 'supercluster';
 import * as turf from '@turf/turf';
