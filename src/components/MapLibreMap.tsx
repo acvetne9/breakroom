@@ -75,14 +75,14 @@ function debugGeoJSONProperties(geojsonData: any) {
 }
 
 // Since the roads are already merged and processed, we can simplify this function
-const processRoadGeometry = (geojsonData: any) => {
+const processRoadGeometry = (geojsonData: any): FeatureCollection<Polygon> => {
   console.log('Buffering MultiLineString roads into polygons...');
 
-  const bufferedFeatures = geojsonData.features
+  const bufferedFeatures: Feature<Polygon>[] = geojsonData.features
     .filter((f: any) => f.geometry?.type === 'MultiLineString')
     .map((feature: any) => {
       try {
-        const buffered = turf.buffer(feature, 5, { units: 'meters' }); // Adjust width
+        const buffered = turf.buffer(feature, 5, { units: 'meters' }) as Feature<Polygon>;
         buffered.properties = {
           name: feature.properties?.name || '',
           original: 'buffered-line'
@@ -93,7 +93,7 @@ const processRoadGeometry = (geojsonData: any) => {
         return null;
       }
     })
-    .filter((f: any) => f !== null);
+    .filter((f: any): f is Feature<Polygon> => f !== null);
 
   return {
     type: 'FeatureCollection',
