@@ -116,69 +116,150 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   
   const MARKER_VISIBILITY_ZOOM_THRESHOLD = 13;
 
-  // Function to decompress gzipped content
+  // Function to decompress gzipped content with better error handling
   const decompressGzip = async (response: Response): Promise<any> => {
+    console.log('=== DECOMPRESSION DEBUG ===');
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+    console.log('Response content-type:', response.headers.get('content-type'));
+    console.log('Response content-encoding:', response.headers.get('content-encoding'));
+    
     try {
-      // Check if the browser supports CompressionStream (modern browsers)
-      if ('DecompressionStream' in window) {
-        console.log('Using browser native decompression...');
-        const stream = new ReadableStream({
-          start(controller) {
-            response.body?.getReader().read().then(function pump({ done, value }): any {
-              if (done) {
-                controller.close();
-                return;
-              }
-              controller.enqueue(value);
-              return response.body?.getReader().read().then(pump);
-            });
-          }
-        });
-        
-        const decompressedStream = stream.pipeThrough(new (window as any).DecompressionStream('gzip'));
-        const decompressedResponse = new Response(decompressedStream);
-        return await decompressedResponse.json();
-      } else {
-        console.log('Browser native decompression not available, trying direct JSON parse...');
-        // Fallback: try to parse directly (in case the server auto-decompresses)
-        return await response.json();
+      // First, let's try the simplest approach - direct JSON parse
+      console.log('Attempting direct JSON parse...');
+      const text = await response.text();
+      console.log('Response text length:', text.length);
+      console.log('First 200 characters:', text.substring(0, 200));
+      
+      // Check if it's already JSON (not gzipped)
+      if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
+        console.log('Data appears to be uncompressed JSON');
+        return JSON.parse(text);
       }
+      
+      // If we get here, it might be gzipped or binary
+      console.log('Data does not appear to be plain JSON, might be compressed');
+      
+      // Try to decode as binary and look for gzip magic number
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      console.log('Binary data length:', bytes.length);
+      console.log('First 10 bytes:', Array.from(bytes.slice(0, 10)).map(b => b.toString(16)).join(' '));
+      
+      // Check for gzip magic number (1f 8b)
+      if (bytes.length > 2 && bytes[0] === 0x1f && bytes[1] === 0x8b) {
+        console.log('Detected gzip magic number');
+        
+        // Try browser decompression if available
+        if ('DecompressionStream' in window) {
+          console.log('Using browser native decompression...');
+          const stream = new ReadableStream({
+            start(controller) {
+              controller.enqueue(bytes);
+              controller.close();
+            }
+          });
+          
+          const decompressedStream = stream.pipeThrough(new (window as any).DecompressionStream('gzip'));
+          const decompressedResponse = new Response(decompressedStream);
+          const decompressedText = await decompressedResponse.text();
+          console.log('Decompressed text length:', decompressedText.length);
+          console.log('First 200 chars of decompressed:', decompressedText.substring(0, 200));
+          return JSON.parse(decompressedText);
+        } else {
+          console.error('Browser does not support DecompressionStream');
+          throw new Error('Gzip decompression not supported in this browser');
+        }
+      } else {
+        console.log('No gzip magic number found, trying direct parse of binary as text');
+        const decoder = new TextDecoder();
+        const decodedText = decoder.decode(bytes);
+        console.log('Decoded text length:', decodedText.length);
+        console.log('First 200 chars of decoded:', decodedText.substring(0, 200));
+        return JSON.parse(decodedText);
+      }
+      
     } catch (error) {
-      console.warn('Decompression failed, trying direct JSON parse:', error);
-      // Final fallback
-      return await response.json();
+      console.error('Comprehensive decompression failed:', error);
+      throw error;
     }
   };
 
-  // Function to fetch merged roads GeoJSON from Supabase
+  // Function to fetch merged roads GeoJSON from Supabase with comprehensive debugging
   const fetchMergedRoadsGeoJSON = useCallback(async () => {
     try {
-      console.log('Fetching merged roads GeoJSON from Supabase...');
-      const response = await fetch(`${supabaseUrl}/storage/v1/object/public/nyc-map-storage-files/merged_roads.geojson.gz`, {
+      console.log('=== FETCH DEBUG START ===');
+      console.log('Supabase URL:', supabaseUrl);
+      console.log('Supabase Key:', supabaseKey ? 'Present' : 'Missing');
+      
+      const fullUrl = `${supabaseUrl}/storage/v1/object/public/nyc-map-storage-files/merged_roads.geojson.gz`;
+      console.log('Full fetch URL:', fullUrl);
+      
+      console.log('Starting fetch...');
+      const response = await fetch(fullUrl, {
         headers: {
           'Authorization': `Bearer ${supabaseKey}`,
-          'Accept': 'application/json, application/gzip',
-          'Accept-Encoding': 'gzip'
+          'Accept': 'application/json, application/gzip, */*',
+          'Accept-Encoding': 'gzip, deflate'
         }
       });
       
+      console.log('Fetch completed. Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      console.log('Response statusText:', response.statusText);
+      
       if (!response.ok) {
-        throw new Error(`Failed to fetch GeoJSON: ${response.statusText}`);
+        console.error('Fetch failed with status:', response.status, response.statusText);
+        
+        // Try without the .gz extension as a fallback
+        console.log('Trying without .gz extension...');
+        const fallbackUrl = `${supabaseUrl}/storage/v1/object/public/nyc-map-storage-files/merged_roads.geojson`;
+        console.log('Fallback URL:', fallbackUrl);
+        
+        const fallbackResponse = await fetch(fallbackUrl, {
+          headers: {
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Accept': 'application/json, */*'
+          }
+        });
+        
+        console.log('Fallback response status:', fallbackResponse.status);
+        
+        if (!fallbackResponse.ok) {
+          throw new Error(`Both attempts failed. Original: ${response.statusText}, Fallback: ${fallbackResponse.statusText}`);
+        }
+        
+        console.log('Fallback successful, parsing JSON...');
+        const fallbackData = await fallbackResponse.json();
+        console.log('Fallback data loaded successfully');
+        debugGeoJSONProperties(fallbackData);
+        return processRoadGeometry(fallbackData);
       }
       
-      console.log('Response received, attempting to decompress...');
+      console.log('Main response successful, attempting decompression...');
       const geojsonData = await decompressGzip(response);
       
-      console.log('Merged roads GeoJSON loaded successfully, starting debug...');
+      console.log('Data loaded successfully, type:', typeof geojsonData);
+      console.log('Data keys:', Object.keys(geojsonData || {}));
+      
+      if (!geojsonData) {
+        console.error('Decompression returned null/undefined');
+        return null;
+      }
+      
+      console.log('Starting GeoJSON debug...');
       debugGeoJSONProperties(geojsonData);
       
-      console.log('Processing merged road geometry...');
+      console.log('Starting road geometry processing...');
       const processedData = processRoadGeometry(geojsonData);
-      console.log('Merged road geometry processing complete');
+      console.log('Processing complete');
       
       return processedData;
     } catch (error) {
-      console.error('Error fetching merged roads GeoJSON from Supabase:', error);
+      console.error('=== FETCH ERROR ===');
+      console.error('Error type:', error.constructor.name);
+      console.error('Error message:', error.message);
+      console.error('Full error:', error);
+      console.error('Stack trace:', error.stack);
       return null;
     }
   }, [supabaseUrl, supabaseKey]);
@@ -466,21 +547,61 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
             console.log('All debug layers added successfully!');
             
-            // Debug: Check what was actually added
+            // Debug: Check what was actually added and log more details
             setTimeout(() => {
               try {
-                const transportationPolygons = mapInstance!.queryRenderedFeatures(undefined, { layers: ['transportation-polygons'] });
-                const transportationMultiPolygons = mapInstance!.queryRenderedFeatures(undefined, { layers: ['transportation-multipolygons'] });
-                const transportationLines = mapInstance!.queryRenderedFeatures(undefined, { layers: ['transportation-lines'] });
-                console.log(`Rendered transportation features: ${transportationPolygons.length} polygons, ${transportationMultiPolygons.length} multipolygons, ${transportationLines.length} lines`);
+                console.log('=== DEBUGGING RENDERED FEATURES ===');
                 
-                if (transportationPolygons.length > 0) {
-                  console.log('Sample transportation polygon feature:', transportationPolygons[0]);
+                // Check if any features are being rendered at all
+                const allFeatures = mapInstance!.queryRenderedFeatures();
+                console.log(`Total rendered features (all layers): ${allFeatures.length}`);
+                
+                // Check specific debug layers
+                const debugPolygons = mapInstance!.queryRenderedFeatures(undefined, { layers: ['all-polygons-debug'] });
+                const debugMultiPolygons = mapInstance!.queryRenderedFeatures(undefined, { layers: ['all-multipolygons-debug'] });
+                const debugLines = mapInstance!.queryRenderedFeatures(undefined, { layers: ['all-lines-debug'] });
+                const debugPoints = mapInstance!.queryRenderedFeatures(undefined, { layers: ['all-features-debug'] });
+                
+                console.log(`Debug layer results:
+                  - Polygons (red): ${debugPolygons.length}
+                  - MultiPolygons (green): ${debugMultiPolygons.length}
+                  - Lines (blue): ${debugLines.length}
+                  - Points (yellow): ${debugPoints.length}`);
+                
+                // Check the actual data source
+                const source = mapInstance!.getSource('merged-roads');
+                if (source && source.type === 'geojson') {
+                  console.log('GeoJSON source found, checking data...');
+                  // Try to access the data if possible
+                  try {
+                    const data = (source as any)._data;
+                    if (data && data.features) {
+                      console.log(`Source has ${data.features.length} features`);
+                      console.log('First 3 features:', data.features.slice(0, 3));
+                    }
+                  } catch (e) {
+                    console.log('Could not access source data directly');
+                  }
                 }
+                
+                // Log sample features if any exist
+                if (debugPolygons.length > 0) {
+                  console.log('Sample polygon feature:', debugPolygons[0]);
+                }
+                if (debugLines.length > 0) {
+                  console.log('Sample line feature:', debugLines[0]);
+                }
+                
+                // Check map bounds and zoom
+                const bounds = mapInstance!.getBounds();
+                const zoom = mapInstance!.getZoom();
+                console.log(`Map zoom: ${zoom}`);
+                console.log(`Map bounds:`, bounds.toArray());
+                
               } catch (error) {
-                console.warn('Could not query rendered features:', error);
+                console.warn('Error during debugging:', error);
               }
-            }, 2000);
+            }, 3000); // Wait a bit longer for rendering
 
           } catch (dataError) {
             console.error('Error adding merged roads GeoJSON data to map:', dataError);
