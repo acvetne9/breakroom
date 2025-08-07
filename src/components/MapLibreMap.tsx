@@ -458,6 +458,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 'fill-opacity': 0.7
               }
             });
+            const bounds = bbox(safeBufferedData);
+            mapInstance.fitBounds(bounds, {
+              padding: 20,
+              duration: 1000
+            });
 
             // Add the main gray road polygons layer ON TOP of OSM tiles
             mapInstance!.addLayer({
