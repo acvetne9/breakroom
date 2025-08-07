@@ -519,7 +519,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         });
 
         // Add zoom change listener
-        mapInstance.on('zoom', handleZoomChange);
+        const zoomHandler = () => {
+          if (mapInstance) {
+            const zoom = mapInstance.getZoom();
+            setCurrentZoom(zoom);
+          }
+        };
+        mapInstance.on('zoom', zoomHandler);
 
         // Error handling
         mapInstance.on('error', (e) => {
@@ -551,7 +557,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       mapInstance = null;
       setMap(null);
     };
-  }, [supabaseUrl, supabaseKey, fetchMergedRoadsGeoJSON, handleZoomChange, onMapLoad]);
+  }, [supabaseUrl, supabaseKey]); // Removed function dependencies that cause re-renders
 
   // Create marker clustering
   useEffect(() => {
