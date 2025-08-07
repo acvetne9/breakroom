@@ -19,9 +19,48 @@ interface MapLibreMapProps {
   selectedBusiness?: { position: { lat: number; lng: number } } | null;
 }
 
-// Enhanced road processing function that buffers line geometries into polygons
+// NYC Borough coordinates - approximate boundaries
+const createNYCMask = (): FeatureCollection<Polygon> => {
+  // This creates an inverted mask - everything OUTSIDE NYC will be covered
+  const worldBounds = [
+    [-180, -85],
+    [180, -85],
+    [180, 85],
+    [-180, 85],
+    [-180, -85]
+  ];
 
-// Enhanced road processing function that buffers ALL line geometries
+  // Approximate NYC boundary (simplified)
+  const nycBoundary = [
+    [-74.2557, 40.4960], // Southwest corner
+    [-73.7004, 40.4960], // Southeast corner
+    [-73.7004, 40.9152], // Northeast corner
+    [-74.2557, 40.9152], // Northwest corner
+    [-74.2557, 40.4960]  // Close the polygon
+  ];
+
+  // Create a polygon with a hole (world minus NYC)
+  const maskPolygon: Feature<Polygon> = {
+    type: 'Feature',
+    geometry: {
+      type: 'Polygon',
+      coordinates: [
+        worldBounds, // Outer ring (world)
+        nycBoundary  // Inner ring (hole for NYC)
+      ]
+    },
+    properties: {
+      name: 'non-nyc-mask'
+    }
+  };
+
+  return {
+    type: 'FeatureCollection',
+    features: [maskPolygon]
+  };
+};
+
+// Enhanced road processing function that buffers line geometries into polygons
 const processRoadGeometry = (geojsonData: any): FeatureCollection<Polygon> => {
   console.log('Processing road geometry - buffering all lines into gray polygons...');
   
@@ -212,13 +251,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, []);
 
-  // Handle zoom change - removed as it was causing re-renders
-
   // Initialize map with merged roads GeoJSON data
   useEffect(() => {
     if (!mapRef.current) return;
     
-    console.log('MapLibre: Initializing map with buffered roads...');
+    console.log('MapLibre: Initializing map with buffered roads and NYC boundary mask...');
     let mapInstance: maplibregl.Map | null = null;
     let isCleanedUp = false;
 
@@ -226,27 +263,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       try {
         console.log('=== MAP INITIALIZATION START ===');
         
-        // Create a basic map first
-        console.log('Creating basic OSM map first...');
+        // Create a map with transparent background and no base tiles
+        console.log('Creating map with transparent background...');
         mapInstance = new maplibregl.Map({
           container: mapRef.current!,
           style: {
             version: 8,
-            sources: {
-              'osm': {
-                type: 'raster',
-                tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-                tileSize: 256,
-                attribution: '© OpenStreetMap contributors'
-              }
-            },
-            layers: [
-              {
-                id: 'osm-tiles',
-                type: 'raster',
-                source: 'osm'
-              }
-            ]
+            sources: {},
+            layers: []
           },
           center: [-73.9712, 40.7831],
           zoom: 14,
@@ -262,7 +286,36 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           console.log('Basic map loaded successfully!');
           
           try {
-            // Load and process roads GeoJSON data immediately
+            // First, add the NYC boundary mask to hide non-NYC areas
+            console.log('Creating NYC boundary mask...');
+            const nycMask = createNYCMask();
+            
+            mapInstance!.addSource('nyc-mask', {
+              type: 'geojson',
+              data: nycMask
+            });
+
+            // Add mask layer to hide everything outside NYC
+            mapInstance!.addLayer({
+              id: 'non-nyc-mask',
+              type: 'fill',
+              source: 'nyc-mask',
+              paint: {
+                'fill-color': 'rgba(0, 0, 0, 0)', // Transparent
+                'fill-opacity': 0
+              }
+            });
+
+            // Add a subtle NYC area background
+            mapInstance!.addLayer({
+              id: 'nyc-background',
+              type: 'background',
+              paint: {
+                'background-color': '#f8f8f8' // Light gray background for NYC area
+              }
+            });
+
+            // Load and process roads GeoJSON data
             console.log('Loading and processing roads GeoJSON data...');
             const geojsonData = await loadGeoJSONData();
             
@@ -272,7 +325,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             }
             
             if (!geojsonData) {
-              console.warn('No GeoJSON data available, keeping basic OSM map');
+              console.warn('No GeoJSON data available, keeping NYC boundary only');
               if (!isCleanedUp) {
                 setMap(mapInstance);
                 onMapLoad?.(mapInstance);
@@ -330,7 +383,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               }
             });
 
-            console.log('Road layers added successfully!');
+            // Finally, add the mask layer on top to create the cutout effect
+            mapInstance!.addLayer({
+              id: 'non-nyc-overlay',
+              type: 'fill',
+              source: 'nyc-mask',
+              paint: {
+                'fill-color': 'rgba(255, 255, 255, 0.95)', // Near-white overlay
+                'fill-opacity': 1.0
+              }
+            });
+
+            console.log('Road layers and NYC mask added successfully!');
 
           } catch (dataError) {
             console.error('Error adding buffered roads data to map:', dataError);
@@ -532,6 +596,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       className="absolute inset-0 w-full h-full"
       style={{ 
         zIndex: 1,
+        backgroundColor: 'transparent' // Make sure container background is transparent
       }}
     />
   );
