@@ -95,25 +95,41 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             type: 'geojson',
             data: geoData
           });
+          
+          // Water polygons (name contains water words)
           mapInstance.addLayer({
-            id: 'polygons',
+            id: 'water',
             type: 'fill',
             source: 'geojson-data',
-            filter: ['in', '$type', 'Polygon', 'MultiPolygon'],
+            filter: ['all',
+              ['in', '$type', 'Polygon', 'MultiPolygon'],
+              ['match', ['downcase', ['get', 'name']],
+                ['blue heron pond', 'clove lake', 'prospect park lake', 'turtle pond'],
+                true,
+                false
+              ]
+            ],
             paint: {
-              'fill-color': '#AEDFF7',
+              'fill-color': '#64B5F6',
               'fill-opacity': 0.6
             }
           });
 
           mapInstance.addLayer({
-            id: 'polygon-outline',
-            type: 'line',
+            id: 'parks',
+            type: 'fill',
             source: 'geojson-data',
-            filter: ['in', '$type', 'Polygon', 'MultiPolygon'],
+            filter: ['all',
+              ['in', '$type', 'Polygon', 'MultiPolygon'],
+              ['match', ['downcase', ['get', 'name']],
+                ['fdr boardwalk and beach', 'central park'],
+                true,
+                false
+              ]
+            ],
             paint: {
-              'line-color': '#4A90E2',
-              'line-width': 1
+              'fill-color': '#81C784',
+              'fill-opacity': 0.5
             }
           });
 
