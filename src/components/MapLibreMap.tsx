@@ -443,7 +443,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             // Add the merged roads GeoJSON as a source
             mapInstance!.addSource('merged-roads', {
               type: 'geojson',
-              data: geojsonData
+              data: processedData  // ✅ now fully typed
             });
 
             console.log('Adding merged road polygon layers...');
