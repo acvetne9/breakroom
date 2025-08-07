@@ -289,20 +289,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   };
 
-  // Function to fetch merged roads GeoJSON from Supabase with comprehensive debugging
+  // Function to fetch merged roads GeoJSON from local file and save uncompressed version
   const fetchMergedRoadsGeoJSON = useCallback(async () => {
     try {
       console.log('=== FETCH DEBUG START ===');
-      console.log('Supabase URL:', supabaseUrl);
-      console.log('Supabase Key:', supabaseKey ? 'Present' : 'Missing');
+      console.log('Loading from local compressed file...');
       
-      const fullUrl = `${supabaseUrl}/storage/v1/object/public/nyc-map-storage-files/merged_roads.geojson.gz`;
+      const fullUrl = '/data/merged_roads.geojson.gz';
       console.log('Full fetch URL:', fullUrl);
       
       console.log('Starting fetch...');
       const response = await fetch(fullUrl, {
         headers: {
-          'Authorization': `Bearer ${supabaseKey}`,
           'Accept': 'application/json, application/gzip, */*',
           'Accept-Encoding': 'gzip, deflate'
         }
@@ -349,6 +347,21 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       if (!geojsonData) {
         console.error('Decompression returned null/undefined');
         return null;
+      }
+      
+      // Save uncompressed version locally
+      try {
+        const geojsonString = JSON.stringify(geojsonData, null, 2);
+        const blob = new Blob([geojsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'merged_roads.geojson';
+        link.click();
+        URL.revokeObjectURL(url);
+        console.log('Uncompressed GeoJSON file downloaded successfully');
+      } catch (saveError) {
+        console.warn('Failed to save uncompressed GeoJSON:', saveError);
       }
       
       console.log('Starting GeoJSON debug...');
