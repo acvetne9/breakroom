@@ -437,45 +437,45 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               }
             });
 
-            // Add road polygon outline layer
+            // Transportation polygon outline layer
             mapInstance!.addLayer({
-              id: 'merged-road-outlines',
+              id: 'transportation-outlines',
               type: 'line',
               source: 'merged-roads',
               filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
               paint: {
-                'line-color': '#555555',
+                'line-color': '#555555', // Darker gray for outlines
                 'line-width': 0.8,
                 'line-opacity': 0.6
               }
             });
 
-            console.log('Adding fallback road lines layer...');
-            // Add any remaining road lines (fallback)
+            console.log('Adding fallback transportation lines layer...');
+            // Add any remaining transportation lines (fallback) - all gray
             mapInstance!.addLayer({
-              id: 'merged-road-lines',
+              id: 'transportation-lines',
               type: 'line',
               source: 'merged-roads',
               filter: ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
               paint: {
-                'line-color': '#777777',
+                'line-color': '#777777', // Consistent gray for all transportation lines
                 'line-width': 3,
                 'line-opacity': 0.8
               }
             });
 
-            console.log('All merged road layers added successfully!');
+            console.log('All transportation layers added successfully!');
             
             // Debug: Check what was actually added
             setTimeout(() => {
               try {
-                const roadPolygons = mapInstance!.queryRenderedFeatures(undefined, { layers: ['merged-road-polygons'] });
-                const roadMultiPolygons = mapInstance!.queryRenderedFeatures(undefined, { layers: ['merged-road-multipolygons'] });
-                const roadLines = mapInstance!.queryRenderedFeatures(undefined, { layers: ['merged-road-lines'] });
-                console.log(`Rendered merged road features: ${roadPolygons.length} polygons, ${roadMultiPolygons.length} multipolygons, ${roadLines.length} lines`);
+                const transportationPolygons = mapInstance!.queryRenderedFeatures(undefined, { layers: ['transportation-polygons'] });
+                const transportationMultiPolygons = mapInstance!.queryRenderedFeatures(undefined, { layers: ['transportation-multipolygons'] });
+                const transportationLines = mapInstance!.queryRenderedFeatures(undefined, { layers: ['transportation-lines'] });
+                console.log(`Rendered transportation features: ${transportationPolygons.length} polygons, ${transportationMultiPolygons.length} multipolygons, ${transportationLines.length} lines`);
                 
-                if (roadPolygons.length > 0) {
-                  console.log('Sample merged road polygon feature:', roadPolygons[0]);
+                if (transportationPolygons.length > 0) {
+                  console.log('Sample transportation polygon feature:', transportationPolygons[0]);
                 }
               } catch (error) {
                 console.warn('Could not query rendered features:', error);
