@@ -87,7 +87,9 @@ const processRoadGeometry = (geojsonData: any): FeatureCollection<Polygon> => {
           name: feature.properties?.name || '',
           original: 'buffered-line'
         };
-        return buffered;
+        if (buffered.geometry.type === 'Polygon') {
+          return buffered as Feature<Polygon>;
+        }
       } catch (err) {
         console.warn('Buffer failed for feature:', err);
         return null;
@@ -443,7 +445,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             // Add the merged roads GeoJSON as a source
             mapInstance!.addSource('merged-roads', {
               type: 'geojson',
-              data: geojsonData  // ← ✅ Fixed
+              data: geojsonData
+            });
+            mapInstance!.addLayer({
+              id: 'polygon-debug',
+              type: 'fill',
+              source: 'merged-roads',
+              paint: {
+                'fill-color': '#ff0000',
+                'fill-opacity': 0.3
+              }
             });
 
             console.log('Adding merged road polygon layers...');
