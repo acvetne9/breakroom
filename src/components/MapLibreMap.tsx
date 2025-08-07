@@ -4,7 +4,6 @@ import maplibregl from 'maplibre-gl';
 import Supercluster from 'supercluster';
 import * as turf from '@turf/turf';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import bbox from '@turf/bbox';
 
 interface MapLibreMapProps {
   onMapLoad?: (map: maplibregl.Map) => void;
@@ -459,8 +458,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 'fill-opacity': 0.7
               }
             });
-            const bounds = bbox(safeBufferedData);
-            mapInstance.fitBounds(bounds, {
+            const boundstest = bbox(safeBufferedData);
+            mapInstance.fitBounds(boundstest, {
               padding: 20,
               duration: 1000
             });
@@ -471,8 +470,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               type: 'fill',
               source: 'buffered-roads',
               paint: {
-                'fill-color': '#FF0000', // RED
-                'fill-opacity': 1
+                'fill-color': '#777777', // Gray color for all roads
+                'fill-opacity': 1.0 // Make it fully opaque so it covers OSM roads
               }
             });
 
@@ -493,11 +492,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 ],
                 'line-opacity': 0.8
               }
-            });
-            const bounds = bbox(safeBufferedData);
-            mapInstance.fitBounds(bounds, {
-              padding: 20,
-              duration: 1000
             });
 
             console.log('All road layers added - you should see red debug roads first, then gray roads on top');
