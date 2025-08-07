@@ -438,10 +438,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
             console.log(`Adding ${bufferedRoadsData.features.length} buffered road features to map...`);
             
+            const safeBufferedData = JSON.parse(JSON.stringify(bufferedRoadsData));
+            console.log('Sanitized buffered road data:', safeBufferedData);
+            console.log('Feature count:', safeBufferedData.features?.length);
+
             // Add the buffered roads GeoJSON as a source
             mapInstance!.addSource('buffered-roads', {
               type: 'geojson',
-              data: bufferedRoadsData
+              data: safeBufferedData
             });
 
             // Add a debug layer first with bright colors to verify roads are rendering
