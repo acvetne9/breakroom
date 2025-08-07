@@ -17,63 +17,9 @@ interface MapLibreMapProps {
   }>;
   onBusinessClick?: (business: any) => void;
   selectedBusiness?: { position: { lat: number; lng: number } } | null;
-  supabaseUrl: string;
-  supabaseKey: string;
 }
 
-function debugGeoJSONProperties(geojsonData: any) {
-  console.log('=== COMPREHENSIVE GeoJSON Debug Info ===');
-  
-  if (geojsonData?.features) {
-    console.log(`Total features: ${geojsonData.features.length}`);
-    
-    // Group by geometry type
-    const geometryTypes = geojsonData.features.reduce((acc: any, f: any) => {
-      const type = f.geometry.type;
-      acc[type] = (acc[type] || 0) + 1;
-      return acc;
-    }, {});
-    
-    console.log('Geometry type breakdown:', geometryTypes);
-    
-    // Sample features by type
-    Object.keys(geometryTypes).forEach(geomType => {
-      const featuresOfType = geojsonData.features.filter((f: any) => f.geometry.type === geomType);
-      console.log(`\n--- ${geomType} Features (${featuresOfType.length} total) ---`);
-      
-      // Show first 3 features of each type
-      featuresOfType.slice(0, 3).forEach((feature: any, index: number) => {
-        console.log(`${geomType} Feature ${index}:`, {
-          properties: feature.properties,
-          propertyKeys: Object.keys(feature.properties || {}),
-          hasCoordinates: !!feature.geometry.coordinates,
-          coordinateLength: Array.isArray(feature.geometry.coordinates) ? feature.geometry.coordinates.length : 0
-        });
-      });
-      
-      // Get all unique property keys for this geometry type
-      const allProps = new Set();
-      featuresOfType.forEach((f: any) => {
-        if (f.properties) {
-          Object.keys(f.properties).forEach(key => allProps.add(key));
-        }
-      });
-      console.log(`All property keys for ${geomType}:`, Array.from(allProps));
-      
-      // Check for specific property values
-      ['natural', 'leisure', 'landuse', 'highway', 'waterway', 'building', 'amenity', 'bridge', 'tunnel', 'man_made'].forEach(prop => {
-        const withProp = featuresOfType.filter((f: any) => f.properties?.[prop]);
-        if (withProp.length > 0) {
-          const uniqueValues = [...new Set(withProp.map((f: any) => f.properties[prop]))];
-          console.log(`  ${geomType} features with '${prop}': ${withProp.length}, values:`, uniqueValues.slice(0, 10));
-        }
-      });
-    });
-    
-  } else {
-    console.log('No features found in GeoJSON data');
-  }
-}
+// Enhanced road processing function that buffers line geometries into polygons
 
 // Enhanced road processing function that buffers ALL line geometries
 const processRoadGeometry = (geojsonData: any): FeatureCollection<Polygon> => {
@@ -209,9 +155,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   onMapLoad, 
   businesses = [], 
   onBusinessClick, 
-  selectedBusiness,
-  supabaseUrl,
-  supabaseKey
+  selectedBusiness
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
@@ -221,166 +165,52 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   
   const MARKER_VISIBILITY_ZOOM_THRESHOLD = 13;
 
-  // Function to decompress gzipped content with better error handling
-  const decompressGzip = async (response: Response): Promise<any> => {
-    console.log('=== DECOMPRESSION DEBUG ===');
-    console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-    console.log('Response content-type:', response.headers.get('content-type'));
-    console.log('Response content-encoding:', response.headers.get('content-encoding'));
-    
+  // Optimized function to load GeoJSON data
+  const loadGeoJSONData = useCallback(async (): Promise<any> => {
     try {
-      // First, let's try the simplest approach - direct JSON parse
-      console.log('Attempting direct JSON parse...');
-      const text = await response.text();
-      console.log('Response text length:', text.length);
-      console.log('First 200 characters:', text.substring(0, 200));
+      console.log('Loading GeoJSON data...');
       
-      // Check if it's already JSON (not gzipped)
-      if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
-        console.log('Data appears to be uncompressed JSON');
-        return JSON.parse(text);
-      }
-      
-      // If we get here, it might be gzipped or binary
-      console.log('Data does not appear to be plain JSON, might be compressed');
-      
-      // Try to decode as binary and look for gzip magic number
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      console.log('Binary data length:', bytes.length);
-      console.log('First 10 bytes:', Array.from(bytes.slice(0, 10)).map(b => b.toString(16)).join(' '));
-      
-      // Check for gzip magic number (1f 8b)
-      if (bytes.length > 2 && bytes[0] === 0x1f && bytes[1] === 0x8b) {
-        console.log('Detected gzip magic number');
-        
-        // Try browser decompression if available
-        if ('DecompressionStream' in window) {
-          console.log('Using browser native decompression...');
-          const stream = new ReadableStream({
-            start(controller) {
-              controller.enqueue(bytes);
-              controller.close();
-            }
-          });
-          
-          const decompressedStream = stream.pipeThrough(new (window as any).DecompressionStream('gzip'));
-          const decompressedResponse = new Response(decompressedStream);
-          const decompressedText = await decompressedResponse.text();
-          console.log('Decompressed text length:', decompressedText.length);
-          console.log('First 200 chars of decompressed:', decompressedText.substring(0, 200));
-          return JSON.parse(decompressedText);
-        } else {
-          console.error('Browser does not support DecompressionStream');
-          throw new Error('Gzip decompression not supported in this browser');
-        }
-      } else {
-        console.log('No gzip magic number found, trying direct parse of binary as text');
-        const decoder = new TextDecoder();
-        const decodedText = decoder.decode(bytes);
-        console.log('Decoded text length:', decodedText.length);
-        console.log('First 200 chars of decoded:', decodedText.substring(0, 200));
-        return JSON.parse(decodedText);
-      }
-      
-    } catch (error) {
-      console.error('Comprehensive decompression failed:', error);
-      throw error;
-    }
-  };
-
-  // Function to fetch merged roads GeoJSON from local file and save uncompressed version
-  const fetchMergedRoadsGeoJSON = useCallback(async () => {
-    try {
-      console.log('=== FETCH DEBUG START ===');
-      console.log('Loading from local compressed file...');
-      
-      const fullUrl = '/data/merged_roads.geojson.gz';
-      console.log('Full fetch URL:', fullUrl);
-      
-      console.log('Starting fetch...');
-      const response = await fetch(fullUrl, {
+      const response = await fetch('/data/merged_roads.geojson.gz', {
         headers: {
-          'Accept': 'application/json, application/gzip, */*',
-          'Accept-Encoding': 'gzip, deflate'
+          'Accept': 'application/json, application/gzip, */*'
         }
       });
       
-      console.log('Fetch completed. Response status:', response.status);
-      console.log('Response ok:', response.ok);
-      console.log('Response statusText:', response.statusText);
-      
       if (!response.ok) {
-        console.error('Fetch failed with status:', response.status, response.statusText);
-        
-        // Try without the .gz extension as a fallback
-        console.log('Trying without .gz extension...');
-        const fallbackUrl = `${supabaseUrl}/storage/v1/object/public/nyc-map-storage-files/merged_roads.geojson`;
-        console.log('Fallback URL:', fallbackUrl);
-        
-        const fallbackResponse = await fetch(fallbackUrl, {
-          headers: {
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Accept': 'application/json, */*'
-          }
-        });
-        
-        console.log('Fallback response status:', fallbackResponse.status);
-        
-        if (!fallbackResponse.ok) {
-          throw new Error(`Both attempts failed. Original: ${response.statusText}, Fallback: ${fallbackResponse.statusText}`);
-        }
-        
-        console.log('Fallback successful, parsing JSON...');
-        const fallbackData = await fallbackResponse.json();
-        console.log('Fallback data loaded successfully');
-        debugGeoJSONProperties(fallbackData);
-        return processRoadGeometry(fallbackData);
-      }
-      
-      console.log('Main response successful, attempting decompression...');
-      const geojsonData = await decompressGzip(response);
-      
-      console.log('Data loaded successfully, type:', typeof geojsonData);
-      console.log('Data keys:', Object.keys(geojsonData || {}));
-      
-      if (!geojsonData) {
-        console.error('Decompression returned null/undefined');
+        console.error('Failed to load GeoJSON:', response.statusText);
         return null;
       }
       
-      // Save uncompressed version locally
-      try {
-        const geojsonString = JSON.stringify(geojsonData, null, 2);
-        const blob = new Blob([geojsonString], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'merged_roads.geojson';
-        link.click();
-        URL.revokeObjectURL(url);
-        console.log('Uncompressed GeoJSON file downloaded successfully');
-      } catch (saveError) {
-        console.warn('Failed to save uncompressed GeoJSON:', saveError);
+      // Simple decompression for .gz files
+      const text = await response.text();
+      
+      // Check if it's already JSON
+      if (text.trim().startsWith('{')) {
+        return JSON.parse(text);
       }
       
-      console.log('Starting GeoJSON debug...');
-      debugGeoJSONProperties(geojsonData);
+      // Handle gzipped content
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes[0] === 0x1f && bytes[1] === 0x8b && 'DecompressionStream' in window) {
+        const stream = new ReadableStream({
+          start(controller) {
+            controller.enqueue(bytes);
+            controller.close();
+          }
+        });
+        
+        const decompressedStream = stream.pipeThrough(new (window as any).DecompressionStream('gzip'));
+        const decompressedResponse = new Response(decompressedStream);
+        const decompressedText = await decompressedResponse.text();
+        return JSON.parse(decompressedText);
+      }
       
-      console.log('Starting road geometry processing...');
-      const processedData = processRoadGeometry(geojsonData);
-      console.log('Processing complete, result features:', processedData.features.length);
-      
-      return processedData;
+      return null;
     } catch (error) {
-      console.error('=== FETCH ERROR ===');
-      console.error('Error type:', error.constructor.name);
-      console.error('Error message:', error.message);
-      console.error('Full error:', error);
-      console.error('Stack trace:', error.stack);
+      console.error('Error loading GeoJSON:', error);
       return null;
     }
-  }, [supabaseUrl, supabaseKey]);
+  }, []);
 
   // Handle zoom change - removed as it was causing re-renders
 
@@ -432,17 +262,29 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           console.log('Basic map loaded successfully!');
           
           try {
-            // Fetch and add the buffered roads GeoJSON data
-            console.log('Fetching and processing roads GeoJSON data...');
-            const bufferedRoadsData = await fetchMergedRoadsGeoJSON();
+            // Load and process roads GeoJSON data immediately
+            console.log('Loading and processing roads GeoJSON data...');
+            const geojsonData = await loadGeoJSONData();
             
             if (isCleanedUp) {
               console.log('MapLibre: Initialization cancelled due to cleanup');
               return;
             }
             
-            if (!bufferedRoadsData || !bufferedRoadsData.features.length) {
-              console.warn('No buffered roads data available, keeping basic OSM map');
+            if (!geojsonData) {
+              console.warn('No GeoJSON data available, keeping basic OSM map');
+              if (!isCleanedUp) {
+                setMap(mapInstance);
+                onMapLoad?.(mapInstance);
+              }
+              return;
+            }
+
+            // Process the data for buffering
+            const bufferedRoadsData = processRoadGeometry(geojsonData);
+            
+            if (!bufferedRoadsData.features.length) {
+              console.warn('No processed road features available');
               if (!isCleanedUp) {
                 setMap(mapInstance);
                 onMapLoad?.(mapInstance);
@@ -451,54 +293,31 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             }
 
             console.log(`Adding ${bufferedRoadsData.features.length} buffered road features to map...`);
-            
-            const safeBufferedData = JSON.parse(JSON.stringify(bufferedRoadsData));
-            console.log('Sanitized buffered road data:', safeBufferedData);
-            console.log('Feature count:', safeBufferedData.features?.length);
 
             // Add the buffered roads GeoJSON as a source
             mapInstance!.addSource('buffered-roads', {
               type: 'geojson',
-              data: safeBufferedData
+              data: bufferedRoadsData
             });
 
-            // Add a debug layer first with bright colors to verify roads are rendering
-            mapInstance!.addLayer({
-              id: 'buffered-roads-debug',
-              type: 'fill',
-              source: 'buffered-roads',
-              paint: {
-                'fill-color': '#ff0000', // Bright red for debugging
-                'fill-opacity': 0.7
-              }
-            });
-            const boundstest = bbox(safeBufferedData); // returns [minX, minY, maxX, maxY]
-            mapInstance.fitBounds(
-              [[boundstest[0], boundstest[1]], [boundstest[2], boundstest[3]]], // southwest and northeast corners
-              {
-                padding: 20,
-                duration: 1000
-              }
-            );
-
-            // Add the main gray road polygons layer ON TOP of OSM tiles
+            // Add the main gray road polygons layer
             mapInstance!.addLayer({
               id: 'buffered-roads-fill',
               type: 'fill',
               source: 'buffered-roads',
               paint: {
-                'fill-color': '#777777', // Gray color for all roads
-                'fill-opacity': 1.0 // Make it fully opaque so it covers OSM roads
+                'fill-color': '#777777',
+                'fill-opacity': 1.0
               }
             });
 
-            // Add subtle road outlines for better definition
+            // Add road outlines for better definition
             mapInstance!.addLayer({
               id: 'buffered-roads-outline',
               type: 'line',
               source: 'buffered-roads',
               paint: {
-                'line-color': '#444444', // Even darker gray for contrast
+                'line-color': '#444444',
                 'line-width': [
                   'interpolate',
                   ['linear'],
@@ -511,47 +330,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               }
             });
 
-            console.log('All road layers added - you should see red debug roads first, then gray roads on top');
-
-            console.log('Buffered road layers added successfully!');
-            
-            // Debug: Log what was actually rendered
-            setTimeout(() => {
-              try {
-                console.log('=== DEBUGGING RENDERED ROAD FEATURES ===');
-                
-                const debugFeatures = mapInstance!.queryRenderedFeatures(undefined, { 
-                  layers: ['buffered-roads-debug'] 
-                });
-                const roadFeatures = mapInstance!.queryRenderedFeatures(undefined, { 
-                  layers: ['buffered-roads-fill'] 
-                });
-                console.log(`Rendered debug road features (red): ${debugFeatures.length}`);
-                console.log(`Rendered buffered road features (gray): ${roadFeatures.length}`);
-                
-                if (debugFeatures.length > 0) {
-                  console.log('Sample debug feature:', debugFeatures[0]);
-                  console.log('Debug feature properties:', debugFeatures[0].properties);
-                }
-                if (roadFeatures.length > 0) {
-                  console.log('Sample road feature:', roadFeatures[0]);
-                  console.log('Road feature properties:', roadFeatures[0].properties);
-                }
-                
-                // Also check the source data directly
-                const source = mapInstance!.getSource('buffered-roads');
-                console.log('Road source:', source);
-                
-                // Check map bounds and zoom
-                const bounds = mapInstance!.getBounds();
-                const zoom = mapInstance!.getZoom();
-                console.log(`Map zoom: ${zoom}`);
-                console.log(`Map bounds:`, bounds.toArray());
-                
-              } catch (error) {
-                console.warn('Error during road debugging:', error);
-              }
-            }, 2000);
+            console.log('Road layers added successfully!');
 
           } catch (dataError) {
             console.error('Error adding buffered roads data to map:', dataError);
@@ -602,7 +381,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       mapInstance = null;
       setMap(null);
     };
-  }, [supabaseUrl, supabaseKey]); // Removed function dependencies that cause re-renders
+  }, []); // No dependencies needed since we load from local file
 
   // Create marker clustering
   useEffect(() => {
