@@ -522,9 +522,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             // Load and process all GeoJSON data files
             console.log('Loading GeoJSON data files...');
             const [roadsData, parksData, waterData] = await Promise.all([
-              loadGeoJSONData('merged_roads.geojson.gz'),
-              loadGeoJSONData('parks.geojson'),
-              loadGeoJSONData('water.geojson')
+              loadGeoJSONData('simplified.geojson'),
+              loadGeoJSONData('simplified.geojson'),
+              loadGeoJSONData('simplified.geojson')
             ]);
             
             if (isCleanedUp) {
