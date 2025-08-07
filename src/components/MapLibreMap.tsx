@@ -102,9 +102,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             type: 'fill',
             source: 'geojson-data',
             filter: ['all',
-              ['in', '$type', 'Polygon', 'MultiPolygon'],
+              ['in', ['geometry-type'], 'Polygon', 'MultiPolygon'],
               ['==', ['get', 'leisure'], 'park']
-            ],
+            ] as any,
             paint: {
               'fill-color': '#81C784',
               'fill-opacity': 0.5
@@ -116,9 +116,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             type: 'fill',
             source: 'geojson-data',
             filter: ['all',
-              ['in', '$type', 'Polygon', 'MultiPolygon'],
+              ['in', ['geometry-type'], 'Polygon', 'MultiPolygon'],
               ['==', ['get', 'natural'], 'water']
-            ],
+            ] as any,
             paint: {
               'fill-color': '#64B5F6',
               'fill-opacity': 0.6
