@@ -4,7 +4,13 @@ import maplibregl from 'maplibre-gl';
 import * as turf from '@turf/turf';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
-const MapLibreMap: React.FC = () => {
+interface MapLibreMapProps {
+  businesses: any[];
+  onBusinessClick: (business: any) => void;
+  selectedBusiness: any;
+}
+
+const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, selectedBusiness }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
 
