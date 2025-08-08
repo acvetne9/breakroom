@@ -51,13 +51,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
             }
           ]
         },
-        center: [-73.9712, 40.7831], // NYC center
-        zoom: 12,
+        center: [-73.945, 40.789], // Center based on your data
+        zoom: 16,
         attributionControl: false,
-        // Restrict map bounds to NYC area
+        // Tight bounds around your data area
         maxBounds: [
-          [-74.5, 40.4], // Southwest coordinates
-          [-73.4, 41.1]  // Northeast coordinates
+          [-73.96, 40.78], // Southwest coordinates
+          [-73.93, 40.80]  // Northeast coordinates
         ]
       });
 
@@ -72,7 +72,32 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           data: geoData
         });
 
-        // PARKS layer - fill polygons where leisure=park
+        // Main polygons layer - all your polygon features
+        mapInstance.addLayer({
+          id: 'polygons',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['==', ['geometry-type'], 'Polygon'],
+          paint: {
+            'fill-color': '#4CAF50',
+            'fill-opacity': 0.6
+          }
+        });
+
+        // Polygon borders for better definition
+        mapInstance.addLayer({
+          id: 'polygon-borders',
+          type: 'line',
+          source: 'geojson-data',
+          filter: ['==', ['geometry-type'], 'Polygon'],
+          paint: {
+            'line-color': '#2E7D32',
+            'line-width': 1,
+            'line-opacity': 0.8
+          }
+        });
+
+        // Keep the existing layers for any parks/water that might be in the data
         mapInstance.addLayer({
           id: 'parks',
           type: 'fill',
@@ -80,11 +105,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['==', ['get', 'leisure'], 'park']],
           paint: {
             'fill-color': '#81C784',
-            'fill-opacity': 0.5
+            'fill-opacity': 0.7
           }
         });
 
-        // WATER layer - fill polygons where natural=water
         mapInstance.addLayer({
           id: 'water',
           type: 'fill',
@@ -92,51 +116,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['==', ['get', 'natural'], 'water']],
           paint: {
             'fill-color': '#64B5F6',
-            'fill-opacity': 0.6
+            'fill-opacity': 0.7
           }
         });
 
-        // ROADS layer - linestrings (fixed filter syntax)
-        mapInstance.addLayer({
-          id: 'roads',
-          type: 'line',
-          source: 'geojson-data',
-          filter: ['==', ['geometry-type'], 'LineString'],
-          paint: {
-            'line-color': '#888888',
-            'line-width': 2,
-            'line-opacity': 0.8
-          }
-        });
+        // Remove road layers since your data doesn't contain roads
 
-        // Optional: Add different road styling based on highway type
-        mapInstance.addLayer({
-          id: 'major-roads',
-          type: 'line',
-          source: 'geojson-data',
-          filter: ['all', 
-            ['==', ['geometry-type'], 'LineString'],
-            ['in', ['get', 'highway'], ['literal', ['primary', 'secondary', 'trunk', 'motorway']]]
-          ],
-          paint: {
-            'line-color': '#666666',
-            'line-width': 3,
-            'line-opacity': 0.9
-          }
-        });
-
-        // Only fit to bounds if the data is within reasonable NYC bounds
+        // Fit tightly to your data bounds
         try {
           const bbox = turf.bbox(geoData);
           if (bbox && bbox.length === 4) {
-            // Check if bbox is within NYC area before fitting
-            const [minLng, minLat, maxLng, maxLat] = bbox;
-            if (minLng >= -74.5 && maxLng <= -73.4 && minLat >= 40.4 && maxLat <= 41.1) {
-              mapInstance.fitBounds(bbox as [number, number, number, number], {
-                padding: 50,
-                duration: 1000
-              });
-            }
+            mapInstance.fitBounds(bbox as [number, number, number, number], {
+              padding: 20, // Very tight padding
+              duration: 1000
+            });
           }
         } catch (e) {
           console.error('Error fitting bounds:', e);
