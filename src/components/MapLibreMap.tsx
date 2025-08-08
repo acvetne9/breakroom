@@ -9,23 +9,18 @@ interface MapLibreMapProps {
   selectedBusiness: any;
 }
 
-const MapLibreMap: React.FC<MapLibreMapProps> = ({
-  businesses,
-  onBusinessClick,
-  selectedBusiness
-}) => {
+const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, selectedBusiness }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
 
   const loadGeoJSONData = useCallback(async (): Promise<FeatureCollection | null> => {
     try {
-      const response = await fetch('/data/example-points.geojson');
+      const response = await fetch('/data/nyc.geojson'); // your local NYC boundaries + water + parks
       if (!response.ok) {
         console.error('Failed to load GeoJSON:', response.statusText);
         return null;
       }
-      const data: FeatureCollection = await response.json();
-      return data;
+      return await response.json();
     } catch (error) {
       console.error('Error loading GeoJSON:', error);
       return null;
@@ -43,79 +38,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         container: mapRef.current!,
         style: {
           version: 8,
-          name: "Custom Inline Style",
-          sources: {
-            // Base vector tile source for streets, buildings, etc.
-            osm: {
-              type: "vector",
-              tiles: [
-                "https://tile.openstreetmap.org/{z}/{x}/{y}.pbf"
-              ],
-              minzoom: 0,
-              maxzoom: 14
-            }
-          },
+          name: "Local Data Map",
+          sources: {},
           layers: [
-            // Background
             {
-              id: "background",
-              type: "background",
-              paint: { "background-color": "#f0f0f0" }
-            },
-            // Water
-            {
-              id: "water",
-              type: "fill",
-              source: "osm",
-              "source-layer": "water",
-              paint: { "fill-color": "#64B5F6" }
-            },
-            // Parks
-            {
-              id: "parks",
-              type: "fill",
-              source: "osm",
-              "source-layer": "landuse",
-              filter: ["==", "class", "park"],
-              paint: { "fill-color": "#81C784" }
-            },
-            // Roads
-            {
-              id: "roads",
-              type: "line",
-              source: "osm",
-              "source-layer": "transportation",
-              paint: {
-                "line-color": "#ffffff",
-                "line-width": 1.5
-              }
-            },
-            // Road outlines
-            {
-              id: "road-outline",
-              type: "line",
-              source: "osm",
-              "source-layer": "transportation",
-              paint: {
-                "line-color": "#999999",
-                "line-width": 2
-              }
-            },
-            // Labels
-            {
-              id: "place-labels",
-              type: "symbol",
-              source: "osm",
-              "source-layer": "place",
-              layout: {
-                "text-field": ["get", "name"],
-                "text-size": 12
-              },
-              paint: {
-                "text-color": "#333333",
-                "text-halo-color": "#ffffff",
-                "text-halo-width": 1
-              }
+              id: 'background',
+              type: 'background',
+              paint: { 'background-color': '#dcdcdc' } // base gray background
             }
           ]
         },
@@ -134,91 +63,63 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         const geoData = await loadGeoJSONData();
         if (!geoData || !mapInstance) return;
 
-        mapInstance.addSource('geojson-data', {
+        mapInstance.addSource('nyc-data', {
           type: 'geojson',
           data: geoData
         });
 
-        // NYC land polygons
+        // Land
         mapInstance.addLayer({
-          id: 'nyc-land',
+          id: 'land',
           type: 'fill',
-          source: 'geojson-data',
-          filter: [
-            'all',
-            ['==', ['geometry-type'], 'Polygon'],
-            ['!=', ['get', 'natural'], 'water']
-          ],
+          source: 'nyc-data',
+          filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['!=', ['get', 'natural'], 'water']],
           paint: {
             'fill-color': '#f0f0f0',
             'fill-opacity': 1
           }
         });
 
-        // Custom water override
+        // Water
         mapInstance.addLayer({
-          id: 'custom-water',
+          id: 'water',
           type: 'fill',
-          source: 'geojson-data',
-          filter: [
-            'all',
-            ['==', ['geometry-type'], 'Polygon'],
-            ['==', ['get', 'natural'], 'water']
-          ],
+          source: 'nyc-data',
+          filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['==', ['get', 'natural'], 'water']],
           paint: {
             'fill-color': '#64B5F6',
             'fill-opacity': 1
           }
         });
 
-        // Parks override
+        // Parks
         mapInstance.addLayer({
-          id: 'custom-parks',
+          id: 'parks',
           type: 'fill',
-          source: 'geojson-data',
-          filter: [
-            'all',
-            ['==', ['geometry-type'], 'Polygon'],
-            ['==', ['get', 'leisure'], 'park']
-          ],
+          source: 'nyc-data',
+          filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['==', ['get', 'leisure'], 'park']],
           paint: {
             'fill-color': '#81C784',
             'fill-opacity': 0.8
           }
         });
 
-        setMap(mapInstance);
-      });
+        // Roads (optional, if in your data)
+        mapInstance.addLayer({
+          id: 'roads',
+          type: 'line',
+          source: 'nyc-data',
+          filter: ['all', ['==', ['geometry-type'], 'LineString'], ['==', ['get', 'highway'], 'primary']],
+          paint: {
+            'line-color': '#ffffff',
+            'line-width': 2
+          }
+        });
 
-      mapInstance.on('error', e => {
-        console.error('Map error:', e.error);
+        setMap(mapInstance);
       });
     };
 
     initializeMap();
 
-    return () => {
-      cleanedUp = true;
-      if (mapInstance) {
-        mapInstance.remove();
-      }
-      setMap(null);
-    };
-  }, [loadGeoJSONData]);
-
-  return (
-    <div
-      ref={mapRef}
-      style={{
-        position: 'absolute',
-        top: 0,
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: '#f0f0f0'
-      }}
-    />
-  );
-};
-
-export default MapLibreMap;
+    return
