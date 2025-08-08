@@ -107,22 +107,31 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           }
         });
 
-        // Water (natural=water or has water tag)
+        // Water
         mapInstance!.addLayer({
           id: 'water',
           type: 'fill',
           source: 'geojson-data',
           filter: [
             'all',
-            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-            ['any', ['==', ['get', 'natural'], 'water'], ['has', 'water']]
+            ['any',
+              ['==', ['geometry-type'], 'Polygon'],
+              ['==', ['geometry-type'], 'MultiPolygon']
+            ],
+            ['any',
+              ['==', ['get', 'natural'], 'water'],
+              ['==', ['get', 'natural'], 'sea'],
+              ['==', ['get', 'water'], 'ocean'],
+              ['==', ['get', 'water'], 'bay'],
+              ['has', 'water']
+            ]
           ],
           paint: {
             'fill-color': '#64B5F6',
             'fill-opacity': 0.7
           }
         });
-
+        
         // Roads
         mapInstance!.addLayer({
           id: 'roads',
@@ -130,7 +139,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           source: 'geojson-data',
           filter: [
             'all',
-            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+            ['any',
+              ['==', ['geometry-type'], 'LineString'],
+              ['==', ['geometry-type'], 'MultiLineString']
+            ],
             ['has', 'highway']
           ],
           paint: {
@@ -146,10 +158,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
               'unclassified', 1.2,
               'residential', 1,
               'living_street', 1,
-              0.8 // default
+              0.8
             ]
           }
         });
+
 
         // Coastline lines
         mapInstance!.addLayer({
