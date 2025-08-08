@@ -51,13 +51,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
             }
           ]
         },
-        center: [-73.945, 40.789], // Center based on your data
-        zoom: 16,
+        center: [-73.9712, 40.7831], // NYC center
+        zoom: 10,
         attributionControl: false,
-        // Tight bounds around your data area
+        // Tight bounds around all of NYC
         maxBounds: [
-          [-73.96, 40.78], // Southwest coordinates
-          [-73.93, 40.80]  // Northeast coordinates
+          [-74.3, 40.4], // Southwest coordinates (includes Staten Island)
+          [-73.6, 40.95] // Northeast coordinates (includes Bronx)
         ]
       });
 
@@ -122,18 +122,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
 
         // Remove road layers since your data doesn't contain roads
 
-        // Fit tightly to your data bounds
-        try {
-          const bbox = turf.bbox(geoData);
-          if (bbox && bbox.length === 4) {
-            mapInstance.fitBounds(bbox as [number, number, number, number], {
-              padding: 20, // Very tight padding
-              duration: 1000
-            });
-          }
-        } catch (e) {
-          console.error('Error fitting bounds:', e);
-        }
+        // Fit to NYC bounds instead of data bounds
+        const nycBounds: [number, number, number, number] = [-74.3, 40.4, -73.6, 40.95];
+        mapInstance.fitBounds(nycBounds, {
+          padding: 20,
+          duration: 1000
+        });
 
         setMap(mapInstance);
       });
