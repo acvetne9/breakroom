@@ -36,9 +36,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
     let cleanedUp = false;
 
     const initializeMap = async () => {
+      // Create a simple gray background style
+      const grayStyle = {
+        version: 8,
+        sources: {},
+        layers: [
+          {
+            id: 'background',
+            type: 'background',
+            paint: {
+              'background-color': '#f0f0f0' // Light gray background
+            }
+          }
+        ]
+      };
+
       mapInstance = new maplibregl.Map({
         container: mapRef.current!,
-        style: 'https://demotiles.maplibre.org/style.json', // ✅ Add OSM tile style
+        style: grayStyle, // Use gray background instead of demo tiles
         center: [-73.9712, 40.7831], // NYC
         zoom: 12
       });
