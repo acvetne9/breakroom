@@ -39,77 +39,28 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
     const initializeMap = async () => {
       mapInstance = new maplibregl.Map({
         container: mapRef.current!,
-        style: {
-          version: 8,
-          name: "Custom Gray",
-          sources: {},
-          layers: [
-            {
-              id: 'background',
-              type: 'background',
-              paint: { 'background-color': '#e0e0e0' } // light gray background
-            }
-          ]
-        },
-        center: [-73.9712, 40.7831], // NYC center
+        style: 'https://demotiles.maplibre.org/style.json', // full default style with roads, labels, etc.
+        center: [-73.9712, 40.7831],
         zoom: 10,
         attributionControl: false,
-        // Constrain bounds to NYC's exact north/south limits
         maxBounds: [
-          [-74.5, 40.477], // Southwest coordinates (southernmost point of Staten Island)
-          [-73.5, 40.917]  // Northeast coordinates (northernmost point of Bronx)
+          [-74.5, 40.477],
+          [-73.5, 40.917]
         ]
       });
-
+      
       mapInstance.on('load', async () => {
         if (cleanedUp) return;
-
+      
         const geoData = await loadGeoJSONData();
         if (!geoData || !mapInstance) return;
-
+      
         mapInstance.addSource('geojson-data', {
           type: 'geojson',
           data: geoData
         });
-
-        // Main polygons layer - all your polygon features
-        mapInstance.addLayer({
-          id: 'polygons',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: ['==', ['geometry-type'], 'Polygon'],
-          paint: {
-            'fill-color': '#4CAF50',
-            'fill-opacity': 0.6
-          }
-        });
-
-        // Polygon borders for better definition
-        mapInstance.addLayer({
-          id: 'polygon-borders',
-          type: 'line',
-          source: 'geojson-data',
-          filter: ['==', ['geometry-type'], 'Polygon'],
-          paint: {
-            'line-color': '#2E7D32',
-            'line-width': 1,
-            'line-opacity': 0.8
-          }
-        });
-
-        // Keep the existing layers for any parks/water that might be in the data
-        mapInstance.addLayer({
-          id: 'parks',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['==', ['get', 'leisure'], 'park']],
-          paint: {
-            'fill-color': '#81C784',
-            'fill-opacity': 0.7
-          }
-        });
-
-        // Replace your 'polygons' layer definition with this:
+      
+        // NYC land - light gray
         mapInstance.addLayer({
           id: 'nyc-land',
           type: 'fill',
@@ -117,19 +68,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           filter: [
             'all',
             ['==', ['geometry-type'], 'Polygon'],
-            ['!=', ['get', 'natural'], 'water'] // exclude water polygons
+            ['!=', ['get', 'natural'], 'water']
           ],
           paint: {
-            'fill-color': '#f0f0f0', // lighter gray for NYC land
+            'fill-color': '#f0f0f0',
             'fill-opacity': 1
           }
         });
-        
-        // Remove the old 'polygons' layer if you had one
-        
-        // Keep water definition but make it consistent:
+      
+        // Water - bright blue
         mapInstance.addLayer({
-          id: 'water',
+          id: 'water-custom',
           type: 'fill',
           source: 'geojson-data',
           filter: [
@@ -138,10 +87,28 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
             ['==', ['get', 'natural'], 'water']
           ],
           paint: {
-            'fill-color': '#64B5F6', // blue water
+            'fill-color': '#64B5F6',
             'fill-opacity': 1
           }
         });
+      
+        // Parks - green
+        mapInstance.addLayer({
+          id: 'parks-custom',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: [
+            'all',
+            ['==', ['geometry-type'], 'Polygon'],
+            ['==', ['get', 'leisure'], 'park']
+          ],
+          paint: {
+            'fill-color': '#81C784',
+            'fill-opacity': 0.8
+          }
+        });
+      });
+
 
 
         // Remove road layers since your data doesn't contain roads
