@@ -43,11 +43,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
         zoom: 12
       });
 
-      // ✅ Restrict bounds to NYC
-      mapInstance.setMaxBounds([
-        [-74.25909, 40.477399],
-        [-73.700272, 40.917577],
-      ]);
+      const nycBounds: maplibregl.LngLatBoundsLike = [
+        [-74.25909, 40.477399], // SW
+        [-73.700272, 40.917577], // NE
+      ];
+      
+      mapInstance.setMaxBounds(nycBounds);
 
       mapInstance.on('load', async () => {
         if (cleanedUp) return;
