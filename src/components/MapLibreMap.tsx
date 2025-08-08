@@ -54,10 +54,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
         center: [-73.9712, 40.7831], // NYC center
         zoom: 10,
         attributionControl: false,
-        // Tight bounds around all of NYC
+        // Constrain bounds to NYC's exact north/south limits
         maxBounds: [
-          [-74.3, 40.4], // Southwest coordinates (includes Staten Island)
-          [-73.6, 40.95] // Northeast coordinates (includes Bronx)
+          [-74.5, 40.477], // Southwest coordinates (southernmost point of Staten Island)
+          [-73.5, 40.917]  // Northeast coordinates (northernmost point of Bronx)
         ]
       });
 
