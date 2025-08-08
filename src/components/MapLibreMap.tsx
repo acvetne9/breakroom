@@ -98,8 +98,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           source: 'geojson-data',
           filter: [
             'all',
-            ['any', ['==', '$type', 'Polygon'], ['==', '$type', 'MultiPolygon']],
-            ['==', 'leisure', 'park']
+            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+            ['==', ['get', 'leisure'], 'park']
           ],
           paint: {
             'fill-color': '#81C784',
@@ -114,8 +114,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           source: 'geojson-data',
           filter: [
             'all',
-            ['any', ['==', '$type', 'Polygon'], ['==', '$type', 'MultiPolygon']],
-            ['any', ['==', 'natural', 'water'], ['has', 'water']]
+            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+            ['any', ['==', ['get', 'natural'], 'water'], ['has', 'water']]
           ],
           paint: {
             'fill-color': '#64B5F6',
@@ -130,7 +130,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           source: 'geojson-data',
           filter: [
             'all',
-            ['any', ['==', '$type', 'LineString'], ['==', '$type', 'MultiLineString']],
+            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
             ['has', 'highway']
           ],
           paint: {
@@ -158,8 +158,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           source: 'geojson-data',
           filter: [
             'all',
-            ['any', ['==', '$type', 'LineString'], ['==', '$type', 'MultiLineString']],
-            ['==', 'natural', 'coastline']
+            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+            ['==', ['get', 'natural'], 'coastline']
           ],
           paint: {
             'line-color': '#795548',
