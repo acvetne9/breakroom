@@ -38,20 +38,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
     const initializeMap = async () => {
       mapInstance = new maplibregl.Map({
         container: mapRef.current!,
-        style: {
-          version: 8,
-          sources: {},
-          layers: [
-            {
-              id: 'background',
-              type: 'background',
-              paint: { 'background-color': '#f0f0f0' }
-            }
-          ]
-        },
-        center: [-73.9712, 40.7831],
+        style: 'https://demotiles.maplibre.org/style.json', // ✅ Add OSM tile style
+        center: [-73.9712, 40.7831], // NYC
         zoom: 12
       });
+
+      // ✅ Restrict bounds to NYC
+      const nycBounds: [number, number][] = [
+        [-74.25909, 40.477399], // Southwest
+        [-73.700272, 40.917577], // Northeast
+      ];
+      mapInstance.setMaxBounds(nycBounds);
 
       mapInstance.on('load', async () => {
         if (cleanedUp) return;
@@ -64,7 +61,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           data: geoData
         });
 
-        // Parks: Polygon where leisure = park
+        // Optional custom layers:
         mapInstance!.addLayer({
           id: 'parks',
           type: 'fill',
@@ -76,7 +73,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           }
         });
 
-        // Water: Polygon where natural = water
         mapInstance!.addLayer({
           id: 'water',
           type: 'fill',
@@ -88,7 +84,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           }
         });
 
-        // Roads: LineString features, no filter on 'highway' property to be safe
         mapInstance!.addLayer({
           id: 'roads',
           type: 'line',
@@ -100,7 +95,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           }
         });
 
-        // Fit map to data bounds with padding
+        // Zoom to data bounds (optional)
         const bbox = turf.bbox(geoData);
         mapInstance!.fitBounds(bbox as [number, number, number, number], {
           padding: 100,
@@ -129,7 +124,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
   return (
     <div
       ref={mapRef}
-      style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: '#f0f0f0' }}
+      style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
     />
   );
 };
