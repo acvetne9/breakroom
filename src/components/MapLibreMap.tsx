@@ -10,11 +10,7 @@ interface MapLibreMapProps {
   selectedBusiness: any;
 }
 
-const MapLibreMap: React.FC<MapLibreMapProps> = ({
-  businesses,
-  onBusinessClick,
-  selectedBusiness
-}) => {
+const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, selectedBusiness }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
 
@@ -26,6 +22,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         return null;
       }
       const data: FeatureCollection = await response.json();
+      console.log('Loaded GeoJSON:', data);  // Debug logging
       return data;
     } catch (error) {
       console.error('Error loading GeoJSON:', error);
@@ -44,19 +41,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         container: mapRef.current!,
         style: {
           version: 8,
+          name: "Custom Gray",
           sources: {},
           layers: [
             {
-              id: 'land',
+              id: 'background',
               type: 'background',
-              paint: { 'background-color': '#e0e0e0' }
+              paint: { 'background-color': '#e0e0e0' } // light gray background
             }
           ]
         },
         center: [-73.9712, 40.7831],
-        zoom: 12
+        zoom: 12,
+        attributionControl: false
       });
-
 
       mapInstance.on('load', async () => {
         if (cleanedUp) return;
@@ -69,48 +67,54 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           data: geoData
         });
 
-        // Only render parks (Polygon where leisure=park)
+        // PARKS layer - fill polygons where leisure=park
         mapInstance!.addLayer({
           id: 'parks',
           type: 'fill',
           source: 'geojson-data',
-          filter: ['all', ['==', '$type', 'Polygon'], ['==', ['get', 'leisure'], 'park']],
+          filter: ['all', ['==', '$type', 'Polygon'], ['==', 'leisure', 'park']],
           paint: {
-            'fill-color': '#a5d6a7', // muted green
-            'fill-opacity': 0.6
-          }
-        });
-
-        // Only render water (Polygon where natural=water)
-        mapInstance!.addLayer({
-          id: 'water',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: ['all', ['==', '$type', 'Polygon'], ['==', ['get', 'natural'], 'water']],
-          paint: {
-            'fill-color': '#90caf9', // muted blue
+            'fill-color': '#81C784',
             'fill-opacity': 0.5
           }
         });
 
-        // Only render roads (LineString)
+        // WATER layer - fill polygons where natural=water
+        mapInstance!.addLayer({
+          id: 'water',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['all', ['==', '$type', 'Polygon'], ['==', 'natural', 'water']],
+          paint: {
+            'fill-color': '#64B5F6',
+            'fill-opacity': 0.6
+          }
+        });
+
+        // ROADS layer - linestrings
         mapInstance!.addLayer({
           id: 'roads',
           type: 'line',
           source: 'geojson-data',
           filter: ['==', '$type', 'LineString'],
           paint: {
-            'line-color': '#999999',
-            'line-width': 1.2
+            'line-color': '#888888',
+            'line-width': 1.5
           }
         });
 
-        // Fit to the bounds of your data
-        const bbox = turf.bbox(geoData);
-        mapInstance!.fitBounds(bbox as [number, number, number, number], {
-          padding: 80,
-          duration: 1000
-        });
+        // Fit map to GeoJSON bounds
+        try {
+          const bbox = turf.bbox(geoData);
+          if (bbox && bbox.length === 4) {
+            mapInstance!.fitBounds(bbox as [number, number, number, number], {
+              padding: 100,
+              duration: 1000
+            });
+          }
+        } catch (e) {
+          console.error('Error fitting bounds:', e);
+        }
 
         setMap(mapInstance);
       });
@@ -134,14 +138,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   return (
     <div
       ref={mapRef}
-      style={{
-        position: 'absolute',
-        top: 0,
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: '#e0e0e0'
-      }}
+      style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: '#e0e0e0' }}
     />
   );
 };
