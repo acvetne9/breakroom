@@ -109,6 +109,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
         });
       });
 
+      mapInstance = new maplibregl.Map({
+
 
 
         // Remove road layers since your data doesn't contain roads
