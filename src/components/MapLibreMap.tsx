@@ -77,11 +77,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         try {
           const bbox2d = turf.bbox(geoData) as [number, number, number, number];
           if (bbox2d[0] !== bbox2d[2] && bbox2d[1] !== bbox2d[3]) {
-            mapInstance!.fitBounds(bbox2d as maplibregl.LngLatBoundsLike, {
+            const boundsObj = new maplibregl.LngLatBounds(bbox2d[0], bbox2d[1]);
+            mapInstance!.fitBounds(boundsObj, {
               padding: 100,
               duration: 1000
             } as any);
-
           }
         } catch (err) {
           console.warn('Could not calculate bbox:', err);
