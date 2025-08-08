@@ -78,7 +78,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           const bbox2d = turf.bbox(geoData) as [number, number, number, number];
           if (bbox2d[0] !== bbox2d[2] && bbox2d[1] !== bbox2d[3]) {
             const boundsObj = new maplibregl.LngLatBounds(bbox2d[0], bbox2d[1]);
-            mapInstance!.fitBounds(boundsObj, {
+            mapInstance!.fitBounds(boundsObj as maplibregl.LngLatBoundsLike, {
               padding: 100,
               duration: 1000
             } as any);
