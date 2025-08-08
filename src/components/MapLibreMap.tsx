@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import type { FeatureCollection } from 'geojson';
 import maplibregl from 'maplibre-gl';
-import * as turf from '@turf/turf';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 interface MapLibreMapProps {
@@ -10,7 +9,11 @@ interface MapLibreMapProps {
   selectedBusiness: any;
 }
 
-const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, selectedBusiness }) => {
+const MapLibreMap: React.FC<MapLibreMapProps> = ({
+  businesses,
+  onBusinessClick,
+  selectedBusiness
+}) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
 
@@ -22,7 +25,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
         return null;
       }
       const data: FeatureCollection = await response.json();
-      console.log('Loaded GeoJSON:', data);  // Debug logging
       return data;
     } catch (error) {
       console.error('Error loading GeoJSON:', error);
@@ -39,7 +41,84 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
     const initializeMap = async () => {
       mapInstance = new maplibregl.Map({
         container: mapRef.current!,
-        style: 'https://demotiles.maplibre.org/style.json', // full default style with roads, labels, etc.
+        style: {
+          version: 8,
+          name: "Custom Inline Style",
+          sources: {
+            // Base vector tile source for streets, buildings, etc.
+            osm: {
+              type: "vector",
+              tiles: [
+                "https://tile.openstreetmap.org/{z}/{x}/{y}.pbf"
+              ],
+              minzoom: 0,
+              maxzoom: 14
+            }
+          },
+          layers: [
+            // Background
+            {
+              id: "background",
+              type: "background",
+              paint: { "background-color": "#f0f0f0" }
+            },
+            // Water
+            {
+              id: "water",
+              type: "fill",
+              source: "osm",
+              "source-layer": "water",
+              paint: { "fill-color": "#64B5F6" }
+            },
+            // Parks
+            {
+              id: "parks",
+              type: "fill",
+              source: "osm",
+              "source-layer": "landuse",
+              filter: ["==", "class", "park"],
+              paint: { "fill-color": "#81C784" }
+            },
+            // Roads
+            {
+              id: "roads",
+              type: "line",
+              source: "osm",
+              "source-layer": "transportation",
+              paint: {
+                "line-color": "#ffffff",
+                "line-width": 1.5
+              }
+            },
+            // Road outlines
+            {
+              id: "road-outline",
+              type: "line",
+              source: "osm",
+              "source-layer": "transportation",
+              paint: {
+                "line-color": "#999999",
+                "line-width": 2
+              }
+            },
+            // Labels
+            {
+              id: "place-labels",
+              type: "symbol",
+              source: "osm",
+              "source-layer": "place",
+              layout: {
+                "text-field": ["get", "name"],
+                "text-size": 12
+              },
+              paint: {
+                "text-color": "#333333",
+                "text-halo-color": "#ffffff",
+                "text-halo-width": 1
+              }
+            }
+          ]
+        },
         center: [-73.9712, 40.7831],
         zoom: 10,
         attributionControl: false,
@@ -48,19 +127,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           [-73.5, 40.917]
         ]
       });
-      
+
       mapInstance.on('load', async () => {
         if (cleanedUp) return;
-      
+
         const geoData = await loadGeoJSONData();
         if (!geoData || !mapInstance) return;
-      
+
         mapInstance.addSource('geojson-data', {
           type: 'geojson',
           data: geoData
         });
-      
-        // NYC land - light gray
+
+        // NYC land polygons
         mapInstance.addLayer({
           id: 'nyc-land',
           type: 'fill',
@@ -75,10 +154,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
             'fill-opacity': 1
           }
         });
-      
-        // Water - bright blue
+
+        // Custom water override
         mapInstance.addLayer({
-          id: 'water-custom',
+          id: 'custom-water',
           type: 'fill',
           source: 'geojson-data',
           filter: [
@@ -91,10 +170,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
             'fill-opacity': 1
           }
         });
-      
-        // Parks - green
+
+        // Parks override
         mapInstance.addLayer({
-          id: 'parks-custom',
+          id: 'custom-parks',
           type: 'fill',
           source: 'geojson-data',
           filter: [
@@ -106,20 +185,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
             'fill-color': '#81C784',
             'fill-opacity': 0.8
           }
-        });
-      });
-
-      mapInstance = new maplibregl.Map({
-
-
-
-        // Remove road layers since your data doesn't contain roads
-
-        // Fit to NYC bounds instead of data bounds
-        const nycBounds: [number, number, number, number] = [-74.3, 40.4, -73.6, 40.95];
-        mapInstance.fitBounds(nycBounds, {
-          padding: 20,
-          duration: 1000
         });
 
         setMap(mapInstance);
@@ -144,7 +209,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
   return (
     <div
       ref={mapRef}
-      style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: '#e0e0e0' }}
+      style={{
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#f0f0f0'
+      }}
     />
   );
 };
