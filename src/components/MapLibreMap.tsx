@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import type { FeatureCollection } from 'geojson';
+import type { FeatureCollection, Polygon, MultiPolygon } from 'geojson';
 import maplibregl from 'maplibre-gl';
 import * as turf from '@turf/turf';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -47,7 +47,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           {
             id: 'background',
             type: 'background' as const,
-            paint: { 'background-color': '#f0f0f0' } // Light gray background land
+            paint: { 'background-color': '#e5e5e5' } // Light gray background land
           }
         ]
       };
@@ -74,40 +74,49 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           return;
         }
 
+        // Fit map to data
         try {
           const bbox2d = turf.bbox(geoData) as [number, number, number, number];
           if (bbox2d[0] !== bbox2d[2] && bbox2d[1] !== bbox2d[3]) {
-            map.fitBounds([minLng, minLat, maxLng, maxLat]); 
+            mapInstance!.fitBounds(bbox2d, { padding: 100, duration: 1000 });
           }
         } catch (err) {
           console.warn('Could not calculate bbox:', err);
         }
 
+        // Main data source
         mapInstance!.addSource('geojson-data', {
           type: 'geojson',
           data: geoData
         });
 
-        // --- Create global ocean polygon (big bbox around NYC)
+        // --- Build ocean background outside of land polygons
         const mapBbox: [number, number, number, number] = [-75, 40.2, -73, 41.2];
         const oceanPoly = turf.bboxPolygon(mapBbox);
 
-        // Extract land polygons from geoData (those not tagged as water)
+        // Extract land polygons
         const landFeatures = geoData.features.filter(f =>
-          f.geometry.type.includes('Polygon') &&
+          (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon') &&
           !(
             (f.properties?.natural === 'water') ||
             (f.properties?.water) ||
             (f.properties?.natural === 'sea') ||
             (f.properties?.water === 'ocean') ||
-            (f.properties?.water === 'bay')
+            (f.properties?.water === 'bay') ||
+            (f.properties?.landuse === 'reservoir') ||
+            (f.properties?.waterway)
           )
         );
 
-        let oceanWithHoles: turf.AllGeoJSON = oceanPoly;
+        let oceanWithHoles = oceanPoly;
         if (landFeatures.length > 0) {
           try {
-            oceanWithHoles = turf.difference(oceanPoly, turf.union(...landFeatures));
+            // Clean geometries before union/difference
+            const flattened = turf.flatten({ type: 'FeatureCollection', features: landFeatures });
+            const unioned = turf.union(...flattened.features as any);
+            if (unioned) {
+              oceanWithHoles = turf.difference(oceanPoly, unioned) || oceanPoly;
+            }
           } catch (err) {
             console.warn('Could not subtract land from ocean polygon:', err);
           }
@@ -124,6 +133,31 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         });
 
+        // --- Water polygons from data
+        mapInstance!.addLayer({
+          id: 'water',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: [
+            'all',
+            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+            ['any',
+              ['==', ['get', 'natural'], 'water'],
+              ['==', ['get', 'natural'], 'sea'],
+              ['==', ['get', 'natural'], 'bay'],
+              ['==', ['get', 'water'], 'ocean'],
+              ['==', ['get', 'water'], 'bay'],
+              ['==', ['get', 'water'], 'river'],
+              ['==', ['get', 'waterway'], 'riverbank'],
+              ['has', 'water']
+            ]
+          ],
+          paint: {
+            'fill-color': '#64B5F6',
+            'fill-opacity': 0.85
+          }
+        });
+
         // --- Parks
         mapInstance!.addLayer({
           id: 'parks',
@@ -137,28 +171,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           paint: {
             'fill-color': '#81C784',
             'fill-opacity': 0.6
-          }
-        });
-
-        // --- Water polygons from geoData
-        mapInstance!.addLayer({
-          id: 'water',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: [
-            'all',
-            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-            ['any',
-              ['==', ['get', 'natural'], 'water'],
-              ['==', ['get', 'natural'], 'sea'],
-              ['==', ['get', 'water'], 'ocean'],
-              ['==', ['get', 'water'], 'bay'],
-              ['has', 'water']
-            ]
-          ],
-          paint: {
-            'fill-color': '#64B5F6',
-            'fill-opacity': 0.7
           }
         });
 
@@ -198,10 +210,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           filter: [
             'all',
             ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
-            ['==', ['get', 'natural'], 'coastline']
+            ['any',
+              ['==', ['get', 'natural'], 'coastline'],
+              ['==', ['get', 'natural'], 'shoreline']
+            ]
           ],
           paint: {
-            'line-color': '#795548',
+            'line-color': '#5D4037',
             'line-width': 2
           }
         });
