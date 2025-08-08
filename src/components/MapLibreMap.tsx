@@ -92,23 +92,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
         // Create synthetic ocean polygon
         const mapBbox: [number, number, number, number] = [-75, 40.2, -73, 41.2];
-        const nycLand = turf.featureCollection(
-          geoData.features.filter(
-            f =>
-              (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon') &&
-              !(f.properties?.natural === 'water' || f.properties?.water || f.properties?.natural === 'sea')
-          )
-        );
-        const outerPoly = turf.bboxPolygon(mapBbox);
-        let oceanPoly: turf.AllGeoJSON = outerPoly;
-        nycLand.features.forEach(land => {
-          try {
-            const diff = turf.difference(oceanPoly as any, land as any);
-            if (diff) oceanPoly = diff;
-          } catch (err) {
-            console.warn('Ocean clipping error:', err);
-          }
-        });
+        const oceanPoly = turf.bboxPolygon(mapBbox);
 
         mapInstance!.addSource('ocean', { type: 'geojson', data: oceanPoly });
         mapInstance!.addLayer({
