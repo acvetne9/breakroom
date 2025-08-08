@@ -47,17 +47,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           sources: {},
           layers: [
             {
-              id: 'background',
+              id: 'land',
               type: 'background',
-              paint: {
-                'background-color': '#e0e0e0' // light gray
-              }
+              paint: { 'background-color': '#e0e0e0' }
             }
           ]
         },
         center: [-73.9712, 40.7831],
         zoom: 12
       });
+
 
       mapInstance.on('load', async () => {
         if (cleanedUp) return;
