@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import type { FeatureCollection, Feature, Polygon, MultiPolygon } from 'geojson';
+import type { FeatureCollection } from 'geojson';
 import maplibregl from 'maplibre-gl';
 import * as turf from '@turf/turf';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -10,13 +10,17 @@ interface MapLibreMapProps {
   selectedBusiness: any;
 }
 
-const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, selectedBusiness }) => {
+const MapLibreMap: React.FC<MapLibreMapProps> = ({
+  businesses,
+  onBusinessClick,
+  selectedBusiness
+}) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
 
   const loadGeoJSONData = useCallback(async (): Promise<FeatureCollection | null> => {
     try {
-      const response = await fetch('/data/processed.geojson'); // path to your filtered GeoJSON
+      const response = await fetch('/data/example-points.geojson'); // change to processed.geojson
       if (!response.ok) {
         console.error('Failed to load GeoJSON:', response.statusText);
         return null;
@@ -56,13 +60,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
       });
 
       const nycBounds: maplibregl.LngLatBoundsLike = [
-        [-74.25909, 40.477399], // SW
-        [-73.700272, 40.917577], // NE
+        [-74.25909, 40.477399],
+        [-73.700272, 40.917577]
       ];
       mapInstance.setMaxBounds(nycBounds);
 
       mapInstance.on('load', async () => {
         if (cleanedUp) return;
+        if (mapInstance!.getSource('geojson-data')) return;
 
         const geoData = await loadGeoJSONData();
         if (!geoData || !geoData.features.length) {
@@ -70,68 +75,52 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           return;
         }
 
-        // Fit bounds to data
+        // Fit bounds safely
         try {
-          const bbox = turf.bbox(geoData);
-          if (bbox[0] !== bbox[2] && bbox[1] !== bbox[3]) {
-            mapInstance!.fitBounds(bbox as [number, number, number, number], {
-              padding: 100,
-              duration: 1000
-            });
+          const bbox2d = turf.bbox(geoData) as [number, number, number, number];
+          if (bbox2d[0] !== bbox2d[2] && bbox2d[1] !== bbox2d[3]) {
+            mapInstance!.fitBounds(bbox2d, { padding: 100, duration: 1000 });
           }
         } catch (err) {
           console.warn('Could not calculate bbox:', err);
         }
 
-        // Add main data source
+        // Add main source
         mapInstance!.addSource('geojson-data', {
           type: 'geojson',
           data: geoData
         });
 
-        // --- Synthetic Ocean Layer ---
-        try {
-          // Extend bounds around NYC so we get a large ocean area
-          const mapBbox = [-75, 40.2, -73, 41.2]; // minLng, minLat, maxLng, maxLat
-          const outerPoly = turf.bboxPolygon(mapBbox);
-
-          // Get land polygons from GeoJSON (non-water)
-          const nycLand = turf.featureCollection(
-            geoData.features.filter(f =>
+        // Create synthetic ocean polygon
+        const mapBbox = [-75, 40.2, -73, 41.2]; // expanded area around NYC
+        const nycLand = turf.featureCollection(
+          geoData.features.filter(
+            f =>
               (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon') &&
-              !(f.properties?.natural === 'water' ||
-                f.properties?.natural === 'sea' ||
-                f.properties?.water)
-            ) as Feature<Polygon | MultiPolygon>[]
-          );
+              !(f.properties?.natural === 'water' || f.properties?.water || f.properties?.natural === 'sea')
+          )
+        );
+        const outerPoly = turf.bboxPolygon(mapBbox);
+        let oceanPoly: turf.AllGeoJSON = outerPoly;
+        nycLand.features.forEach(land => {
+          try {
+            const diff = turf.difference(oceanPoly as any, land as any);
+            if (diff) oceanPoly = diff;
+          } catch (err) {
+            console.warn('Ocean clipping error:', err);
+          }
+        });
 
-          // Subtract each land polygon from the big outer polygon
-          let oceanPoly: Feature<Polygon | MultiPolygon> = outerPoly;
-          nycLand.features.forEach(land => {
-            try {
-              const diff = turf.difference(oceanPoly, land);
-              if (diff) {
-                oceanPoly = diff as Feature<Polygon | MultiPolygon>;
-              }
-            } catch (err) {
-              console.warn('Ocean clipping error:', err);
-            }
-          });
-
-          // Add synthetic ocean source and layer
-          mapInstance!.addSource('ocean', { type: 'geojson', data: oceanPoly });
-          mapInstance!.addLayer({
-            id: 'ocean',
-            type: 'fill',
-            source: 'ocean',
-            paint: {
-              'fill-color': '#64B5F6',
-              'fill-opacity': 0.7
-            }
-          }, 'background');
-        } catch (err) {
-          console.error('Error creating ocean layer:', err);
-        }
+        mapInstance!.addSource('ocean', { type: 'geojson', data: oceanPoly });
+        mapInstance!.addLayer({
+          id: 'ocean',
+          type: 'fill',
+          source: 'ocean',
+          paint: {
+            'fill-color': '#64B5F6',
+            'fill-opacity': 0.7
+          }
+        });
 
         // Parks
         mapInstance!.addLayer({
@@ -149,7 +138,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           }
         });
 
-        // Water from your data
+        // Water polygons
         mapInstance!.addLayer({
           id: 'water',
           type: 'fill',
