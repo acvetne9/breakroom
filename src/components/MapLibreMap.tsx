@@ -38,12 +38,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
     const initializeMap = async () => {
       // Create a simple gray background style
       const grayStyle = {
-        version: 8,
+        version: 8 as const,
         sources: {},
         layers: [
           {
             id: 'background',
-            type: 'background',
+            type: 'background' as const,
             paint: {
               'background-color': '#f0f0f0' // Light gray background
             }
