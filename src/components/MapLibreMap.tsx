@@ -109,16 +109,40 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           }
         });
 
+        // Replace your 'polygons' layer definition with this:
+        mapInstance.addLayer({
+          id: 'nyc-land',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: [
+            'all',
+            ['==', ['geometry-type'], 'Polygon'],
+            ['!=', ['get', 'natural'], 'water'] // exclude water polygons
+          ],
+          paint: {
+            'fill-color': '#f0f0f0', // lighter gray for NYC land
+            'fill-opacity': 1
+          }
+        });
+        
+        // Remove the old 'polygons' layer if you had one
+        
+        // Keep water definition but make it consistent:
         mapInstance.addLayer({
           id: 'water',
           type: 'fill',
           source: 'geojson-data',
-          filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['==', ['get', 'natural'], 'water']],
+          filter: [
+            'all',
+            ['==', ['geometry-type'], 'Polygon'],
+            ['==', ['get', 'natural'], 'water']
+          ],
           paint: {
-            'fill-color': '#64B5F6',
-            'fill-opacity': 0.7
+            'fill-color': '#64B5F6', // blue water
+            'fill-opacity': 1
           }
         });
+
 
         // Remove road layers since your data doesn't contain roads
 
