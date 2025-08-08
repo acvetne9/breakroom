@@ -20,7 +20,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   const loadGeoJSONData = useCallback(async (): Promise<FeatureCollection | null> => {
     try {
-      const response = await fetch('/data/example-points.geojson'); // change to processed.geojson
+      const response = await fetch('/data/example-points.geojson');
       if (!response.ok) {
         console.error('Failed to load GeoJSON:', response.statusText);
         return null;
@@ -75,24 +75,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           return;
         }
 
-        // Fit bounds safely
+        // Fit bounds safely (force as any to avoid BBox TS issue)
         try {
           const bbox2d = turf.bbox(geoData) as [number, number, number, number];
           if (bbox2d[0] !== bbox2d[2] && bbox2d[1] !== bbox2d[3]) {
-            mapInstance!.fitBounds(bbox2d, { padding: 100, duration: 1000 });
+            mapInstance!.fitBounds(bbox2d as any, { padding: 100, duration: 1000 });
           }
         } catch (err) {
           console.warn('Could not calculate bbox:', err);
         }
 
-        // Add main source
         mapInstance!.addSource('geojson-data', {
           type: 'geojson',
           data: geoData
         });
 
         // Create synthetic ocean polygon
-        const mapBbox = [-75, 40.2, -73, 41.2]; // expanded area around NYC
+        const mapBbox: [number, number, number, number] = [-75, 40.2, -73, 41.2];
         const nycLand = turf.featureCollection(
           geoData.features.filter(
             f =>
