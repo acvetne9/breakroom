@@ -16,7 +16,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
 
   const loadGeoJSONData = useCallback(async (): Promise<FeatureCollection | null> => {
     try {
-      const response = await fetch('/data/example-points.geojson'); // replace with your processed file
+      const response = await fetch('/data/example-points.geojson'); // update path to processed.geojson
       if (!response.ok) {
         console.error('Failed to load GeoJSON:', response.statusText);
         return null;
@@ -51,7 +51,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
       mapInstance = new maplibregl.Map({
         container: mapRef.current!,
         style: grayStyle,
-        center: [-73.9712, 40.7831], // NYC center
+        center: [-73.9712, 40.7831],
         zoom: 12
       });
 
@@ -64,8 +64,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
       mapInstance.on('load', async () => {
         if (cleanedUp) return;
 
+        // Avoid adding twice
+        if (mapInstance!.getSource('geojson-data')) return;
+
         const geoData = await loadGeoJSONData();
-        if (!geoData) return;
+        if (!geoData || !geoData.features.length) {
+          console.warn('No GeoJSON features loaded.');
+          return;
+        }
+
+        // Validate bbox before fit
+        try {
+          const bbox = turf.bbox(geoData);
+          if (bbox[0] !== bbox[2] && bbox[1] !== bbox[3]) {
+            mapInstance!.fitBounds(bbox as [number, number, number, number], {
+              padding: 100,
+              duration: 1000
+            });
+          }
+        } catch (err) {
+          console.warn('Could not calculate bbox:', err);
+        }
 
         mapInstance!.addSource('geojson-data', {
           type: 'geojson',
@@ -132,7 +151,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           }
         });
 
-        // Optional coastline lines
+        // Coastline lines
         mapInstance!.addLayer({
           id: 'coastline',
           type: 'line',
@@ -147,15 +166,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
             'line-width': 2
           }
         });
-
-        // Fit to data
-        const bbox = turf.bbox(geoData);
-        mapInstance!.fitBounds(bbox as [number, number, number, number], {
-          padding: 100,
-          duration: 1000
-        });
-
-        setMap(mapInstance);
       });
 
       mapInstance.on('error', e => {
