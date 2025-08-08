@@ -51,28 +51,33 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
             }
           ]
         },
-        center: [-73.9712, 40.7831],
+        center: [-73.9712, 40.7831], // NYC center
         zoom: 12,
-        attributionControl: false
+        attributionControl: false,
+        // Restrict map bounds to NYC area
+        maxBounds: [
+          [-74.5, 40.4], // Southwest coordinates
+          [-73.4, 41.1]  // Northeast coordinates
+        ]
       });
 
       mapInstance.on('load', async () => {
         if (cleanedUp) return;
 
         const geoData = await loadGeoJSONData();
-        if (!geoData) return;
+        if (!geoData || !mapInstance) return;
 
-        mapInstance!.addSource('geojson-data', {
+        mapInstance.addSource('geojson-data', {
           type: 'geojson',
           data: geoData
         });
 
         // PARKS layer - fill polygons where leisure=park
-        mapInstance!.addLayer({
+        mapInstance.addLayer({
           id: 'parks',
           type: 'fill',
           source: 'geojson-data',
-          filter: ['all', ['==', '$type', 'Polygon'], ['==', 'leisure', 'park']],
+          filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['==', ['get', 'leisure'], 'park']],
           paint: {
             'fill-color': '#81C784',
             'fill-opacity': 0.5
@@ -80,37 +85,58 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
         });
 
         // WATER layer - fill polygons where natural=water
-        mapInstance!.addLayer({
+        mapInstance.addLayer({
           id: 'water',
           type: 'fill',
           source: 'geojson-data',
-          filter: ['all', ['==', '$type', 'Polygon'], ['==', 'natural', 'water']],
+          filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['==', ['get', 'natural'], 'water']],
           paint: {
             'fill-color': '#64B5F6',
             'fill-opacity': 0.6
           }
         });
 
-        // ROADS layer - linestrings
-        mapInstance!.addLayer({
+        // ROADS layer - linestrings (fixed filter syntax)
+        mapInstance.addLayer({
           id: 'roads',
           type: 'line',
           source: 'geojson-data',
-          filter: ['==', '$type', 'LineString'],
+          filter: ['==', ['geometry-type'], 'LineString'],
           paint: {
             'line-color': '#888888',
-            'line-width': 1.5
+            'line-width': 2,
+            'line-opacity': 0.8
           }
         });
 
-        // Fit map to GeoJSON bounds
+        // Optional: Add different road styling based on highway type
+        mapInstance.addLayer({
+          id: 'major-roads',
+          type: 'line',
+          source: 'geojson-data',
+          filter: ['all', 
+            ['==', ['geometry-type'], 'LineString'],
+            ['in', ['get', 'highway'], ['literal', ['primary', 'secondary', 'trunk', 'motorway']]]
+          ],
+          paint: {
+            'line-color': '#666666',
+            'line-width': 3,
+            'line-opacity': 0.9
+          }
+        });
+
+        // Only fit to bounds if the data is within reasonable NYC bounds
         try {
           const bbox = turf.bbox(geoData);
           if (bbox && bbox.length === 4) {
-            mapInstance!.fitBounds(bbox as [number, number, number, number], {
-              padding: 100,
-              duration: 1000
-            });
+            // Check if bbox is within NYC area before fitting
+            const [minLng, minLat, maxLng, maxLat] = bbox;
+            if (minLng >= -74.5 && maxLng <= -73.4 && minLat >= 40.4 && maxLat <= 41.1) {
+              mapInstance.fitBounds(bbox as [number, number, number, number], {
+                padding: 50,
+                duration: 1000
+              });
+            }
           }
         } catch (e) {
           console.error('Error fitting bounds:', e);
