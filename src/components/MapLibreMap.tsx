@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import type { FeatureCollection } from 'geojson';
+import type { FeatureCollection, Feature, Polygon, MultiPolygon } from 'geojson';
 import maplibregl from 'maplibre-gl';
 import * as turf from '@turf/turf';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -16,7 +16,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
 
   const loadGeoJSONData = useCallback(async (): Promise<FeatureCollection | null> => {
     try {
-      const response = await fetch('/data/example-points.geojson'); // update path to processed.geojson
+      const response = await fetch('/data/processed.geojson'); // path to your filtered GeoJSON
       if (!response.ok) {
         console.error('Failed to load GeoJSON:', response.statusText);
         return null;
@@ -64,16 +64,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
       mapInstance.on('load', async () => {
         if (cleanedUp) return;
 
-        // Avoid adding twice
-        if (mapInstance!.getSource('geojson-data')) return;
-
         const geoData = await loadGeoJSONData();
         if (!geoData || !geoData.features.length) {
           console.warn('No GeoJSON features loaded.');
           return;
         }
 
-        // Validate bbox before fit
+        // Fit bounds to data
         try {
           const bbox = turf.bbox(geoData);
           if (bbox[0] !== bbox[2] && bbox[1] !== bbox[3]) {
@@ -86,10 +83,55 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           console.warn('Could not calculate bbox:', err);
         }
 
+        // Add main data source
         mapInstance!.addSource('geojson-data', {
           type: 'geojson',
           data: geoData
         });
+
+        // --- Synthetic Ocean Layer ---
+        try {
+          // Extend bounds around NYC so we get a large ocean area
+          const mapBbox = [-75, 40.2, -73, 41.2]; // minLng, minLat, maxLng, maxLat
+          const outerPoly = turf.bboxPolygon(mapBbox);
+
+          // Get land polygons from GeoJSON (non-water)
+          const nycLand = turf.featureCollection(
+            geoData.features.filter(f =>
+              (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon') &&
+              !(f.properties?.natural === 'water' ||
+                f.properties?.natural === 'sea' ||
+                f.properties?.water)
+            ) as Feature<Polygon | MultiPolygon>[]
+          );
+
+          // Subtract each land polygon from the big outer polygon
+          let oceanPoly: Feature<Polygon | MultiPolygon> = outerPoly;
+          nycLand.features.forEach(land => {
+            try {
+              const diff = turf.difference(oceanPoly, land);
+              if (diff) {
+                oceanPoly = diff as Feature<Polygon | MultiPolygon>;
+              }
+            } catch (err) {
+              console.warn('Ocean clipping error:', err);
+            }
+          });
+
+          // Add synthetic ocean source and layer
+          mapInstance!.addSource('ocean', { type: 'geojson', data: oceanPoly });
+          mapInstance!.addLayer({
+            id: 'ocean',
+            type: 'fill',
+            source: 'ocean',
+            paint: {
+              'fill-color': '#64B5F6',
+              'fill-opacity': 0.7
+            }
+          }, 'background');
+        } catch (err) {
+          console.error('Error creating ocean layer:', err);
+        }
 
         // Parks
         mapInstance!.addLayer({
@@ -107,17 +149,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           }
         });
 
-        // Water
+        // Water from your data
         mapInstance!.addLayer({
           id: 'water',
           type: 'fill',
           source: 'geojson-data',
           filter: [
             'all',
-            ['any',
-              ['==', ['geometry-type'], 'Polygon'],
-              ['==', ['geometry-type'], 'MultiPolygon']
-            ],
+            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
             ['any',
               ['==', ['get', 'natural'], 'water'],
               ['==', ['get', 'natural'], 'sea'],
@@ -131,7 +170,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
             'fill-opacity': 0.7
           }
         });
-        
+
         // Roads
         mapInstance!.addLayer({
           id: 'roads',
@@ -139,10 +178,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           source: 'geojson-data',
           filter: [
             'all',
-            ['any',
-              ['==', ['geometry-type'], 'LineString'],
-              ['==', ['geometry-type'], 'MultiLineString']
-            ],
+            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
             ['has', 'highway']
           ],
           paint: {
@@ -163,8 +199,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           }
         });
 
-
-        // Coastline lines
+        // Coastline
         mapInstance!.addLayer({
           id: 'coastline',
           type: 'line',
