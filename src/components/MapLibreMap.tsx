@@ -92,7 +92,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           id: 'water',
           type: 'fill',
           source: 'geojson-data',
-          filter: ['all', ['==', '$type', 'Polygon'], ['==', 'natural', 'water']],
+          filter: [
+            'all',
+            ['==', '$type', 'Polygon'],
+            ['any',
+              ['==', 'natural', 'water'],
+              ['has', 'water']
+            ]
+          ],
           paint: {
             'fill-color': '#64B5F6',
             'fill-opacity': 0.7
@@ -150,6 +157,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
             'line-width': 2
           }
         });
+
+        mapInstance!.addLayer({
+          id: 'roads',
+          type: 'line',
+          source: 'geojson-data',
+          filter: ['all', ['==', '$type', 'LineString'], ['has', 'highway']],
+          paint: {
+            'line-color': '#555',
+            'line-width': [
+              'match',
+              ['get', 'highway'],
+              'motorway', 3,
+              'trunk', 2.5,
+              'primary', 2.2,
+              'secondary', 2,
+              'tertiary', 1.5,
+              1 // default
+            ]
+          }
+        });
+
 
         // Zoom to data bounds (optional)
         const bbox = turf.bbox(geoData);
