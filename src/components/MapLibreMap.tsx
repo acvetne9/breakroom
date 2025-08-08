@@ -122,4 +122,21 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
 
     initializeMap();
 
-    return
+    return () => {
+      cleanedUp = true;
+      if (mapInstance) {
+        mapInstance.remove();
+      }
+      setMap(null);
+    };
+  }, [loadGeoJSONData]);
+
+  return (
+    <div
+      ref={mapRef}
+      style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
+    />
+  );
+};
+
+export default MapLibreMap;
