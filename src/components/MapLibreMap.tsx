@@ -108,19 +108,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           )
         );
 
-        let oceanWithHoles = oceanPoly;
-        if (landFeatures.length > 0) {
-          try {
-            // Clean geometries before union/difference
-            const flattened = turf.flatten({ type: 'FeatureCollection', features: landFeatures });
-            const unioned = turf.union(...flattened.features as any);
-            if (unioned) {
-              oceanWithHoles = turf.difference(oceanPoly, unioned) || oceanPoly;
-            }
-          } catch (err) {
-            console.warn('Could not subtract land from ocean polygon:', err);
-          }
-        }
+        // Use simple ocean polygon without holes for now
+        const oceanWithHoles = oceanPoly;
 
         mapInstance!.addSource('ocean', { type: 'geojson', data: oceanWithHoles });
         mapInstance!.addLayer({
