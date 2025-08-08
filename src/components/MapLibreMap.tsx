@@ -63,60 +63,147 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
         const geoData = await loadGeoJSONData();
         if (!geoData || !mapInstance) return;
 
+        console.log('Loaded GeoJSON data:', geoData); // Debug log
+
         mapInstance.addSource('nyc-data', {
           type: 'geojson',
           data: geoData
         });
 
-        // Land
-        mapInstance.addLayer({
-          id: 'land',
-          type: 'fill',
-          source: 'nyc-data',
-          filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['!=', ['get', 'natural'], 'water']],
-          paint: {
-            'fill-color': '#f0f0f0',
-            'fill-opacity': 1
-          }
-        });
-
-        // Water
+        // Water - using simplified filter that matches your data
         mapInstance.addLayer({
           id: 'water',
           type: 'fill',
           source: 'nyc-data',
-          filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['==', ['get', 'natural'], 'water']],
+          filter: ['==', ['get', 'natural'], 'water'],
           paint: {
             'fill-color': '#64B5F6',
-            'fill-opacity': 1
+            'fill-opacity': 0.8,
+            'fill-outline-color': '#1976D2'
           }
         });
 
-        // Parks
+        // Parks/green spaces - check for leisure=park or natural=park
         mapInstance.addLayer({
           id: 'parks',
           type: 'fill',
           source: 'nyc-data',
-          filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['==', ['get', 'leisure'], 'park']],
+          filter: [
+            'any',
+            ['==', ['get', 'leisure'], 'park'],
+            ['==', ['get', 'natural'], 'park'],
+            ['==', ['get', 'landuse'], 'recreation_ground']
+          ],
           paint: {
             'fill-color': '#81C784',
-            'fill-opacity': 0.8
+            'fill-opacity': 0.7,
+            'fill-outline-color': '#4CAF50'
           }
         });
 
-        // Roads (optional, if in your data)
+        // Land - everything else that's a polygon but not water or parks
         mapInstance.addLayer({
-          id: 'roads',
+          id: 'land',
+          type: 'fill',
+          source: 'nyc-data',
+          filter: [
+            'all',
+            ['==', ['geometry-type'], 'Polygon'],
+            ['!=', ['get', 'natural'], 'water'],
+            ['!=', ['get', 'leisure'], 'park'],
+            ['!=', ['get', 'natural'], 'park'],
+            ['!=', ['get', 'landuse'], 'recreation_ground']
+          ],
+          paint: {
+            'fill-color': '#f0f0f0',
+            'fill-opacity': 0.8,
+            'fill-outline-color': '#cccccc'
+          }
+        });
+
+        // Roads - check for various highway types
+        mapInstance.addLayer({
+          id: 'roads-major',
           type: 'line',
           source: 'nyc-data',
-          filter: ['all', ['==', ['geometry-type'], 'LineString'], ['==', ['get', 'highway'], 'primary']],
+          filter: [
+            'all',
+            ['==', ['geometry-type'], 'LineString'],
+            [
+              'in',
+              ['get', 'highway'],
+              ['literal', ['primary', 'secondary', 'trunk', 'motorway', 'primary_link', 'secondary_link']]
+            ]
+          ],
           paint: {
             'line-color': '#ffffff',
-            'line-width': 2
+            'line-width': [
+              'case',
+              ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk']]], 4,
+              ['in', ['get', 'highway'], ['literal', ['primary', 'primary_link']]], 3,
+              2
+            ],
+            'line-opacity': 0.8
           }
         });
 
+        // Minor roads
+        mapInstance.addLayer({
+          id: 'roads-minor',
+          type: 'line',
+          source: 'nyc-data',
+          filter: [
+            'all',
+            ['==', ['geometry-type'], 'LineString'],
+            [
+              'in',
+              ['get', 'highway'],
+              ['literal', ['tertiary', 'residential', 'unclassified', 'service']]
+            ]
+          ],
+          paint: {
+            'line-color': '#ffffff',
+            'line-width': 1.5,
+            'line-opacity': 0.6
+          }
+        });
+
+        // Add click handlers for debugging
+        mapInstance.on('click', 'water', (e) => {
+          console.log('Water feature clicked:', e.features?.[0]?.properties);
+        });
+
+        mapInstance.on('click', 'parks', (e) => {
+          console.log('Park feature clicked:', e.features?.[0]?.properties);
+        });
+
+        mapInstance.on('click', 'land', (e) => {
+          console.log('Land feature clicked:', e.features?.[0]?.properties);
+        });
+
+        // Log layer information for debugging
+        console.log('Map layers added. Available sources:', mapInstance.getStyle().sources);
+        
+        // Check if data is actually loaded
+        setTimeout(() => {
+          const source = mapInstance?.getSource('nyc-data') as maplibregl.GeoJSONSource;
+          if (source) {
+            console.log('Source loaded successfully');
+          }
+        }, 1000);
+
         setMap(mapInstance);
+      });
+
+      // Add error handling
+      mapInstance.on('error', (e) => {
+        console.error('Map error:', e);
+      });
+
+      mapInstance.on('sourcedata', (e) => {
+        if (e.sourceId === 'nyc-data' && e.isSourceLoaded) {
+          console.log('NYC data source loaded successfully');
+        }
       });
     };
 
