@@ -10,7 +10,11 @@ interface MapLibreMapProps {
   selectedBusiness: any;
 }
 
-const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, selectedBusiness }) => {
+const MapLibreMap: React.FC<MapLibreMapProps> = ({
+  businesses,
+  onBusinessClick,
+  selectedBusiness
+}) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
 
@@ -38,17 +42,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
     const initializeMap = async () => {
       mapInstance = new maplibregl.Map({
         container: mapRef.current!,
-        style: 'https://demotiles.maplibre.org/style.json', // ✅ Add OSM tile style
-        center: [-73.9712, 40.7831], // NYC
+        style: {
+          version: 8,
+          sources: {},
+          layers: [
+            {
+              id: 'background',
+              type: 'background',
+              paint: {
+                'background-color': '#e0e0e0' // light gray
+              }
+            }
+          ]
+        },
+        center: [-73.9712, 40.7831],
         zoom: 12
       });
-
-      const nycBounds: maplibregl.LngLatBoundsLike = [
-        [-74.25909, 40.477399], // SW
-        [-73.700272, 40.917577], // NE
-      ];
-      
-      mapInstance.setMaxBounds(nycBounds);
 
       mapInstance.on('load', async () => {
         if (cleanedUp) return;
@@ -61,44 +70,46 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           data: geoData
         });
 
-        // Optional custom layers:
+        // Only render parks (Polygon where leisure=park)
         mapInstance!.addLayer({
           id: 'parks',
           type: 'fill',
           source: 'geojson-data',
-          filter: ['all', ['==', '$type', 'Polygon'], ['==', 'leisure', 'park']],
+          filter: ['all', ['==', '$type', 'Polygon'], ['==', ['get', 'leisure'], 'park']],
           paint: {
-            'fill-color': '#81C784',
-            'fill-opacity': 0.5
-          }
-        });
-
-        mapInstance!.addLayer({
-          id: 'water',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: ['all', ['==', '$type', 'Polygon'], ['==', 'natural', 'water']],
-          paint: {
-            'fill-color': '#64B5F6',
+            'fill-color': '#a5d6a7', // muted green
             'fill-opacity': 0.6
           }
         });
 
+        // Only render water (Polygon where natural=water)
+        mapInstance!.addLayer({
+          id: 'water',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['all', ['==', '$type', 'Polygon'], ['==', ['get', 'natural'], 'water']],
+          paint: {
+            'fill-color': '#90caf9', // muted blue
+            'fill-opacity': 0.5
+          }
+        });
+
+        // Only render roads (LineString)
         mapInstance!.addLayer({
           id: 'roads',
           type: 'line',
           source: 'geojson-data',
           filter: ['==', '$type', 'LineString'],
           paint: {
-            'line-color': '#888888',
-            'line-width': 1.5
+            'line-color': '#999999',
+            'line-width': 1.2
           }
         });
 
-        // Zoom to data bounds (optional)
+        // Fit to the bounds of your data
         const bbox = turf.bbox(geoData);
         mapInstance!.fitBounds(bbox as [number, number, number, number], {
-          padding: 100,
+          padding: 80,
           duration: 1000
         });
 
@@ -124,7 +135,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
   return (
     <div
       ref={mapRef}
-      style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
+      style={{
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#e0e0e0'
+      }}
     />
   );
 };
