@@ -76,7 +76,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           data: geoData
         });
 
-        // Optional custom layers:
+        // Optional custom layers for your polygon-based data:
         mapInstance!.addLayer({
           id: 'parks',
           type: 'fill',
@@ -84,7 +84,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           filter: ['all', ['==', '$type', 'Polygon'], ['==', 'leisure', 'park']],
           paint: {
             'fill-color': '#81C784',
-            'fill-opacity': 0.5
+            'fill-opacity': 0.6
           }
         });
 
@@ -95,18 +95,59 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           filter: ['all', ['==', '$type', 'Polygon'], ['==', 'natural', 'water']],
           paint: {
             'fill-color': '#64B5F6',
-            'fill-opacity': 0.6
+            'fill-opacity': 0.7
           }
         });
 
+        // Landuse areas (residential, commercial, etc.)
         mapInstance!.addLayer({
-          id: 'roads',
+          id: 'landuse',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['all', ['==', '$type', 'Polygon'], ['has', 'landuse']],
+          paint: {
+            'fill-color': [
+              'match',
+              ['get', 'landuse'],
+              'residential', '#FFF3E0',
+              'commercial', '#F3E5F5',
+              'industrial', '#E8F5E8',
+              'forest', '#C8E6C9',
+              'grass', '#DCEDC8',
+              '#E0E0E0' // default gray
+            ],
+            'fill-opacity': 0.4
+          }
+        });
+
+        // Natural features (besides water)
+        mapInstance!.addLayer({
+          id: 'natural',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['all', ['==', '$type', 'Polygon'], ['has', 'natural'], ['!=', 'natural', 'water']],
+          paint: {
+            'fill-color': [
+              'match',
+              ['get', 'natural'],
+              'coastline', '#FFE0B2',
+              'beach', '#FFF8E1',
+              'wood', '#C8E6C9',
+              '#E8F5E8' // default light green
+            ],
+            'fill-opacity': 0.5
+          }
+        });
+
+        // Coastline as lines (if any LineString features exist)
+        mapInstance!.addLayer({
+          id: 'coastline',
           type: 'line',
           source: 'geojson-data',
-          filter: ['==', '$type', 'LineString'],
+          filter: ['all', ['==', '$type', 'LineString'], ['==', 'natural', 'coastline']],
           paint: {
-            'line-color': '#888888',
-            'line-width': 1.5
+            'line-color': '#795548',
+            'line-width': 2
           }
         });
 
