@@ -44,11 +44,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
       });
 
       // ✅ Restrict bounds to NYC
-      const nycBounds: [number, number][] = [
-        [-74.25909, 40.477399], // Southwest
-        [-73.700272, 40.917577], // Northeast
-      ];
-      mapInstance.setMaxBounds(nycBounds);
+      mapInstance.setMaxBounds([
+        [-74.25909, 40.477399],
+        [-73.700272, 40.917577],
+      ]);
 
       mapInstance.on('load', async () => {
         if (cleanedUp) return;
