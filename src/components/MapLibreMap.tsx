@@ -94,11 +94,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           source: 'geojson-data',
           filter: [
             'all',
-            ['==', '$type', 'Polygon'],
-            ['any',
-              ['==', 'natural', 'water'],
-              ['has', 'water']
-            ]
+            ['any', ['==', '$type', 'Polygon'], ['==', '$type', 'MultiPolygon']],
+            ['any', ['==', 'natural', 'water'], ['has', 'water']]
           ],
           paint: {
             'fill-color': '#64B5F6',
@@ -162,7 +159,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           id: 'roads',
           type: 'line',
           source: 'geojson-data',
-          filter: ['all', ['==', '$type', 'LineString'], ['has', 'highway']],
+          filter: [
+            'all',
+            ['any', ['==', '$type', 'LineString'], ['==', '$type', 'MultiLineString']],
+            ['has', 'highway']
+          ],
           paint: {
             'line-color': '#555',
             'line-width': [
