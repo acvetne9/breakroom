@@ -12,204 +12,151 @@ interface MapLibreMapProps {
 const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, selectedBusiness }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const loadGeoJSONData = useCallback(async (): Promise<FeatureCollection | null> => {
     try {
-      const response = await fetch('/data/nyc.geojson'); // your local NYC boundaries + water + parks
+      console.log('Attempting to load GeoJSON...');
+      const response = await fetch('/data/nyc.geojson');
       if (!response.ok) {
-        console.error('Failed to load GeoJSON:', response.statusText);
-        return null;
+        throw new Error(`Failed to load GeoJSON: ${response.status} ${response.statusText}`);
       }
-      return await response.json();
+      const data = await response.json();
+      console.log('GeoJSON loaded successfully:', data);
+      return data;
     } catch (error) {
       console.error('Error loading GeoJSON:', error);
+      setError(`Failed to load map data: ${error}`);
       return null;
     }
   }, []);
 
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapRef.current) {
+      console.error('Map container ref is null');
+      return;
+    }
 
+    console.log('Initializing MapLibre GL JS...');
+    
     let mapInstance: maplibregl.Map | null = null;
     let cleanedUp = false;
 
     const initializeMap = async () => {
-      mapInstance = new maplibregl.Map({
-        container: mapRef.current!,
-        style: {
-          version: 8,
-          name: "Local Data Map",
-          sources: {},
-          layers: [
-            {
-              id: 'background',
-              type: 'background',
-              paint: { 'background-color': '#dcdcdc' } // base gray background
+      try {
+        // Create a basic map first
+        mapInstance = new maplibregl.Map({
+          container: mapRef.current!,
+          style: {
+            version: 8,
+            name: "Basic NYC Map",
+            sources: {},
+            layers: [
+              {
+                id: 'background',
+                type: 'background',
+                paint: { 'background-color': '#f8f8f8' }
+              }
+            ]
+          },
+          center: [-74.0, 40.7],
+          zoom: 11,
+          attributionControl: false
+        });
+
+        console.log('Map instance created');
+
+        mapInstance.on('load', async () => {
+          if (cleanedUp) return;
+          
+          console.log('Map loaded, adding data...');
+
+          // Try to load and add GeoJSON data
+          const geoData = await loadGeoJSONData();
+          
+          if (geoData && mapInstance) {
+            console.log('Adding GeoJSON source with', geoData.features?.length, 'features');
+            
+            mapInstance.addSource('nyc-data', {
+              type: 'geojson',
+              data: geoData
+            });
+
+            // Add a simple layer for all polygons first
+            mapInstance.addLayer({
+              id: 'all-polygons',
+              type: 'fill',
+              source: 'nyc-data',
+              filter: ['==', ['geometry-type'], 'Polygon'],
+              paint: {
+                'fill-color': [
+                  'case',
+                  ['==', ['get', 'natural'], 'water'], '#64B5F6',
+                  ['any', ['==', ['get', 'leisure'], 'park'], ['==', ['get', 'landuse'], 'recreation_ground']], '#81C784',
+                  '#e0e0e0'
+                ],
+                'fill-opacity': 0.7,
+                'fill-outline-color': '#666666'
+              }
+            });
+
+            // Add simple lines for roads
+            mapInstance.addLayer({
+              id: 'all-lines',
+              type: 'line',
+              source: 'nyc-data',
+              filter: ['==', ['geometry-type'], 'LineString'],
+              paint: {
+                'line-color': '#ffffff',
+                'line-width': 1.5,
+                'line-opacity': 0.8
+              }
+            });
+
+            console.log('Layers added successfully');
+            
+            // Fit map to data bounds if possible
+            try {
+              const bounds = new maplibregl.LngLatBounds();
+              geoData.features.forEach(feature => {
+                if (feature.geometry.type === 'Polygon') {
+                  feature.geometry.coordinates[0].forEach(coord => {
+                    bounds.extend([coord[0], coord[1]]);
+                  });
+                }
+              });
+              mapInstance.fitBounds(bounds, { padding: 20 });
+            } catch (boundsError) {
+              console.warn('Could not fit bounds:', boundsError);
             }
-          ]
-        },
-        center: [-73.9712, 40.7831],
-        zoom: 10,
-        attributionControl: false,
-        maxBounds: [
-          [-74.5, 40.477],
-          [-73.5, 40.917]
-        ]
-      });
+          } else {
+            console.warn('No GeoJSON data available, showing empty map');
+          }
 
-      mapInstance.on('load', async () => {
-        if (cleanedUp) return;
-
-        const geoData = await loadGeoJSONData();
-        if (!geoData || !mapInstance) return;
-
-        console.log('Loaded GeoJSON data:', geoData); // Debug log
-
-        mapInstance.addSource('nyc-data', {
-          type: 'geojson',
-          data: geoData
+          setMap(mapInstance);
         });
 
-        // Water - using simplified filter that matches your data
-        mapInstance.addLayer({
-          id: 'water',
-          type: 'fill',
-          source: 'nyc-data',
-          filter: ['==', ['get', 'natural'], 'water'],
-          paint: {
-            'fill-color': '#64B5F6',
-            'fill-opacity': 0.8,
-            'fill-outline-color': '#1976D2'
+        mapInstance.on('error', (e) => {
+          console.error('MapLibre error:', e.error);
+          setError(`Map error: ${e.error?.message || 'Unknown error'}`);
+        });
+
+        mapInstance.on('sourcedata', (e) => {
+          if (e.sourceId === 'nyc-data') {
+            console.log('Source data event:', e.dataType, 'loaded:', e.isSourceLoaded);
           }
         });
 
-        // Parks/green spaces - check for leisure=park or natural=park
-        mapInstance.addLayer({
-          id: 'parks',
-          type: 'fill',
-          source: 'nyc-data',
-          filter: [
-            'any',
-            ['==', ['get', 'leisure'], 'park'],
-            ['==', ['get', 'natural'], 'park'],
-            ['==', ['get', 'landuse'], 'recreation_ground']
-          ],
-          paint: {
-            'fill-color': '#81C784',
-            'fill-opacity': 0.7,
-            'fill-outline-color': '#4CAF50'
-          }
-        });
-
-        // Land - everything else that's a polygon but not water or parks
-        mapInstance.addLayer({
-          id: 'land',
-          type: 'fill',
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['==', ['geometry-type'], 'Polygon'],
-            ['!=', ['get', 'natural'], 'water'],
-            ['!=', ['get', 'leisure'], 'park'],
-            ['!=', ['get', 'natural'], 'park'],
-            ['!=', ['get', 'landuse'], 'recreation_ground']
-          ],
-          paint: {
-            'fill-color': '#f0f0f0',
-            'fill-opacity': 0.8,
-            'fill-outline-color': '#cccccc'
-          }
-        });
-
-        // Roads - check for various highway types
-        mapInstance.addLayer({
-          id: 'roads-major',
-          type: 'line',
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['==', ['geometry-type'], 'LineString'],
-            [
-              'in',
-              ['get', 'highway'],
-              ['literal', ['primary', 'secondary', 'trunk', 'motorway', 'primary_link', 'secondary_link']]
-            ]
-          ],
-          paint: {
-            'line-color': '#ffffff',
-            'line-width': [
-              'case',
-              ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk']]], 4,
-              ['in', ['get', 'highway'], ['literal', ['primary', 'primary_link']]], 3,
-              2
-            ],
-            'line-opacity': 0.8
-          }
-        });
-
-        // Minor roads
-        mapInstance.addLayer({
-          id: 'roads-minor',
-          type: 'line',
-          source: 'nyc-data',
-          filter: [
-            'all',
-            ['==', ['geometry-type'], 'LineString'],
-            [
-              'in',
-              ['get', 'highway'],
-              ['literal', ['tertiary', 'residential', 'unclassified', 'service']]
-            ]
-          ],
-          paint: {
-            'line-color': '#ffffff',
-            'line-width': 1.5,
-            'line-opacity': 0.6
-          }
-        });
-
-        // Add click handlers for debugging
-        mapInstance.on('click', 'water', (e) => {
-          console.log('Water feature clicked:', e.features?.[0]?.properties);
-        });
-
-        mapInstance.on('click', 'parks', (e) => {
-          console.log('Park feature clicked:', e.features?.[0]?.properties);
-        });
-
-        mapInstance.on('click', 'land', (e) => {
-          console.log('Land feature clicked:', e.features?.[0]?.properties);
-        });
-
-        // Log layer information for debugging
-        console.log('Map layers added. Available sources:', mapInstance.getStyle().sources);
-        
-        // Check if data is actually loaded
-        setTimeout(() => {
-          const source = mapInstance?.getSource('nyc-data') as maplibregl.GeoJSONSource;
-          if (source) {
-            console.log('Source loaded successfully');
-          }
-        }, 1000);
-
-        setMap(mapInstance);
-      });
-
-      // Add error handling
-      mapInstance.on('error', (e) => {
-        console.error('Map error:', e);
-      });
-
-      mapInstance.on('sourcedata', (e) => {
-        if (e.sourceId === 'nyc-data' && e.isSourceLoaded) {
-          console.log('NYC data source loaded successfully');
-        }
-      });
+      } catch (error) {
+        console.error('Error initializing map:', error);
+        setError(`Map initialization failed: ${error}`);
+      }
     };
 
     initializeMap();
 
     return () => {
+      console.log('Cleaning up map...');
       cleanedUp = true;
       if (mapInstance) {
         mapInstance.remove();
@@ -218,11 +165,54 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
     };
   }, [loadGeoJSONData]);
 
+  if (error) {
+    return (
+      <div style={{ 
+        position: 'absolute', 
+        top: 0, 
+        bottom: 0, 
+        left: 0, 
+        right: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f5f5f5',
+        color: '#d32f2f',
+        padding: '20px',
+        fontSize: '14px'
+      }}>
+        <div>
+          <strong>Map Error:</strong><br />
+          {error}
+          <br /><br />
+          <small>Check the browser console for more details.</small>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div
-      ref={mapRef}
-      style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
-    />
+    <>
+      <div
+        ref={mapRef}
+        style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
+      />
+      {/* Loading indicator */}
+      {!map && !error && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          background: 'rgba(255, 255, 255, 0.9)',
+          padding: '20px',
+          borderRadius: '4px',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+        }}>
+          Loading map...
+        </div>
+      )}
+    </>
   );
 };
 
