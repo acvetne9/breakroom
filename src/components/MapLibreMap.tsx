@@ -16,7 +16,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
 
   const loadGeoJSONData = useCallback(async (): Promise<FeatureCollection | null> => {
     try {
-      const response = await fetch('/data/example-points.geojson');
+      const response = await fetch('/data/example-points.geojson'); // replace with your processed file
       if (!response.ok) {
         console.error('Failed to load GeoJSON:', response.statusText);
         return null;
@@ -36,7 +36,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
     let cleanedUp = false;
 
     const initializeMap = async () => {
-      // Create a simple gray background style
       const grayStyle = {
         version: 8 as const,
         sources: {},
@@ -44,17 +43,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           {
             id: 'background',
             type: 'background' as const,
-            paint: {
-              'background-color': '#f0f0f0' // Light gray background
-            }
+            paint: { 'background-color': '#f0f0f0' }
           }
         ]
       };
 
       mapInstance = new maplibregl.Map({
         container: mapRef.current!,
-        style: grayStyle, // Use gray background instead of demo tiles
-        center: [-73.9712, 40.7831], // NYC
+        style: grayStyle,
+        center: [-73.9712, 40.7831], // NYC center
         zoom: 12
       });
 
@@ -62,7 +59,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
         [-74.25909, 40.477399], // SW
         [-73.700272, 40.917577], // NE
       ];
-      
       mapInstance.setMaxBounds(nycBounds);
 
       mapInstance.on('load', async () => {
@@ -76,18 +72,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
           data: geoData
         });
 
-        // Optional custom layers for your polygon-based data:
-        mapInstance!.addLayer({
-          id: 'parks',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: ['all', ['==', '$type', 'Polygon'], ['==', 'leisure', 'park']],
-          paint: {
-            'fill-color': '#81C784',
-            'fill-opacity': 0.6
-          }
-        });
-
+        // Parks
         mapInstance!.addLayer({
           id: 'parks',
           type: 'fill',
@@ -102,7 +87,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
             'fill-opacity': 0.6
           }
         });
-        
+
+        // Water (natural=water or has water tag)
         mapInstance!.addLayer({
           id: 'water',
           type: 'fill',
@@ -117,7 +103,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
             'fill-opacity': 0.7
           }
         });
-        
+
+        // Roads
         mapInstance!.addLayer({
           id: 'roads',
           type: 'line',
@@ -137,12 +124,31 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
               'primary', 2.2,
               'secondary', 2,
               'tertiary', 1.5,
-              1 // default
+              'unclassified', 1.2,
+              'residential', 1,
+              'living_street', 1,
+              0.8 // default
             ]
           }
         });
 
-        // Zoom to data bounds (optional)
+        // Optional coastline lines
+        mapInstance!.addLayer({
+          id: 'coastline',
+          type: 'line',
+          source: 'geojson-data',
+          filter: [
+            'all',
+            ['any', ['==', '$type', 'LineString'], ['==', '$type', 'MultiLineString']],
+            ['==', 'natural', 'coastline']
+          ],
+          paint: {
+            'line-color': '#795548',
+            'line-width': 2
+          }
+        });
+
+        // Fit to data
         const bbox = turf.bbox(geoData);
         mapInstance!.fitBounds(bbox as [number, number, number, number], {
           padding: 100,
