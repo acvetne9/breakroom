@@ -47,6 +47,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       for (const coastline of coastlines) {
         try {
+          if (coastline.geometry.type !== 'LineString') continue;
           const coords = coastline.geometry.coordinates;
           if (coords.length < 3) continue;
           
@@ -84,8 +85,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       // APPROACH 2: Create land by subtracting water bodies from bounding box
       try {
-        // Get all water features based on the comprehensive Overpass query
-        const waterFeatures = geoData.features.filter(feature => {
+        // Get all explicit water polygon features
+        const waterPolygons = geoData.features.filter(feature => {
           const props = feature.properties;
           if (!props) return false;
           
@@ -93,8 +94,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             // Natural water bodies
             props.natural === 'water' ||
             
-            // Waterways - rivers, streams, canals (both LineString and Polygon)
-            (props.waterway && ['river', 'stream', 'canal', 'riverbank'].includes(props.waterway)) ||
+            // Waterways - riverbanks (polygonal)
+            props.waterway === 'riverbank' ||
             
             // Named major water bodies around NYC
             (props.name && [
@@ -122,9 +123,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon');
         });
 
-        console.log(`Found ${waterFeatures.length} water features for subtraction`);
+        console.log(`Found ${waterPolygons.length} explicit water polygons`);
         
-        // Also get linear water features for buffering
+        // Get linear water features for buffering
         const linearWaterFeatures = geoData.features.filter(feature => {
           const props = feature.properties;
           return props && 
@@ -134,12 +135,75 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         
         console.log(`Found ${linearWaterFeatures.length} linear water features`);
 
-        if (waterFeatures.length > 0 || linearWaterFeatures.length > 0) {
+        // Get coastlines - these define the boundary between land and major water bodies
+        const coastlines = geoData.features.filter(feature => 
+          feature.geometry.type === 'LineString' &&
+          feature.properties?.natural === 'coastline'
+        );
+        
+        console.log(`Found ${coastlines.length} coastline features`);
+
+        if (waterPolygons.length > 0 || linearWaterFeatures.length > 0 || coastlines.length > 0) {
           // Create a bounding box for the NYC area (matching your query bounds)
           const bbox: [number, number, number, number] = [-74.30, 40.50, -73.70, 40.93];
           let landArea = turf.bboxPolygon(bbox);
 
-          // First, buffer linear water features and subtract them
+          // STRATEGY: Assume everything is water initially, then subtract known land areas
+          // This works better when you have coastlines but not explicit water polygons for bays
+
+          // Method 1: If we have coastlines, create water polygons by buffering the entire area
+          // and then subtracting small land polygons created from coastlines
+          if (coastlines.length > 0) {
+            try {
+              // Create a large water area (the entire bounding box)
+              let waterArea = turf.bboxPolygon(bbox);
+              
+              // Try to create small land islands from closed coastline loops
+              for (const coastline of coastlines) {
+                try {
+                  const coords = coastline.geometry.coordinates;
+                  if (coords.length < 4) continue;
+                  
+                  // Check if this coastline segment might form a closed area
+                  const firstPoint = coords[0];
+                  const lastPoint = coords[coords.length - 1];
+                  const distance = turf.distance(firstPoint, lastPoint, { units: 'kilometers' });
+                  
+                  // If the coastline is nearly closed (endpoints are close), make it a land polygon
+                  if (distance < 0.5) { // Within 500m
+                    const closedCoords = [...coords, firstPoint];
+                    if (closedCoords.length >= 4) {
+                      const landPolygon = turf.polygon([closedCoords]);
+                      const area = turf.area(landPolygon);
+                      
+                      // Only subtract significant land areas (greater than 100,000 sq meters)
+                      if (area > 100000) {
+                        const difference = turf.difference(waterArea, landPolygon);
+                        if (difference) {
+                          waterArea = difference;
+                        }
+                      }
+                    }
+                  }
+                } catch (err) {
+                  // Continue with other coastlines
+                }
+              }
+              
+              // The remaining area after subtracting land is our comprehensive water body
+              if (waterArea) {
+                // Now subtract this comprehensive water area from our land area
+                const difference = turf.difference(landArea as any, waterArea as any);
+                if (difference) {
+                  landArea = difference;
+                }
+              }
+            } catch (err) {
+              console.warn('Could not process coastlines for comprehensive water:', err);
+            }
+          }
+
+          // Method 2: Buffer linear water features and subtract them
           for (const linearWater of linearWaterFeatures) {
             try {
               const bufferedWater = turf.buffer(linearWater, 0.0005, { units: 'degrees' }); // ~50m buffer
@@ -154,8 +218,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             }
           }
 
-          // Then subtract polygonal water bodies from the land area
-          for (const waterFeature of waterFeatures) {
+          // Method 3: Subtract explicit polygonal water bodies
+          for (const waterFeature of waterPolygons) {
             try {
               const difference = turf.difference(landArea, waterFeature as any);
               if (difference) {
@@ -172,8 +236,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ...landArea,
               properties: { 
                 landType: 'water-inverse',
-                source: 'water-subtraction',
-                waterFeaturesProcessed: waterFeatures.length + linearWaterFeatures.length
+                source: 'comprehensive-water-subtraction',
+                waterFeaturesProcessed: waterPolygons.length + linearWaterFeatures.length,
+                coastlinesProcessed: coastlines.length
               }
             });
           }
@@ -280,14 +345,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           data: landPolygons
         });
 
-        // --- LAND AREAS (gray) - created from coastline boundaries
+        // --- LAND AREAS (light gray) - created from water subtraction
         mapInstance!.addLayer({
           id: 'land-areas',
           type: 'fill',
           source: 'land-polygons',
           paint: {
-            'fill-color': '#DDDDDD', // Gray land
-            'fill-opacity': 0.8
+            'fill-color': '#E0E0E0', // Light gray land
+            'fill-opacity': 0.9
           }
         });
 
