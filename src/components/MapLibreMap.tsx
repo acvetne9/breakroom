@@ -442,14 +442,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             if (hull && hull.geometry.type === 'Polygon') {
               // Buffer the hull slightly inward to create land
               const buffered = turf.buffer(hull, -0.001, { units: 'degrees' });
-              if (buffered && (buffered.geometry.type === 'Polygon' || buffered.geometry.type === 'MultiPolygon')) {
-                allLandFeatures.push({
-                  ...buffered,
-                  properties: { 
-                    landType: 'coastline-hull-buffered',
-                    source: 'fallback-buffer'
-                  }
-                } as Feature<Polygon | MultiPolygon, { [name: string]: any }>);
+              if (buffered) {
+                if (buffered.geometry.type === 'Polygon') {
+                  allLandFeatures.push({
+                    ...buffered,
+                    properties: { 
+                      landType: 'coastline-hull-buffered',
+                      source: 'fallback-buffer'
+                    }
+                  } as Feature<Polygon, { [name: string]: any }>);
+                } else if (buffered.geometry.type === 'MultiPolygon') {
+                  allLandFeatures.push({
+                    ...buffered,
+                    properties: { 
+                      landType: 'coastline-hull-buffered',
+                      source: 'fallback-buffer'
+                    }
+                  } as Feature<MultiPolygon, { [name: string]: any }>);
+                }
               }
             }
           }
