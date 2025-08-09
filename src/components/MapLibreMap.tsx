@@ -110,12 +110,21 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         console.log('Found park features:', parkFeatures);
         console.log('Found cemetery features:', cemeteryFeatures);
         
-        // IMPROVED LAND DETECTION - Much more comprehensive
+        // Fix 1: Update the land features filter to properly include cemeteries
         const landFeatures = mainData.features.filter(feature => {
           const props = feature.properties;
           if (!props || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
           
           return (
+            // CEMETERY DETECTION - Fixed
+            props.landuse === 'cemetery' ||
+            props.amenity === 'grave_yard' ||
+            // Check for cemetery names (case-insensitive)
+            (props.name && props.name.toLowerCase().includes('cemetery')) ||
+            (props.name && props.name.toLowerCase().includes('calvary')) ||
+            (props.name && props.name.toLowerCase().includes('green-wood')) ||
+            (props.name && props.name.toLowerCase().includes('woodlawn')) ||
+            
             // Landuse categories
             props.landuse === 'residential' ||
             props.landuse === 'commercial' ||
@@ -124,7 +133,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             props.landuse === 'institutional' ||
             props.landuse === 'education' ||
             props.landuse === 'recreation_ground' ||
-            props.landuse === 'cemetery' ||
             props.landuse === 'construction' ||
             props.landuse === 'brownfield' ||
             props.landuse === 'greenfield' ||
@@ -141,7 +149,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             props.natural === 'sand' ||
             props.natural === 'beach' ||
             
-            // Leisure areas (parks, etc.) - INCLUDE ALL PARKS HERE
+            // Leisure areas (parks, etc.)
             props.leisure === 'park' ||
             props.leisure === 'playground' ||
             props.leisure === 'pitch' ||
@@ -151,12 +159,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             props.leisure === 'stadium' ||
             props.leisure === 'sports_centre' ||
             
-            // Amenities that represent land
+            // Other amenities that represent land
             props.amenity === 'university' ||
             props.amenity === 'school' ||
             props.amenity === 'hospital' ||
             props.amenity === 'parking' ||
-            props.amenity === 'grave_yard' || // Additional cemetery designation
             
             // Transportation that represents solid ground
             props.aeroway === 'aerodrome' ||
@@ -187,7 +194,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           );
         }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
         
-        // IMPROVED WATER DETECTION
+        // Fix 2: Improved water detection
         const waterFeatures = mainData.features.filter(feature => {
           const props = feature.properties;
           if (!props || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
@@ -202,13 +209,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             props.waterway === 'riverbank' ||
             props.waterway === 'dock' ||
             
-            // Named major water bodies (case-insensitive matching)
+            // Named major water bodies (FIXED - case-insensitive partial matching)
             (props.name && [
               'Upper New York Bay', 'Lower New York Bay', 'Newark Bay', 'Jamaica Bay',
               'Long Island Sound', 'Hudson River', 'East River', 'Harlem River',
               'Arthur Kill', 'Kill Van Kull', 'Raritan Bay', 'Sheepshead Bay',
               'Rockaway Inlet', 'Gowanus Canal', 'Newtown Creek'
-            ].some(waterName => props.name && props.name.toLowerCase().includes(waterName.toLowerCase()))) ||
+            ].some(waterName => 
+              props.name && props.name.toLowerCase().includes(waterName.toLowerCase())
+            )) ||
             
             // Water-related landuse
             props.landuse === 'reservoir' ||
@@ -223,6 +232,38 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             (props.place && ['sea', 'ocean', 'bay'].includes(props.place))
           );
         }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
+        
+        // Fix 3: Update the paint expression for better cemetery detection
+        const landLayerPaint = {
+          'fill-color': [
+            'case',
+            // Cemetery colors (darker green) - FIXED
+            ['==', ['get', 'landuse'], 'cemetery'], '#2E7D32',
+            ['==', ['get', 'amenity'], 'grave_yard'], '#2E7D32',
+            
+            // Named cemeteries (case-insensitive matching) - FIXED
+            ['any',
+              ['in', 'green-wood', ['downcase', ['coalesce', ['get', 'name'], '']]],
+              ['in', 'calvary', ['downcase', ['coalesce', ['get', 'name'], '']]],
+              ['in', 'woodlawn', ['downcase', ['coalesce', ['get', 'name'], '']]],
+              ['in', 'cemetery', ['downcase', ['coalesce', ['get', 'name'], '']]],
+              ['in', 'evergreens', ['downcase', ['coalesce', ['get', 'name'], '']]],
+              ['in', 'cypress', ['downcase', ['coalesce', ['get', 'name'], '']]]
+            ], '#2E7D32',
+            
+            // Park colors (bright green)
+            ['==', ['get', 'leisure'], 'park'], '#4CAF50',
+            ['==', ['get', 'leisure'], 'garden'], '#4CAF50',
+            ['==', ['get', 'leisure'], 'playground'], '#4CAF50',
+            
+            // Natural vegetation (forest green)
+            ['==', ['get', 'natural'], 'wood'], '#388E3C',
+            ['==', ['get', 'natural'], 'forest'], '#388E3C',
+            
+            '#E8F5E8' // Very light green for all other land
+          ],
+          'fill-opacity': 0.9
+        };
         
         console.log(`Found ${landFeatures.length} land features`);
         console.log(`Found ${waterFeatures.length} water features`);
