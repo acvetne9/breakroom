@@ -202,13 +202,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             props.waterway === 'riverbank' ||
             props.waterway === 'dock' ||
             
-            // Named major water bodies
+            // Named major water bodies (case-insensitive matching)
             (props.name && [
               'Upper New York Bay', 'Lower New York Bay', 'Newark Bay', 'Jamaica Bay',
               'Long Island Sound', 'Hudson River', 'East River', 'Harlem River',
               'Arthur Kill', 'Kill Van Kull', 'Raritan Bay', 'Sheepshead Bay',
               'Rockaway Inlet', 'Gowanus Canal', 'Newtown Creek'
-            ].some(waterName => props.name && props.name.includes(waterName))) ||
+            ].some(waterName => props.name && props.name.toLowerCase().includes(waterName.toLowerCase()))) ||
             
             // Water-related landuse
             props.landuse === 'reservoir' ||
@@ -621,7 +621,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     };
 
-    // Add land areas with proper color coding for parks and cemeteries
+    // Add land areas with enhanced color coding for cemeteries and parks
     addOrUpdate('land-data', landData, {
       id: 'land-areas',
       type: 'fill',
@@ -629,14 +629,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       paint: { 
         'fill-color': [
           'case',
-          ['==', ['get', 'landuse'], 'cemetery'], '#228B22', // Dark forest green for cemeteries
-          ['==', ['get', 'amenity'], 'grave_yard'], '#228B22', // Dark forest green for grave yards
-          ['==', ['get', 'leisure'], 'park'], '#32CD32', // Lime green for parks
-          ['==', ['get', 'leisure'], 'garden'], '#32CD32', // Lime green for gardens
-          ['==', ['get', 'leisure'], 'playground'], '#32CD32', // Lime green for playgrounds
-          ['==', ['get', 'natural'], 'wood'], '#228B22', // Dark green for woods
-          ['==', ['get', 'natural'], 'forest'], '#228B22', // Dark green for forests
-          '#90EE90' // Light green for all other land
+          // Cemetery colors (darker green)
+          ['==', ['get', 'landuse'], 'cemetery'], '#2E7D32', // Dark green for cemeteries
+          ['==', ['get', 'amenity'], 'grave_yard'], '#2E7D32', // Dark green for grave yards
+          // Named cemeteries (case-insensitive matching)
+          ['in', 'green-wood', ['downcase', ['get', 'name']]], '#2E7D32',
+          ['in', 'calvary', ['downcase', ['get', 'name']]], '#2E7D32',
+          ['in', 'woodlawn', ['downcase', ['get', 'name']]], '#2E7D32',
+          ['in', 'cemetery', ['downcase', ['get', 'name']]], '#2E7D32',
+          
+          // Park colors (bright green)
+          ['==', ['get', 'leisure'], 'park'], '#4CAF50', // Bright green for parks
+          ['==', ['get', 'leisure'], 'garden'], '#4CAF50', // Bright green for gardens
+          ['==', ['get', 'leisure'], 'playground'], '#4CAF50', // Bright green for playgrounds
+          
+          // Natural vegetation (forest green)
+          ['==', ['get', 'natural'], 'wood'], '#388E3C', // Forest green for woods
+          ['==', ['get', 'natural'], 'forest'], '#388E3C', // Forest green for forests
+          
+          '#E8F5E8' // Very light green for all other land
         ],
         'fill-opacity': 0.9 
       }
