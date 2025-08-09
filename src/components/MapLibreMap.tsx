@@ -4,11 +4,7 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 // Turf imports
-import turf from '@turf/turf';
-import buffer from '@turf/buffer';
-import union from '@turf/union';
-import difference from '@turf/difference';
-import bbox from '@turf/bbox';
+import * as turf from '@turf/turf';
 
 // Props interface combining both functionalities
 interface MapLibreMapProps {
@@ -32,11 +28,6 @@ interface MapLibreMapProps {
   }[];
   onBusinessClick?: (business: any) => void;
   selectedBusiness?: any;
-  
-  // Geographic data from second script
-  roadsData: FeatureCollection<LineString>;
-  landData: FeatureCollection<Polygon | MultiPolygon>;
-  waterData: FeatureCollection<Polygon | MultiPolygon>;
 }
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
@@ -47,6 +38,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [roadsData, setRoadsData] = useState<FeatureCollection<LineString> | null>(null);
+  const [landData, setLandData] = useState<FeatureCollection<Polygon | MultiPolygon> | null>(null);
+  const [waterData, setWaterData] = useState<FeatureCollection<Polygon | MultiPolygon> | null>(null);
 
   const loadGeoJSONData = useCallback(async (): Promise<FeatureCollection | null> => {
     try {
@@ -62,6 +56,53 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return null;
     }
   }, []);
+
+  const loadGeographicData = useCallback(async () => {
+    try {
+      // Load roads data
+      const roadsResponse = await fetch('/data/merged_roads.geojson.gz');
+      if (roadsResponse.ok) {
+        const roadsData = await roadsResponse.json();
+        setRoadsData(roadsData);
+      }
+      
+      // Extract land and water data from the main GeoJSON
+      const mainData = await loadGeoJSONData();
+      if (mainData) {
+        const landFeatures = mainData.features.filter(feature => 
+          feature.properties && 
+          (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') &&
+          (
+            feature.properties.landuse === 'residential' ||
+            feature.properties.landuse === 'commercial' ||
+            feature.properties.landuse === 'industrial' ||
+            feature.properties.natural === 'land'
+          )
+        ) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
+        
+        const waterFeatures = mainData.features.filter(feature =>
+          feature.properties && 
+          (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') &&
+          (
+            feature.properties.natural === 'water' ||
+            feature.properties.waterway === 'riverbank'
+          )
+        ) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
+        
+        setLandData({
+          type: 'FeatureCollection',
+          features: landFeatures
+        });
+        
+        setWaterData({
+          type: 'FeatureCollection', 
+          features: waterFeatures
+        });
+      }
+    } catch (error) {
+      console.error('Error loading geographic data:', error);
+    }
+  }, [loadGeoJSONData]);
 
   const createLandFromCoastlinesAndWater = useCallback((geoData: FeatureCollection): FeatureCollection => {
     try {
@@ -352,6 +393,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       mapInstance.on('load', async () => {
         if (cleanedUp) return;
+        setMapLoaded(true);
 
         const geoData = await loadGeoJSONData();
         if (!geoData || !geoData.features.length) {
@@ -375,60 +417,70 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           data: geoData
         });
 
-        // Create land polygons from coastlines and water bodies
-        const landPolygons = createLandFromCoastlinesAndWater(geoData);
-        mapInstance!.addSource('land-polygons', {
-          type: 'geojson',
-          data: landPolygons
-        });
+        // Add roads data if available
+        if (roadsData) {
+          mapInstance!.addSource('roads-data', {
+            type: 'geojson',
+            data: roadsData
+          });
+        }
 
-        // --- LAND AREAS (light gray) - created from water subtraction
-        mapInstance!.addLayer({
-          id: 'land-areas',
-          type: 'fill',
-          source: 'land-polygons',
-          paint: {
-            'fill-color': '#E0E0E0', // Light gray land
-            'fill-opacity': 0.9
-          }
-        });
+        // Add land data if available
+        if (landData) {
+          mapInstance!.addSource('land-data', {
+            type: 'geojson',
+            data: landData
+          });
+        }
 
-        // --- COASTLINES (to show land/water boundaries)
-        mapInstance!.addLayer({
-          id: 'coastlines',
-          type: 'line',
-          source: 'geojson-data',
-          filter: ['==', 'natural', 'coastline'] as any,
-          paint: {
-            'line-color': '#1976D2',
-            'line-width': 2
-          }
-        });
+        // Add water data if available
+        if (waterData) {
+          mapInstance!.addSource('water-data', {
+            type: 'geojson',
+            data: waterData
+          });
+        }
 
-        // --- SPECIFIC WATER FEATURES (blue overlays)
-        mapInstance!.addLayer({
-          id: 'water-bodies',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: ['==', 'natural', 'water'] as any,
-          paint: {
-            'fill-color': '#2196F3',
-            'fill-opacity': 0.9
-          }
-        });
+        // --- LAND AREAS (light gray)
+        if (landData) {
+          mapInstance!.addLayer({
+            id: 'land-areas',
+            type: 'fill',
+            source: 'land-data',
+            paint: {
+              'fill-color': '#E0E0E0',
+              'fill-opacity': 0.9
+            }
+          });
+        }
 
-        mapInstance!.addLayer({
-          id: 'rivers-poly',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: ['==', 'waterway', 'riverbank'] as any,
-          paint: {
-            'fill-color': '#2196F3',
-            'fill-opacity': 0.9
-          }
-        });
+        // --- WATER FEATURES (blue)
+        if (waterData) {
+          mapInstance!.addLayer({
+            id: 'water-bodies',
+            type: 'fill',
+            source: 'water-data',
+            paint: {
+              'fill-color': '#2196F3',
+              'fill-opacity': 0.9
+            }
+          });
+        }
 
-        // --- PARKS (green overlay on land)
+        // --- ROADS (gray infrastructure)
+        if (roadsData) {
+          mapInstance!.addLayer({
+            id: 'roads',
+            type: 'line',
+            source: 'roads-data',
+            paint: {
+              'line-color': '#424242',
+              'line-width': 2
+            }
+          });
+        }
+
+        // Fallback layers from main data
         mapInstance!.addLayer({
           id: 'parks',
           type: 'fill',
@@ -440,58 +492,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         });
 
-        // --- CEMETERIES (green overlay on land)
         mapInstance!.addLayer({
-          id: 'cemeteries',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: ['==', 'landuse', 'cemetery'] as any,
-          paint: {
-            'fill-color': '#4CAF50',
-            'fill-opacity': 0.6
-          }
-        });
-
-        // --- ROADS (gray infrastructure)
-        mapInstance!.addLayer({
-          id: 'roads',
+          id: 'coastlines',
           type: 'line',
           source: 'geojson-data',
-          filter: ['has', 'highway'] as any,
+          filter: ['==', 'natural', 'coastline'] as any,
           paint: {
-            'line-color': '#424242',
-            'line-width': [
-              'match',
-              ['get', 'highway'],
-              'motorway', 3,
-              'trunk', 2.5,
-              'primary', 2,
-              'secondary', 1.5,
-              1
-            ]
-          }
-        });
-
-        // --- RIVERS (blue lines)
-        mapInstance!.addLayer({
-          id: 'rivers',
-          type: 'line',
-          source: 'geojson-data',
-          filter: ['==', 'waterway', 'river'] as any,
-          paint: {
-            'line-color': '#2196F3',
-            'line-width': 3
-          }
-        });
-
-        // --- CANALS (blue lines)
-        mapInstance!.addLayer({
-          id: 'canals',
-          type: 'line',
-          source: 'geojson-data',
-          filter: ['==', 'waterway', 'canal'] as any,
-          paint: {
-            'line-color': '#2196F3',
+            'line-color': '#1976D2',
             'line-width': 2
           }
         });
@@ -513,12 +520,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
       setMap(null);
     };
-  }, [loadGeoJSONData, createLandFromCoastlinesAndWater]);
+  }, [loadGeoJSONData, roadsData, landData, waterData]);
+
+  // Load geographic data on mount
+  useEffect(() => {
+    loadGeographicData();
+  }, [loadGeographicData]);
 
     // Add business markers to the map
     useEffect(() => {
-      if (!mapLoaded || !businesses || !mapRef.current) return;
-      const map = mapRef.current;
+      if (!mapLoaded || !businesses || !map) return;
   
       // Remove existing business markers
       const existingMarkers = map.getSource('businesses');
@@ -590,8 +601,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   
     // Handle selected business highlighting
     useEffect(() => {
-      if (!mapLoaded || !mapRef.current) return;
-      const map = mapRef.current;
+      if (!mapLoaded || !map) return;
   
       // Update business layer styling based on selection
       if (map.getLayer('businesses-layer') && selectedBusiness) {
