@@ -47,7 +47,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           {
             id: 'background',
             type: 'background' as const,
-            paint: { 'background-color': '#e5e5e5' } // Light gray background land
+            paint: { 'background-color': '#2196F3' } // Blue background (water by default)
           }
         ]
       };
@@ -90,39 +90,37 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           data: geoData
         });
 
-        // --- Build ocean background outside of land polygons
-        const mapBbox: [number, number, number, number] = [-75, 40.2, -73, 41.2];
-        const oceanPoly = turf.bboxPolygon(mapBbox);
-
-        // Extract land polygons
-        const landFeatures = geoData.features.filter(f =>
-          (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon') &&
-          !(
-            (f.properties?.natural === 'water') ||
-            (f.properties?.water) ||
-            (f.properties?.natural === 'sea') ||
-            (f.properties?.water === 'ocean') ||
-            (f.properties?.water === 'bay') ||
-            (f.properties?.landuse === 'reservoir') ||
-            (f.properties?.waterway)
-          )
-        );
-
-        // Use simple ocean polygon without holes for now
-        const oceanWithHoles = oceanPoly;
-
-        mapInstance!.addSource('ocean', { type: 'geojson', data: oceanWithHoles });
+        // --- Land areas (gray)
         mapInstance!.addLayer({
-          id: 'ocean',
+          id: 'land',
           type: 'fill',
-          source: 'ocean',
+          source: 'geojson-data',
+          filter: [
+            'all',
+            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+            ['none',
+              // Exclude water features
+              ['==', ['get', 'natural'], 'water'],
+              ['==', ['get', 'natural'], 'sea'],
+              ['==', ['get', 'natural'], 'bay'],
+              ['==', ['get', 'water'], 'ocean'],
+              ['==', ['get', 'water'], 'bay'],
+              ['==', ['get', 'water'], 'river'],
+              ['==', ['get', 'water'], 'lake'],
+              ['==', ['get', 'water'], 'pond'],
+              ['==', ['get', 'waterway'], 'riverbank'],
+              ['==', ['get', 'landuse'], 'reservoir'],
+              ['==', ['get', 'leisure'], 'marina'],
+              ['has', 'water']
+            ]
+          ],
           paint: {
-            'fill-color': '#64B5F6', // Blue water
-            'fill-opacity': 0.7
+            'fill-color': '#9E9E9E', // Gray land
+            'fill-opacity': 0.8
           }
         });
 
-        // --- Water polygons from data
+        // --- All water bodies (comprehensive water detection)
         mapInstance!.addLayer({
           id: 'water',
           type: 'fill',
@@ -131,23 +129,48 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'all',
             ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
             ['any',
+              // Natural water features
               ['==', ['get', 'natural'], 'water'],
               ['==', ['get', 'natural'], 'sea'],
               ['==', ['get', 'natural'], 'bay'],
+              ['==', ['get', 'natural'], 'coastline'],
+              ['==', ['get', 'natural'], 'shoreline'],
+              // Water tags
               ['==', ['get', 'water'], 'ocean'],
               ['==', ['get', 'water'], 'bay'],
               ['==', ['get', 'water'], 'river'],
+              ['==', ['get', 'water'], 'lake'],
+              ['==', ['get', 'water'], 'pond'],
+              ['==', ['get', 'water'], 'reservoir'],
+              ['==', ['get', 'water'], 'canal'],
+              // Waterway features
               ['==', ['get', 'waterway'], 'riverbank'],
-              ['has', 'water']
+              ['==', ['get', 'waterway'], 'dock'],
+              // Land use water
+              ['==', ['get', 'landuse'], 'reservoir'],
+              ['==', ['get', 'landuse'], 'basin'],
+              // Leisure water
+              ['==', ['get', 'leisure'], 'marina'],
+              // Generic water property
+              ['has', 'water'],
+              // Specific named water bodies (common NYC water body names)
+              ['in', ['get', 'name'], ['literal', [
+                'Hudson River', 'East River', 'Harlem River', 'Gowanus Canal',
+                'Newtown Creek', 'Arthur Kill', 'Kill Van Kull', 'The Narrows',
+                'Upper New York Bay', 'Lower New York Bay', 'Jamaica Bay',
+                'Flushing Bay', 'Bowery Bay', 'Little Hell Gate', 'Bronx River',
+                'Hutchinson River', 'Westchester Creek', 'Pelham Bay',
+                'Long Island Sound', 'Atlantic Ocean'
+              ]]]
             ]
           ],
           paint: {
-            'fill-color': '#64B5F6',
-            'fill-opacity': 0.85
+            'fill-color': '#2196F3', // Blue water
+            'fill-opacity': 0.9
           }
         });
 
-        // --- Parks
+        // --- Parks (green overlay on gray land)
         mapInstance!.addLayer({
           id: 'parks',
           type: 'fill',
@@ -155,10 +178,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           filter: [
             'all',
             ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-            ['==', ['get', 'leisure'], 'park']
+            ['any',
+              ['==', ['get', 'leisure'], 'park'],
+              ['==', ['get', 'landuse'], 'recreation_ground'],
+              ['==', ['get', 'landuse'], 'forest'],
+              ['==', ['get', 'natural'], 'wood']
+            ]
           ],
           paint: {
-            'fill-color': '#81C784',
+            'fill-color': '#4CAF50',
             'fill-opacity': 0.6
           }
         });
@@ -174,7 +202,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             ['has', 'highway']
           ],
           paint: {
-            'line-color': '#555',
+            'line-color': '#424242',
             'line-width': [
               'match',
               ['get', 'highway'],
@@ -191,7 +219,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         });
 
-        // --- Coastline
+        // --- Coastline (for definition between land and water)
         mapInstance!.addLayer({
           id: 'coastline',
           type: 'line',
@@ -205,8 +233,36 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             ]
           ],
           paint: {
-            'line-color': '#5D4037',
-            'line-width': 2
+            'line-color': '#1976D2', // Darker blue for coastline definition
+            'line-width': 1.5
+          }
+        });
+
+        // --- Water boundaries/edges (rivers, canals as lines)
+        mapInstance!.addLayer({
+          id: 'waterways',
+          type: 'line',
+          source: 'geojson-data',
+          filter: [
+            'all',
+            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+            ['any',
+              ['==', ['get', 'waterway'], 'river'],
+              ['==', ['get', 'waterway'], 'canal'],
+              ['==', ['get', 'waterway'], 'stream'],
+              ['==', ['get', 'waterway'], 'drain']
+            ]
+          ],
+          paint: {
+            'line-color': '#2196F3', // Blue waterways
+            'line-width': [
+              'match',
+              ['get', 'waterway'],
+              'river', 3,
+              'canal', 2,
+              'stream', 1.5,
+              1
+            ]
           }
         });
       });
@@ -214,6 +270,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       mapInstance.on('error', e => {
         console.error('Map error:', e.error);
       });
+
+      setMap(mapInstance);
     };
 
     initializeMap();
