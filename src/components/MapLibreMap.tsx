@@ -408,12 +408,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         if (totalLandArea) {
           if (totalLandArea.geometry.type === 'Polygon') {
             allLandFeatures.push({
-              ...totalLandArea,
+              type: 'Feature',
+              geometry: totalLandArea.geometry,
               properties: totalLandArea.properties || { landType: 'comprehensive', source: 'water-subtraction' }
             } as Feature<Polygon, { [name: string]: any }>);
           } else if (totalLandArea.geometry.type === 'MultiPolygon') {
             allLandFeatures.push({
-              ...totalLandArea,
+              type: 'Feature',
+              geometry: totalLandArea.geometry,
               properties: totalLandArea.properties || { landType: 'comprehensive', source: 'water-subtraction' }
             } as Feature<MultiPolygon, { [name: string]: any }>);
           }
@@ -445,7 +447,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               if (buffered) {
                 if (buffered.geometry.type === 'Polygon') {
                   allLandFeatures.push({
-                    ...buffered,
+                    type: 'Feature',
+                    geometry: buffered.geometry,
                     properties: { 
                       landType: 'coastline-hull-buffered',
                       source: 'fallback-buffer'
@@ -453,7 +456,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                   } as Feature<Polygon, { [name: string]: any }>);
                 } else if (buffered.geometry.type === 'MultiPolygon') {
                   allLandFeatures.push({
-                    ...buffered,
+                    type: 'Feature',
+                    geometry: buffered.geometry,
                     properties: { 
                       landType: 'coastline-hull-buffered',
                       source: 'fallback-buffer'
