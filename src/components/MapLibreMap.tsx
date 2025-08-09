@@ -71,44 +71,96 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       if (mainData) {
         console.log(`Processing ${mainData.features.length} total features`);
         
-        // DEBUG: Log all unique property combinations to see what we're missing
-        const propertyStats = new Map<string, number>();
-        const parkFeatures: any[] = [];
-        const cemeteryFeatures: any[] = [];
+        // DEBUG: Find ALL features with names containing keywords we're looking for
+        const debugResults = {
+          cemeteryFeatures: [] as any[],
+          waterFeatures: [] as any[],
+          allNames: new Set<string>(),
+          geometryTypes: new Map<string, number>(),
+          propertyStats: new Map<string, number>()
+        };
         
-        mainData.features.forEach(feature => {
+        mainData.features.forEach((feature, index) => {
           const props = feature.properties;
+          const geomType = feature.geometry.type;
+          
+          // Track geometry types
+          debugResults.geometryTypes.set(geomType, (debugResults.geometryTypes.get(geomType) || 0) + 1);
+          
+          if (props && props.name) {
+            const name = props.name.toLowerCase();
+            debugResults.allNames.add(props.name);
+            
+            // Look for cemetery-related names
+            if (name.includes('cemetery') || name.includes('calvary') || 
+                name.includes('green-wood') || name.includes('greenwood') || 
+                name.includes('woodlawn') || name.includes('evergreens')) {
+              debugResults.cemeteryFeatures.push({
+                index,
+                name: props.name,
+                geometry: geomType,
+                leisure: props.leisure,
+                natural: props.natural,
+                allProps: props
+              });
+            }
+            
+            // Look for water-related names
+            if (name.includes('bay') || name.includes('kill') || name.includes('river') || 
+                name.includes('newark') || name.includes('arthur') || name.includes('hudson')) {
+              debugResults.waterFeatures.push({
+                index,
+                name: props.name,
+                geometry: geomType,
+                natural: props.natural,
+                water: props.water,
+                allProps: props
+              });
+            }
+          }
+          
+          // Track all property keys
           if (props) {
-            // Track park-related features
-            if (props.leisure === 'park' || (props.name && props.name.toLowerCase().includes('park'))) {
-              parkFeatures.push({ name: props.name, leisure: props.leisure, landuse: props.landuse, geometry: feature.geometry.type });
-            }
-            
-            // Track cemetery-related features  
-            if (props.landuse === 'cemetery' || props.amenity === 'grave_yard' || 
-                (props.name && props.name.toLowerCase().includes('cemetery'))) {
-              cemeteryFeatures.push({ name: props.name, landuse: props.landuse, amenity: props.amenity, geometry: feature.geometry.type });
-            }
-            
-            // Check for relevant properties
-            if (props.leisure) {
-              const key = `leisure=${props.leisure}`;
-              propertyStats.set(key, (propertyStats.get(key) || 0) + 1);
-            }
-            if (props.landuse) {
-              const key = `landuse=${props.landuse}`;
-              propertyStats.set(key, (propertyStats.get(key) || 0) + 1);
-            }
-            if (props.amenity) {
-              const key = `amenity=${props.amenity}`;
-              propertyStats.set(key, (propertyStats.get(key) || 0) + 1);
-            }
+            Object.keys(props).forEach(key => {
+              const propKey = `${key}=${props[key]}`;
+              debugResults.propertyStats.set(propKey, (debugResults.propertyStats.get(propKey) || 0) + 1);
+            });
           }
         });
         
-        console.log('Property statistics:', Object.fromEntries(propertyStats));
-        console.log('Found park features:', parkFeatures);
-        console.log('Found cemetery features:', cemeteryFeatures);
+        console.log('=== DEBUGGING RESULTS ===');
+        console.log('Geometry types:', Object.fromEntries(debugResults.geometryTypes));
+        console.log('Found cemetery features:', debugResults.cemeteryFeatures);
+        console.log('Found water features:', debugResults.waterFeatures);
+        
+        // Show sample of all names to help identify patterns
+        const nameArray = Array.from(debugResults.allNames);
+        console.log(`Total named features: ${nameArray.length}`);
+        console.log('Sample names (first 20):', nameArray.slice(0, 20));
+        
+        // Show water-related names
+        const waterNames = nameArray.filter(name => 
+          name.toLowerCase().includes('bay') || 
+          name.toLowerCase().includes('kill') || 
+          name.toLowerCase().includes('river') ||
+          name.toLowerCase().includes('water')
+        );
+        console.log('All water-related names found:', waterNames);
+        
+        // Show cemetery-related names
+        const cemeteryNames = nameArray.filter(name => 
+          name.toLowerCase().includes('cemetery') || 
+          name.toLowerCase().includes('calvary') || 
+          name.toLowerCase().includes('green') ||
+          name.toLowerCase().includes('wood')
+        );
+        console.log('All cemetery-related names found:', cemeteryNames);
+        
+        // Show top property combinations
+        const sortedProps = Array.from(debugResults.propertyStats.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 30);
+        console.log('Top 30 property combinations:', sortedProps);
         
         // IMPROVED LAND DETECTION - Working with limited properties
         const landFeatures = mainData.features.filter(feature => {
@@ -159,7 +211,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           );
         }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
         
-        // Replace the water detection section
         // IMPROVED WATER DETECTION - Using only available properties
         const waterFeatures = mainData.features.filter(feature => {
           const props = feature.properties;
@@ -191,50 +242,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             }))
           );
         }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
-        
-        // Replace the land layer paint properties in the useEffect where you add land areas
-        const landLayerConfig = {
-          id: 'land-areas',
-          type: 'fill',
-          source: 'land-data',
-          paint: { 
-            'fill-color': [
-              'case',
-              
-              // Cemetery colors (darker green) - Name-based detection only
-              ['any',
-                ['in', 'green-wood', ['downcase', ['coalesce', ['get', 'name'], '']]],
-                ['in', 'greenwood', ['downcase', ['coalesce', ['get', 'name'], '']]],
-                ['in', 'calvary', ['downcase', ['coalesce', ['get', 'name'], '']]],
-                ['in', 'woodlawn', ['downcase', ['coalesce', ['get', 'name'], '']]],
-                ['in', 'cemetery', ['downcase', ['coalesce', ['get', 'name'], '']]],
-                ['in', 'evergreens', ['downcase', ['coalesce', ['get', 'name'], '']]],
-                ['in', 'cypress', ['downcase', ['coalesce', ['get', 'name'], '']]]
-              ], '#2E7D32', // Dark green for cemeteries
-              
-              // Park colors (bright green) - using leisure property we have
-              ['==', ['get', 'leisure'], 'park'], '#4CAF50',
-              ['==', ['get', 'leisure'], 'garden'], '#4CAF50',
-              ['==', ['get', 'leisure'], 'playground'], '#4CAF50',
-              ['==', ['get', 'leisure'], 'golf_course'], '#4CAF50',
-              
-              // Natural vegetation (forest green) - using natural property we have
-              ['==', ['get', 'natural'], 'wood'], '#388E3C',
-              ['==', ['get', 'natural'], 'forest'], '#388E3C',
-              
-              // Famous parks by name (bright green)
-              ['any',
-                ['in', 'central park', ['downcase', ['coalesce', ['get', 'name'], '']]],
-                ['in', 'prospect park', ['downcase', ['coalesce', ['get', 'name'], '']]],
-                ['in', 'battery park', ['downcase', ['coalesce', ['get', 'name'], '']]],
-                ['in', 'bryant park', ['downcase', ['coalesce', ['get', 'name'], '']]]
-              ], '#4CAF50',
-              
-              '#E8F5E8' // Very light green for all other land
-            ],
-            'fill-opacity': 0.9 
-          }
-        };
         
         console.log(`Found ${landFeatures.length} land features`);
         console.log(`Found ${waterFeatures.length} water features`);
@@ -314,7 +321,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') &&
             (
               props.natural === 'water' ||
-              props.waterway === 'riverbank' ||
               (props.name && [
                 'Upper New York Bay', 'Lower New York Bay', 'Newark Bay', 'Jamaica Bay',
                 'Long Island Sound', 'Hudson River', 'East River', 'Harlem River'
@@ -624,23 +630,35 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       paint: { 
         'fill-color': [
           'case',
-          // Cemetery colors (darker green)
-          ['==', ['get', 'landuse'], 'cemetery'], '#2E7D32', // Dark green for cemeteries
-          ['==', ['get', 'amenity'], 'grave_yard'], '#2E7D32', // Dark green for grave yards
-          // Named cemeteries (case-insensitive matching)
-          ['in', 'green-wood', ['downcase', ['get', 'name']]], '#2E7D32',
-          ['in', 'calvary', ['downcase', ['get', 'name']]], '#2E7D32',
-          ['in', 'woodlawn', ['downcase', ['get', 'name']]], '#2E7D32',
-          ['in', 'cemetery', ['downcase', ['get', 'name']]], '#2E7D32',
           
-          // Park colors (bright green)
-          ['==', ['get', 'leisure'], 'park'], '#4CAF50', // Bright green for parks
-          ['==', ['get', 'leisure'], 'garden'], '#4CAF50', // Bright green for gardens
-          ['==', ['get', 'leisure'], 'playground'], '#4CAF50', // Bright green for playgrounds
+          // Cemetery colors (darker green) - Name-based detection only
+          ['any',
+            ['in', 'green-wood', ['downcase', ['coalesce', ['get', 'name'], '']]],
+            ['in', 'greenwood', ['downcase', ['coalesce', ['get', 'name'], '']]],
+            ['in', 'calvary', ['downcase', ['coalesce', ['get', 'name'], '']]],
+            ['in', 'woodlawn', ['downcase', ['coalesce', ['get', 'name'], '']]],
+            ['in', 'cemetery', ['downcase', ['coalesce', ['get', 'name'], '']]],
+            ['in', 'evergreens', ['downcase', ['coalesce', ['get', 'name'], '']]],
+            ['in', 'cypress', ['downcase', ['coalesce', ['get', 'name'], '']]]
+          ], '#2E7D32', // Dark green for cemeteries
           
-          // Natural vegetation (forest green)
-          ['==', ['get', 'natural'], 'wood'], '#388E3C', // Forest green for woods
-          ['==', ['get', 'natural'], 'forest'], '#388E3C', // Forest green for forests
+          // Park colors (bright green) - using leisure property we have
+          ['==', ['get', 'leisure'], 'park'], '#4CAF50',
+          ['==', ['get', 'leisure'], 'garden'], '#4CAF50',
+          ['==', ['get', 'leisure'], 'playground'], '#4CAF50',
+          ['==', ['get', 'leisure'], 'golf_course'], '#4CAF50',
+          
+          // Natural vegetation (forest green) - using natural property we have
+          ['==', ['get', 'natural'], 'wood'], '#388E3C',
+          ['==', ['get', 'natural'], 'forest'], '#388E3C',
+          
+          // Famous parks by name (bright green)
+          ['any',
+            ['in', 'central park', ['downcase', ['coalesce', ['get', 'name'], '']]],
+            ['in', 'prospect park', ['downcase', ['coalesce', ['get', 'name'], '']]],
+            ['in', 'battery park', ['downcase', ['coalesce', ['get', 'name'], '']]],
+            ['in', 'bryant park', ['downcase', ['coalesce', ['get', 'name'], '']]]
+          ], '#4CAF50',
           
           '#E8F5E8' // Very light green for all other land
         ],
