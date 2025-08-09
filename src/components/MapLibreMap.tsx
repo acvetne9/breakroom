@@ -47,7 +47,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
 
       // Create a large bounding box for the NYC area
-      const bbox = [-74.5, 40.3, -73.5, 41.0];
+      const bbox: [number, number, number, number] = [-74.5, 40.3, -73.5, 41.0];
+      const outerPolygon = turf.bboxPolygon(bbox);
 
       // For now, let's create land polygons based on known NYC borough boundaries
       // This is a simplified approach - in reality you'd need more complex polygon operations
@@ -136,8 +137,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
         // Fit map to data
         try {
-          const bbox: [number, number, number, number] = [-74.5, 40.3, -73.5, 41.0];
-          const outerPolygon = turf.bboxPolygon(bbox);
+          const bbox2d = turf.bbox(geoData) as [number, number, number, number];
           if (bbox2d[0] !== bbox2d[2] && bbox2d[1] !== bbox2d[3]) {
             mapInstance!.fitBounds(bbox2d, { padding: 100, duration: 1000 });
           }
@@ -164,7 +164,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: 'fill',
           source: 'land-polygons',
           paint: {
-            'fill-color': '#9E9E9E', // Gray land
+            'fill-color': '#DDDDDD', // Gray land
             'fill-opacity': 0.8
           }
         });
