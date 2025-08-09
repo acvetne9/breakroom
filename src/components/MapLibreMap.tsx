@@ -1,4 +1,39 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+// Extract land and water data from the main GeoJSON
+      const mainData = await loadGeoJSONData();
+      if (mainData) {
+        console.log(`Processing ${mainData.features.length} total features`);
+        
+        // DEBUG: Log all unique property combinations to see what we're missing
+        const propertyStats = new Map<string, number>();
+        mainData.features.forEach(feature => {
+          const props = feature.properties;
+          if (props) {
+            // Check for park-related properties
+            if (props.leisure) {
+              const key = `leisure=${props.leisure}`;
+              propertyStats.set(key, (propertyStats.get(key) || 0) + 1);
+            }
+            if (props.landuse) {
+              const key = `landuse=${props.landuse}`;
+              propertyStats.set(key, (propertyStats.get(key) || 0) + 1);
+            }
+            if (props.amenity) {
+              const key = `amenity=${props.amenity}`;
+              propertyStats.set(key, (propertyStats.get(key) || 0) + 1);
+            }
+            if (props.natural) {
+              const key = `natural=${props.natural}`;
+              propertyStats.set(key, (propertyStats.get(key) || 0) + 1);
+            }
+          }
+        });
+        
+        console.log('Property statistics:', Object.fromEntries(propertyStats));
+        
+        // IMPROVED LAND DETECTION - Much more comprehensive
+        const landFeatures = mainData.features.filter(feature => {
+          const props = feature.properties;
+          if (!props || !['import React, { useEffect, useRef, useState, useCallback } from 'react';
 import type { Feature, FeatureCollection, Polygon, MultiPolygon, LineString } from 'geojson';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -70,6 +105,45 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const mainData = await loadGeoJSONData();
       if (mainData) {
         console.log(`Processing ${mainData.features.length} total features`);
+        
+        // DEBUG: Log all unique property combinations to see what we're missing
+        const propertyStats = new Map<string, number>();
+        const parkFeatures: any[] = [];
+        const cemeteryFeatures: any[] = [];
+        
+        mainData.features.forEach(feature => {
+          const props = feature.properties;
+          if (props) {
+            // Track park-related features
+            if (props.leisure === 'park' || (props.name && props.name.toLowerCase().includes('park'))) {
+              parkFeatures.push({ name: props.name, leisure: props.leisure, landuse: props.landuse, geometry: feature.geometry.type });
+            }
+            
+            // Track cemetery-related features  
+            if (props.landuse === 'cemetery' || props.amenity === 'grave_yard' || 
+                (props.name && props.name.toLowerCase().includes('cemetery'))) {
+              cemeteryFeatures.push({ name: props.name, landuse: props.landuse, amenity: props.amenity, geometry: feature.geometry.type });
+            }
+            
+            // Check for relevant properties
+            if (props.leisure) {
+              const key = `leisure=${props.leisure}`;
+              propertyStats.set(key, (propertyStats.get(key) || 0) + 1);
+            }
+            if (props.landuse) {
+              const key = `landuse=${props.landuse}`;
+              propertyStats.set(key, (propertyStats.get(key) || 0) + 1);
+            }
+            if (props.amenity) {
+              const key = `amenity=${props.amenity}`;
+              propertyStats.set(key, (propertyStats.get(key) || 0) + 1);
+            }
+          }
+        });
+        
+        console.log('Property statistics:', Object.fromEntries(propertyStats));
+        console.log('Found park features:', parkFeatures);
+        console.log('Found cemetery features:', cemeteryFeatures);
         
         // IMPROVED LAND DETECTION - Much more comprehensive
         const landFeatures = mainData.features.filter(feature => {
@@ -329,7 +403,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 // Use convex hull to create a proper polygon
                 const points = currentCoords.map(coord => turf.point(coord));
                 const pointCollection = turf.featureCollection(points);
-                const hull = turf.convexHull(pointCollection);
+                const hull = (turf as any).convexHull(pointCollection);
                 
                 if (hull && hull.geometry.type === 'Polygon') {
                   const area = turf.area(hull);
@@ -368,9 +442,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         // Add the resulting land area(s)
         if (totalLandArea) {
           if (totalLandArea.geometry.type === 'Polygon') {
-            allLandFeatures.push(totalLandArea as Feature<Polygon, { [name: string]: any }>);
+            allLandFeatures.push({
+              ...totalLandArea,
+              properties: totalLandArea.properties || { landType: 'comprehensive', source: 'water-subtraction' }
+            } as Feature<Polygon, { [name: string]: any }>);
           } else if (totalLandArea.geometry.type === 'MultiPolygon') {
-            allLandFeatures.push(totalLandArea as Feature<MultiPolygon, { [name: string]: any }>);
+            allLandFeatures.push({
+              ...totalLandArea,
+              properties: totalLandArea.properties || { landType: 'comprehensive', source: 'water-subtraction' }
+            } as Feature<MultiPolygon, { [name: string]: any }>);
           }
         }
         
@@ -392,7 +472,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           if (allCoastlineCoords.length >= 3) {
             const points = allCoastlineCoords.map(coord => turf.point(coord));
             const pointCollection = turf.featureCollection(points);
-            const hull = turf.convexHull(pointCollection);
+            const hull = (turf as any).convexHull(pointCollection);
             
             if (hull && hull.geometry.type === 'Polygon') {
               // Buffer the hull slightly inward to create land
