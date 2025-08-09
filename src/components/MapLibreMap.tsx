@@ -3,11 +3,8 @@ import type { Feature, FeatureCollection, Polygon, MultiPolygon, LineString } fr
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
-// Turf imports (no wildcard import, fixes TS2554 issues)
-import buffer from '@turf/buffer';
-import union from '@turf/union';
-import difference from '@turf/difference';
-import bbox from '@turf/bbox';
+// Turf imports 
+import { bbox } from '@turf/turf';
 
 // Props interface combining both functionalities
 interface MapLibreMapProps {
@@ -32,10 +29,10 @@ interface MapLibreMapProps {
   onBusinessClick?: (business: any) => void;
   selectedBusiness?: any;
   
-  // Geographic data from second script
-  roadsData: FeatureCollection<LineString>;
-  landData: FeatureCollection<Polygon | MultiPolygon>;
-  waterData: FeatureCollection<Polygon | MultiPolygon>;
+  // Geographic data from second script (optional)
+  roadsData?: FeatureCollection<LineString>;
+  landData?: FeatureCollection<Polygon | MultiPolygon>;
+  waterData?: FeatureCollection<Polygon | MultiPolygon>;
 }
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({ 
@@ -50,50 +47,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
-  // Convert lines (roads, bridges, tunnels) to polygons
-  const convertLinesToPolygons = useCallback((lineFeatures: FeatureCollection<LineString>) => {
-    if (!lineFeatures || !lineFeatures.features || lineFeatures.features.length === 0) {
-      return null;
-    }
-    
-    const buffered: Feature<Polygon>[] = lineFeatures.features.map(line =>
-      buffer(line, 5, { units: 'meters' }) as Feature<Polygon>
-    );
-
-    // Merge into one polygon feature
-    let merged: Feature<Polygon | MultiPolygon> | null = null;
-    for (const poly of buffered) {
-      merged = merged ? (union(merged, poly) as Feature<Polygon | MultiPolygon>) : poly;
-    }
-
-    return merged;
-  }, []);
-
-  // Merge all land into single feature
-  const mergeLand = useCallback((fc: FeatureCollection<Polygon | MultiPolygon>) => {
-    if (!fc || !fc.features || fc.features.length === 0) {
-      return null;
-    }
-    
-    let merged: Feature<Polygon | MultiPolygon> | null = null;
-    for (const feat of fc.features) {
-      merged = merged ? (union(merged, feat) as Feature<Polygon | MultiPolygon>) : feat;
-    }
-    return merged;
-  }, []);
-
-  // Merge all water into single feature
-  const mergeWater = useCallback((fc: FeatureCollection<Polygon | MultiPolygon>) => {
-    if (!fc || !fc.features || fc.features.length === 0) {
-      return null;
-    }
-    
-    let merged: Feature<Polygon | MultiPolygon> | null = null;
-    for (const feat of fc.features) {
-      merged = merged ? (union(merged, feat) as Feature<Polygon | MultiPolygon>) : feat;
-    }
-    return merged;
-  }, []);
 
   // Initialize map
   useEffect(() => {
@@ -125,30 +78,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     const map = mapRef.current;
 
-    // Check if we have required data
+    // Skip geographic data if not provided (optional)
     if (!roadsData || !landData || !waterData) {
-      console.warn('Missing geographic data:', { roadsData, landData, waterData });
       return;
     }
 
-    // 1. Merge land & water
-    const landFeature = mergeLand(landData);
-    const waterFeature = mergeWater(waterData);
-
-    // 2. Remove water from land
-    let nycLand = landFeature;
-    if (landFeature && waterFeature) {
-      nycLand = difference(landFeature, waterFeature) as Feature<Polygon | MultiPolygon>;
-    }
-
-    // 3. Convert roads to polygons
-    const roadsPolygon = convertLinesToPolygons(roadsData);
-
-    // 4. Add land layer
-    if (nycLand) {
+    // Add land layer directly without complex processing for now
+    if (landData && landData.features && landData.features.length > 0) {
       map.addSource('nyc-land', {
         type: 'geojson',
-        data: nycLand
+        data: landData
       });
       map.addLayer({
         id: 'nyc-land-fill',
@@ -161,11 +100,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
     }
 
-    // 5. Add water layer
-    if (waterFeature) {
+    // Add water layer
+    if (waterData && waterData.features && waterData.features.length > 0) {
       map.addSource('nyc-water', {
         type: 'geojson',
-        data: waterFeature
+        data: waterData
       });
       map.addLayer({
         id: 'nyc-water-fill',
@@ -178,29 +117,29 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
     }
 
-    // 6. Add roads polygons
-    if (roadsPolygon) {
+    // Add roads as lines instead of polygons
+    if (roadsData && roadsData.features && roadsData.features.length > 0) {
       map.addSource('nyc-roads', {
         type: 'geojson',
-        data: roadsPolygon
+        data: roadsData
       });
       map.addLayer({
-        id: 'nyc-roads-fill',
-        type: 'fill',
+        id: 'nyc-roads-line',
+        type: 'line',
         source: 'nyc-roads',
         paint: {
-          'fill-color': '#bfbfbf', // darker gray
-          'fill-opacity': 1
+          'line-color': '#bfbfbf', // darker gray
+          'line-width': 2
         }
       });
     }
 
-    // Fit map to all data
-    if (nycLand) {
-      const bounds = bbox(nycLand) as [number, number, number, number];
+    // Fit map to land data if available
+    if (landData && landData.features && landData.features.length > 0) {
+      const bounds = bbox(landData) as [number, number, number, number];
       map.fitBounds(bounds, { padding: 50 });
     }
-  }, [mapLoaded, roadsData, landData, waterData, mergeLand, mergeWater, convertLinesToPolygons]);
+  }, [mapLoaded, roadsData, landData, waterData]);
 
   // Add business markers to the map
   useEffect(() => {
