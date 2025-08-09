@@ -5,8 +5,25 @@ import * as turf from '@turf/turf';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 interface MapLibreMapProps {
-  geojsonData?: FeatureCollection;
+  businesses: {
+    id: string;
+    name: string;
+    position: { lat: number; lng: number };
+    atmosphere: string[];
+    salary?: string;
+    stories?: { id: string; text: string; author: string }[];
+    businessType?: string;
+    roles?: {
+      role: string;
+      salary: string;
+      upvotes?: number;
+      downvotes?: number;
+      userVote?: 'up' | 'down';
+    }[];
+    place_id?: string;
+  }[];
 }
+
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({ geojsonData }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
