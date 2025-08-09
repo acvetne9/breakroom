@@ -447,13 +447,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     };
 
-    // Add land areas (beige/tan color for land)
+    // Add land areas (green color for land)
     addOrUpdate('land-data', landData, {
       id: 'land-areas',
       type: 'fill',
       source: 'land-data',
       paint: { 
-        'fill-color': '#F5DEB3', // Wheat color for land
+        'fill-color': [
+          'case',
+          ['==', ['get', 'landuse'], 'cemetery'], '#228B22', // Forest green for cemeteries
+          '#90EE90' // Light green for all other land
+        ],
         'fill-opacity': 0.9 
       }
     } as any);
