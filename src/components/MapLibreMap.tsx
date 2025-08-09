@@ -32,10 +32,10 @@ interface MapLibreMapProps {
   onBusinessClick?: (business: any) => void;
   selectedBusiness?: any;
   
-  // Geographic data from second script
-  roadsData: FeatureCollection<LineString>;
-  landData: FeatureCollection<Polygon | MultiPolygon>;
-  waterData: FeatureCollection<Polygon | MultiPolygon>;
+  // Geographic data from second script (optional)
+  roadsData?: FeatureCollection<LineString>;
+  landData?: FeatureCollection<Polygon | MultiPolygon>;
+  waterData?: FeatureCollection<Polygon | MultiPolygon>;
 }
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({ 
@@ -52,33 +52,58 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Convert lines (roads, bridges, tunnels) to polygons
   const convertLinesToPolygons = useCallback((lineFeatures: FeatureCollection<LineString>) => {
-    const buffered: Feature<Polygon>[] = lineFeatures.features.map(line =>
-      buffer(line, 5, { units: 'meters' }) as Feature<Polygon>
-    );
+    try {
+      const buffered: Feature<Polygon>[] = lineFeatures.features.map(line =>
+        buffer(line, 5, { units: 'meters' }) as Feature<Polygon>
+      );
 
-    // Merge into one polygon feature
-    let merged: Feature<Polygon | MultiPolygon> | null = null;
-    for (const poly of buffered) {
-      merged = merged ? (union(merged, poly) as Feature<Polygon | MultiPolygon>) : poly;
+      // Merge into one polygon feature
+      if (!buffered.length) return null;
+      let merged: Feature<Polygon | MultiPolygon> | null = buffered[0];
+      for (let i = 1; i < buffered.length; i++) {
+        if (merged) {
+          try {
+            merged = union(merged, buffered[i]) as Feature<Polygon | MultiPolygon>;
+          } catch (error) {
+            console.warn('Error merging road polygons:', error);
+          }
+        }
+      }
+      return merged;
+    } catch (error) {
+      console.warn('Error converting lines to polygons:', error);
+      return null;
     }
-
-    return merged;
   }, []);
 
   // Merge all land into single feature
   const mergeLand = useCallback((fc: FeatureCollection<Polygon | MultiPolygon>) => {
-    let merged: Feature<Polygon | MultiPolygon> | null = null;
-    for (const feat of fc.features) {
-      merged = merged ? (union(merged, feat) as Feature<Polygon | MultiPolygon>) : feat;
+    if (!fc.features.length) return null;
+    let merged: Feature<Polygon | MultiPolygon> | null = fc.features[0];
+    for (let i = 1; i < fc.features.length; i++) {
+      if (merged) {
+        try {
+          merged = union(merged, fc.features[i]) as Feature<Polygon | MultiPolygon>;
+        } catch (error) {
+          console.warn('Error merging land feature:', error);
+        }
+      }
     }
     return merged;
   }, []);
 
   // Merge all water into single feature
   const mergeWater = useCallback((fc: FeatureCollection<Polygon | MultiPolygon>) => {
-    let merged: Feature<Polygon | MultiPolygon> | null = null;
-    for (const feat of fc.features) {
-      merged = merged ? (union(merged, feat) as Feature<Polygon | MultiPolygon>) : feat;
+    if (!fc.features.length) return null;
+    let merged: Feature<Polygon | MultiPolygon> | null = fc.features[0];
+    for (let i = 1; i < fc.features.length; i++) {
+      if (merged) {
+        try {
+          merged = union(merged, fc.features[i]) as Feature<Polygon | MultiPolygon>;
+        } catch (error) {
+          console.warn('Error merging water feature:', error);
+        }
+      }
     }
     return merged;
   }, []);
@@ -110,6 +135,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // Add geographic data layers (land, water, roads) once map is loaded
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return;
+    // Skip if no geographic data is provided
+    if (!roadsData || !landData || !waterData) return;
 
     const map = mapRef.current;
 
@@ -120,7 +147,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     // 2. Remove water from land
     let nycLand = landFeature;
     if (landFeature && waterFeature) {
-      nycLand = difference(landFeature, waterFeature) as Feature<Polygon | MultiPolygon>;
+      try {
+        nycLand = difference(landFeature, waterFeature) as Feature<Polygon | MultiPolygon>;
+      } catch (error) {
+        console.warn('Error calculating land-water difference:', error);
+        nycLand = landFeature; // Fallback to original land
+      }
     }
 
     // 3. Convert roads to polygons
@@ -179,8 +211,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     // Fit map to all data
     if (nycLand) {
-      const bounds = bbox(nycLand) as [number, number, number, number];
-      map.fitBounds(bounds, { padding: 50 });
+      try {
+        const bounds = bbox(nycLand) as [number, number, number, number];
+        map.fitBounds(bounds, { padding: 50 });
+      } catch (error) {
+        console.warn('Error fitting bounds:', error);
+      }
     }
   }, [mapLoaded, roadsData, landData, waterData, mergeLand, mergeWater, convertLinesToPolygons]);
 
