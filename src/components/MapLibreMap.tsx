@@ -102,7 +102,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             props.natural === 'sand' ||
             props.natural === 'beach' ||
             
-            // Leisure areas (parks, etc.)
+            // Leisure areas (parks, etc.) - INCLUDE ALL PARKS HERE
             props.leisure === 'park' ||
             props.leisure === 'playground' ||
             props.leisure === 'pitch' ||
@@ -117,6 +117,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             props.amenity === 'school' ||
             props.amenity === 'hospital' ||
             props.amenity === 'parking' ||
+            props.amenity === 'grave_yard' || // Additional cemetery designation
             
             // Transportation that represents solid ground
             props.aeroway === 'aerodrome' ||
@@ -217,7 +218,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [loadGeoJSONData]);
 
-  // SIMPLIFIED coastline-to-land conversion
+  // IMPROVED coastline-to-land conversion strategy
   const createLandFromCoastlines = useCallback((geoData: FeatureCollection): FeatureCollection<Polygon | MultiPolygon> => {
     try {
       const allLandFeatures: Feature<Polygon | MultiPolygon, { [name: string]: any }>[] = [];
@@ -250,49 +251,167 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         };
       }
 
-      // Try to create polygons from coastlines that are nearly closed
-      coastlines.forEach((coastline, index) => {
-        try {
-          if (coastline.geometry.type !== 'LineString') return;
+      // STRATEGY 1: Create comprehensive water mask, then subtract from bounding box
+      try {
+        const bbox: [number, number, number, number] = [-74.30, 40.50, -73.70, 40.93];
+        let totalLandArea = turf.bboxPolygon(bbox);
+        
+        // Get all water bodies (both explicit and coastline-derived)
+        const explicitWaterBodies = geoData.features.filter(feature => {
+          const props = feature.properties;
+          return props && 
+            (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') &&
+            (
+              props.natural === 'water' ||
+              props.waterway === 'riverbank' ||
+              (props.name && [
+                'Upper New York Bay', 'Lower New York Bay', 'Newark Bay', 'Jamaica Bay',
+                'Long Island Sound', 'Hudson River', 'East River', 'Harlem River'
+              ].some(waterName => props.name.includes(waterName)))
+            );
+        });
+        
+        console.log(`Found ${explicitWaterBodies.length} explicit water bodies`);
+        
+        // Create water polygons from coastline segments using convex hull approach
+        const coastlineWaterBodies: Feature<Polygon | MultiPolygon>[] = [];
+        
+        // Group coastlines by proximity to create coherent water bodies
+        const processedCoastlines = new Set<number>();
+        
+        coastlines.forEach((coastline, index) => {
+          if (processedCoastlines.has(index)) return;
           
-          const lineGeometry = coastline.geometry as any;
-          const coords = lineGeometry.coordinates;
-          if (!coords || coords.length < 4) return;
-          
-          const firstPoint = coords[0];
-          const lastPoint = coords[coords.length - 1];
-          const distance = turf.distance(firstPoint, lastPoint, { units: 'kilometers' });
-          
-          // If endpoints are close (within 1km), try to close the polygon
-          if (distance < 1.0) {
-            const closedCoords = [...coords, firstPoint];
+          try {
+            const coords = (coastline.geometry as any).coordinates;
+            if (!coords || coords.length < 3) return;
             
-            if (closedCoords.length >= 4) {
-              try {
-                const polygon = turf.polygon([closedCoords]);
-                const area = turf.area(polygon);
-                
-                // Only include significant areas (>10,000 sq meters)
-                if (area > 10000) {
-                  allLandFeatures.push({
-                    ...polygon,
-                    properties: { 
-                      landType: 'coastline-polygon',
-                      area: area,
-                      source: 'coastline-' + index
-                    }
-                  } as Feature<Polygon, { [name: string]: any }>);
-                  console.log(`Created land polygon from coastline ${index}, area: ${Math.round(area)} sq meters`);
+            // Find nearby coastline segments
+            const nearbyCoastlines = [coastline];
+            const currentCoords = [...coords];
+            
+            coastlines.forEach((otherCoastline, otherIndex) => {
+              if (otherIndex === index || processedCoastlines.has(otherIndex)) return;
+              
+              const otherCoords = (otherCoastline.geometry as any).coordinates;
+              if (!otherCoords || otherCoords.length < 3) return;
+              
+              // Check if any endpoint of this coastline is close to any endpoint of the other
+              const endpoints = [
+                coords[0], coords[coords.length - 1],
+                otherCoords[0], otherCoords[otherCoords.length - 1]
+              ];
+              
+              let isNearby = false;
+              for (let i = 0; i < 2; i++) {
+                for (let j = 2; j < 4; j++) {
+                  const dist = turf.distance(endpoints[i], endpoints[j], { units: 'kilometers' });
+                  if (dist < 0.5) { // Within 500m
+                    isNearby = true;
+                    break;
+                  }
                 }
-              } catch (polyErr) {
-                console.warn(`Could not create polygon from coastline ${index}:`, polyErr);
+                if (isNearby) break;
+              }
+              
+              if (isNearby) {
+                nearbyCoastlines.push(otherCoastline);
+                currentCoords.push(...otherCoords);
+                processedCoastlines.add(otherIndex);
+              }
+            });
+            
+            processedCoastlines.add(index);
+            
+            // Create a polygon from all the collected coastline points
+            if (currentCoords.length >= 6) { // Need at least 3 unique points for polygon
+              try {
+                // Use convex hull to create a proper polygon
+                const points = currentCoords.map(coord => turf.point(coord));
+                const pointCollection = turf.featureCollection(points);
+                const hull = turf.convexHull(pointCollection);
+                
+                if (hull && hull.geometry.type === 'Polygon') {
+                  const area = turf.area(hull);
+                  
+                  // Only include significant water bodies (>50,000 sq meters)
+                  if (area > 50000) {
+                    coastlineWaterBodies.push(hull as Feature<Polygon>);
+                    console.log(`Created water body from coastline group ${index}, area: ${Math.round(area)} sq meters`);
+                  }
+                }
+              } catch (hullErr) {
+                console.warn(`Could not create convex hull for coastline group ${index}:`, hullErr);
+              }
+            }
+          } catch (err) {
+            console.warn(`Error processing coastline group ${index}:`, err);
+          }
+        });
+        
+        // Subtract all water bodies from the total land area
+        const allWaterBodies = [...explicitWaterBodies, ...coastlineWaterBodies];
+        console.log(`Subtracting ${allWaterBodies.length} total water bodies from land`);
+        
+        allWaterBodies.forEach((waterBody, index) => {
+          try {
+            const difference = (turf as any).difference(totalLandArea, waterBody);
+            if (difference) {
+              totalLandArea = difference;
+              console.log(`Subtracted water body ${index}`);
+            }
+          } catch (diffErr) {
+            console.warn(`Could not subtract water body ${index}:`, diffErr);
+          }
+        });
+        
+        // Add the resulting land area(s)
+        if (totalLandArea) {
+          if (totalLandArea.geometry.type === 'Polygon') {
+            allLandFeatures.push(totalLandArea as Feature<Polygon, { [name: string]: any }>);
+          } else if (totalLandArea.geometry.type === 'MultiPolygon') {
+            allLandFeatures.push(totalLandArea as Feature<MultiPolygon, { [name: string]: any }>);
+          }
+        }
+        
+      } catch (err) {
+        console.warn('Comprehensive land creation failed:', err);
+        
+        // FALLBACK: Simple buffered coastlines
+        try {
+          console.log('Using simple buffer fallback');
+          const allCoastlineCoords: number[][] = [];
+          
+          coastlines.forEach(coastline => {
+            if (coastline.geometry.type === 'LineString') {
+              const coords = (coastline.geometry as any).coordinates;
+              allCoastlineCoords.push(...coords);
+            }
+          });
+          
+          if (allCoastlineCoords.length >= 3) {
+            const points = allCoastlineCoords.map(coord => turf.point(coord));
+            const pointCollection = turf.featureCollection(points);
+            const hull = turf.convexHull(pointCollection);
+            
+            if (hull && hull.geometry.type === 'Polygon') {
+              // Buffer the hull slightly inward to create land
+              const buffered = turf.buffer(hull, -0.001, { units: 'degrees' });
+              if (buffered && (buffered.geometry.type === 'Polygon' || buffered.geometry.type === 'MultiPolygon')) {
+                allLandFeatures.push({
+                  ...buffered,
+                  properties: { 
+                    landType: 'coastline-hull-buffered',
+                    source: 'fallback-buffer'
+                  }
+                } as Feature<Polygon | MultiPolygon, { [name: string]: any }>);
               }
             }
           }
-        } catch (err) {
-          console.warn(`Error processing coastline ${index}:`, err);
+        } catch (fallbackErr) {
+          console.warn('Fallback buffer approach also failed:', fallbackErr);
         }
-      });
+      }
 
       console.log(`Created ${allLandFeatures.length} land features from coastlines`);
       
@@ -447,7 +566,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     };
 
-    // Add land areas (green color for land)
+    // Add land areas with proper color coding for parks and cemeteries
     addOrUpdate('land-data', landData, {
       id: 'land-areas',
       type: 'fill',
@@ -455,7 +574,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       paint: { 
         'fill-color': [
           'case',
-          ['==', ['get', 'landuse'], 'cemetery'], '#228B22', // Forest green for cemeteries
+          ['==', ['get', 'landuse'], 'cemetery'], '#228B22', // Dark forest green for cemeteries
+          ['==', ['get', 'amenity'], 'grave_yard'], '#228B22', // Dark forest green for grave yards
+          ['==', ['get', 'leisure'], 'park'], '#32CD32', // Lime green for parks
+          ['==', ['get', 'leisure'], 'garden'], '#32CD32', // Lime green for gardens
+          ['==', ['get', 'leisure'], 'playground'], '#32CD32', // Lime green for playgrounds
+          ['==', ['get', 'natural'], 'wood'], '#228B22', // Dark green for woods
+          ['==', ['get', 'natural'], 'forest'], '#228B22', // Dark green for forests
           '#90EE90' // Light green for all other land
         ],
         'fill-opacity': 0.9 
