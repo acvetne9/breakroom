@@ -45,11 +45,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       console.log(`Found ${coastlines.length} coastline features`);
 
-      for (const coastline of coastlines) {
+      coastlines.forEach(coastline => {
         try {
-          if (coastline.geometry.type !== 'LineString') continue;
-          const coords = coastline.geometry.coordinates;
-          if (coords.length < 3) continue;
+          if (coastline.geometry.type !== 'LineString') return;
+          
+          const lineGeometry = coastline.geometry as any;
+          const coords = lineGeometry.coordinates;
+          if (!coords || coords.length < 3) return;
           
           // Check if coastline forms a closed loop or can be closed
           const firstPoint = coords[0];
@@ -81,7 +83,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         } catch (err) {
           console.warn('Could not create polygon from coastline:', err);
         }
-      }
+      });
 
       // APPROACH 2: Create land by subtracting water bodies from bounding box
       try {
@@ -134,35 +136,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         });
         
         console.log(`Found ${linearWaterFeatures.length} linear water features`);
-
-        // Get coastlines - these define the boundary between land and major water bodies
-        const coastlines = geoData.features.filter(feature => 
-          feature.geometry.type === 'LineString' &&
-          feature.properties?.natural === 'coastline'
-        );
-        
-        console.log(`Found ${coastlines.length} coastline features`);
+        console.log(`Using ${coastlines.length} coastline features for water processing`);
 
         if (waterPolygons.length > 0 || linearWaterFeatures.length > 0 || coastlines.length > 0) {
           // Create a bounding box for the NYC area (matching your query bounds)
           const bbox: [number, number, number, number] = [-74.30, 40.50, -73.70, 40.93];
-          let landArea = turf.bboxPolygon(bbox);
+          let landArea: any = turf.bboxPolygon(bbox);
 
           // STRATEGY: Assume everything is water initially, then subtract known land areas
-          // This works better when you have coastlines but not explicit water polygons for bays
-
-          // Method 1: If we have coastlines, create water polygons by buffering the entire area
-          // and then subtracting small land polygons created from coastlines
           if (coastlines.length > 0) {
             try {
               // Create a large water area (the entire bounding box)
-              let waterArea = turf.bboxPolygon(bbox);
+              let waterArea: any = turf.bboxPolygon(bbox);
               
               // Try to create small land islands from closed coastline loops
-              for (const coastline of coastlines) {
+              coastlines.forEach(coastline => {
                 try {
-                  const coords = coastline.geometry.coordinates;
-                  if (coords.length < 4) continue;
+                  if (coastline.geometry.type !== 'LineString') return;
+                  
+                  const lineGeometry = coastline.geometry as any;
+                  const coords = lineGeometry.coordinates;
+                  if (!coords || coords.length < 4) return;
                   
                   // Check if this coastline segment might form a closed area
                   const firstPoint = coords[0];
@@ -178,9 +172,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                       
                       // Only subtract significant land areas (greater than 100,000 sq meters)
                       if (area > 100000) {
-                        const difference = turf.difference(waterArea, landPolygon);
-                        if (difference) {
-                          waterArea = difference;
+                        try {
+                          const difference = (turf as any).difference(waterArea, landPolygon);
+                          if (difference) {
+                            waterArea = difference;
+                          }
+                        } catch (diffErr) {
+                          console.warn('Could not subtract land polygon:', diffErr);
                         }
                       }
                     }
@@ -188,14 +186,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 } catch (err) {
                   // Continue with other coastlines
                 }
-              }
+              });
               
               // The remaining area after subtracting land is our comprehensive water body
               if (waterArea) {
                 // Now subtract this comprehensive water area from our land area
-                const difference = turf.difference(landArea as any, waterArea as any);
-                if (difference) {
-                  landArea = difference;
+                try {
+                  const difference = (turf as any).difference(landArea, waterArea);
+                  if (difference) {
+                    landArea = difference;
+                  }
+                } catch (diffErr) {
+                  console.warn('Could not subtract comprehensive water area:', diffErr);
                 }
               }
             } catch (err) {
@@ -204,32 +206,36 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
 
           // Method 2: Buffer linear water features and subtract them
-          for (const linearWater of linearWaterFeatures) {
+          linearWaterFeatures.forEach(linearWater => {
             try {
-              if (linearWater.geometry.type !== 'LineString') continue;
+              if (linearWater.geometry.type !== 'LineString') return;
               const bufferedWater = turf.buffer(linearWater, 0.0005, { units: 'degrees' }); // ~50m buffer
               if (bufferedWater) {
-                const difference = turf.difference(landArea as any, bufferedWater as any);
-                if (difference) {
-                  landArea = difference as any;
+                try {
+                  const difference = (turf as any).difference(landArea, bufferedWater);
+                  if (difference) {
+                    landArea = difference;
+                  }
+                } catch (diffErr) {
+                  console.warn('Could not subtract buffered water:', diffErr);
                 }
               }
             } catch (err) {
-              console.warn('Could not buffer and subtract linear water feature:', err);
+              console.warn('Could not buffer linear water feature:', err);
             }
-          }
+          });
 
           // Method 3: Subtract explicit polygonal water bodies
-          for (const waterFeature of waterPolygons) {
+          waterPolygons.forEach(waterFeature => {
             try {
-              const difference = turf.difference(landArea as any, waterFeature as any);
+              const difference = (turf as any).difference(landArea, waterFeature);
               if (difference) {
-                landArea = difference as any;
+                landArea = difference;
               }
             } catch (err) {
               console.warn('Could not subtract water body:', err);
             }
-          }
+          });
 
           // Add the resulting land mass
           if (landArea) {
@@ -241,7 +247,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 waterFeaturesProcessed: waterPolygons.length + linearWaterFeatures.length,
                 coastlinesProcessed: coastlines.length
               }
-            } as any);
+            });
           }
         }
       } catch (err) {
@@ -401,6 +407,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           paint: {
             'fill-color': '#4CAF50',
             'fill-opacity': 0.7
+          }
+        });
+
+        // --- CEMETERIES (green overlay on land)
+        mapInstance!.addLayer({
+          id: 'cemeteries',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['==', 'landuse', 'cemetery'] as any,
+          paint: {
+            'fill-color': '#4CAF50',
+            'fill-opacity': 0.6
           }
         });
 
