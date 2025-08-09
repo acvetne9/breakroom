@@ -1,540 +1,279 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import type { FeatureCollection, Polygon, Feature } from 'geojson';
-import { bbox } from '@turf/turf';
+import type { Feature, FeatureCollection, Polygon, MultiPolygon, LineString } from 'geojson';
 import maplibregl from 'maplibre-gl';
-import Supercluster from 'supercluster';
-import * as turf from '@turf/turf';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
+// Turf imports (no wildcard import, fixes TS2554 issues)
+import buffer from '@turf/buffer';
+import union from '@turf/union';
+import difference from '@turf/difference';
+import bbox from '@turf/bbox';
+
+// Props interface combining both functionalities
 interface MapLibreMapProps {
-  onMapLoad?: (map: maplibregl.Map) => void;
-  businesses?: Array<{
+  // Business data from first script
+  businesses: {
     id: string;
     name: string;
     position: { lat: number; lng: number };
     atmosphere: string[];
     salary?: string;
-  }>;
+    stories?: { id: string; text: string; author: string }[];
+    businessType?: string;
+    roles?: {
+      role: string;
+      salary: string;
+      upvotes?: number;
+      downvotes?: number;
+      userVote?: 'up' | 'down';
+    }[];
+    place_id?: string;
+  }[];
   onBusinessClick?: (business: any) => void;
-  selectedBusiness?: { position: { lat: number; lng: number } } | null;
+  selectedBusiness?: any;
+  
+  // Geographic data from second script
+  roadsData: FeatureCollection<LineString>;
+  landData: FeatureCollection<Polygon | MultiPolygon>;
+  waterData: FeatureCollection<Polygon | MultiPolygon>;
 }
 
-// Enhanced road processing function that buffers line geometries into polygons
-
-// Enhanced road processing function that buffers ALL line geometries
-const processRoadGeometry = (geojsonData: any): FeatureCollection<Polygon> => {
-  console.log('Processing road geometry - buffering all lines into gray polygons...');
-  
-  if (!geojsonData?.features) {
-    console.warn('No features found in GeoJSON data');
-    return { type: 'FeatureCollection', features: [] };
-  }
-
-  const bufferedFeatures: Feature<Polygon>[] = [];
-  
-  geojsonData.features.forEach((feature: any, index: number) => {
-    try {
-      const geomType = feature.geometry?.type;
-      
-      // Process LineString and MultiLineString geometries
-      if (geomType === 'LineString' || geomType === 'MultiLineString') {
-        console.log(`Buffering ${geomType} feature ${index}`);
-        
-        // Determine buffer width based on road type (if available)
-        const highway = feature.properties?.highway;
-        let bufferWidth = 3; // Default width in meters
-        
-        switch (highway) {
-          case 'motorway':
-          case 'trunk':
-            bufferWidth = 8;
-            break;
-          case 'primary':
-            bufferWidth = 6;
-            break;
-          case 'secondary':
-            bufferWidth = 5;
-            break;
-          case 'tertiary':
-            bufferWidth = 4;
-            break;
-          case 'residential':
-          case 'service':
-            bufferWidth = 3;
-            break;
-          case 'footway':
-          case 'path':
-            bufferWidth = 1.5;
-            break;
-          default:
-            bufferWidth = 3;
-        }
-        
-        const buffered = turf.buffer(feature, bufferWidth, { units: 'meters' });
-        
-        if (buffered && buffered.geometry) {
-          // Handle both Polygon and MultiPolygon results from buffer
-          if (buffered.geometry.type === 'Polygon') {
-            bufferedFeatures.push({
-              type: 'Feature',
-              geometry: buffered.geometry as Polygon,
-              properties: {
-                name: feature.properties?.name || '',
-                highway: feature.properties?.highway || '',
-                original_type: geomType,
-                buffered: true
-              }
-            });
-          } else if (buffered.geometry.type === 'MultiPolygon') {
-            // Convert MultiPolygon to multiple Polygon features
-            buffered.geometry.coordinates.forEach((polygonCoords: any, polyIndex: number) => {
-              bufferedFeatures.push({
-                type: 'Feature',
-                geometry: {
-                  type: 'Polygon',
-                  coordinates: polygonCoords
-                },
-                properties: {
-                  name: feature.properties?.name || '',
-                  highway: feature.properties?.highway || '',
-                  original_type: geomType,
-                  buffered: true,
-                  multi_part: polyIndex
-                }
-              });
-            });
-          }
-        }
-      }
-      // Also include existing polygon features if any
-      else if (geomType === 'Polygon') {
-        console.log(`Including existing polygon feature ${index}`);
-        bufferedFeatures.push({
-          type: 'Feature',
-          geometry: feature.geometry,
-          properties: {
-            ...feature.properties,
-            original_type: geomType,
-            buffered: false
-          }
-        });
-      }
-      else if (geomType === 'MultiPolygon') {
-        console.log(`Converting MultiPolygon feature ${index} to individual polygons`);
-        feature.geometry.coordinates.forEach((polygonCoords: any, polyIndex: number) => {
-          bufferedFeatures.push({
-            type: 'Feature',
-            geometry: {
-              type: 'Polygon',
-              coordinates: polygonCoords
-            },
-            properties: {
-              ...feature.properties,
-              original_type: geomType,
-              buffered: false,
-              multi_part: polyIndex
-            }
-          });
-        });
-      }
-      
-    } catch (err) {
-      console.warn(`Buffer failed for feature ${index}:`, err);
-    }
-  });
-
-  console.log(`Processed ${geojsonData.features.length} input features into ${bufferedFeatures.length} polygon features`);
-  
-  return {
-    type: 'FeatureCollection',
-    features: bufferedFeatures
-  };
-};
-
 const MapLibreMap: React.FC<MapLibreMapProps> = ({ 
-  onMapLoad, 
-  businesses = [], 
+  businesses, 
   onBusinessClick, 
-  selectedBusiness
+  selectedBusiness,
+  roadsData, 
+  landData, 
+  waterData 
 }) => {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const [map, setMap] = useState<maplibregl.Map | null>(null);
-  const [markers, setMarkers] = useState<maplibregl.Marker[]>([]);
-  const [currentZoom, setCurrentZoom] = useState<number>(14);
-  const clusterRef = useRef<Supercluster | null>(null);
-  
-  const MARKER_VISIBILITY_ZOOM_THRESHOLD = 13;
+  const mapContainer = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
-  // Optimized function to load GeoJSON data
-  const loadGeoJSONData = useCallback(async (): Promise<any> => {
-    try {
-      console.log('Loading GeoJSON data...');
-      
-      const response = await fetch('/data/merged_roads.geojson.gz', {
-        headers: {
-          'Accept': 'application/json, application/gzip, */*'
-        }
-      });
-      
-      if (!response.ok) {
-        console.error('Failed to load GeoJSON:', response.statusText);
-        return null;
-      }
-      
-      // Simple decompression for .gz files
-      const text = await response.text();
-      
-      // Check if it's already JSON
-      if (text.trim().startsWith('{')) {
-        return JSON.parse(text);
-      }
-      
-      // Handle gzipped content
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      if (bytes[0] === 0x1f && bytes[1] === 0x8b && 'DecompressionStream' in window) {
-        const stream = new ReadableStream({
-          start(controller) {
-            controller.enqueue(bytes);
-            controller.close();
-          }
-        });
-        
-        const decompressedStream = stream.pipeThrough(new (window as any).DecompressionStream('gzip'));
-        const decompressedResponse = new Response(decompressedStream);
-        const decompressedText = await decompressedResponse.text();
-        return JSON.parse(decompressedText);
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Error loading GeoJSON:', error);
-      return null;
+  // Convert lines (roads, bridges, tunnels) to polygons
+  const convertLinesToPolygons = useCallback((lineFeatures: FeatureCollection<LineString>) => {
+    const buffered: Feature<Polygon>[] = lineFeatures.features.map(line =>
+      buffer(line, 5, { units: 'meters' }) as Feature<Polygon>
+    );
+
+    // Merge into one polygon feature
+    let merged: Feature<Polygon | MultiPolygon> | null = null;
+    for (const poly of buffered) {
+      merged = merged ? (union(merged, poly) as Feature<Polygon | MultiPolygon>) : poly;
     }
+
+    return merged;
   }, []);
 
-  // Handle zoom change - removed as it was causing re-renders
+  // Merge all land into single feature
+  const mergeLand = useCallback((fc: FeatureCollection<Polygon | MultiPolygon>) => {
+    let merged: Feature<Polygon | MultiPolygon> | null = null;
+    for (const feat of fc.features) {
+      merged = merged ? (union(merged, feat) as Feature<Polygon | MultiPolygon>) : feat;
+    }
+    return merged;
+  }, []);
 
-  // Initialize map with merged roads GeoJSON data
+  // Merge all water into single feature
+  const mergeWater = useCallback((fc: FeatureCollection<Polygon | MultiPolygon>) => {
+    let merged: Feature<Polygon | MultiPolygon> | null = null;
+    for (const feat of fc.features) {
+      merged = merged ? (union(merged, feat) as Feature<Polygon | MultiPolygon>) : feat;
+    }
+    return merged;
+  }, []);
+
+  // Initialize map
   useEffect(() => {
-    if (!mapRef.current) return;
-    
-    console.log('MapLibre: Initializing map with buffered roads...');
-    let mapInstance: maplibregl.Map | null = null;
-    let isCleanedUp = false;
+    if (!mapContainer.current) return;
 
-    const initializeMap = async () => {
-      try {
-        console.log('=== MAP INITIALIZATION START ===');
-        
-        // Create a basic map first
-        console.log('Creating basic OSM map first...');
-        mapInstance = new maplibregl.Map({
-          container: mapRef.current!,
-          style: {
-            version: 8,
-            sources: {
-              'osm': {
-                type: 'raster',
-                tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-                tileSize: 256,
-                attribution: '© OpenStreetMap contributors'
-              }
-            },
-            layers: [
-              {
-                id: 'osm-tiles',
-                type: 'raster',
-                source: 'osm'
-              }
-            ]
-          },
-          center: [-73.9712, 40.7831],
-          zoom: 14,
-          maxBounds: [
-            [-74.2557, 40.4960],
-            [-73.7004, 40.9152]
-          ]
-        });
+    mapRef.current = new maplibregl.Map({
+      container: mapContainer.current,
+      style: {
+        version: 8,
+        sources: {},
+        layers: []
+      },
+      center: [-74.006, 40.7128],
+      zoom: 11
+    });
 
-        console.log('Basic map created, waiting for load...');
-
-        mapInstance.on('load', async () => {
-          console.log('Basic map loaded successfully!');
-          
-          try {
-            // Load and process roads GeoJSON data immediately
-            console.log('Loading and processing roads GeoJSON data...');
-            const geojsonData = await loadGeoJSONData();
-            
-            if (isCleanedUp) {
-              console.log('MapLibre: Initialization cancelled due to cleanup');
-              return;
-            }
-            
-            if (!geojsonData) {
-              console.warn('No GeoJSON data available, keeping basic OSM map');
-              if (!isCleanedUp) {
-                setMap(mapInstance);
-                onMapLoad?.(mapInstance);
-              }
-              return;
-            }
-
-            // Process the data for buffering
-            const bufferedRoadsData = processRoadGeometry(geojsonData);
-            
-            if (!bufferedRoadsData.features.length) {
-              console.warn('No processed road features available');
-              if (!isCleanedUp) {
-                setMap(mapInstance);
-                onMapLoad?.(mapInstance);
-              }
-              return;
-            }
-
-            console.log(`Adding ${bufferedRoadsData.features.length} buffered road features to map...`);
-
-            // Add the buffered roads GeoJSON as a source
-            mapInstance!.addSource('buffered-roads', {
-              type: 'geojson',
-              data: bufferedRoadsData
-            });
-
-            // Add the main gray road polygons layer
-            mapInstance!.addLayer({
-              id: 'buffered-roads-fill',
-              type: 'fill',
-              source: 'buffered-roads',
-              paint: {
-                'fill-color': '#777777',
-                'fill-opacity': 1.0
-              }
-            });
-
-            // Add road outlines for better definition
-            mapInstance!.addLayer({
-              id: 'buffered-roads-outline',
-              type: 'line',
-              source: 'buffered-roads',
-              paint: {
-                'line-color': '#444444',
-                'line-width': [
-                  'interpolate',
-                  ['linear'],
-                  ['zoom'],
-                  10, 0.5,
-                  15, 1.0,
-                  18, 1.5
-                ],
-                'line-opacity': 0.8
-              }
-            });
-
-            console.log('Road layers added successfully!');
-
-          } catch (dataError) {
-            console.error('Error adding buffered roads data to map:', dataError);
-          }
-          
-          if (!isCleanedUp) {
-            setMap(mapInstance);
-            onMapLoad?.(mapInstance);
-          }
-        });
-
-        // Add zoom change listener
-        const zoomHandler = () => {
-          if (mapInstance) {
-            const zoom = mapInstance.getZoom();
-            setCurrentZoom(zoom);
-          }
-        };
-        mapInstance.on('zoom', zoomHandler);
-
-        // Error handling
-        mapInstance.on('error', (e) => {
-          console.error('MapLibre: Map error:', e);
-        });
-
-        console.log('MapLibre: Map instance created, waiting for load event');
-
-      } catch (error) {
-        console.error('MapLibre: Error during initialization:', error);
-      }
-    };
-
-    initializeMap();
+    mapRef.current.on('load', () => {
+      setMapLoaded(true);
+    });
 
     return () => {
-      console.log('MapLibre: Cleanup function called');
-      isCleanedUp = true;
-      
-      // Cleanup function
-      try {
-        if (mapInstance && mapInstance.getContainer()) {
-          console.log('MapLibre: Removing map instance');
-          mapInstance.remove();
-        }
-      } catch (error) {
-        console.warn('MapLibre: Error cleaning up map:', error);
-      }
-      mapInstance = null;
-      setMap(null);
+      mapRef.current?.remove();
     };
-  }, []); // No dependencies needed since we load from local file
+  }, []);
 
-  // Create marker clustering
+  // Add geographic data layers (land, water, roads) once map is loaded
   useEffect(() => {
-    if (!map || !businesses.length) return;
+    if (!mapLoaded || !mapRef.current) return;
 
-    // Clear existing markers
-    markers.forEach(marker => marker.remove());
+    const map = mapRef.current;
 
-    // Prepare data for clustering
-    const points = businesses.map(business => ({
+    // 1. Merge land & water
+    const landFeature = mergeLand(landData);
+    const waterFeature = mergeWater(waterData);
+
+    // 2. Remove water from land
+    let nycLand = landFeature;
+    if (landFeature && waterFeature) {
+      nycLand = difference(landFeature, waterFeature) as Feature<Polygon | MultiPolygon>;
+    }
+
+    // 3. Convert roads to polygons
+    const roadsPolygon = convertLinesToPolygons(roadsData);
+
+    // 4. Add land layer
+    if (nycLand) {
+      map.addSource('nyc-land', {
+        type: 'geojson',
+        data: nycLand
+      });
+      map.addLayer({
+        id: 'nyc-land-fill',
+        type: 'fill',
+        source: 'nyc-land',
+        paint: {
+          'fill-color': '#d9d9d9', // light gray
+          'fill-opacity': 1
+        }
+      });
+    }
+
+    // 5. Add water layer
+    if (waterFeature) {
+      map.addSource('nyc-water', {
+        type: 'geojson',
+        data: waterFeature
+      });
+      map.addLayer({
+        id: 'nyc-water-fill',
+        type: 'fill',
+        source: 'nyc-water',
+        paint: {
+          'fill-color': '#4da6ff', // blue
+          'fill-opacity': 1
+        }
+      });
+    }
+
+    // 6. Add roads polygons
+    if (roadsPolygon) {
+      map.addSource('nyc-roads', {
+        type: 'geojson',
+        data: roadsPolygon
+      });
+      map.addLayer({
+        id: 'nyc-roads-fill',
+        type: 'fill',
+        source: 'nyc-roads',
+        paint: {
+          'fill-color': '#bfbfbf', // darker gray
+          'fill-opacity': 1
+        }
+      });
+    }
+
+    // Fit map to all data
+    if (nycLand) {
+      const bounds = bbox(nycLand) as [number, number, number, number];
+      map.fitBounds(bounds, { padding: 50 });
+    }
+  }, [mapLoaded, roadsData, landData, waterData, mergeLand, mergeWater, convertLinesToPolygons]);
+
+  // Add business markers to the map
+  useEffect(() => {
+    if (!mapLoaded || !businesses || !mapRef.current) return;
+    const map = mapRef.current;
+
+    // Remove existing business markers
+    const existingMarkers = map.getSource('businesses');
+    if (existingMarkers) {
+      map.removeLayer('businesses-layer');
+      map.removeSource('businesses');
+    }
+
+    // Create GeoJSON from businesses
+    const businessFeatures = businesses.map(business => ({
       type: 'Feature' as const,
-      properties: {
-        cluster: false,
-        business
-      },
       geometry: {
         type: 'Point' as const,
         coordinates: [business.position.lng, business.position.lat]
+      },
+      properties: {
+        id: business.id,
+        name: business.name,
+        businessType: business.businessType || 'unknown'
       }
     }));
 
-    // Initialize supercluster
-    const cluster = new Supercluster({
-      radius: 80,
-      maxZoom: 12
+    const businessFC = {
+      type: 'FeatureCollection' as const,
+      features: businessFeatures
+    };
+
+    // Add business source and layer (on top of other layers)
+    map.addSource('businesses', {
+      type: 'geojson',
+      data: businessFC
     });
 
-    cluster.load(points);
-    clusterRef.current = cluster;
-
-    // Get clusters for current view
-    const bounds = map.getBounds();
-    const zoom = Math.floor(map.getZoom());
-    
-    const clusters = cluster.getClusters(
-      [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()],
-      zoom
-    );
-
-    const newMarkers: maplibregl.Marker[] = [];
-
-    clusters.forEach(cluster => {
-      const [lng, lat] = cluster.geometry.coordinates;
-      
-      if (cluster.properties.cluster) {
-        // Could add cluster markers here if needed
-      } else {
-        // Create individual business marker
-        const el = document.createElement('div');
-        el.className = 'business-marker';
-        el.style.cssText = `
-          background: #FFEB3B;
-          border: 2px solid #FFC107;
-          border-radius: 50%;
-          width: 16px;
-          height: 16px;
-          cursor: pointer;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-          z-index: 1000;
-        `;
-        
-        const marker = new maplibregl.Marker({ element: el })
-          .setLngLat([lng, lat])
-          .addTo(map);
-
-        // Add click handler
-        el.addEventListener('click', () => {
-          onBusinessClick?.(cluster.properties.business);
-        });
-
-        newMarkers.push(marker);
+    map.addLayer({
+      id: 'businesses-layer',
+      type: 'circle',
+      source: 'businesses',
+      paint: {
+        'circle-radius': 8,
+        'circle-color': '#3B82F6', // blue
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#FFFFFF' // white
       }
     });
 
-    setMarkers(newMarkers);
-
-    // Update markers on map move
-    const updateMarkers = () => {
-      // Clear existing markers
-      newMarkers.forEach(marker => marker.remove());
-      
-      // Get new clusters
-      const bounds = map.getBounds();
-      const zoom = Math.floor(map.getZoom());
-      
-      const clusters = cluster.getClusters(
-        [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()],
-        zoom
-      );
-
-      const updatedMarkers: maplibregl.Marker[] = [];
-
-      clusters.forEach(cluster => {
-        const [lng, lat] = cluster.geometry.coordinates;
-        
-        if (!cluster.properties.cluster) {
-          const el = document.createElement('div');
-          el.className = 'business-marker';
-          el.style.cssText = `
-            background: #FFEB3B;
-            border: 2px solid #FFC107;
-            border-radius: 50%;
-            width: 16px;
-            height: 16px;
-            cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-            z-index: 1000;
-          `;
-          
-          const marker = new maplibregl.Marker({ element: el })
-            .setLngLat([lng, lat])
-            .addTo(map);
-
-          el.addEventListener('click', () => {
-            onBusinessClick?.(cluster.properties.business);
-          });
-
-          updatedMarkers.push(marker);
+    // Add click handler for businesses
+    if (onBusinessClick) {
+      map.on('click', 'businesses-layer', (e) => {
+        if (e.features && e.features[0]) {
+          const businessId = e.features[0].properties?.id;
+          const business = businesses.find(b => b.id === businessId);
+          if (business) {
+            onBusinessClick(business);
+          }
         }
       });
+    }
 
-      setMarkers(updatedMarkers);
-    };
-
-    map.on('moveend', updateMarkers);
-    map.on('zoomend', updateMarkers);
-
-    return () => {
-      map.off('moveend', updateMarkers);
-      map.off('zoomend', updateMarkers);
-      newMarkers.forEach(marker => marker.remove());
-    };
-  }, [map, businesses, onBusinessClick, currentZoom]);
-
-  // Center map on selected business
-  useEffect(() => {
-    if (!map || !selectedBusiness?.position) return;
-    
-    map.easeTo({
-      center: [selectedBusiness.position.lng, selectedBusiness.position.lat],
-      zoom: 16
+    // Change cursor on hover
+    map.on('mouseenter', 'businesses-layer', () => {
+      map.getCanvas().style.cursor = 'pointer';
     });
-  }, [map, selectedBusiness]);
 
-  return (
-    <div 
-      ref={mapRef} 
-      className="absolute inset-0 w-full h-full"
-      style={{ 
-        zIndex: 1,
-      }}
-    />
-  );
+    map.on('mouseleave', 'businesses-layer', () => {
+      map.getCanvas().style.cursor = '';
+    });
+
+  }, [mapLoaded, businesses, onBusinessClick]);
+
+  // Handle selected business highlighting
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return;
+    const map = mapRef.current;
+
+    // Update business layer styling based on selection
+    if (map.getLayer('businesses-layer') && selectedBusiness) {
+      map.setPaintProperty('businesses-layer', 'circle-color', [
+        'case',
+        ['==', ['get', 'id'], selectedBusiness.id],
+        '#EF4444', // red for selected
+        '#3B82F6'  // blue for unselected
+      ]);
+    }
+  }, [mapLoaded, selectedBusiness]);
+
+  return <div ref={mapContainer} style={{ width: '100%', height: '100%' }} />;
 };
 
 export default MapLibreMap;
