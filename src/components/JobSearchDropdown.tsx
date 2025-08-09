@@ -68,7 +68,6 @@ const JobSearchDropdown: React.FC<JobSearchDropdownProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setSearchTerm(newValue);
-    onChange(newValue);
     setIsOpen(true);
   };
 
@@ -80,13 +79,15 @@ const JobSearchDropdown: React.FC<JobSearchDropdownProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Escape') {
       setIsOpen(false);
       setSearchTerm('');
-      onBlur?.();
-    } else if (e.key === 'Escape') {
-      setIsOpen(false);
-      setSearchTerm('');
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      // Only select if there's exactly one filtered option
+      if (filteredOptions.length === 1) {
+        handleOptionSelect(filteredOptions[0]);
+      }
     }
   };
 
@@ -132,13 +133,9 @@ const JobSearchDropdown: React.FC<JobSearchDropdownProps> = ({
                 {option}
               </button>
             ))
-          ) : searchTerm ? (
-            <div className="px-3 py-2 text-app-gray-medium text-sm">
-              Press Enter to use "{searchTerm}"
-            </div>
           ) : (
             <div className="px-3 py-2 text-app-gray-medium text-sm">
-              No matching jobs found
+              No matching jobs found - please select from available options
             </div>
           )}
         </div>
