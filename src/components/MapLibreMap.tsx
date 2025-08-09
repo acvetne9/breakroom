@@ -1,12 +1,7 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import type { Feature, FeatureCollection, Polygon, MultiPolygon, LineString } from 'geojson';
+import React, { useEffect, useRef, useState } from 'react';
+import type { FeatureCollection, Polygon, MultiPolygon, LineString } from 'geojson';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-
-// Turf imports
-import buffer from '@turf/buffer';
-import union from '@turf/union';
-import difference from '@turf/difference';
 import bbox from '@turf/bbox';
 
 interface MapLibreMapProps {
@@ -48,47 +43,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [mapLoaded, setMapLoaded] = useState(false);
 
   // Dynamic color from feature property or fallback
-  const getFeatureColor = (fallback: string) => [
+  const getFeatureColor = (fallback: string): any => [
     'case',
     ['has', 'color'],
     ['get', 'color'],
     fallback
   ];
 
-  // Convert lines to polygons
-  const convertLinesToPolygons = useCallback((lineFeatures: FeatureCollection<LineString>) => {
-    if (!lineFeatures?.features?.length) return null;
-
-    const buffered: Feature<Polygon>[] = lineFeatures.features.map(line =>
-      buffer(line, 5, { units: 'meters' }) as Feature<Polygon>
-    );
-
-    let merged: Feature<Polygon | MultiPolygon> | null = null;
-    for (const poly of buffered) {
-      merged = merged ? (union(merged, poly) as Feature<Polygon | MultiPolygon>) : poly;
-    }
-    return merged;
-  }, []);
-
-  // Merge all land
-  const mergeLand = useCallback((fc: FeatureCollection<Polygon | MultiPolygon>) => {
-    if (!fc?.features?.length) return null;
-    let merged: Feature<Polygon | MultiPolygon> | null = null;
-    for (const feat of fc.features) {
-      merged = merged ? (union(merged, feat) as Feature<Polygon | MultiPolygon>) : feat;
-    }
-    return merged;
-  }, []);
-
-  // Merge all water
-  const mergeWater = useCallback((fc: FeatureCollection<Polygon | MultiPolygon>) => {
-    if (!fc?.features?.length) return null;
-    let merged: Feature<Polygon | MultiPolygon> | null = null;
-    for (const feat of fc.features) {
-      merged = merged ? (union(merged, feat) as Feature<Polygon | MultiPolygon>) : feat;
-    }
-    return merged;
-  }, []);
 
   // Initialize map
   useEffect(() => {
@@ -116,79 +77,58 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Add geographic data layers
   useEffect(() => {
-    if (
-      !mapLoaded ||
-      !mapRef.current ||
-      !roadsData?.features?.length ||
-      !landData?.features?.length ||
-      !waterData?.features?.length
-    ) {
-      return;
-    }
+    if (!mapLoaded || !mapRef.current) return;
 
     const map = mapRef.current;
 
-    // Merge land and water
-    const landFeature = mergeLand(landData);
-    const waterFeature = mergeWater(waterData);
-
-    // Remove water from land
-    let nycLand = landFeature;
-    if (landFeature && waterFeature) {
-      nycLand = difference(landFeature, waterFeature) as Feature<Polygon | MultiPolygon>;
-    }
-
-    // Convert roads to polygons
-    const roadsPolygon = convertLinesToPolygons(roadsData);
-
-    // Land layer
-    if (nycLand) {
-      map.addSource('nyc-land', { type: 'geojson', data: nycLand });
+    // Add land layer
+    if (landData?.features?.length) {
+      map.addSource('nyc-land', { type: 'geojson', data: landData });
       map.addLayer({
         id: 'nyc-land-fill',
         type: 'fill',
         source: 'nyc-land',
         paint: {
-          'fill-color': getFeatureColor('#d9d9d9'),
+          'fill-color': '#d9d9d9',
           'fill-opacity': 1
         }
       });
     }
 
-    // Water layer
-    if (waterFeature) {
-      map.addSource('nyc-water', { type: 'geojson', data: waterFeature });
+    // Add water layer
+    if (waterData?.features?.length) {
+      map.addSource('nyc-water', { type: 'geojson', data: waterData });
       map.addLayer({
         id: 'nyc-water-fill',
         type: 'fill',
         source: 'nyc-water',
         paint: {
-          'fill-color': getFeatureColor('#4da6ff'),
+          'fill-color': '#4da6ff',
           'fill-opacity': 1
         }
       });
     }
 
-    // Roads layer
-    if (roadsPolygon) {
-      map.addSource('nyc-roads', { type: 'geojson', data: roadsPolygon });
+    // Add roads layer
+    if (roadsData?.features?.length) {
+      map.addSource('nyc-roads', { type: 'geojson', data: roadsData });
       map.addLayer({
-        id: 'nyc-roads-fill',
-        type: 'fill',
+        id: 'nyc-roads-line',
+        type: 'line',
         source: 'nyc-roads',
         paint: {
-          'fill-color': getFeatureColor('#bfbfbf'),
-          'fill-opacity': 1
+          'line-color': '#bfbfbf',
+          'line-width': 1
         }
       });
     }
 
-    // Fit map to land
-    if (nycLand) {
-      const bounds = bbox(nycLand) as [number, number, number, number];
+    // Fit map to land if available
+    if (landData?.features?.length) {
+      const bounds = bbox(landData) as [number, number, number, number];
       map.fitBounds(bounds, { padding: 50 });
     }
-  }, [mapLoaded, roadsData, landData, waterData, mergeLand, mergeWater, convertLinesToPolygons]);
+  }, [mapLoaded, roadsData, landData, waterData]);
 
   // Add business markers
 useEffect(() => {
