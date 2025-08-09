@@ -57,6 +57,310 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, []);
 
+  // CEMETERY DETECTION STRATEGIES
+  
+  // Strategy 1: Direct cemetery layer from main data
+  const addDirectCemeteryLayer = useCallback((mainData: FeatureCollection) => {
+    if (!map || !mapLoaded) return;
+    
+    // Remove existing layers if they exist
+    if (map.getLayer('cemeteries-layer')) map.removeLayer('cemeteries-layer');
+    if (map.getLayer('cemeteries-border')) map.removeLayer('cemeteries-border');
+    
+    // Add cemetery layer from main geojson data
+    map.addLayer({
+      id: 'cemeteries-layer',
+      type: 'fill',
+      source: 'geojson-data', // Using the main data source
+      filter: [
+        'any',
+        // Check for cemetery in name (case insensitive)
+        ['in', 'cemetery', ['downcase', ['coalesce', ['get', 'name'], '']]],
+        ['in', 'calvary', ['downcase', ['coalesce', ['get', 'name'], '']]],
+        ['in', 'green-wood', ['downcase', ['coalesce', ['get', 'name'], '']]],
+        ['in', 'greenwood', ['downcase', ['coalesce', ['get', 'name'], '']]],
+        ['in', 'woodlawn', ['downcase', ['coalesce', ['get', 'name'], '']]],
+        ['in', 'evergreen', ['downcase', ['coalesce', ['get', 'name'], '']]],
+        ['in', 'cypress', ['downcase', ['coalesce', ['get', 'name'], '']]],
+        // Also check for common cemetery patterns
+        ['in', 'memorial', ['downcase', ['coalesce', ['get', 'name'], '']]],
+        ['in', 'rest', ['downcase', ['coalesce', ['get', 'name'], '']]], 
+        ['in', 'mount', ['downcase', ['coalesce', ['get', 'name'], '']]], 
+        ['in', 'saint', ['downcase', ['coalesce', ['get', 'name'], '']]], 
+        ['in', 'holy', ['downcase', ['coalesce', ['get', 'name'], '']]]
+      ],
+      paint: {
+        'fill-color': '#2E7D32', // Dark green
+        'fill-opacity': 0.9
+      }
+    });
+    
+    // Add cemetery borders for better visibility
+    map.addLayer({
+      id: 'cemeteries-border',
+      type: 'line',
+      source: 'geojson-data',
+      filter: [
+        'any',
+        ['in', 'cemetery', ['downcase', ['coalesce', ['get', 'name'], '']]],
+        ['in', 'calvary', ['downcase', ['coalesce', ['get', 'name'], '']]],
+        ['in', 'green-wood', ['downcase', ['coalesce', ['get', 'name'], '']]],
+        ['in', 'greenwood', ['downcase', ['coalesce', ['get', 'name'], '']]],
+        ['in', 'woodlawn', ['downcase', ['coalesce', ['get', 'name'], '']]],
+        ['in', 'evergreen', ['downcase', ['coalesce', ['get', 'name'], '']]],
+        ['in', 'cypress', ['downcase', ['coalesce', ['get', 'name'], '']]]
+      ],
+      paint: {
+        'line-color': '#1B5E20', // Darker green border
+        'line-width': 2
+      }
+    });
+
+    console.log('Strategy 1: Direct cemetery layer added');
+  }, [map, mapLoaded]);
+
+  // Strategy 2: Comprehensive cemetery detection
+  const findAndColorCemeteries = useCallback((mainData: FeatureCollection) => {
+    if (!map || !mapLoaded) return;
+    
+    // Find ALL features that might be cemeteries using multiple criteria
+    const potentialCemeteries = mainData.features.filter(feature => {
+      const props = feature.properties;
+      if (!props) return false;
+      
+      // Check geometry type - cemeteries can be points or polygons
+      const isValidGeometry = ['Point', 'Polygon', 'MultiPolygon'].includes(feature.geometry.type);
+      if (!isValidGeometry) return false;
+      
+      const name = props.name ? props.name.toLowerCase() : '';
+      
+      return (
+        // Direct cemetery mentions
+        name.includes('cemetery') ||
+        name.includes('cemetary') || // Common misspelling
+        name.includes('burial') ||
+        name.includes('graveyard') ||
+        
+        // Famous NYC cemeteries by name
+        name.includes('green-wood') ||
+        name.includes('greenwood') ||
+        name.includes('calvary') ||
+        name.includes('woodlawn') ||
+        name.includes('evergreens') ||
+        name.includes('cypress hills') ||
+        name.includes('mount hebron') ||
+        name.includes('beth david') ||
+        name.includes('mount richmond') ||
+        name.includes('moravian') ||
+        name.includes('fresh pond') ||
+        name.includes('mount judah') ||
+        
+        // Religious/memorial keywords
+        name.includes('memorial park') ||
+        name.includes('rest') && (name.includes('park') || name.includes('land')) ||
+        name.includes('mount ') && (name.includes('olivet') || name.includes('zion') || name.includes('carmel')) ||
+        (name.includes('saint') || name.includes('st.') || name.includes('st ')) && name.includes('cemetery') ||
+        name.includes('holy') && (name.includes('cross') || name.includes('sepulchre')) ||
+        
+        // Check if leisure property hints at cemetery
+        props.leisure === 'cemetery' || // Just in case this exists
+        
+        // Check natural property
+        props.natural === 'cemetery' || // Just in case this exists
+        
+        // Highway/area designations that might indicate cemeteries
+        (props.highway && props.highway.includes('cemetery'))
+      );
+    });
+    
+    console.log(`Strategy 2: Found ${potentialCemeteries.length} potential cemetery features:`, 
+                potentialCemeteries.map(f => ({ name: f.properties?.name, geometry: f.geometry.type })));
+    
+    if (potentialCemeteries.length > 0) {
+      // Create a separate geojson source for cemeteries
+      const cemeteryFC = {
+        type: 'FeatureCollection' as const,
+        features: potentialCemeteries
+      };
+      
+      // Remove existing cemetery layers if they exist
+      if (map.getLayer('dedicated-cemeteries')) map.removeLayer('dedicated-cemeteries');
+      if (map.getLayer('dedicated-cemeteries-border')) map.removeLayer('dedicated-cemeteries-border');
+      if (map.getLayer('dedicated-cemeteries-points')) map.removeLayer('dedicated-cemeteries-points');
+      if (map.getSource('cemetery-data')) map.removeSource('cemetery-data');
+      
+      // Add cemetery source
+      map.addSource('cemetery-data', {
+        type: 'geojson',
+        data: cemeteryFC
+      });
+      
+      // Add fill layer for polygon cemeteries
+      map.addLayer({
+        id: 'dedicated-cemeteries',
+        type: 'fill',
+        source: 'cemetery-data',
+        filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+        paint: {
+          'fill-color': '#2E7D32', // Dark green
+          'fill-opacity': 0.9
+        }
+      });
+      
+      // Add border for polygon cemeteries
+      map.addLayer({
+        id: 'dedicated-cemeteries-border',
+        type: 'line',
+        source: 'cemetery-data',
+        filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+        paint: {
+          'line-color': '#1B5E20', // Darker green
+          'line-width': 2
+        }
+      });
+      
+      // Add circles for point cemeteries
+      map.addLayer({
+        id: 'dedicated-cemeteries-points',
+        type: 'circle',
+        source: 'cemetery-data',
+        filter: ['==', ['geometry-type'], 'Point'],
+        paint: {
+          'circle-color': '#2E7D32',
+          'circle-radius': 6,
+          'circle-stroke-color': '#1B5E20',
+          'circle-stroke-width': 2
+        }
+      });
+    }
+  }, [map, mapLoaded]);
+
+  // Strategy 3: Brute force - check EVERY polygon feature for cemetery keywords
+  const addCemeteryOverlay = useCallback((mainData: FeatureCollection) => {
+    if (!map || !mapLoaded) return;
+    
+    // Check every single feature with a name for cemetery-like words
+    const suspiciousCemeteries = mainData.features.filter(feature => {
+      const props = feature.properties;
+      if (!props || !props.name) return false;
+      
+      const name = props.name.toLowerCase();
+      const words = name.split(/[\s\-_.,]+/); // Split on various separators
+      
+      // Cemetery-related words
+      const cemeteryWords = [
+        'cemetery', 'cemetary', 'burial', 'grave', 'tomb', 'memorial', 
+        'rest', 'eternal', 'peace', 'mount', 'calvary', 'saint', 'holy',
+        'cross', 'wood', 'lawn', 'hill', 'green', 'cypress', 'pine',
+        'oak', 'elm', 'maple', 'rose', 'garden', 'park'
+      ];
+      
+      // Check if name contains multiple cemetery-related words
+      const matchingWords = words.filter(word => 
+        cemeteryWords.some(cemWord => word.includes(cemWord) || cemWord.includes(word))
+      );
+      
+      // If multiple matches, likely a cemetery
+      return matchingWords.length >= 2 || 
+             words.some(word => ['cemetery', 'cemetary', 'calvary'].includes(word));
+    });
+    
+    console.log('Strategy 3: Suspicious cemetery features found:', 
+                suspiciousCemeteries.map(f => ({ name: f.properties?.name, geometry: f.geometry.type })));
+    
+    if (suspiciousCemeteries.length > 0) {
+      const suspiciousFC = {
+        type: 'FeatureCollection' as const,
+        features: suspiciousCemeteries
+      };
+      
+      // Clean up existing
+      if (map.getLayer('suspicious-cemeteries')) map.removeLayer('suspicious-cemeteries');
+      if (map.getSource('suspicious-cemetery-data')) map.removeSource('suspicious-cemetery-data');
+      
+      map.addSource('suspicious-cemetery-data', {
+        type: 'geojson',
+        data: suspiciousFC
+      });
+      
+      map.addLayer({
+        id: 'suspicious-cemeteries',
+        type: 'fill',
+        source: 'suspicious-cemetery-data',
+        filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+        paint: {
+          'fill-color': '#4A148C', // Purple to distinguish from regular cemeteries
+          'fill-opacity': 0.7
+        }
+      });
+    }
+  }, [map, mapLoaded]);
+
+  // Strategy 4: Geographic approach - find areas that are likely cemeteries by location
+  const findCemeteriesByLocation = useCallback((mainData: FeatureCollection) => {
+    if (!map || !mapLoaded) return;
+    
+    // Known cemetery locations in NYC (approximate coordinates)
+    const knownCemeteryAreas = [
+      { name: "Green-Wood Cemetery", center: [-73.9932, 40.6551], radius: 0.01 },
+      { name: "Calvary Cemetery", center: [-73.9057, 40.7441], radius: 0.008 },
+      { name: "Woodlawn Cemetery", center: [-73.8681, 40.8971], radius: 0.007 },
+      { name: "Cypress Hills Cemetery", center: [-73.8813, 40.6851], radius: 0.006 },
+      { name: "Evergreens Cemetery", center: [-73.9052, 40.6910], radius: 0.005 },
+      { name: "Mount Hebron Cemetery", center: [-73.8440, 40.6340], radius: 0.004 }
+    ];
+    
+    const nearCemeteryFeatures = mainData.features.filter(feature => {
+      if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
+      
+      // Get centroid of feature
+      try {
+        const centroid = turf.centroid(feature);
+        const [lng, lat] = centroid.geometry.coordinates;
+        
+        // Check if feature is near any known cemetery location
+        return knownCemeteryAreas.some(cemetery => {
+          const distance = Math.sqrt(
+            Math.pow(lng - cemetery.center[0], 2) + 
+            Math.pow(lat - cemetery.center[1], 2)
+          );
+          return distance < cemetery.radius;
+        });
+      } catch (err) {
+        return false;
+      }
+    });
+    
+    console.log(`Strategy 4: Found ${nearCemeteryFeatures.length} features near known cemetery locations:`, 
+                nearCemeteryFeatures.map(f => ({ name: f.properties?.name })));
+    
+    if (nearCemeteryFeatures.length > 0) {
+      const locationFC = {
+        type: 'FeatureCollection' as const,
+        features: nearCemeteryFeatures
+      };
+      
+      // Clean up existing
+      if (map.getLayer('location-based-cemeteries')) map.removeLayer('location-based-cemeteries');
+      if (map.getSource('location-cemetery-data')) map.removeSource('location-cemetery-data');
+      
+      map.addSource('location-cemetery-data', {
+        type: 'geojson',
+        data: locationFC
+      });
+      
+      map.addLayer({
+        id: 'location-based-cemeteries',
+        type: 'fill',
+        source: 'location-cemetery-data',
+        paint: {
+          'fill-color': '#FF6F00', // Orange to distinguish
+          'fill-opacity': 0.8
+        }
+      });
+    }
+  }, [map, mapLoaded]);
+
   const loadGeographicData = useCallback(async () => {
     try {
       // Load roads data
@@ -155,15 +459,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           name.toLowerCase().includes('wood')
         );
         console.log('All cemetery-related names found:', cemeteryNames);
-        console.log('CEMETERY_NAMES_COUNT:', cemeteryNames.length);
-        console.log('CEMETERY_NAMES_JSON:', JSON.stringify(cemeteryNames));
-        (window as any).__cemeteryNames = cemeteryNames;
         
         // Show top property combinations
         const sortedProps = Array.from(debugResults.propertyStats.entries())
           .sort((a, b) => b[1] - a[1])
           .slice(0, 30);
         console.log('Top 30 property combinations:', sortedProps);
+
+        // TRY ALL CEMETERY DETECTION STRATEGIES HERE
+        console.log('\n=== APPLYING CEMETERY DETECTION STRATEGIES ===');
+        
+        // Wait a bit for map to be ready, then apply all strategies
+        setTimeout(() => {
+          addDirectCemeteryLayer(mainData);
+          findAndColorCemeteries(mainData);
+          addCemeteryOverlay(mainData);
+          findCemeteriesByLocation(mainData);
+        }, 1000);
         
         // IMPROVED LAND DETECTION - Working with limited properties
         const landFeatures = mainData.features.filter(feature => {
@@ -277,7 +589,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     } catch (error) {
       console.error('Error loading geographic data:', error);
     }
-  }, [loadGeoJSONData]);
+  }, [loadGeoJSONData, addDirectCemeteryLayer, findAndColorCemeteries, addCemeteryOverlay, findCemeteriesByLocation]);
 
   // IMPROVED coastline-to-land conversion strategy
   const createLandFromCoastlines = useCallback((geoData: FeatureCollection): FeatureCollection<Polygon | MultiPolygon> => {
@@ -499,7 +811,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           {
             id: 'background',
             type: 'background' as const,
-            paint: { 'background-color': '#D3D3D3' } // Changed from light blue to light gray
+            paint: { 'background-color': '#D3D3D3' } // Light gray background
           }
         ]
       };
@@ -669,13 +981,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     } as any);
 
-    // Add water bodies (changed from light blue background to gray, but keeping water features dark blue)
+    // Add water bodies
     addOrUpdate('water-data', waterData, {
       id: 'water-bodies',
       type: 'fill',
       source: 'water-data',
       paint: { 
-        'fill-color': '#4A90E2', // Changed back to dark blue for water bodies
+        'fill-color': '#4A90E2', // Dark blue for water bodies
         'fill-opacity': 0.8 
       }
     } as any);
