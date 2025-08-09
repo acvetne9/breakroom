@@ -192,8 +192,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           console.log('Few explicit land features found, trying coastline-based approach...');
           const coastlineGenerated = createLandFromCoastlines(mainData);
           if (coastlineGenerated.features.length > 0) {
-            landFeatures.push(...coastlineGenerated.features);
-            console.log(`Added ${coastlineGenerated.features.length} coastline-generated land features`);
+            // Ensure all coastline-generated features are properly typed
+            const typedCoastlineFeatures = coastlineGenerated.features.filter(
+              (feature): feature is Feature<Polygon | MultiPolygon, { [name: string]: any }> => 
+                feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon'
+            );
+            landFeatures.push(...typedCoastlineFeatures);
+            console.log(`Added ${typedCoastlineFeatures.length} coastline-generated land features`);
           }
         }
         
@@ -213,9 +218,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [loadGeoJSONData]);
 
   // SIMPLIFIED coastline-to-land conversion
-  const createLandFromCoastlines = useCallback((geoData: FeatureCollection): FeatureCollection => {
+  const createLandFromCoastlines = useCallback((geoData: FeatureCollection): FeatureCollection<Polygon | MultiPolygon> => {
     try {
-      const allLandFeatures: any[] = [];
+      const allLandFeatures: Feature<Polygon | MultiPolygon, { [name: string]: any }>[] = [];
       
       // Get coastlines
       const coastlines = geoData.features.filter(feature => 
@@ -237,7 +242,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             landType: 'default-bbox',
             source: 'fallback'
           }
-        });
+        } as Feature<Polygon, { [name: string]: any }>);
         
         return {
           type: 'FeatureCollection',
@@ -276,7 +281,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                       area: area,
                       source: 'coastline-' + index
                     }
-                  });
+                  } as Feature<Polygon, { [name: string]: any }>);
                   console.log(`Created land polygon from coastline ${index}, area: ${Math.round(area)} sq meters`);
                 }
               } catch (polyErr) {
