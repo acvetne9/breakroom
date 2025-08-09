@@ -123,14 +123,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         });
         
-        // ✅ Add this block right here
         mapInstance!.addLayer({
           id: 'land',
           type: 'fill',
           source: 'geojson-data',
           filter: [
             'all',
-            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+            ['any',
+              ['==', ['geometry-type'], 'Polygon'],
+              ['==', ['geometry-type'], 'MultiPolygon']
+            ],
             ['!', [
               'any',
               ['==', ['get', 'natural'], 'water'],
@@ -149,6 +151,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'fill-opacity': 1
           }
         });
+
 
 
         // --- Water polygons from data
