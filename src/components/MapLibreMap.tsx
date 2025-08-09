@@ -112,7 +112,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         const oceanWithHoles = oceanPoly;
 
         mapInstance!.addSource('ocean', { type: 'geojson', data: oceanWithHoles });
-        mapInstance!.addSource('ocean', { type: 'geojson', data: oceanWithHoles });
         mapInstance!.addLayer({
           id: 'ocean',
           type: 'fill',
@@ -122,37 +121,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'fill-opacity': 0.7
           }
         });
-        
-        mapInstance!.addLayer({
-          id: 'land',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: [
-            'all',
-            ['any',
-              ['==', ['geometry-type'], 'Polygon'],
-              ['==', ['geometry-type'], 'MultiPolygon']
-            ],
-            ['!', [
-              'any',
-              ['==', ['get', 'natural'], 'water'],
-              ['==', ['get', 'natural'], 'sea'],
-              ['==', ['get', 'natural'], 'bay'],
-              ['==', ['get', 'water'], 'ocean'],
-              ['==', ['get', 'water'], 'bay'],
-              ['==', ['get', 'water'], 'river'],
-              ['==', ['get', 'landuse'], 'reservoir'],
-              ['==', ['get', 'waterway'], 'riverbank'],
-              ['has', 'water']
-            ]]
-          ],
-          paint: {
-            'fill-color': '#e5e5e5',
-            'fill-opacity': 1
-          }
-        });
-
-
 
         // --- Water polygons from data
         mapInstance!.addLayer({
