@@ -110,34 +110,32 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         console.log('Found park features:', parkFeatures);
         console.log('Found cemetery features:', cemeteryFeatures);
         
-        // Fix 1: Update the land features filter to properly include cemeteries
+        // IMPROVED LAND DETECTION - Working with limited properties
         const landFeatures = mainData.features.filter(feature => {
           const props = feature.properties;
           if (!props || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
           
           return (
-            // CEMETERY DETECTION - Fixed
-            props.landuse === 'cemetery' ||
-            props.amenity === 'grave_yard' ||
-            // Check for cemetery names (case-insensitive)
+            // CEMETERY DETECTION - Name-based only since we don't have landuse/amenity
             (props.name && props.name.toLowerCase().includes('cemetery')) ||
             (props.name && props.name.toLowerCase().includes('calvary')) ||
             (props.name && props.name.toLowerCase().includes('green-wood')) ||
+            (props.name && props.name.toLowerCase().includes('greenwood')) ||
             (props.name && props.name.toLowerCase().includes('woodlawn')) ||
+            (props.name && props.name.toLowerCase().includes('evergreens')) ||
+            (props.name && props.name.toLowerCase().includes('cypress hills')) ||
             
-            // Landuse categories
-            props.landuse === 'residential' ||
-            props.landuse === 'commercial' ||
-            props.landuse === 'industrial' ||
-            props.landuse === 'retail' ||
-            props.landuse === 'institutional' ||
-            props.landuse === 'education' ||
-            props.landuse === 'recreation_ground' ||
-            props.landuse === 'construction' ||
-            props.landuse === 'brownfield' ||
-            props.landuse === 'greenfield' ||
+            // Leisure areas (parks, etc.) - these we DO have
+            props.leisure === 'park' ||
+            props.leisure === 'playground' ||
+            props.leisure === 'pitch' ||
+            props.leisure === 'garden' ||
+            props.leisure === 'golf_course' ||
+            props.leisure === 'recreation_ground' ||
+            props.leisure === 'stadium' ||
+            props.leisure === 'sports_centre' ||
             
-            // Natural land areas
+            // Natural land areas - these we DO have
             props.natural === 'wood' ||
             props.natural === 'forest' ||
             props.natural === 'grassland' ||
@@ -148,121 +146,94 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             props.natural === 'scree' ||
             props.natural === 'sand' ||
             props.natural === 'beach' ||
+            props.natural === 'land' ||
             
-            // Leisure areas (parks, etc.)
-            props.leisure === 'park' ||
-            props.leisure === 'playground' ||
-            props.leisure === 'pitch' ||
-            props.leisure === 'garden' ||
-            props.leisure === 'golf_course' ||
-            props.leisure === 'recreation_ground' ||
-            props.leisure === 'stadium' ||
-            props.leisure === 'sports_centre' ||
-            
-            // Other amenities that represent land
-            props.amenity === 'university' ||
-            props.amenity === 'school' ||
-            props.amenity === 'hospital' ||
-            props.amenity === 'parking' ||
-            
-            // Transportation that represents solid ground
-            props.aeroway === 'aerodrome' ||
-            props.aeroway === 'runway' ||
-            props.aeroway === 'taxiway' ||
-            
-            // Buildings (if polygonal)
-            props.building ||
-            
-            // Administrative boundaries (often represent land areas)
-            (props.admin_level && feature.geometry.type === 'Polygon') ||
-            
-            // Places that are typically land
-            (props.place && ['city', 'town', 'village', 'hamlet', 'suburb', 'neighbourhood', 'island'].includes(props.place)) ||
-            
-            // Military areas
-            props.military ||
-            
-            // Tourism areas
-            props.tourism === 'camp_site' ||
-            props.tourism === 'caravan_site' ||
-            
-            // Historic areas
-            props.historic ||
-            
-            // Explicit land designation
-            props.natural === 'land'
+            // Name-based detection for major land features
+            (props.name && [
+              'central park', 'prospect park', 'battery park', 'bryant park', 
+              'madison square park', 'washington square park', 'riverside park',
+              'governors island', 'staten island', 'liberty island', 'ellis island'
+            ].some(landName => 
+              props.name.toLowerCase().includes(landName.toLowerCase())
+            ))
           );
         }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
         
-        // Fix 2: Improved water detection
+        // Replace the water detection section
+        // IMPROVED WATER DETECTION - Using only available properties
         const waterFeatures = mainData.features.filter(feature => {
           const props = feature.properties;
           if (!props || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
           
           return (
-            // Natural water bodies
+            // Natural water bodies - we have this
             props.natural === 'water' ||
             props.natural === 'bay' ||
             props.natural === 'strait' ||
             
-            // Waterways - riverbanks (polygonal)
-            props.waterway === 'riverbank' ||
-            props.waterway === 'dock' ||
-            
-            // Named major water bodies (FIXED - case-insensitive partial matching)
+            // Named major water bodies - FIXED for exact and partial matches
             (props.name && [
               'Upper New York Bay', 'Lower New York Bay', 'Newark Bay', 'Jamaica Bay',
               'Long Island Sound', 'Hudson River', 'East River', 'Harlem River',
               'Arthur Kill', 'Kill Van Kull', 'Raritan Bay', 'Sheepshead Bay',
               'Rockaway Inlet', 'Gowanus Canal', 'Newtown Creek'
-            ].some(waterName => 
-              props.name && props.name.toLowerCase().includes(waterName.toLowerCase())
-            )) ||
-            
-            // Water-related landuse
-            props.landuse === 'reservoir' ||
-            props.landuse === 'basin' ||
-            props.landuse === 'salt_pond' ||
-            
-            // Water-related leisure
-            props.leisure === 'marina' ||
-            props.leisure === 'swimming_pool' ||
-            
-            // Place types that are water
-            (props.place && ['sea', 'ocean', 'bay'].includes(props.place))
+            ].some(waterName => {
+              if (!props.name) return false;
+              const name = props.name.toLowerCase();
+              const water = waterName.toLowerCase();
+              
+              // Exact match OR contains the water name
+              return name === water || name.includes(water) || 
+                     // Special cases for compound names
+                     (water.includes('bay') && name.includes('bay')) ||
+                     (water.includes('river') && name.includes('river')) ||
+                     (water.includes('kill') && name.includes('kill'));
+            }))
           );
         }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
         
-        // Fix 3: Update the paint expression for better cemetery detection
-        const landLayerPaint = {
-          'fill-color': [
-            'case',
-            // Cemetery colors (darker green) - FIXED
-            ['==', ['get', 'landuse'], 'cemetery'], '#2E7D32',
-            ['==', ['get', 'amenity'], 'grave_yard'], '#2E7D32',
-            
-            // Named cemeteries (case-insensitive matching) - FIXED
-            ['any',
-              ['in', 'green-wood', ['downcase', ['coalesce', ['get', 'name'], '']]],
-              ['in', 'calvary', ['downcase', ['coalesce', ['get', 'name'], '']]],
-              ['in', 'woodlawn', ['downcase', ['coalesce', ['get', 'name'], '']]],
-              ['in', 'cemetery', ['downcase', ['coalesce', ['get', 'name'], '']]],
-              ['in', 'evergreens', ['downcase', ['coalesce', ['get', 'name'], '']]],
-              ['in', 'cypress', ['downcase', ['coalesce', ['get', 'name'], '']]]
-            ], '#2E7D32',
-            
-            // Park colors (bright green)
-            ['==', ['get', 'leisure'], 'park'], '#4CAF50',
-            ['==', ['get', 'leisure'], 'garden'], '#4CAF50',
-            ['==', ['get', 'leisure'], 'playground'], '#4CAF50',
-            
-            // Natural vegetation (forest green)
-            ['==', ['get', 'natural'], 'wood'], '#388E3C',
-            ['==', ['get', 'natural'], 'forest'], '#388E3C',
-            
-            '#E8F5E8' // Very light green for all other land
-          ],
-          'fill-opacity': 0.9
+        // Replace the land layer paint properties in the useEffect where you add land areas
+        const landLayerConfig = {
+          id: 'land-areas',
+          type: 'fill',
+          source: 'land-data',
+          paint: { 
+            'fill-color': [
+              'case',
+              
+              // Cemetery colors (darker green) - Name-based detection only
+              ['any',
+                ['in', 'green-wood', ['downcase', ['coalesce', ['get', 'name'], '']]],
+                ['in', 'greenwood', ['downcase', ['coalesce', ['get', 'name'], '']]],
+                ['in', 'calvary', ['downcase', ['coalesce', ['get', 'name'], '']]],
+                ['in', 'woodlawn', ['downcase', ['coalesce', ['get', 'name'], '']]],
+                ['in', 'cemetery', ['downcase', ['coalesce', ['get', 'name'], '']]],
+                ['in', 'evergreens', ['downcase', ['coalesce', ['get', 'name'], '']]],
+                ['in', 'cypress', ['downcase', ['coalesce', ['get', 'name'], '']]]
+              ], '#2E7D32', // Dark green for cemeteries
+              
+              // Park colors (bright green) - using leisure property we have
+              ['==', ['get', 'leisure'], 'park'], '#4CAF50',
+              ['==', ['get', 'leisure'], 'garden'], '#4CAF50',
+              ['==', ['get', 'leisure'], 'playground'], '#4CAF50',
+              ['==', ['get', 'leisure'], 'golf_course'], '#4CAF50',
+              
+              // Natural vegetation (forest green) - using natural property we have
+              ['==', ['get', 'natural'], 'wood'], '#388E3C',
+              ['==', ['get', 'natural'], 'forest'], '#388E3C',
+              
+              // Famous parks by name (bright green)
+              ['any',
+                ['in', 'central park', ['downcase', ['coalesce', ['get', 'name'], '']]],
+                ['in', 'prospect park', ['downcase', ['coalesce', ['get', 'name'], '']]],
+                ['in', 'battery park', ['downcase', ['coalesce', ['get', 'name'], '']]],
+                ['in', 'bryant park', ['downcase', ['coalesce', ['get', 'name'], '']]]
+              ], '#4CAF50',
+              
+              '#E8F5E8' // Very light green for all other land
+            ],
+            'fill-opacity': 0.9 
+          }
         };
         
         console.log(`Found ${landFeatures.length} land features`);
