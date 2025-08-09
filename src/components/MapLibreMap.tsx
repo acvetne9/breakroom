@@ -90,97 +90,127 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           data: geoData
         });
 
-        // --- Land areas (gray) - simplified filter
+        // --- Land areas (gray) - no filter, just show all polygons as land first
         mapInstance!.addLayer({
           id: 'land',
           type: 'fill',
           source: 'geojson-data',
-          filter: [
-            'all',
-            ['==', '$type', 'Polygon'],
-            ['!=', ['get', 'natural'], 'water'],
-            ['!=', ['get', 'waterway'], 'riverbank'],
-            ['!=', ['get', 'landuse'], 'reservoir']
-          ] as any,
           paint: {
             'fill-color': '#9E9E9E', // Gray land
             'fill-opacity': 0.8
           }
         });
 
-        // --- All water bodies (simplified filter for compatibility)
+        // --- Water bodies (blue) - override land with water features
+        // Natural water features
         mapInstance!.addLayer({
           id: 'water-natural',
           type: 'fill',
           source: 'geojson-data',
-          filter: [
-            'all',
-            ['==', '$type', 'Polygon'],
-            ['==', ['get', 'natural'], 'water']
-          ] as any,
-          paint: {
-            'fill-color': '#2196F3', // Blue water
-            'fill-opacity': 0.9
-          }
-        });
-
-        // Additional water layers for different water types
-        mapInstance!.addLayer({
-          id: 'water-waterway',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: [
-            'all',
-            ['==', '$type', 'Polygon'],
-            ['==', ['get', 'waterway'], 'riverbank']
-          ] as any,
+          filter: ['==', ['get', 'natural'], 'water'],
           paint: {
             'fill-color': '#2196F3',
             'fill-opacity': 0.9
           }
         });
 
+        // Waterway riverbanks
         mapInstance!.addLayer({
-          id: 'water-landuse',
+          id: 'water-riverbank',
           type: 'fill',
           source: 'geojson-data',
-          filter: [
-            'all',
-            ['==', '$type', 'Polygon'],
-            ['==', ['get', 'landuse'], 'reservoir']
-          ] as any,
+          filter: ['==', ['get', 'waterway'], 'riverbank'],
           paint: {
             'fill-color': '#2196F3',
             'fill-opacity': 0.9
           }
         });
 
-        // Water with specific names (major NYC water bodies)
+        // Water landuse (reservoirs)
         mapInstance!.addLayer({
-          id: 'water-named',
+          id: 'water-reservoir',
           type: 'fill',
           source: 'geojson-data',
-          filter: [
-            'all',
-            ['==', '$type', 'Polygon'],
-            ['in', ['get', 'name'], 'Hudson River', 'East River', 'Harlem River', 'Jamaica Bay', 'Upper New York Bay', 'Lower New York Bay']
-          ] as any,
+          filter: ['==', ['get', 'landuse'], 'reservoir'],
+          paint: {
+            'fill-color': '#2196F3',
+            'fill-opacity': 0.9
+          }
+        });
+
+        // Named water bodies
+        mapInstance!.addLayer({
+          id: 'water-hudson',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['==', ['get', 'name'], 'Hudson River'],
           paint: {
             'fill-color': '#1976D2',
             'fill-opacity': 0.9
           }
         });
 
-        // --- Parks (green overlay on gray land)
+        mapInstance!.addLayer({
+          id: 'water-east',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['==', ['get', 'name'], 'East River'],
+          paint: {
+            'fill-color': '#1976D2',
+            'fill-opacity': 0.9
+          }
+        });
+
+        mapInstance!.addLayer({
+          id: 'water-harlem',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['==', ['get', 'name'], 'Harlem River'],
+          paint: {
+            'fill-color': '#1976D2',
+            'fill-opacity': 0.9
+          }
+        });
+
+        mapInstance!.addLayer({
+          id: 'water-jamaica-bay',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['==', ['get', 'name'], 'Jamaica Bay'],
+          paint: {
+            'fill-color': '#1976D2',
+            'fill-opacity': 0.9
+          }
+        });
+
+        mapInstance!.addLayer({
+          id: 'water-upper-bay',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['==', ['get', 'name'], 'Upper New York Bay'],
+          paint: {
+            'fill-color': '#1976D2',
+            'fill-opacity': 0.9
+          }
+        });
+
+        mapInstance!.addLayer({
+          id: 'water-lower-bay',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['==', ['get', 'name'], 'Lower New York Bay'],
+          paint: {
+            'fill-color': '#1976D2',
+            'fill-opacity': 0.9
+          }
+        });
+
+        // --- Parks (green overlay)
         mapInstance!.addLayer({
           id: 'parks',
           type: 'fill',
           source: 'geojson-data',
-          filter: [
-            'all',
-            ['==', '$type', 'Polygon'],
-            ['==', ['get', 'leisure'], 'park']
-          ] as any,
+          filter: ['==', ['get', 'leisure'], 'park'],
           paint: {
             'fill-color': '#4CAF50',
             'fill-opacity': 0.6
@@ -192,11 +222,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           id: 'roads',
           type: 'line',
           source: 'geojson-data',
-          filter: [
-            'all',
-            ['==', '$type', 'LineString'],
-            ['has', 'highway']
-          ] as any,
+          filter: ['has', 'highway'],
           paint: {
             'line-color': '#424242',
             'line-width': [
@@ -215,35 +241,39 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         });
 
-        // --- Coastline (for definition between land and water)
+        // --- Coastline
         mapInstance!.addLayer({
           id: 'coastline',
           type: 'line',
           source: 'geojson-data',
-          filter: [
-            'all',
-            ['==', '$type', 'LineString'],
-            ['==', ['get', 'natural'], 'coastline']
-          ] as any,
+          filter: ['==', ['get', 'natural'], 'coastline'],
           paint: {
-            'line-color': '#1976D2', // Darker blue for coastline definition
+            'line-color': '#1976D2',
             'line-width': 1.5
           }
         });
 
-        // --- Water boundaries/edges (rivers, canals as lines)
+        // --- Rivers as lines
         mapInstance!.addLayer({
-          id: 'waterways',
+          id: 'rivers',
           type: 'line',
           source: 'geojson-data',
-          filter: [
-            'all',
-            ['==', '$type', 'LineString'],
-            ['==', ['get', 'waterway'], 'river']
-          ] as any,
+          filter: ['==', ['get', 'waterway'], 'river'],
           paint: {
-            'line-color': '#2196F3', // Blue waterways
+            'line-color': '#2196F3',
             'line-width': 2
+          }
+        });
+
+        // --- Canals as lines
+        mapInstance!.addLayer({
+          id: 'canals',
+          type: 'line',
+          source: 'geojson-data',
+          filter: ['==', ['get', 'waterway'], 'canal'],
+          paint: {
+            'line-color': '#2196F3',
+            'line-width': 1.5
           }
         });
       });
