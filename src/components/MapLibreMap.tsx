@@ -243,12 +243,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         }
         
         setLandData({
-          type: 'FeatureCollection',
+          type: 'FeatureCollection' as const,
           features: landFeatures
         });
         
         setWaterData({
-          type: 'FeatureCollection', 
+          type: 'FeatureCollection' as const, 
           features: waterFeatures
         });
       }
@@ -285,7 +285,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         } as Feature<Polygon, { [name: string]: any }>);
         
         return {
-          type: 'FeatureCollection',
+          type: 'FeatureCollection' as const,
           features: allLandFeatures
         };
       }
@@ -461,13 +461,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.log(`Created ${allLandFeatures.length} land features from coastlines`);
       
       return {
-        type: 'FeatureCollection',
+        type: 'FeatureCollection' as const,
         features: allLandFeatures
       };
       
     } catch (error) {
       console.error('Error creating land from coastlines:', error);
-      return { type: 'FeatureCollection', features: [] };
+      return { type: 'FeatureCollection' as const, features: [] };
     }
   }, []);
 
@@ -632,13 +632,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     } as any);
 
-    // Add water bodies (changed from light blue to gray)
+    // Add water bodies (changed from light blue background to gray, but keeping water features dark blue)
     addOrUpdate('water-data', waterData, {
       id: 'water-bodies',
       type: 'fill',
       source: 'water-data',
       paint: { 
-        'fill-color': '#808080', // Changed from #4A90E2 (blue) to gray
+        'fill-color': '#4A90E2', // Changed back to dark blue for water bodies
         'fill-opacity': 0.8 
       }
     } as any);
