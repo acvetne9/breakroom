@@ -90,95 +90,83 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           data: geoData
         });
 
-        // --- Land areas (gray)
+        // --- Land areas (gray) - simplified filter
         mapInstance!.addLayer({
           id: 'land',
           type: 'fill',
           source: 'geojson-data',
           filter: [
             'all',
-            ['in', '$type', 'Polygon', 'MultiPolygon'],
-            ['!',
-              ['any',
-                ['==', ['get', 'natural'], 'water'],
-                ['==', ['get', 'natural'], 'sea'],
-                ['==', ['get', 'natural'], 'bay'],
-                ['==', ['get', 'water'], 'ocean'],
-                ['==', ['get', 'water'], 'bay'],
-                ['==', ['get', 'water'], 'river'],
-                ['==', ['get', 'water'], 'lake'],
-                ['==', ['get', 'water'], 'pond'],
-                ['==', ['get', 'waterway'], 'riverbank'],
-                ['==', ['get', 'landuse'], 'reservoir'],
-                ['==', ['get', 'leisure'], 'marina'],
-                ['has', 'water']
-              ]
-            ]
-          ],
+            ['==', '$type', 'Polygon'],
+            ['!=', ['get', 'natural'], 'water'],
+            ['!=', ['get', 'waterway'], 'riverbank'],
+            ['!=', ['get', 'landuse'], 'reservoir']
+          ] as any,
           paint: {
             'fill-color': '#9E9E9E', // Gray land
             'fill-opacity': 0.8
           }
         });
 
-        // --- All water bodies (comprehensive water detection)
+        // --- All water bodies (simplified filter for compatibility)
         mapInstance!.addLayer({
-          id: 'water',
+          id: 'water-natural',
           type: 'fill',
           source: 'geojson-data',
           filter: [
             'all',
-            ['in', '$type', 'Polygon', 'MultiPolygon'],
-            ['any',
-              // Natural water features
-              ['==', ['get', 'natural'], 'water'],
-              ['==', ['get', 'natural'], 'sea'],
-              ['==', ['get', 'natural'], 'bay'],
-              ['==', ['get', 'natural'], 'coastline'],
-              ['==', ['get', 'natural'], 'shoreline'],
-              // Water tags
-              ['==', ['get', 'water'], 'ocean'],
-              ['==', ['get', 'water'], 'bay'],
-              ['==', ['get', 'water'], 'river'],
-              ['==', ['get', 'water'], 'lake'],
-              ['==', ['get', 'water'], 'pond'],
-              ['==', ['get', 'water'], 'reservoir'],
-              ['==', ['get', 'water'], 'canal'],
-              // Waterway features
-              ['==', ['get', 'waterway'], 'riverbank'],
-              ['==', ['get', 'waterway'], 'dock'],
-              // Land use water
-              ['==', ['get', 'landuse'], 'reservoir'],
-              ['==', ['get', 'landuse'], 'basin'],
-              // Leisure water
-              ['==', ['get', 'leisure'], 'marina'],
-              // Generic water property
-              ['has', 'water'],
-              // Specific named water bodies (using individual checks for compatibility)
-              ['==', ['get', 'name'], 'Hudson River'],
-              ['==', ['get', 'name'], 'East River'],
-              ['==', ['get', 'name'], 'Harlem River'],
-              ['==', ['get', 'name'], 'Gowanus Canal'],
-              ['==', ['get', 'name'], 'Newtown Creek'],
-              ['==', ['get', 'name'], 'Arthur Kill'],
-              ['==', ['get', 'name'], 'Kill Van Kull'],
-              ['==', ['get', 'name'], 'The Narrows'],
-              ['==', ['get', 'name'], 'Upper New York Bay'],
-              ['==', ['get', 'name'], 'Lower New York Bay'],
-              ['==', ['get', 'name'], 'Jamaica Bay'],
-              ['==', ['get', 'name'], 'Flushing Bay'],
-              ['==', ['get', 'name'], 'Bowery Bay'],
-              ['==', ['get', 'name'], 'Little Hell Gate'],
-              ['==', ['get', 'name'], 'Bronx River'],
-              ['==', ['get', 'name'], 'Hutchinson River'],
-              ['==', ['get', 'name'], 'Westchester Creek'],
-              ['==', ['get', 'name'], 'Pelham Bay'],
-              ['==', ['get', 'name'], 'Long Island Sound'],
-              ['==', ['get', 'name'], 'Atlantic Ocean']
-            ]
-          ],
+            ['==', '$type', 'Polygon'],
+            ['==', ['get', 'natural'], 'water']
+          ] as any,
           paint: {
             'fill-color': '#2196F3', // Blue water
+            'fill-opacity': 0.9
+          }
+        });
+
+        // Additional water layers for different water types
+        mapInstance!.addLayer({
+          id: 'water-waterway',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: [
+            'all',
+            ['==', '$type', 'Polygon'],
+            ['==', ['get', 'waterway'], 'riverbank']
+          ] as any,
+          paint: {
+            'fill-color': '#2196F3',
+            'fill-opacity': 0.9
+          }
+        });
+
+        mapInstance!.addLayer({
+          id: 'water-landuse',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: [
+            'all',
+            ['==', '$type', 'Polygon'],
+            ['==', ['get', 'landuse'], 'reservoir']
+          ] as any,
+          paint: {
+            'fill-color': '#2196F3',
+            'fill-opacity': 0.9
+          }
+        });
+
+        // Water with specific names (major NYC water bodies)
+        mapInstance!.addLayer({
+          id: 'water-named',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: [
+            'all',
+            ['==', '$type', 'Polygon'],
+            ['in', ['get', 'name'], 'Hudson River', 'East River', 'Harlem River', 'Jamaica Bay', 'Upper New York Bay', 'Lower New York Bay']
+          ] as any,
+          paint: {
+            'fill-color': '#1976D2',
             'fill-opacity': 0.9
           }
         });
@@ -190,14 +178,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           source: 'geojson-data',
           filter: [
             'all',
-            ['in', '$type', 'Polygon', 'MultiPolygon'],
-            ['any',
-              ['==', ['get', 'leisure'], 'park'],
-              ['==', ['get', 'landuse'], 'recreation_ground'],
-              ['==', ['get', 'landuse'], 'forest'],
-              ['==', ['get', 'natural'], 'wood']
-            ]
-          ],
+            ['==', '$type', 'Polygon'],
+            ['==', ['get', 'leisure'], 'park']
+          ] as any,
           paint: {
             'fill-color': '#4CAF50',
             'fill-opacity': 0.6
@@ -211,9 +194,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           source: 'geojson-data',
           filter: [
             'all',
-            ['in', '$type', 'LineString', 'MultiLineString'],
+            ['==', '$type', 'LineString'],
             ['has', 'highway']
-          ],
+          ] as any,
           paint: {
             'line-color': '#424242',
             'line-width': [
@@ -239,12 +222,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           source: 'geojson-data',
           filter: [
             'all',
-            ['in', '$type', 'LineString', 'MultiLineString'],
-            ['any',
-              ['==', ['get', 'natural'], 'coastline'],
-              ['==', ['get', 'natural'], 'shoreline']
-            ]
-          ],
+            ['==', '$type', 'LineString'],
+            ['==', ['get', 'natural'], 'coastline']
+          ] as any,
           paint: {
             'line-color': '#1976D2', // Darker blue for coastline definition
             'line-width': 1.5
@@ -258,24 +238,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           source: 'geojson-data',
           filter: [
             'all',
-            ['in', '$type', 'LineString', 'MultiLineString'],
-            ['any',
-              ['==', ['get', 'waterway'], 'river'],
-              ['==', ['get', 'waterway'], 'canal'],
-              ['==', ['get', 'waterway'], 'stream'],
-              ['==', ['get', 'waterway'], 'drain']
-            ]
-          ],
+            ['==', '$type', 'LineString'],
+            ['==', ['get', 'waterway'], 'river']
+          ] as any,
           paint: {
             'line-color': '#2196F3', // Blue waterways
-            'line-width': [
-              'match',
-              ['get', 'waterway'],
-              'river', 3,
-              'canal', 2,
-              'stream', 1.5,
-              1
-            ]
+            'line-width': 2
           }
         });
       });
