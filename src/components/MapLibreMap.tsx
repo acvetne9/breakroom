@@ -1,427 +1,98 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import type { FeatureCollection, Polygon, MultiPolygon } from 'geojson';
+import React, { useEffect, useRef, useState } from 'react';
+import type { FeatureCollection, Feature, Polygon, MultiPolygon, LineString } from 'geojson';
 import maplibregl from 'maplibre-gl';
 import * as turf from '@turf/turf';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 interface MapLibreMapProps {
-  businesses: {
-    id: string;
-    name: string;
-    position: { lat: number; lng: number };
-    atmosphere: string[];
-    salary?: string;
-    stories?: { id: string; text: string; author: string }[];
-    businessType?: string;
-    roles?: {
-      role: string;
-      salary: string;
-      upvotes?: number;
-      downvotes?: number;
-      userVote?: "up" | "down";
-    }[];
-    place_id?: string;
-  }[];
-  onBusinessClick: (id: string) => void;
+  geojsonData?: FeatureCollection;
 }
 
-const MapLibreMap: React.FC<MapLibreMapProps> = ({
-  businesses,
-  onBusinessClick,
-  selectedBusiness
-}) => {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const [map, setMap] = useState<maplibregl.Map | null>(null);
+const MapLibreMap: React.FC<MapLibreMapProps> = ({ geojsonData }) => {
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
-  const loadGeoJSONData = useCallback(async (): Promise<FeatureCollection | null> => {
-    try {
-      const response = await fetch('/data/example-points.geojson');
-      if (!response.ok) {
-        console.error('Failed to load GeoJSON:', response.statusText);
-        return null;
-      }
-      const data: FeatureCollection = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error loading GeoJSON:', error);
-      return null;
-    }
-  }, []);
+  // Utility: always return a FeatureCollection
+  const toFeatureCollection = (
+    input: FeatureCollection | Feature
+  ): FeatureCollection => {
+    if (!input) return turf.featureCollection([]);
+    if (input.type === 'FeatureCollection') return input;
+    return turf.featureCollection([input]);
+  };
 
-  const createLandFromCoastlinesAndWater = useCallback((geoData: FeatureCollection): FeatureCollection => {
-    try {
-      const allLandFeatures: any[] = [];
-      
-      // APPROACH 1: Create polygons from coastlines
-      const coastlines = geoData.features.filter(feature => 
-        feature.geometry.type === 'LineString' &&
-        feature.properties?.natural === 'coastline'
-      );
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
 
-      console.log(`Found ${coastlines.length} coastline features`);
+    const map = new maplibregl.Map({
+      container: mapContainerRef.current,
+      style: {
+        version: 8,
+        sources: {},
+        layers: [],
+      },
+      center: [-74.006, 40.7128],
+      zoom: 11,
+    });
 
-      for (const coastline of coastlines) {
-        try {
-          const coords = coastline.geometry.coordinates;
-          if (coords.length < 3) continue;
-          
-          // Check if coastline forms a closed loop or can be closed
-          const firstPoint = coords[0];
-          const lastPoint = coords[coords.length - 1];
-          const isAlreadyClosed = firstPoint[0] === lastPoint[0] && firstPoint[1] === lastPoint[1];
-          
-          // Only try to create polygon if we have enough points
-          if (coords.length >= 4 || (coords.length >= 3 && !isAlreadyClosed)) {
-            const closedCoords = isAlreadyClosed ? coords : [...coords, firstPoint];
-            
-            // Validate that we have a valid polygon (at least 4 points including closure)
-            if (closedCoords.length >= 4) {
-              const polygon = turf.polygon([closedCoords]);
-              
-              // Check if polygon is valid (has area)
-              const area = turf.area(polygon);
-              if (area > 1000) { // Only include polygons with significant area (>1000 sq meters)
-                allLandFeatures.push({
-                  ...polygon,
-                  properties: { 
-                    landType: 'coastline-derived',
-                    area: area,
-                    source: 'coastline'
-                  }
-                });
-              }
-            }
-          }
-        } catch (err) {
-          console.warn('Could not create polygon from coastline:', err);
-        }
-      }
+    map.on('load', () => {
+      setMapLoaded(true);
+    });
 
-      // APPROACH 2: Create land by subtracting water bodies from bounding box
-      try {
-        // Get all water features based on the comprehensive Overpass query
-        const waterFeatures = geoData.features.filter(feature => {
-          const props = feature.properties;
-          if (!props) return false;
-          
-          return (
-            // Natural water bodies
-            props.natural === 'water' ||
-            
-            // Waterways - rivers, streams, canals (both LineString and Polygon)
-            (props.waterway && ['river', 'stream', 'canal', 'riverbank'].includes(props.waterway)) ||
-            
-            // Named major water bodies around NYC
-            (props.name && [
-              'Upper New York Bay', 'Lower New York Bay', 'Newark Bay', 'Jamaica Bay',
-              'Long Island Sound', 'Hudson River', 'East River', 'Harlem River',
-              'Arthur Kill', 'Kill Van Kull', 'Raritan Bay', 'Sheepshead Bay',
-              'Rockaway Inlet'
-            ].some(waterName => props.name.includes(waterName))) ||
-            
-            // Additional water-related landuse
-            props.landuse === 'reservoir' ||
-            props.landuse === 'basin' ||
-            
-            // Water-related leisure
-            props.leisure === 'marina' ||
-            
-            // Additional natural water features
-            props.natural === 'bay' ||
-            props.natural === 'strait' ||
-            
-            // Place types that are water
-            (props.place && ['sea', 'ocean', 'bay'].includes(props.place))
-          ) && 
-          // Only include polygonal water features for subtraction
-          (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon');
-        });
+    mapRef.current = map;
 
-        console.log(`Found ${waterFeatures.length} water features for subtraction`);
-        
-        // Also get linear water features for buffering
-        const linearWaterFeatures = geoData.features.filter(feature => {
-          const props = feature.properties;
-          return props && 
-            feature.geometry.type === 'LineString' &&
-            (props.waterway && ['river', 'stream', 'canal'].includes(props.waterway));
-        });
-        
-        console.log(`Found ${linearWaterFeatures.length} linear water features`);
-
-        if (waterFeatures.length > 0 || linearWaterFeatures.length > 0) {
-          // Create a bounding box for the NYC area (matching your query bounds)
-          const bbox: [number, number, number, number] = [-74.30, 40.50, -73.70, 40.93];
-          let landArea = turf.bboxPolygon(bbox);
-
-          // First, buffer linear water features and subtract them
-          for (const linearWater of linearWaterFeatures) {
-            try {
-              const bufferedWater = turf.buffer(linearWater, 0.0005, { units: 'degrees' }); // ~50m buffer
-              if (bufferedWater) {
-                const difference = turf.difference(landArea, bufferedWater);
-                if (difference) {
-                  landArea = difference;
-                }
-              }
-            } catch (err) {
-              console.warn('Could not buffer and subtract linear water feature:', err);
-            }
-          }
-
-          // Then subtract polygonal water bodies from the land area
-          for (const waterFeature of waterFeatures) {
-            try {
-              const difference = turf.difference(landArea, waterFeature as any);
-              if (difference) {
-                landArea = difference;
-              }
-            } catch (err) {
-              console.warn('Could not subtract water body:', err);
-            }
-          }
-
-          // Add the resulting land mass
-          if (landArea) {
-            allLandFeatures.push({
-              ...landArea,
-              properties: { 
-                landType: 'water-inverse',
-                source: 'water-subtraction',
-                waterFeaturesProcessed: waterFeatures.length + linearWaterFeatures.length
-              }
-            });
-          }
-        }
-      } catch (err) {
-        console.warn('Could not create land from water subtraction:', err);
-      }
-
-      // APPROACH 3: Fallback - create buffer around coastlines if other methods didn't work well
-      if (allLandFeatures.length === 0 && coastlines.length > 0) {
-        try {
-          console.log('Using fallback buffer approach');
-          const coastlineCollection = turf.featureCollection(coastlines);
-          const buffered = turf.buffer(coastlineCollection, 0.002, { units: 'degrees' });
-          
-          if (buffered) {
-            allLandFeatures.push({
-              ...buffered,
-              properties: { 
-                landType: 'coastline-buffered',
-                source: 'buffer-fallback'
-              }
-            });
-          }
-        } catch (err) {
-          console.warn('Buffer fallback also failed:', err);
-        }
-      }
-
-      console.log(`Created ${allLandFeatures.length} land features`);
-      
-      return {
-        type: 'FeatureCollection',
-        features: allLandFeatures
-      };
-      
-    } catch (error) {
-      console.error('Error creating land from coastlines and water:', error);
-      return { type: 'FeatureCollection', features: [] };
-    }
+    return () => {
+      map.remove();
+    };
   }, []);
 
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapLoaded || !geojsonData || !geojsonData.features) return;
+    const map = mapRef.current;
+    if (!map) return;
 
-    let mapInstance: maplibregl.Map | null = null;
-    let cleanedUp = false;
+    // Process line features into polygons
+    const lineFeatures = geojsonData.features.filter(
+      f => f.geometry.type === 'LineString' || f.geometry.type === 'MultiLineString'
+    );
 
-    const initializeMap = async () => {
-      const baseStyle = {
-        version: 8 as const,
-        sources: {},
-        layers: [
-          {
-            id: 'background',
-            type: 'background' as const,
-            paint: { 'background-color': '#2196F3' } // Blue background for water
-          }
-        ]
-      };
+    const bufferedPolygons: Feature<Polygon | MultiPolygon>[] = [];
 
-      mapInstance = new maplibregl.Map({
-        container: mapRef.current!,
-        style: baseStyle,
-        center: [-73.9712, 40.7831],
-        zoom: 12
-      });
-
-      const nycBounds: maplibregl.LngLatBoundsLike = [
-        [-74.25909, 40.477399],
-        [-73.700272, 40.917577]
-      ];
-      mapInstance.setMaxBounds(nycBounds);
-
-      mapInstance.on('load', async () => {
-        if (cleanedUp) return;
-
-        const geoData = await loadGeoJSONData();
-        if (!geoData || !geoData.features.length) {
-          console.warn('No GeoJSON features loaded.');
-          return;
+    lineFeatures.forEach(line => {
+      const buffered = turf.buffer(line as Feature<LineString>, 5, { units: 'meters' });
+      const fc = toFeatureCollection(buffered);
+      fc.features.forEach(f => {
+        if (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon') {
+          bufferedPolygons.push(f as Feature<Polygon | MultiPolygon>);
         }
+      });
+    });
 
-        // Fit map to data
-        try {
-          const dataBbox = turf.bbox(geoData) as [number, number, number, number];
-          if (dataBbox[0] !== dataBbox[2] && dataBbox[1] !== dataBbox[3]) {
-            mapInstance!.fitBounds(dataBbox, { padding: 100, duration: 1000 });
-          }
-        } catch (err) {
-          console.warn('Could not calculate bbox:', err);
-        }
+    const polygonFC = turf.featureCollection(bufferedPolygons);
 
-        // Main data source
-        mapInstance!.addSource('geojson-data', {
-          type: 'geojson',
-          data: geoData
-        });
-
-        // Create land polygons from coastlines and water bodies
-        const landPolygons = createLandFromCoastlinesAndWater(geoData);
-        mapInstance!.addSource('land-polygons', {
-          type: 'geojson',
-          data: landPolygons
-        });
-
-        // --- LAND AREAS (gray) - created from coastline boundaries
-        mapInstance!.addLayer({
-          id: 'land-areas',
-          type: 'fill',
-          source: 'land-polygons',
-          paint: {
-            'fill-color': '#DDDDDD', // Gray land
-            'fill-opacity': 0.8
-          }
-        });
-
-        // --- COASTLINES (to show land/water boundaries)
-        mapInstance!.addLayer({
-          id: 'coastlines',
-          type: 'line',
-          source: 'geojson-data',
-          filter: ['==', 'natural', 'coastline'] as any,
-          paint: {
-            'line-color': '#1976D2',
-            'line-width': 2
-          }
-        });
-
-        // --- SPECIFIC WATER FEATURES (blue overlays)
-        mapInstance!.addLayer({
-          id: 'water-bodies',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: ['==', 'natural', 'water'] as any,
-          paint: {
-            'fill-color': '#2196F3',
-            'fill-opacity': 0.9
-          }
-        });
-
-        mapInstance!.addLayer({
-          id: 'rivers-poly',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: ['==', 'waterway', 'riverbank'] as any,
-          paint: {
-            'fill-color': '#2196F3',
-            'fill-opacity': 0.9
-          }
-        });
-
-        // --- PARKS (green overlay on land)
-        mapInstance!.addLayer({
-          id: 'parks',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: ['==', 'leisure', 'park'] as any,
-          paint: {
-            'fill-color': '#4CAF50',
-            'fill-opacity': 0.7
-          }
-        });
-
-        // --- ROADS (gray infrastructure)
-        mapInstance!.addLayer({
-          id: 'roads',
-          type: 'line',
-          source: 'geojson-data',
-          filter: ['has', 'highway'] as any,
-          paint: {
-            'line-color': '#424242',
-            'line-width': [
-              'match',
-              ['get', 'highway'],
-              'motorway', 3,
-              'trunk', 2.5,
-              'primary', 2,
-              'secondary', 1.5,
-              1
-            ]
-          }
-        });
-
-        // --- RIVERS (blue lines)
-        mapInstance!.addLayer({
-          id: 'rivers',
-          type: 'line',
-          source: 'geojson-data',
-          filter: ['==', 'waterway', 'river'] as any,
-          paint: {
-            'line-color': '#2196F3',
-            'line-width': 3
-          }
-        });
-
-        // --- CANALS (blue lines)
-        mapInstance!.addLayer({
-          id: 'canals',
-          type: 'line',
-          source: 'geojson-data',
-          filter: ['==', 'waterway', 'canal'] as any,
-          paint: {
-            'line-color': '#2196F3',
-            'line-width': 2
-          }
-        });
+    if (!map.getSource('roads-polygons')) {
+      map.addSource('roads-polygons', {
+        type: 'geojson',
+        data: polygonFC,
       });
 
-      mapInstance.on('error', e => {
-        console.error('Map error:', e.error);
+      map.addLayer({
+        id: 'roads-fill',
+        type: 'fill',
+        source: 'roads-polygons',
+        paint: {
+          'fill-color': '#bbbbbb',
+          'fill-opacity': 0.8,
+        },
       });
+    } else {
+      const source = map.getSource('roads-polygons') as maplibregl.GeoJSONSource;
+      source.setData(polygonFC);
+    }
+  }, [mapLoaded, geojsonData]);
 
-      setMap(mapInstance);
-    };
-
-    initializeMap();
-
-    return () => {
-      cleanedUp = true;
-      if (mapInstance) {
-        mapInstance.remove();
-      }
-      setMap(null);
-    };
-  }, [loadGeoJSONData, createLandFromCoastlinesAndWater]);
-
-  return (
-    <div
-      ref={mapRef}
-      style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
-    />
-  );
+  return <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />;
 };
 
 export default MapLibreMap;
