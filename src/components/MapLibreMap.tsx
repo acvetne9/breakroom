@@ -206,11 +206,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           // Method 2: Buffer linear water features and subtract them
           for (const linearWater of linearWaterFeatures) {
             try {
+              if (linearWater.geometry.type !== 'LineString') continue;
               const bufferedWater = turf.buffer(linearWater, 0.0005, { units: 'degrees' }); // ~50m buffer
               if (bufferedWater) {
-                const difference = turf.difference(landArea, bufferedWater);
+                const difference = turf.difference(landArea as any, bufferedWater as any);
                 if (difference) {
-                  landArea = difference;
+                  landArea = difference as any;
                 }
               }
             } catch (err) {
@@ -221,9 +222,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           // Method 3: Subtract explicit polygonal water bodies
           for (const waterFeature of waterPolygons) {
             try {
-              const difference = turf.difference(landArea, waterFeature as any);
+              const difference = turf.difference(landArea as any, waterFeature as any);
               if (difference) {
-                landArea = difference;
+                landArea = difference as any;
               }
             } catch (err) {
               console.warn('Could not subtract water body:', err);
@@ -240,7 +241,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 waterFeaturesProcessed: waterPolygons.length + linearWaterFeatures.length,
                 coastlinesProcessed: coastlines.length
               }
-            });
+            } as any);
           }
         }
       } catch (err) {
