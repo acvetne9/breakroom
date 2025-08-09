@@ -406,19 +406,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         
         // Add the resulting land area(s)
         if (totalLandArea) {
-          if (totalLandArea.geometry.type === 'Polygon') {
-            allLandFeatures.push({
-              type: 'Feature',
-              geometry: totalLandArea.geometry,
-              properties: totalLandArea.properties || { landType: 'comprehensive', source: 'water-subtraction' }
-            } as Feature<Polygon, { [name: string]: any }>);
-          } else if (totalLandArea.geometry.type === 'MultiPolygon') {
-            allLandFeatures.push({
-              type: 'Feature',
-              geometry: totalLandArea.geometry,
-              properties: totalLandArea.properties || { landType: 'comprehensive', source: 'water-subtraction' }
-            } as Feature<MultiPolygon, { [name: string]: any }>);
-          }
+          // Convert through unknown to avoid TypeScript geometry type conflicts
+          const landFeature = totalLandArea as unknown as Feature<Polygon | MultiPolygon, { [name: string]: any }>;
+          landFeature.properties = landFeature.properties || { landType: 'comprehensive', source: 'water-subtraction' };
+          allLandFeatures.push(landFeature);
         }
         
       } catch (err) {
@@ -445,25 +436,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               // Buffer the hull slightly inward to create land
               const buffered = turf.buffer(hull, -0.001, { units: 'degrees' });
               if (buffered) {
-                if (buffered.geometry.type === 'Polygon') {
-                  allLandFeatures.push({
-                    type: 'Feature',
-                    geometry: buffered.geometry,
-                    properties: { 
-                      landType: 'coastline-hull-buffered',
-                      source: 'fallback-buffer'
-                    }
-                  } as Feature<Polygon, { [name: string]: any }>);
-                } else if (buffered.geometry.type === 'MultiPolygon') {
-                  allLandFeatures.push({
-                    type: 'Feature',
-                    geometry: buffered.geometry,
-                    properties: { 
-                      landType: 'coastline-hull-buffered',
-                      source: 'fallback-buffer'
-                    }
-                  } as Feature<MultiPolygon, { [name: string]: any }>);
-                }
+                // Convert through unknown to avoid TypeScript geometry type conflicts
+                const bufferedFeature = buffered as unknown as Feature<Polygon | MultiPolygon, { [name: string]: any }>;
+                bufferedFeature.properties = { 
+                  landType: 'coastline-hull-buffered',
+                  source: 'fallback-buffer'
+                };
+                allLandFeatures.push(bufferedFeature);
               }
             }
           }
