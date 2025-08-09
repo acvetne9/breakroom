@@ -1,39 +1,4 @@
-// Extract land and water data from the main GeoJSON
-      const mainData = await loadGeoJSONData();
-      if (mainData) {
-        console.log(`Processing ${mainData.features.length} total features`);
-        
-        // DEBUG: Log all unique property combinations to see what we're missing
-        const propertyStats = new Map<string, number>();
-        mainData.features.forEach(feature => {
-          const props = feature.properties;
-          if (props) {
-            // Check for park-related properties
-            if (props.leisure) {
-              const key = `leisure=${props.leisure}`;
-              propertyStats.set(key, (propertyStats.get(key) || 0) + 1);
-            }
-            if (props.landuse) {
-              const key = `landuse=${props.landuse}`;
-              propertyStats.set(key, (propertyStats.get(key) || 0) + 1);
-            }
-            if (props.amenity) {
-              const key = `amenity=${props.amenity}`;
-              propertyStats.set(key, (propertyStats.get(key) || 0) + 1);
-            }
-            if (props.natural) {
-              const key = `natural=${props.natural}`;
-              propertyStats.set(key, (propertyStats.get(key) || 0) + 1);
-            }
-          }
-        });
-        
-        console.log('Property statistics:', Object.fromEntries(propertyStats));
-        
-        // IMPROVED LAND DETECTION - Much more comprehensive
-        const landFeatures = mainData.features.filter(feature => {
-          const props = feature.properties;
-          if (!props || !['import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import type { Feature, FeatureCollection, Polygon, MultiPolygon, LineString } from 'geojson';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -347,7 +312,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         
         console.log(`Found ${explicitWaterBodies.length} explicit water bodies`);
         
-        // Create water polygons from coastline segments using convex hull approach
+        // Create water polygons from coastline segments using bounding box approach
         const coastlineWaterBodies: Feature<Polygon | MultiPolygon>[] = [];
         
         // Group coastlines by proximity to create coherent water bodies
@@ -470,16 +435,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           if (allCoastlineCoords.length >= 3) {
             const points = allCoastlineCoords.map(coord => turf.point(coord));
             const pointCollection = turf.featureCollection(points);
-            const hull = (turf as any).convexHull(pointCollection);
             
-            if (hull && hull.geometry.type === 'Polygon') {
-              // Buffer the hull slightly inward to create land
-              const buffered = turf.buffer(hull, -0.001, { units: 'degrees' });
+            // Create bounding box polygon instead of convex hull
+            const bbox = turf.bbox(pointCollection);
+            const bboxPolygon = turf.bboxPolygon(bbox as [number, number, number, number]);
+            
+            if (bboxPolygon && bboxPolygon.geometry.type === 'Polygon') {
+              // Buffer the polygon slightly inward to create land
+              const buffered = turf.buffer(bboxPolygon, -0.001, { units: 'degrees' });
               if (buffered && (buffered.geometry.type === 'Polygon' || buffered.geometry.type === 'MultiPolygon')) {
                 allLandFeatures.push({
                   ...buffered,
                   properties: { 
-                    landType: 'coastline-hull-buffered',
+                    landType: 'coastline-bbox-buffered',
                     source: 'fallback-buffer'
                   }
                 } as Feature<Polygon | MultiPolygon, { [name: string]: any }>);
@@ -562,17 +530,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           data: geoData
         });
 
-        // Fallback layers from main data (parks, coastlines, etc.)
-        mapInstance!.addLayer({
-          id: 'parks',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: ['==', 'leisure', 'park'] as any,
-          paint: {
-            'fill-color': '#4CAF50',
-            'fill-opacity': 0.8
-          }
-        });
+        // NOTE: All land features including parks and cemeteries are now handled 
+        // in the main land-areas layer above to ensure consistent styling
 
         mapInstance!.addLayer({
           id: 'coastlines',
