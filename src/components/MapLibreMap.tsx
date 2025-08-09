@@ -1,125 +1,89 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import type { Feature, FeatureCollection, Polygon, MultiPolygon, LineString } from 'geojson';
+// src/components/MapLibreMap.tsx
+import React, { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
-// Turf imports (no wildcard import, fixes TS2554 issues)
+import { FeatureCollection, Feature, Polygon, MultiPolygon, LineString } from 'geojson';
+
+// Turf direct imports to avoid TS2554 errors
 import buffer from '@turf/buffer';
 import union from '@turf/union';
-import difference from '@turf/difference';
-import polygonToLine from '@turf/polygon-to-line';
-import bbox from '@turf/bbox';
+import lineToPolygon from '@turf/line-to-polygon';
+import booleanIntersects from '@turf/boolean-intersects';
 
-// Props interface
 interface MapLibreMapProps {
-  roadsData: FeatureCollection<LineString>;
-  landData: FeatureCollection<Polygon | MultiPolygon>;
-  waterData: FeatureCollection<Polygon | MultiPolygon>;
+  nycLand: FeatureCollection<Polygon | MultiPolygon>;
+  nycWater: FeatureCollection<Polygon | MultiPolygon>;
+  roads: FeatureCollection<LineString>;
 }
 
-const MapLibreMap: React.FC<MapLibreMapProps> = ({ roadsData, landData, waterData }) => {
-  const mapContainer = useRef<HTMLDivElement | null>(null);
+const MapLibreMap: React.FC<MapLibreMapProps> = ({ nycLand, nycWater, roads }) => {
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
-  const [mapLoaded, setMapLoaded] = useState(false);
 
-  // Convert lines (roads, bridges, tunnels) to polygons
-  const convertLinesToPolygons = useCallback((lineFeatures: FeatureCollection<LineString>) => {
-    const buffered: Feature<Polygon>[] = lineFeatures.features.map(line =>
-      buffer(line, 5, { units: 'meters' }) as Feature<Polygon>
-    );
-
-    // Merge into one polygon feature
-    let merged: Feature<Polygon | MultiPolygon> | null = null;
-    for (const poly of buffered) {
-      merged = merged ? (union(merged, poly) as Feature<Polygon | MultiPolygon>) : poly;
-    }
-
-    return merged;
-  }, []);
-
-  // Merge all land into single feature
-  const mergeLand = useCallback((fc: FeatureCollection<Polygon | MultiPolygon>) => {
-    let merged: Feature<Polygon | MultiPolygon> | null = null;
-    for (const feat of fc.features) {
-      merged = merged ? (union(merged, feat) as Feature<Polygon | MultiPolygon>) : feat;
-    }
-    return merged;
-  }, []);
-
-  // Merge all water into single feature
-  const mergeWater = useCallback((fc: FeatureCollection<Polygon | MultiPolygon>) => {
-    let merged: Feature<Polygon | MultiPolygon> | null = null;
-    for (const feat of fc.features) {
-      merged = merged ? (union(merged, feat) as Feature<Polygon | MultiPolygon>) : feat;
-    }
-    return merged;
-  }, []);
-
-  // Initialize map
   useEffect(() => {
-    if (!mapContainer.current) return;
+    if (!mapContainerRef.current) return;
 
-    mapRef.current = new maplibregl.Map({
-      container: mapContainer.current,
+    const map = new maplibregl.Map({
+      container: mapContainerRef.current,
       style: {
         version: 8,
         sources: {},
-        layers: []
+        layers: [
+          {
+            id: 'background',
+            type: 'background',
+            paint: {
+              'background-color': '#d0d0d0' // default land outside NYC
+            }
+          }
+        ]
       },
       center: [-74.006, 40.7128],
       zoom: 11
     });
 
-    mapRef.current.on('load', () => {
-      setMapLoaded(true);
-    });
+    mapRef.current = map;
 
-    return () => {
-      mapRef.current?.remove();
-    };
-  }, []);
+    map.on('load', () => {
+      // --- 1. Union NYC Land so it's a single Feature ---
+      let unitedLand: Feature<Polygon | MultiPolygon> | null = null;
+      if (nycLand.features.length > 1) {
+        unitedLand = nycLand.features.reduce((acc, feat) => {
+          return acc ? union(acc, feat as Feature<Polygon | MultiPolygon>)! : (feat as Feature<Polygon | MultiPolygon>);
+        }, null as Feature<Polygon | MultiPolygon> | null);
+      } else {
+        unitedLand = nycLand.features[0] as Feature<Polygon | MultiPolygon>;
+      }
 
-  // Add data layers once map is loaded
-  useEffect(() => {
-    if (!mapLoaded || !mapRef.current) return;
-
-    const map = mapRef.current;
-
-    // 1. Merge land & water
-    const landFeature = mergeLand(landData);
-    const waterFeature = mergeWater(waterData);
-
-    // 2. Remove water from land
-    let nycLand = landFeature;
-    if (landFeature && waterFeature) {
-      nycLand = difference(landFeature, waterFeature) as Feature<Polygon | MultiPolygon>;
-    }
-
-    // 3. Convert roads to polygons
-    const roadsPolygon = convertLinesToPolygons(roadsData);
-
-    // 4. Add land layer
-    if (nycLand) {
+      // --- 2. Add NYC Land Layer ---
       map.addSource('nyc-land', {
         type: 'geojson',
-        data: nycLand
+        data: unitedLand as Feature<Polygon | MultiPolygon>
       });
       map.addLayer({
         id: 'nyc-land-fill',
         type: 'fill',
         source: 'nyc-land',
         paint: {
-          'fill-color': '#d9d9d9', // light gray
+          'fill-color': '#eeeeee', // light gray NYC land
           'fill-opacity': 1
         }
       });
-    }
 
-    // 5. Add water layer
-    if (waterFeature) {
+      // --- 3. Union Water and Add Layer ---
+      let unitedWater: Feature<Polygon | MultiPolygon> | null = null;
+      if (nycWater.features.length > 1) {
+        unitedWater = nycWater.features.reduce((acc, feat) => {
+          return acc ? union(acc, feat as Feature<Polygon | MultiPolygon>)! : (feat as Feature<Polygon | MultiPolygon>);
+        }, null as Feature<Polygon | MultiPolygon> | null);
+      } else {
+        unitedWater = nycWater.features[0] as Feature<Polygon | MultiPolygon>;
+      }
+
       map.addSource('nyc-water', {
         type: 'geojson',
-        data: waterFeature
+        data: unitedWater as Feature<Polygon | MultiPolygon>
       });
       map.addLayer({
         id: 'nyc-water-fill',
@@ -127,36 +91,46 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ roadsData, landData, waterDat
         source: 'nyc-water',
         paint: {
           'fill-color': '#4da6ff', // blue
-          'fill-opacity': 1
+          'fill-opacity': 0.9
         }
       });
-    }
 
-    // 6. Add roads polygons
-    if (roadsPolygon) {
-      map.addSource('nyc-roads', {
+      // --- 4. Convert Roads to Polygons & Add Layer ---
+      const roadPolygons: FeatureCollection<Polygon> = {
+        type: 'FeatureCollection',
+        features: roads.features
+          .map(line => {
+            try {
+              const poly = buffer(line as Feature<LineString>, 5, { units: 'meters' }); // widen road
+              return poly as Feature<Polygon>;
+            } catch {
+              return null;
+            }
+          })
+          .filter((f): f is Feature<Polygon> => f !== null)
+      };
+
+      map.addSource('roads', {
         type: 'geojson',
-        data: roadsPolygon
+        data: roadPolygons
       });
       map.addLayer({
-        id: 'nyc-roads-fill',
+        id: 'roads-fill',
         type: 'fill',
-        source: 'nyc-roads',
+        source: 'roads',
         paint: {
-          'fill-color': '#bfbfbf', // darker gray
-          'fill-opacity': 1
+          'fill-color': '#888888', // gray roads
+          'fill-opacity': 0.8
         }
       });
-    }
+    });
 
-    // Fit map to all data
-    if (nycLand) {
-      const bounds = bbox(nycLand) as [number, number, number, number];
-      map.fitBounds(bounds, { padding: 50 });
-    }
-  }, [mapLoaded, roadsData, landData, waterData, mergeLand, mergeWater, convertLinesToPolygons]);
+    return () => {
+      map.remove();
+    };
+  }, [nycLand, nycWater, roads]);
 
-  return <div ref={mapContainer} style={{ width: '100%', height: '100%' }} />;
+  return <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />;
 };
 
 export default MapLibreMap;
