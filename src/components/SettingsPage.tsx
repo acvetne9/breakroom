@@ -6,6 +6,9 @@ import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 import { useDevice } from '@/contexts/DeviceContext';
 
+// Import the predefined job options to check against
+const JOB_OPTIONS = ['Barista', 'Server', 'Cook', 'Cashier', 'Security Guard', 'Retail Associate', 'Delivery Driver', 'Host/Hostess', 'Cleaner', 'Stock Associate', 'Customer Service', 'Manager', 'Waiter/Waitress', 'Receptionist', 'Sales Associate', 'Food Service Worker', 'Maintenance', 'Supervisor', 'Shift Leader', 'Assistant Manager'];
+
 interface UserInfo {
   salary: string;
   role: string;
@@ -146,11 +149,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   const isPastJobComplete = (job: PastJob, timePeriod: string) => {
-    return job.salary && job.role && job.location && timePeriod;
+    const isValidRole = JOB_OPTIONS.includes(job.role);
+    return job.salary && job.role && job.location && timePeriod && isValidRole;
   };
 
   const isCurrentJobComplete = () => {
-    return currentJob.salary && currentJob.role && currentJob.location && currentTimePeriod;
+    const isValidRole = JOB_OPTIONS.includes(currentJob.role);
+    return currentJob.salary && currentJob.role && currentJob.location && currentTimePeriod && isValidRole;
   };
 
   // Create posts for all changed jobs when leaving the page
@@ -177,7 +182,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
       // Helper function to check if current job is complete using refs
       const isCurrentJobCompleteFromRefs = () => {
-        return currentJobRef.current.salary && currentJobRef.current.role && currentJobRef.current.location && currentTimePeriodRef.current;
+        const isValidRole = JOB_OPTIONS.includes(currentJobRef.current.role);
+        return currentJobRef.current.salary && currentJobRef.current.role && currentJobRef.current.location && currentTimePeriodRef.current && isValidRole;
       };
 
       // Create post for current job if changed and complete
