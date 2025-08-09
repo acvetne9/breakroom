@@ -9,7 +9,6 @@ import union from '@turf/union';
 import difference from '@turf/difference';
 import bbox from '@turf/bbox';
 
-// Props interface
 interface MapLibreMapProps {
   businesses: {
     id: string;
@@ -31,9 +30,9 @@ interface MapLibreMapProps {
   onBusinessClick?: (business: any) => void;
   selectedBusiness?: any;
 
-  roadsData: FeatureCollection<LineString>;
-  landData: FeatureCollection<Polygon | MultiPolygon>;
-  waterData: FeatureCollection<Polygon | MultiPolygon>;
+  roadsData?: FeatureCollection<LineString>;
+  landData?: FeatureCollection<Polygon | MultiPolygon>;
+  waterData?: FeatureCollection<Polygon | MultiPolygon>;
 }
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
@@ -48,7 +47,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
-  // --- Utility to dynamically get color from feature properties ---
+  // Helper: dynamic color from feature property or fallback
   const getFeatureColor = (fallback: string) => [
     'case',
     ['has', 'color'],
@@ -56,8 +55,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     fallback
   ];
 
-  // Convert lines (roads, bridges, tunnels) to polygons
-  const convertLinesToPolygons = useCallback((lineFeatures: FeatureCollection<LineString>) => {
+  // Convert lines to polygons (safe)
+  const convertLinesToPolygons = useCallback((lineFeatures?: FeatureCollection<LineString>) => {
+    if (!lineFeatures || !Array.isArray(lineFeatures.features)) return null;
+
     const buffered: Feature<Polygon>[] = lineFeatures.features.map(line =>
       buffer(line, 5, { units: 'meters' }) as Feature<Polygon>
     );
@@ -69,8 +70,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return merged;
   }, []);
 
-  // Merge all land
-  const mergeLand = useCallback((fc: FeatureCollection<Polygon | MultiPolygon>) => {
+  // Merge land (safe)
+  const mergeLand = useCallback((fc?: FeatureCollection<Polygon | MultiPolygon>) => {
+    if (!fc || !Array.isArray(fc.features)) return null;
     let merged: Feature<Polygon | MultiPolygon> | null = null;
     for (const feat of fc.features) {
       merged = merged ? (union(merged, feat) as Feature<Polygon | MultiPolygon>) : feat;
@@ -78,8 +80,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return merged;
   }, []);
 
-  // Merge all water
-  const mergeWater = useCallback((fc: FeatureCollection<Polygon | MultiPolygon>) => {
+  // Merge water (safe)
+  const mergeWater = useCallback((fc?: FeatureCollection<Polygon | MultiPolygon>) => {
+    if (!fc || !Array.isArray(fc.features)) return null;
     let merged: Feature<Polygon | MultiPolygon> | null = null;
     for (const feat of fc.features) {
       merged = merged ? (union(merged, feat) as Feature<Polygon | MultiPolygon>) : feat;
@@ -111,12 +114,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, []);
 
-  // Add geographic data layers
+  // Add geographic data
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return;
     const map = mapRef.current;
 
-    // Merge land and water
     const landFeature = mergeLand(landData);
     const waterFeature = mergeWater(waterData);
 
@@ -126,7 +128,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       nycLand = difference(landFeature, waterFeature) as Feature<Polygon | MultiPolygon>;
     }
 
-    // Convert roads to polygons
     const roadsPolygon = convertLinesToPolygons(roadsData);
 
     // Land
@@ -171,7 +172,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
     }
 
-    // Fit bounds
+    // Fit map
     if (nycLand) {
       const bounds = bbox(nycLand) as [number, number, number, number];
       map.fitBounds(bounds, { padding: 50 });
@@ -183,7 +184,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (!mapLoaded || !businesses || !mapRef.current) return;
     const map = mapRef.current;
 
-    // Remove old
     if (map.getSource('businesses')) {
       map.removeLayer('businesses-layer');
       map.removeSource('businesses');
@@ -227,9 +227,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         if (e.features && e.features[0]) {
           const businessId = e.features[0].properties?.id;
           const business = businesses.find(b => b.id === businessId);
-          if (business) {
-            onBusinessClick(business);
-          }
+          if (business) onBusinessClick(business);
         }
       });
     }
