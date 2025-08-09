@@ -47,7 +47,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
-  // Helper: dynamic color from feature property or fallback
+  // Dynamic color from feature property or fallback
   const getFeatureColor = (fallback: string) => [
     'case',
     ['has', 'color'],
@@ -55,9 +55,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     fallback
   ];
 
-  // Convert lines to polygons (safe)
-  const convertLinesToPolygons = useCallback((lineFeatures?: FeatureCollection<LineString>) => {
-    if (!lineFeatures || !Array.isArray(lineFeatures.features)) return null;
+  // Convert lines to polygons
+  const convertLinesToPolygons = useCallback((lineFeatures: FeatureCollection<LineString>) => {
+    if (!lineFeatures?.features?.length) return null;
 
     const buffered: Feature<Polygon>[] = lineFeatures.features.map(line =>
       buffer(line, 5, { units: 'meters' }) as Feature<Polygon>
@@ -70,9 +70,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return merged;
   }, []);
 
-  // Merge land (safe)
-  const mergeLand = useCallback((fc?: FeatureCollection<Polygon | MultiPolygon>) => {
-    if (!fc || !Array.isArray(fc.features)) return null;
+  // Merge all land
+  const mergeLand = useCallback((fc: FeatureCollection<Polygon | MultiPolygon>) => {
+    if (!fc?.features?.length) return null;
     let merged: Feature<Polygon | MultiPolygon> | null = null;
     for (const feat of fc.features) {
       merged = merged ? (union(merged, feat) as Feature<Polygon | MultiPolygon>) : feat;
@@ -80,9 +80,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return merged;
   }, []);
 
-  // Merge water (safe)
-  const mergeWater = useCallback((fc?: FeatureCollection<Polygon | MultiPolygon>) => {
-    if (!fc || !Array.isArray(fc.features)) return null;
+  // Merge all water
+  const mergeWater = useCallback((fc: FeatureCollection<Polygon | MultiPolygon>) => {
+    if (!fc?.features?.length) return null;
     let merged: Feature<Polygon | MultiPolygon> | null = null;
     for (const feat of fc.features) {
       merged = merged ? (union(merged, feat) as Feature<Polygon | MultiPolygon>) : feat;
@@ -114,11 +114,21 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, []);
 
-  // Add geographic data
+  // Add geographic data layers
   useEffect(() => {
-    if (!mapLoaded || !mapRef.current) return;
+    if (
+      !mapLoaded ||
+      !mapRef.current ||
+      !roadsData?.features?.length ||
+      !landData?.features?.length ||
+      !waterData?.features?.length
+    ) {
+      return;
+    }
+
     const map = mapRef.current;
 
+    // Merge land and water
     const landFeature = mergeLand(landData);
     const waterFeature = mergeWater(waterData);
 
@@ -128,9 +138,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       nycLand = difference(landFeature, waterFeature) as Feature<Polygon | MultiPolygon>;
     }
 
+    // Convert roads to polygons
     const roadsPolygon = convertLinesToPolygons(roadsData);
 
-    // Land
+    // Land layer
     if (nycLand) {
       map.addSource('nyc-land', { type: 'geojson', data: nycLand });
       map.addLayer({
@@ -144,7 +155,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
     }
 
-    // Water
+    // Water layer
     if (waterFeature) {
       map.addSource('nyc-water', { type: 'geojson', data: waterFeature });
       map.addLayer({
@@ -158,7 +169,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
     }
 
-    // Roads
+    // Roads layer
     if (roadsPolygon) {
       map.addSource('nyc-roads', { type: 'geojson', data: roadsPolygon });
       map.addLayer({
@@ -172,7 +183,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
     }
 
-    // Fit map
+    // Fit map to land
     if (nycLand) {
       const bounds = bbox(nycLand) as [number, number, number, number];
       map.fitBounds(bounds, { padding: 50 });
@@ -181,7 +192,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Add business markers
   useEffect(() => {
-    if (!mapLoaded || !businesses || !mapRef.current) return;
+    if (!mapLoaded || !businesses?.length || !mapRef.current) return;
     const map = mapRef.current;
 
     if (map.getSource('businesses')) {
