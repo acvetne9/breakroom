@@ -312,7 +312,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         
         console.log(`Found ${explicitWaterBodies.length} explicit water bodies`);
         
-        // Create water polygons from coastline segments using bounding box approach
+        // Create water polygons from coastline segments using convex hull approach
         const coastlineWaterBodies: Feature<Polygon | MultiPolygon>[] = [];
         
         // Group coastlines by proximity to create coherent water bodies
@@ -365,25 +365,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             // Create a polygon from all the collected coastline points
             if (currentCoords.length >= 6) { // Need at least 3 unique points for polygon
               try {
-                // Simple approach: create bounding polygon from coastline points
+                // Use convex hull to create a proper polygon
                 const points = currentCoords.map(coord => turf.point(coord));
-                
-                // Calculate bounding box of these points and create a polygon
                 const pointCollection = turf.featureCollection(points);
-                const bbox = turf.bbox(pointCollection);
-                const bboxPolygon = turf.bboxPolygon(bbox as [number, number, number, number]);
+                const hull = (turf as any).convexHull(pointCollection);
                 
-                if (bboxPolygon && bboxPolygon.geometry.type === 'Polygon') {
-                  const area = turf.area(bboxPolygon);
+                if (hull && hull.geometry.type === 'Polygon') {
+                  const area = turf.area(hull);
                   
                   // Only include significant water bodies (>50,000 sq meters)
                   if (area > 50000) {
-                    coastlineWaterBodies.push(bboxPolygon as Feature<Polygon>);
+                    coastlineWaterBodies.push(hull as Feature<Polygon>);
                     console.log(`Created water body from coastline group ${index}, area: ${Math.round(area)} sq meters`);
                   }
                 }
               } catch (hullErr) {
-                console.warn(`Could not create polygon for coastline group ${index}:`, hullErr);
+                console.warn(`Could not create convex hull for coastline group ${index}:`, hullErr);
               }
             }
           } catch (err) {
@@ -409,12 +406,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         
         // Add the resulting land area(s)
         if (totalLandArea) {
-          // Handle both Polygon and MultiPolygon results properly
-          const landFeature: Feature<Polygon | MultiPolygon, { [name: string]: any }> = {
-            ...totalLandArea,
-            properties: totalLandArea.properties || { landType: 'comprehensive', source: 'water-subtraction' }
-          };
-          allLandFeatures.push(landFeature);
+          if (totalLandArea.geometry.type === 'Polygon') {
+            allLandFeatures.push({
+              ...totalLandArea,
+              properties: totalLandArea.properties || { landType: 'comprehensive', source: 'water-subtraction' }
+            } as Feature<Polygon, { [name: string]: any }>);
+          } else if (totalLandArea.geometry.type === 'MultiPolygon') {
+            allLandFeatures.push({
+              ...totalLandArea,
+              properties: totalLandArea.properties || { landType: 'comprehensive', source: 'water-subtraction' }
+            } as Feature<MultiPolygon, { [name: string]: any }>);
+          }
         }
         
       } catch (err) {
@@ -435,19 +437,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           if (allCoastlineCoords.length >= 3) {
             const points = allCoastlineCoords.map(coord => turf.point(coord));
             const pointCollection = turf.featureCollection(points);
+            const hull = (turf as any).convexHull(pointCollection);
             
-            // Create bounding box polygon instead of convex hull
-            const bbox = turf.bbox(pointCollection);
-            const bboxPolygon = turf.bboxPolygon(bbox as [number, number, number, number]);
-            
-            if (bboxPolygon && bboxPolygon.geometry.type === 'Polygon') {
-              // Buffer the polygon slightly inward to create land
-              const buffered = turf.buffer(bboxPolygon, -0.001, { units: 'degrees' });
+            if (hull && hull.geometry.type === 'Polygon') {
+              // Buffer the hull slightly inward to create land
+              const buffered = turf.buffer(hull, -0.001, { units: 'degrees' });
               if (buffered && (buffered.geometry.type === 'Polygon' || buffered.geometry.type === 'MultiPolygon')) {
                 allLandFeatures.push({
                   ...buffered,
                   properties: { 
-                    landType: 'coastline-bbox-buffered',
+                    landType: 'coastline-hull-buffered',
                     source: 'fallback-buffer'
                   }
                 } as Feature<Polygon | MultiPolygon, { [name: string]: any }>);
@@ -486,7 +485,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           {
             id: 'background',
             type: 'background' as const,
-            paint: { 'background-color': '#87CEEB' } // Light blue background for water
+            paint: { 'background-color': '#D3D3D3' } // Changed from light blue to light gray
           }
         ]
       };
@@ -530,8 +529,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           data: geoData
         });
 
-        // NOTE: All land features including parks and cemeteries are now handled 
-        // in the main land-areas layer above to ensure consistent styling
+        // Fallback layers from main data (parks, coastlines, etc.)
+        mapInstance!.addLayer({
+          id: 'parks',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['==', 'leisure', 'park'] as any,
+          paint: {
+            'fill-color': '#4CAF50',
+            'fill-opacity': 0.8
+          }
+        });
 
         mapInstance!.addLayer({
           id: 'coastlines',
@@ -624,13 +632,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     } as any);
 
-    // Add water bodies (blue)
+    // Add water bodies (changed from light blue to gray)
     addOrUpdate('water-data', waterData, {
       id: 'water-bodies',
       type: 'fill',
       source: 'water-data',
       paint: { 
-        'fill-color': '#4A90E2', // Darker blue for water
+        'fill-color': '#808080', // Changed from #4A90E2 (blue) to gray
         'fill-opacity': 0.8 
       }
     } as any);
