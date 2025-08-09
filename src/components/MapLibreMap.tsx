@@ -84,24 +84,77 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       // APPROACH 2: Create land by subtracting water bodies from bounding box
       try {
-        // Get all water features
-        const waterFeatures = geoData.features.filter(feature => 
-          (feature.properties?.natural === 'water' ||
-           feature.properties?.waterway === 'riverbank' ||
-           feature.properties?.landuse === 'reservoir' ||
-           feature.properties?.water === 'lake' ||
-           feature.properties?.water === 'pond') &&
-          (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon')
-        );
+        // Get all water features based on the comprehensive Overpass query
+        const waterFeatures = geoData.features.filter(feature => {
+          const props = feature.properties;
+          if (!props) return false;
+          
+          return (
+            // Natural water bodies
+            props.natural === 'water' ||
+            
+            // Waterways - rivers, streams, canals (both LineString and Polygon)
+            (props.waterway && ['river', 'stream', 'canal', 'riverbank'].includes(props.waterway)) ||
+            
+            // Named major water bodies around NYC
+            (props.name && [
+              'Upper New York Bay', 'Lower New York Bay', 'Newark Bay', 'Jamaica Bay',
+              'Long Island Sound', 'Hudson River', 'East River', 'Harlem River',
+              'Arthur Kill', 'Kill Van Kull', 'Raritan Bay', 'Sheepshead Bay',
+              'Rockaway Inlet'
+            ].some(waterName => props.name.includes(waterName))) ||
+            
+            // Additional water-related landuse
+            props.landuse === 'reservoir' ||
+            props.landuse === 'basin' ||
+            
+            // Water-related leisure
+            props.leisure === 'marina' ||
+            
+            // Additional natural water features
+            props.natural === 'bay' ||
+            props.natural === 'strait' ||
+            
+            // Place types that are water
+            (props.place && ['sea', 'ocean', 'bay'].includes(props.place))
+          ) && 
+          // Only include polygonal water features for subtraction
+          (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon');
+        });
 
-        console.log(`Found ${waterFeatures.length} water features`);
+        console.log(`Found ${waterFeatures.length} water features for subtraction`);
+        
+        // Also get linear water features for buffering
+        const linearWaterFeatures = geoData.features.filter(feature => {
+          const props = feature.properties;
+          return props && 
+            feature.geometry.type === 'LineString' &&
+            (props.waterway && ['river', 'stream', 'canal'].includes(props.waterway));
+        });
+        
+        console.log(`Found ${linearWaterFeatures.length} linear water features`);
 
-        if (waterFeatures.length > 0) {
-          // Create a bounding box for the NYC area
-          const bbox: [number, number, number, number] = [-74.5, 40.3, -73.5, 41.0];
+        if (waterFeatures.length > 0 || linearWaterFeatures.length > 0) {
+          // Create a bounding box for the NYC area (matching your query bounds)
+          const bbox: [number, number, number, number] = [-74.30, 40.50, -73.70, 40.93];
           let landArea = turf.bboxPolygon(bbox);
 
-          // Subtract each water body from the land area
+          // First, buffer linear water features and subtract them
+          for (const linearWater of linearWaterFeatures) {
+            try {
+              const bufferedWater = turf.buffer(linearWater, 0.0005, { units: 'degrees' }); // ~50m buffer
+              if (bufferedWater) {
+                const difference = turf.difference(landArea, bufferedWater);
+                if (difference) {
+                  landArea = difference;
+                }
+              }
+            } catch (err) {
+              console.warn('Could not buffer and subtract linear water feature:', err);
+            }
+          }
+
+          // Then subtract polygonal water bodies from the land area
           for (const waterFeature of waterFeatures) {
             try {
               const difference = turf.difference(landArea, waterFeature as any);
@@ -119,7 +172,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ...landArea,
               properties: { 
                 landType: 'water-inverse',
-                source: 'water-subtraction'
+                source: 'water-subtraction',
+                waterFeaturesProcessed: waterFeatures.length + linearWaterFeatures.length
               }
             });
           }
