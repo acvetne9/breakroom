@@ -400,22 +400,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             // Create a polygon from all the collected coastline points
             if (currentCoords.length >= 6) { // Need at least 3 unique points for polygon
               try {
-                // Use convex hull to create a proper polygon
+                // Simple approach: create bounding polygon from coastline points
                 const points = currentCoords.map(coord => turf.point(coord));
-                const pointCollection = turf.featureCollection(points);
-                const hull = (turf as any).convexHull(pointCollection);
                 
-                if (hull && hull.geometry.type === 'Polygon') {
-                  const area = turf.area(hull);
+                // Calculate bounding box of these points and create a polygon
+                const pointCollection = turf.featureCollection(points);
+                const bbox = turf.bbox(pointCollection);
+                const bboxPolygon = turf.bboxPolygon(bbox as [number, number, number, number]);
+                
+                if (bboxPolygon && bboxPolygon.geometry.type === 'Polygon') {
+                  const area = turf.area(bboxPolygon);
                   
                   // Only include significant water bodies (>50,000 sq meters)
                   if (area > 50000) {
-                    coastlineWaterBodies.push(hull as Feature<Polygon>);
+                    coastlineWaterBodies.push(bboxPolygon as Feature<Polygon>);
                     console.log(`Created water body from coastline group ${index}, area: ${Math.round(area)} sq meters`);
                   }
                 }
               } catch (hullErr) {
-                console.warn(`Could not create convex hull for coastline group ${index}:`, hullErr);
+                console.warn(`Could not create polygon for coastline group ${index}:`, hullErr);
               }
             }
           } catch (err) {
@@ -441,17 +444,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         
         // Add the resulting land area(s)
         if (totalLandArea) {
-          if (totalLandArea.geometry.type === 'Polygon') {
-            allLandFeatures.push({
-              ...totalLandArea,
-              properties: totalLandArea.properties || { landType: 'comprehensive', source: 'water-subtraction' }
-            } as Feature<Polygon, { [name: string]: any }>);
-          } else if (totalLandArea.geometry.type === 'MultiPolygon') {
-            allLandFeatures.push({
-              ...totalLandArea,
-              properties: totalLandArea.properties || { landType: 'comprehensive', source: 'water-subtraction' }
-            } as Feature<MultiPolygon, { [name: string]: any }>);
-          }
+          // Handle both Polygon and MultiPolygon results properly
+          const landFeature: Feature<Polygon | MultiPolygon, { [name: string]: any }> = {
+            ...totalLandArea,
+            properties: totalLandArea.properties || { landType: 'comprehensive', source: 'water-subtraction' }
+          };
+          allLandFeatures.push(landFeature);
         }
         
       } catch (err) {
