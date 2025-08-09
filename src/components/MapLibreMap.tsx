@@ -33,63 +33,131 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, []);
 
-  const createLandFromCoastlines = useCallback((geoData: FeatureCollection): FeatureCollection => {
+  const createLandFromCoastlinesAndWater = useCallback((geoData: FeatureCollection): FeatureCollection => {
     try {
-      // Extract coastline features
+      const allLandFeatures: any[] = [];
+      
+      // APPROACH 1: Create polygons from coastlines
       const coastlines = geoData.features.filter(feature => 
         feature.geometry.type === 'LineString' &&
         feature.properties?.natural === 'coastline'
       );
 
-      if (coastlines.length === 0) {
-        console.warn('No coastline features found');
-        return { type: 'FeatureCollection', features: [] };
+      console.log(`Found ${coastlines.length} coastline features`);
+
+      for (const coastline of coastlines) {
+        try {
+          const coords = coastline.geometry.coordinates;
+          if (coords.length < 3) continue;
+          
+          // Check if coastline forms a closed loop or can be closed
+          const firstPoint = coords[0];
+          const lastPoint = coords[coords.length - 1];
+          const isAlreadyClosed = firstPoint[0] === lastPoint[0] && firstPoint[1] === lastPoint[1];
+          
+          // Only try to create polygon if we have enough points
+          if (coords.length >= 4 || (coords.length >= 3 && !isAlreadyClosed)) {
+            const closedCoords = isAlreadyClosed ? coords : [...coords, firstPoint];
+            
+            // Validate that we have a valid polygon (at least 4 points including closure)
+            if (closedCoords.length >= 4) {
+              const polygon = turf.polygon([closedCoords]);
+              
+              // Check if polygon is valid (has area)
+              const area = turf.area(polygon);
+              if (area > 1000) { // Only include polygons with significant area (>1000 sq meters)
+                allLandFeatures.push({
+                  ...polygon,
+                  properties: { 
+                    landType: 'coastline-derived',
+                    area: area,
+                    source: 'coastline'
+                  }
+                });
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Could not create polygon from coastline:', err);
+        }
       }
 
-      // Create a large bounding box for the NYC area
-      const bbox: [number, number, number, number] = [-74.5, 40.3, -73.5, 41.0];
-      const outerPolygon = turf.bboxPolygon(bbox);
+      // APPROACH 2: Create land by subtracting water bodies from bounding box
+      try {
+        // Get all water features
+        const waterFeatures = geoData.features.filter(feature => 
+          (feature.properties?.natural === 'water' ||
+           feature.properties?.waterway === 'riverbank' ||
+           feature.properties?.landuse === 'reservoir' ||
+           feature.properties?.water === 'lake' ||
+           feature.properties?.water === 'pond') &&
+          (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon')
+        );
 
-      // For now, let's create land polygons based on known NYC borough boundaries
-      // This is a simplified approach - in reality you'd need more complex polygon operations
+        console.log(`Found ${waterFeatures.length} water features`);
+
+        if (waterFeatures.length > 0) {
+          // Create a bounding box for the NYC area
+          const bbox: [number, number, number, number] = [-74.5, 40.3, -73.5, 41.0];
+          let landArea = turf.bboxPolygon(bbox);
+
+          // Subtract each water body from the land area
+          for (const waterFeature of waterFeatures) {
+            try {
+              const difference = turf.difference(landArea, waterFeature as any);
+              if (difference) {
+                landArea = difference;
+              }
+            } catch (err) {
+              console.warn('Could not subtract water body:', err);
+            }
+          }
+
+          // Add the resulting land mass
+          if (landArea) {
+            allLandFeatures.push({
+              ...landArea,
+              properties: { 
+                landType: 'water-inverse',
+                source: 'water-subtraction'
+              }
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Could not create land from water subtraction:', err);
+      }
+
+      // APPROACH 3: Fallback - create buffer around coastlines if other methods didn't work well
+      if (allLandFeatures.length === 0 && coastlines.length > 0) {
+        try {
+          console.log('Using fallback buffer approach');
+          const coastlineCollection = turf.featureCollection(coastlines);
+          const buffered = turf.buffer(coastlineCollection, 0.002, { units: 'degrees' });
+          
+          if (buffered) {
+            allLandFeatures.push({
+              ...buffered,
+              properties: { 
+                landType: 'coastline-buffered',
+                source: 'buffer-fallback'
+              }
+            });
+          }
+        } catch (err) {
+          console.warn('Buffer fallback also failed:', err);
+        }
+      }
+
+      console.log(`Created ${allLandFeatures.length} land features`);
       
-      const manhattanLand = turf.polygon([[
-        [-74.02, 40.70], [-73.97, 40.71], [-73.93, 40.78], [-73.93, 40.82],
-        [-73.97, 40.88], [-74.02, 40.87], [-74.02, 40.70]
-      ]]);
-
-      const brooklynLand = turf.polygon([[
-        [-74.05, 40.57], [-73.88, 40.57], [-73.86, 40.68], [-73.94, 40.73],
-        [-74.04, 40.68], [-74.05, 40.57]
-      ]]);
-
-      const queensLand = turf.polygon([[
-        [-73.96, 40.72], [-73.70, 40.72], [-73.70, 40.80], [-73.96, 40.80],
-        [-73.96, 40.72]
-      ]]);
-
-      const bronxLand = turf.polygon([[
-        [-73.93, 40.82], [-73.76, 40.82], [-73.76, 40.92], [-73.93, 40.92],
-        [-73.93, 40.82]
-      ]]);
-
-      const statenIslandLand = turf.polygon([[
-        [-74.26, 40.50], [-74.05, 40.50], [-74.05, 40.65], [-74.26, 40.65],
-        [-74.26, 40.50]
-      ]]);
-
       return {
         type: 'FeatureCollection',
-        features: [
-          { ...manhattanLand, properties: { landType: 'borough', name: 'Manhattan' } },
-          { ...brooklynLand, properties: { landType: 'borough', name: 'Brooklyn' } },
-          { ...queensLand, properties: { landType: 'borough', name: 'Queens' } },
-          { ...bronxLand, properties: { landType: 'borough', name: 'Bronx' } },
-          { ...statenIslandLand, properties: { landType: 'borough', name: 'Staten Island' } }
-        ]
+        features: allLandFeatures
       };
+      
     } catch (error) {
-      console.error('Error creating land from coastlines:', error);
+      console.error('Error creating land from coastlines and water:', error);
       return { type: 'FeatureCollection', features: [] };
     }
   }, []);
@@ -137,9 +205,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
         // Fit map to data
         try {
-          const bbox2d = turf.bbox(geoData) as [number, number, number, number];
-          if (bbox2d[0] !== bbox2d[2] && bbox2d[1] !== bbox2d[3]) {
-            mapInstance!.fitBounds(bbox2d, { padding: 100, duration: 1000 });
+          const dataBbox = turf.bbox(geoData) as [number, number, number, number];
+          if (dataBbox[0] !== dataBbox[2] && dataBbox[1] !== dataBbox[3]) {
+            mapInstance!.fitBounds(dataBbox, { padding: 100, duration: 1000 });
           }
         } catch (err) {
           console.warn('Could not calculate bbox:', err);
@@ -151,8 +219,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           data: geoData
         });
 
-        // Create land polygons from coastlines
-        const landPolygons = createLandFromCoastlines(geoData);
+        // Create land polygons from coastlines and water bodies
+        const landPolygons = createLandFromCoastlinesAndWater(geoData);
         mapInstance!.addSource('land-polygons', {
           type: 'geojson',
           data: landPolygons
@@ -277,7 +345,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
       setMap(null);
     };
-  }, [loadGeoJSONData, createLandFromCoastlines]);
+  }, [loadGeoJSONData, createLandFromCoastlinesAndWater]);
 
   return (
     <div
