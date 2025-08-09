@@ -358,4 +358,4 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   );
 };
 
-export default MapLibre
+export default MapLibreMap;
