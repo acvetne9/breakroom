@@ -164,7 +164,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: 'fill',
           source: 'land-polygons',
           paint: {
-            'fill-color': '#9E9E9E', // Gray land
+            'fill-color': '#DDDDDD', // Gray land
             'fill-opacity': 0.8
           }
         });
