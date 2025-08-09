@@ -191,15 +191,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [mapLoaded, roadsData, landData, waterData, mergeLand, mergeWater, convertLinesToPolygons]);
 
   // Add business markers
-  useEffect(() => {
-    if (!mapLoaded || !businesses?.length || !mapRef.current) return;
+useEffect(() => {
+    if (!mapLoaded || !businesses || !mapRef.current) return;
     const map = mapRef.current;
 
-    if (map.getSource('businesses')) {
+    // Remove existing business markers
+    const existingMarkers = map.getSource('businesses');
+    if (existingMarkers) {
       map.removeLayer('businesses-layer');
       map.removeSource('businesses');
     }
 
+    // Create GeoJSON from businesses
     const businessFeatures = businesses.map(business => ({
       type: 'Feature' as const,
       geometry: {
@@ -213,12 +216,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     }));
 
+    const businessFC = {
+      type: 'FeatureCollection' as const,
+      features: businessFeatures
+    };
+
+    // Add business source and layer (on top of other layers)
     map.addSource('businesses', {
       type: 'geojson',
-      data: {
-        type: 'FeatureCollection',
-        features: businessFeatures
-      }
+      data: businessFC
     });
 
     map.addLayer({
@@ -227,41 +233,48 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       source: 'businesses',
       paint: {
         'circle-radius': 8,
-        'circle-color': '#3B82F6',
+        'circle-color': '#3B82F6', // blue
         'circle-stroke-width': 2,
-        'circle-stroke-color': '#FFFFFF'
+        'circle-stroke-color': '#FFFFFF' // white
       }
     });
 
+    // Add click handler for businesses
     if (onBusinessClick) {
       map.on('click', 'businesses-layer', (e) => {
         if (e.features && e.features[0]) {
           const businessId = e.features[0].properties?.id;
           const business = businesses.find(b => b.id === businessId);
-          if (business) onBusinessClick(business);
+          if (business) {
+            onBusinessClick(business);
+          }
         }
       });
     }
 
+    // Change cursor on hover
     map.on('mouseenter', 'businesses-layer', () => {
       map.getCanvas().style.cursor = 'pointer';
     });
+
     map.on('mouseleave', 'businesses-layer', () => {
       map.getCanvas().style.cursor = '';
     });
 
   }, [mapLoaded, businesses, onBusinessClick]);
 
-  // Highlight selected business
+  // Handle selected business highlighting
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return;
     const map = mapRef.current;
+
+    // Update business layer styling based on selection
     if (map.getLayer('businesses-layer') && selectedBusiness) {
       map.setPaintProperty('businesses-layer', 'circle-color', [
         'case',
         ['==', ['get', 'id'], selectedBusiness.id],
-        '#EF4444',
-        '#3B82F6'
+        '#EF4444', // red for selected
+        '#3B82F6'  // blue for unselected
       ]);
     }
   }, [mapLoaded, selectedBusiness]);
