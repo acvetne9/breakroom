@@ -155,6 +155,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           name.toLowerCase().includes('wood')
         );
         console.log('All cemetery-related names found:', cemeteryNames);
+        console.log('CEMETERY_NAMES_COUNT:', cemeteryNames.length);
+        console.log('CEMETERY_NAMES_JSON:', JSON.stringify(cemeteryNames));
+        (window as any).__cemeteryNames = cemeteryNames;
         
         // Show top property combinations
         const sortedProps = Array.from(debugResults.propertyStats.entries())
