@@ -572,6 +572,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       source: 'roads-data',
       paint: { 'line-color': '#424242', 'line-width': 2 }
     } as any);
+
+    // Ensure businesses layer stays on top of all others
+    if (map.getLayer('businesses-layer')) {
+      map.moveLayer('businesses-layer');
+    }
   }, [mapLoaded, map, landData, waterData, roadsData]);
 
     // Add business markers to the map
@@ -621,6 +626,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           'circle-stroke-color': '#FFFFFF' // white
         }
       });
+
+      // Always keep businesses on top
+      if (map.getLayer('businesses-layer')) {
+        map.moveLayer('businesses-layer');
+      }
   
       // Add click handler for businesses
       if (onBusinessClick) {
