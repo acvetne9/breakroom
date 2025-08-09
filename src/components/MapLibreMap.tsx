@@ -22,10 +22,12 @@ interface MapLibreMapProps {
     }[];
     place_id?: string;
   }[];
+  onBusinessClick?: (business: any) => void;
+  selectedBusiness?: any;
 }
 
 
-const MapLibreMap: React.FC<MapLibreMapProps> = ({ geojsonData }) => {
+const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, selectedBusiness }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -64,50 +66,79 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ geojsonData }) => {
     };
   }, []);
 
+  // Add business markers to the map
   useEffect(() => {
-    if (!mapLoaded || !geojsonData || !geojsonData.features) return;
+    if (!mapLoaded || !businesses) return;
     const map = mapRef.current;
     if (!map) return;
 
-    // Process line features into polygons
-    const lineFeatures = geojsonData.features.filter(
-      f => f.geometry.type === 'LineString' || f.geometry.type === 'MultiLineString'
-    );
+    // Remove existing markers
+    const existingMarkers = map.getSource('businesses');
+    if (existingMarkers) {
+      map.removeLayer('businesses-layer');
+      map.removeSource('businesses');
+    }
 
-    const bufferedPolygons: Feature<Polygon | MultiPolygon>[] = [];
+    // Create GeoJSON from businesses
+    const businessFeatures = businesses.map(business => ({
+      type: 'Feature' as const,
+      geometry: {
+        type: 'Point' as const,
+        coordinates: [business.position.lng, business.position.lat]
+      },
+      properties: {
+        id: business.id,
+        name: business.name,
+        businessType: business.businessType || 'unknown'
+      }
+    }));
 
-    lineFeatures.forEach(line => {
-      const buffered = turf.buffer(line as Feature<LineString>, 5, { units: 'meters' });
-      const fc = toFeatureCollection(buffered);
-      fc.features.forEach(f => {
-        if (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon') {
-          bufferedPolygons.push(f as Feature<Polygon | MultiPolygon>);
-        }
-      });
+    const businessFC = {
+      type: 'FeatureCollection' as const,
+      features: businessFeatures
+    };
+
+    // Add source and layer
+    map.addSource('businesses', {
+      type: 'geojson',
+      data: businessFC
     });
 
-    const polygonFC = turf.featureCollection(bufferedPolygons);
+    map.addLayer({
+      id: 'businesses-layer',
+      type: 'circle',
+      source: 'businesses',
+      paint: {
+        'circle-radius': 8,
+        'circle-color': '#3B82F6',
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#FFFFFF'
+      }
+    });
 
-    if (!map.getSource('roads-polygons')) {
-      map.addSource('roads-polygons', {
-        type: 'geojson',
-        data: polygonFC,
+    // Add click handler
+    if (onBusinessClick) {
+      map.on('click', 'businesses-layer', (e) => {
+        if (e.features && e.features[0]) {
+          const businessId = e.features[0].properties?.id;
+          const business = businesses.find(b => b.id === businessId);
+          if (business) {
+            onBusinessClick(business);
+          }
+        }
       });
-
-      map.addLayer({
-        id: 'roads-fill',
-        type: 'fill',
-        source: 'roads-polygons',
-        paint: {
-          'fill-color': '#bbbbbb',
-          'fill-opacity': 0.8,
-        },
-      });
-    } else {
-      const source = map.getSource('roads-polygons') as maplibregl.GeoJSONSource;
-      source.setData(polygonFC);
     }
-  }, [mapLoaded, geojsonData]);
+
+    // Change cursor on hover
+    map.on('mouseenter', 'businesses-layer', () => {
+      map.getCanvas().style.cursor = 'pointer';
+    });
+
+    map.on('mouseleave', 'businesses-layer', () => {
+      map.getCanvas().style.cursor = '';
+    });
+
+  }, [mapLoaded, businesses, onBusinessClick]);
 
   return <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />;
 };
