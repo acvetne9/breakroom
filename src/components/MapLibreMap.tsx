@@ -569,7 +569,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         source: 'businesses',
         paint: {
           'circle-radius': 8,
-          'circle-color': '#3B82F6', // blue
+          'circle-color': '#FACC15', // yellow
           'circle-stroke-width': 2,
           'circle-stroke-color': '#FFFFFF' // white
         }
@@ -582,6 +582,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             const businessId = e.features[0].properties?.id;
             const business = businesses.find(b => b.id === businessId);
             if (business) {
+              // Zoom to the clicked business
+              map.flyTo({
+                center: [business.position.lng, business.position.lat],
+                zoom: 16,
+                duration: 800,
+                essential: true
+              });
               onBusinessClick(business);
             }
           }
@@ -604,13 +611,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       if (!mapLoaded || !map) return;
   
       // Update business layer styling based on selection
-      if (map.getLayer('businesses-layer') && selectedBusiness) {
-        map.setPaintProperty('businesses-layer', 'circle-color', [
-          'case',
-          ['==', ['get', 'id'], selectedBusiness.id],
-          '#EF4444', // red for selected
-          '#3B82F6'  // blue for unselected
-        ]);
+      if (map.getLayer('businesses-layer')) {
+        if (selectedBusiness) {
+          map.setPaintProperty('businesses-layer', 'circle-color', [
+            'case',
+            ['==', ['get', 'id'], selectedBusiness.id],
+            '#EF4444', // red for selected
+            '#FACC15'  // yellow for unselected
+          ]);
+        } else {
+          map.setPaintProperty('businesses-layer', 'circle-color', '#FACC15');
+        }
       }
     }, [mapLoaded, selectedBusiness]);
 
