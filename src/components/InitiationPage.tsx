@@ -32,13 +32,11 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     setSalary(cleanValue ? `$${cleanValue}` : '');
   };
   const checkForCompletion = () => {
-    const isValidRole = JOB_OPTIONS.includes(role);
-    const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '' && isValidRole;
+    const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
     console.log('checkForCompletion called:', {
       salary,
       role,
       location,
-      isValidRole,
       allFilled
     });
     if (allFilled && !isComplete) {
