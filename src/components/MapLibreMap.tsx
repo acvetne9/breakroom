@@ -97,21 +97,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           source: 'geojson-data',
           filter: [
             'all',
-            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-            ['none',
-              // Exclude water features
-              ['==', ['get', 'natural'], 'water'],
-              ['==', ['get', 'natural'], 'sea'],
-              ['==', ['get', 'natural'], 'bay'],
-              ['==', ['get', 'water'], 'ocean'],
-              ['==', ['get', 'water'], 'bay'],
-              ['==', ['get', 'water'], 'river'],
-              ['==', ['get', 'water'], 'lake'],
-              ['==', ['get', 'water'], 'pond'],
-              ['==', ['get', 'waterway'], 'riverbank'],
-              ['==', ['get', 'landuse'], 'reservoir'],
-              ['==', ['get', 'leisure'], 'marina'],
-              ['has', 'water']
+            ['in', '$type', 'Polygon', 'MultiPolygon'],
+            ['!',
+              ['any',
+                ['==', ['get', 'natural'], 'water'],
+                ['==', ['get', 'natural'], 'sea'],
+                ['==', ['get', 'natural'], 'bay'],
+                ['==', ['get', 'water'], 'ocean'],
+                ['==', ['get', 'water'], 'bay'],
+                ['==', ['get', 'water'], 'river'],
+                ['==', ['get', 'water'], 'lake'],
+                ['==', ['get', 'water'], 'pond'],
+                ['==', ['get', 'waterway'], 'riverbank'],
+                ['==', ['get', 'landuse'], 'reservoir'],
+                ['==', ['get', 'leisure'], 'marina'],
+                ['has', 'water']
+              ]
             ]
           ],
           paint: {
@@ -127,7 +128,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           source: 'geojson-data',
           filter: [
             'all',
-            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+            ['in', '$type', 'Polygon', 'MultiPolygon'],
             ['any',
               // Natural water features
               ['==', ['get', 'natural'], 'water'],
@@ -153,15 +154,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ['==', ['get', 'leisure'], 'marina'],
               // Generic water property
               ['has', 'water'],
-              // Specific named water bodies (common NYC water body names)
-              ['in', ['get', 'name'], ['literal', [
-                'Hudson River', 'East River', 'Harlem River', 'Gowanus Canal',
-                'Newtown Creek', 'Arthur Kill', 'Kill Van Kull', 'The Narrows',
-                'Upper New York Bay', 'Lower New York Bay', 'Jamaica Bay',
-                'Flushing Bay', 'Bowery Bay', 'Little Hell Gate', 'Bronx River',
-                'Hutchinson River', 'Westchester Creek', 'Pelham Bay',
-                'Long Island Sound', 'Atlantic Ocean'
-              ]]]
+              // Specific named water bodies (using individual checks for compatibility)
+              ['==', ['get', 'name'], 'Hudson River'],
+              ['==', ['get', 'name'], 'East River'],
+              ['==', ['get', 'name'], 'Harlem River'],
+              ['==', ['get', 'name'], 'Gowanus Canal'],
+              ['==', ['get', 'name'], 'Newtown Creek'],
+              ['==', ['get', 'name'], 'Arthur Kill'],
+              ['==', ['get', 'name'], 'Kill Van Kull'],
+              ['==', ['get', 'name'], 'The Narrows'],
+              ['==', ['get', 'name'], 'Upper New York Bay'],
+              ['==', ['get', 'name'], 'Lower New York Bay'],
+              ['==', ['get', 'name'], 'Jamaica Bay'],
+              ['==', ['get', 'name'], 'Flushing Bay'],
+              ['==', ['get', 'name'], 'Bowery Bay'],
+              ['==', ['get', 'name'], 'Little Hell Gate'],
+              ['==', ['get', 'name'], 'Bronx River'],
+              ['==', ['get', 'name'], 'Hutchinson River'],
+              ['==', ['get', 'name'], 'Westchester Creek'],
+              ['==', ['get', 'name'], 'Pelham Bay'],
+              ['==', ['get', 'name'], 'Long Island Sound'],
+              ['==', ['get', 'name'], 'Atlantic Ocean']
             ]
           ],
           paint: {
@@ -177,7 +190,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           source: 'geojson-data',
           filter: [
             'all',
-            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+            ['in', '$type', 'Polygon', 'MultiPolygon'],
             ['any',
               ['==', ['get', 'leisure'], 'park'],
               ['==', ['get', 'landuse'], 'recreation_ground'],
@@ -198,7 +211,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           source: 'geojson-data',
           filter: [
             'all',
-            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+            ['in', '$type', 'LineString', 'MultiLineString'],
             ['has', 'highway']
           ],
           paint: {
@@ -226,7 +239,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           source: 'geojson-data',
           filter: [
             'all',
-            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+            ['in', '$type', 'LineString', 'MultiLineString'],
             ['any',
               ['==', ['get', 'natural'], 'coastline'],
               ['==', ['get', 'natural'], 'shoreline']
@@ -245,7 +258,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           source: 'geojson-data',
           filter: [
             'all',
-            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+            ['in', '$type', 'LineString', 'MultiLineString'],
             ['any',
               ['==', ['get', 'waterway'], 'river'],
               ['==', ['get', 'waterway'], 'canal'],
