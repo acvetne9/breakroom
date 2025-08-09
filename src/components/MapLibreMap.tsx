@@ -52,6 +52,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Convert lines (roads, bridges, tunnels) to polygons
   const convertLinesToPolygons = useCallback((lineFeatures: FeatureCollection<LineString>) => {
+    if (!lineFeatures || !lineFeatures.features || lineFeatures.features.length === 0) {
+      return null;
+    }
+    
     const buffered: Feature<Polygon>[] = lineFeatures.features.map(line =>
       buffer(line, 5, { units: 'meters' }) as Feature<Polygon>
     );
@@ -67,6 +71,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Merge all land into single feature
   const mergeLand = useCallback((fc: FeatureCollection<Polygon | MultiPolygon>) => {
+    if (!fc || !fc.features || fc.features.length === 0) {
+      return null;
+    }
+    
     let merged: Feature<Polygon | MultiPolygon> | null = null;
     for (const feat of fc.features) {
       merged = merged ? (union(merged, feat) as Feature<Polygon | MultiPolygon>) : feat;
@@ -76,6 +84,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Merge all water into single feature
   const mergeWater = useCallback((fc: FeatureCollection<Polygon | MultiPolygon>) => {
+    if (!fc || !fc.features || fc.features.length === 0) {
+      return null;
+    }
+    
     let merged: Feature<Polygon | MultiPolygon> | null = null;
     for (const feat of fc.features) {
       merged = merged ? (union(merged, feat) as Feature<Polygon | MultiPolygon>) : feat;
@@ -112,6 +124,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (!mapLoaded || !mapRef.current) return;
 
     const map = mapRef.current;
+
+    // Check if we have required data
+    if (!roadsData || !landData || !waterData) {
+      console.warn('Missing geographic data:', { roadsData, landData, waterData });
+      return;
+    }
 
     // 1. Merge land & water
     const landFeature = mergeLand(landData);
