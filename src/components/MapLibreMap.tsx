@@ -90,21 +90,152 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           data: geoData
         });
 
-        // --- ALL POLYGONS as gray land (no filtering at all)
+        // --- LAND STRATEGY: Target specific land use types
+        
+        // Residential areas
         mapInstance!.addLayer({
-          id: 'all-polygons',
+          id: 'residential',
           type: 'fill',
           source: 'geojson-data',
+          filter: ['==', 'landuse', 'residential'] as any,
           paint: {
-            'fill-color': '#9E9E9E', // Gray for all polygons
+            'fill-color': '#BDBDBD', // Light gray for residential
             'fill-opacity': 0.8
           }
         });
 
-        // --- Water features (blue overlays on top of gray)
-        // Natural water
+        // Commercial areas
         mapInstance!.addLayer({
-          id: 'water1',
+          id: 'commercial',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['==', 'landuse', 'commercial'] as any,
+          paint: {
+            'fill-color': '#9E9E9E', // Medium gray for commercial
+            'fill-opacity': 0.8
+          }
+        });
+
+        // Industrial areas
+        mapInstance!.addLayer({
+          id: 'industrial',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['==', 'landuse', 'industrial'] as any,
+          paint: {
+            'fill-color': '#757575', // Darker gray for industrial
+            'fill-opacity': 0.8
+          }
+        });
+
+        // Built-up areas (buildings, construction)
+        mapInstance!.addLayer({
+          id: 'built-up',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['==', 'landuse', 'construction'] as any,
+          paint: {
+            'fill-color': '#9E9E9E',
+            'fill-opacity': 0.7
+          }
+        });
+
+        // Administrative boundaries (often represent developed areas)
+        mapInstance!.addLayer({
+          id: 'admin-areas',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['has', 'admin_level'] as any,
+          paint: {
+            'fill-color': '#EEEEEE', // Very light gray for admin areas
+            'fill-opacity': 0.3
+          }
+        });
+
+        // Places (cities, neighborhoods, etc.)
+        mapInstance!.addLayer({
+          id: 'places',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['==', 'place', 'city'] as any,
+          paint: {
+            'fill-color': '#9E9E9E',
+            'fill-opacity': 0.5
+          }
+        });
+
+        mapInstance!.addLayer({
+          id: 'neighborhoods',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['==', 'place', 'neighbourhood'] as any,
+          paint: {
+            'fill-color': '#BDBDBD',
+            'fill-opacity': 0.4
+          }
+        });
+
+        // Islands (definitely land)
+        mapInstance!.addLayer({
+          id: 'islands',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['==', 'place', 'island'] as any,
+          paint: {
+            'fill-color': '#9E9E9E',
+            'fill-opacity': 0.8
+          }
+        });
+
+        // Landuse areas that are clearly land
+        mapInstance!.addLayer({
+          id: 'retail',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['==', 'landuse', 'retail'] as any,
+          paint: {
+            'fill-color': '#9E9E9E',
+            'fill-opacity': 0.8
+          }
+        });
+
+        mapInstance!.addLayer({
+          id: 'education',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['==', 'landuse', 'education'] as any,
+          paint: {
+            'fill-color': '#9E9E9E',
+            'fill-opacity': 0.7
+          }
+        });
+
+        // --- PARKS AND GREEN SPACES (on land, so gray base with green tint)
+        mapInstance!.addLayer({
+          id: 'parks',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['==', 'leisure', 'park'] as any,
+          paint: {
+            'fill-color': '#4CAF50',
+            'fill-opacity': 0.7
+          }
+        });
+
+        mapInstance!.addLayer({
+          id: 'recreation',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: ['==', 'landuse', 'recreation_ground'] as any,
+          paint: {
+            'fill-color': '#66BB6A',
+            'fill-opacity': 0.6
+          }
+        });
+
+        // --- WATER FEATURES (keep these blue)
+        mapInstance!.addLayer({
+          id: 'water-natural',
           type: 'fill',
           source: 'geojson-data',
           filter: ['==', 'natural', 'water'] as any,
@@ -114,9 +245,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         });
 
-        // Riverbanks
         mapInstance!.addLayer({
-          id: 'water2',
+          id: 'water-riverbank',
           type: 'fill',
           source: 'geojson-data',
           filter: ['==', 'waterway', 'riverbank'] as any,
@@ -126,78 +256,30 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         });
 
-        // Reservoirs
+        // --- TRANSPORTATION (gray infrastructure on land)
         mapInstance!.addLayer({
-          id: 'water3',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: ['==', 'landuse', 'reservoir'] as any,
-          paint: {
-            'fill-color': '#2196F3',
-            'fill-opacity': 0.9
-          }
-        });
-
-        // Water property
-        mapInstance!.addLayer({
-          id: 'water4',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: ['has', 'water'] as any,
-          paint: {
-            'fill-color': '#2196F3',
-            'fill-opacity': 0.9
-          }
-        });
-
-        // Sea/bay features
-        mapInstance!.addLayer({
-          id: 'water5',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: ['==', 'natural', 'sea'] as any,
-          paint: {
-            'fill-color': '#2196F3',
-            'fill-opacity': 0.9
-          }
-        });
-
-        mapInstance!.addLayer({
-          id: 'water6',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: ['==', 'natural', 'bay'] as any,
-          paint: {
-            'fill-color': '#2196F3',
-            'fill-opacity': 0.9
-          }
-        });
-
-        // Parks (green overlay)
-        mapInstance!.addLayer({
-          id: 'parks',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: ['==', 'leisure', 'park'] as any,
-          paint: {
-            'fill-color': '#4CAF50',
-            'fill-opacity': 0.6
-          }
-        });
-
-        // Roads (lines)
-        mapInstance!.addLayer({
-          id: 'roads',
+          id: 'roads-major',
           type: 'line',
           source: 'geojson-data',
-          filter: ['has', 'highway'] as any,
+          filter: ['in', 'highway', 'motorway', 'trunk', 'primary'] as any,
           paint: {
             'line-color': '#424242',
+            'line-width': 3
+          }
+        });
+
+        mapInstance!.addLayer({
+          id: 'roads-minor',
+          type: 'line',
+          source: 'geojson-data',
+          filter: ['in', 'highway', 'secondary', 'tertiary', 'residential'] as any,
+          paint: {
+            'line-color': '#616161',
             'line-width': 1.5
           }
         });
 
-        // Water lines (rivers, coastlines)
+        // --- COASTLINES (to define land boundaries)
         mapInstance!.addLayer({
           id: 'coastline',
           type: 'line',
@@ -209,6 +291,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         });
 
+        // --- WATER LINES
         mapInstance!.addLayer({
           id: 'rivers',
           type: 'line',
@@ -216,9 +299,37 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           filter: ['==', 'waterway', 'river'] as any,
           paint: {
             'line-color': '#2196F3',
+            'line-width': 3
+          }
+        });
+
+        mapInstance!.addLayer({
+          id: 'canals',
+          type: 'line',
+          source: 'geojson-data',
+          filter: ['==', 'waterway', 'canal'] as any,
+          paint: {
+            'line-color': '#2196F3',
             'line-width': 2
           }
         });
+
+        // --- Create a large land polygon for NYC area
+        const nycLandBounds = turf.bboxPolygon([-74.25, 40.47, -73.70, 40.92]);
+        mapInstance!.addSource('nyc-land', {
+          type: 'geojson',
+          data: nycLandBounds
+        });
+
+        mapInstance!.addLayer({
+          id: 'nyc-base-land',
+          type: 'fill',
+          source: 'nyc-land',
+          paint: {
+            'fill-color': '#E0E0E0', // Very light gray base for all of NYC
+            'fill-opacity': 0.3
+          }
+        }, 'residential'); // Add this layer below other land layers
       });
 
       mapInstance.on('error', e => {
@@ -247,4 +358,4 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   );
 };
 
-export default MapLibreMap;
+export default MapLibre
