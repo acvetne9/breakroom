@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { FeatureCollection, Feature, Polygon, MultiPolygon, LineString } from 'geojson';
+import type { FeatureCollection, Feature } from 'geojson';
 import maplibregl from 'maplibre-gl';
 import * as turf from '@turf/turf';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -26,13 +26,14 @@ interface MapLibreMapProps {
   selectedBusiness?: any;
 }
 
-
-const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, selectedBusiness }) => {
+const MapLibreMap: React.FC<MapLibreMapProps> = ({
+  businesses,
+  onBusinessClick
+}) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
-  // Utility: always return a FeatureCollection
   const toFeatureCollection = (
     input: FeatureCollection | Feature
   ): FeatureCollection => {
@@ -48,11 +49,31 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
       container: mapContainerRef.current,
       style: {
         version: 8,
-        sources: {},
-        layers: [],
+        sources: {
+          // Using OpenStreetMap raster tiles (can be swapped for vector if you want to stay 100% local)
+          'osm-tiles': {
+            type: 'raster',
+            tiles: [
+              'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+            ],
+            tileSize: 256
+          }
+        },
+        layers: [
+          {
+            id: 'background',
+            type: 'background',
+            paint: { 'background-color': '#d0d0d0' } // light gray background
+          },
+          {
+            id: 'osm-tiles-layer',
+            type: 'raster',
+            source: 'osm-tiles'
+          }
+        ]
       },
       center: [-74.006, 40.7128],
-      zoom: 11,
+      zoom: 11
     });
 
     map.on('load', () => {
@@ -60,26 +81,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
     });
 
     mapRef.current = map;
-
     return () => {
       map.remove();
     };
   }, []);
 
-  // Add business markers to the map
   useEffect(() => {
     if (!mapLoaded || !businesses) return;
     const map = mapRef.current;
     if (!map) return;
 
-    // Remove existing markers
-    const existingMarkers = map.getSource('businesses');
-    if (existingMarkers) {
-      map.removeLayer('businesses-layer');
+    if (map.getSource('businesses')) {
+      if (map.getLayer('businesses-layer')) {
+        map.removeLayer('businesses-layer');
+      }
       map.removeSource('businesses');
     }
 
-    // Create GeoJSON from businesses
     const businessFeatures = businesses.map(business => ({
       type: 'Feature' as const,
       geometry: {
@@ -98,7 +116,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
       features: businessFeatures
     };
 
-    // Add source and layer
     map.addSource('businesses', {
       type: 'geojson',
       data: businessFC
@@ -116,9 +133,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
       }
     });
 
-    // Add click handler
     if (onBusinessClick) {
-      map.on('click', 'businesses-layer', (e) => {
+      map.on('click', 'businesses-layer', e => {
         if (e.features && e.features[0]) {
           const businessId = e.features[0].properties?.id;
           const business = businesses.find(b => b.id === businessId);
@@ -129,18 +145,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({ businesses, onBusinessClick, 
       });
     }
 
-    // Change cursor on hover
     map.on('mouseenter', 'businesses-layer', () => {
       map.getCanvas().style.cursor = 'pointer';
     });
-
     map.on('mouseleave', 'businesses-layer', () => {
       map.getCanvas().style.cursor = '';
     });
-
   }, [mapLoaded, businesses, onBusinessClick]);
 
-  return <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />;
+  return (
+    <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
+  );
 };
 
 export default MapLibreMap;
