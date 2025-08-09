@@ -1,10 +1,20 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import type { FeatureCollection } from 'geojson';
+import type { FeatureCollection, Polygon, MultiPolygon } from 'geojson';
 import maplibregl from 'maplibre-gl';
 import * as turf from '@turf/turf';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
-const MapLibreMap: React.FC = () => {
+interface MapLibreMapProps {
+  businesses: any[];
+  onBusinessClick: (business: any) => void;
+  selectedBusiness: any;
+}
+
+const MapLibreMap: React.FC<MapLibreMapProps> = ({
+  businesses,
+  onBusinessClick,
+  selectedBusiness
+}) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
 
@@ -30,78 +40,204 @@ const MapLibreMap: React.FC = () => {
     let cleanedUp = false;
 
     const initializeMap = async () => {
+      const baseStyle = {
+        version: 8 as const,
+        sources: {},
+        layers: [
+          {
+            id: 'background',
+            type: 'background' as const,
+            paint: { 'background-color': '#e5e5e5' } // Light gray background land
+          }
+        ]
+      };
+
       mapInstance = new maplibregl.Map({
         container: mapRef.current!,
-        style: {
-          version: 8,
-          sources: {},
-          layers: [
-            {
-              id: 'background',
-              type: 'background',
-              paint: { 'background-color': '#f0f0f0' }
-            }
-          ]
-        },
+        style: baseStyle,
         center: [-73.9712, 40.7831],
         zoom: 12
       });
+
+      const nycBounds: maplibregl.LngLatBoundsLike = [
+        [-74.25909, 40.477399],
+        [-73.700272, 40.917577]
+      ];
+      mapInstance.setMaxBounds(nycBounds);
 
       mapInstance.on('load', async () => {
         if (cleanedUp) return;
 
         const geoData = await loadGeoJSONData();
-        if (!geoData) return;
+        if (!geoData || !geoData.features.length) {
+          console.warn('No GeoJSON features loaded.');
+          return;
+        }
 
+        // Fit map to data
+        try {
+          const bbox2d = turf.bbox(geoData) as [number, number, number, number];
+          if (bbox2d[0] !== bbox2d[2] && bbox2d[1] !== bbox2d[3]) {
+            mapInstance!.fitBounds(bbox2d, { padding: 100, duration: 1000 });
+          }
+        } catch (err) {
+          console.warn('Could not calculate bbox:', err);
+        }
+
+        // Main data source
         mapInstance!.addSource('geojson-data', {
           type: 'geojson',
           data: geoData
         });
 
-        // Parks: Polygon where leisure = park
+        // --- Build ocean background outside of land polygons
+        const mapBbox: [number, number, number, number] = [-75, 40.2, -73, 41.2];
+        const oceanPoly = turf.bboxPolygon(mapBbox);
+
+        // Extract land polygons
+        const landFeatures = geoData.features.filter(f =>
+          (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon') &&
+          !(
+            (f.properties?.natural === 'water') ||
+            (f.properties?.water) ||
+            (f.properties?.natural === 'sea') ||
+            (f.properties?.water === 'ocean') ||
+            (f.properties?.water === 'bay') ||
+            (f.properties?.landuse === 'reservoir') ||
+            (f.properties?.waterway)
+          )
+        );
+
+        // Use simple ocean polygon without holes for now
+        const oceanWithHoles = oceanPoly;
+
+        mapInstance!.addSource('ocean', { type: 'geojson', data: oceanWithHoles });
+        mapInstance!.addSource('ocean', { type: 'geojson', data: oceanWithHoles });
         mapInstance!.addLayer({
-          id: 'parks',
+          id: 'ocean',
+          type: 'fill',
+          source: 'ocean',
+          paint: {
+            'fill-color': '#64B5F6', // Blue water
+            'fill-opacity': 0.7
+          }
+        });
+        
+        // ✅ Add this block right here
+        mapInstance!.addLayer({
+          id: 'land',
           type: 'fill',
           source: 'geojson-data',
-          filter: ['all', ['==', '$type', 'Polygon'], ['==', ['get', 'leisure'], 'park']],
+          filter: [
+            'all',
+            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+            ['!', [
+              'any',
+              ['==', ['get', 'natural'], 'water'],
+              ['==', ['get', 'natural'], 'sea'],
+              ['==', ['get', 'natural'], 'bay'],
+              ['==', ['get', 'water'], 'ocean'],
+              ['==', ['get', 'water'], 'bay'],
+              ['==', ['get', 'water'], 'river'],
+              ['==', ['get', 'landuse'], 'reservoir'],
+              ['==', ['get', 'waterway'], 'riverbank'],
+              ['has', 'water']
+            ]]
+          ],
           paint: {
-            'fill-color': '#81C784',
-            'fill-opacity': 0.5
+            'fill-color': '#e5e5e5',
+            'fill-opacity': 1
           }
         });
 
-        // Water: Polygon where natural = water
+
+        // --- Water polygons from data
         mapInstance!.addLayer({
           id: 'water',
           type: 'fill',
           source: 'geojson-data',
-          filter: ['all', ['==', '$type', 'Polygon'], ['==', ['get', 'natural'], 'water']],
+          filter: [
+            'all',
+            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+            ['any',
+              ['==', ['get', 'natural'], 'water'],
+              ['==', ['get', 'natural'], 'sea'],
+              ['==', ['get', 'natural'], 'bay'],
+              ['==', ['get', 'water'], 'ocean'],
+              ['==', ['get', 'water'], 'bay'],
+              ['==', ['get', 'water'], 'river'],
+              ['==', ['get', 'waterway'], 'riverbank'],
+              ['has', 'water']
+            ]
+          ],
           paint: {
             'fill-color': '#64B5F6',
+            'fill-opacity': 0.85
+          }
+        });
+
+        // --- Parks
+        mapInstance!.addLayer({
+          id: 'parks',
+          type: 'fill',
+          source: 'geojson-data',
+          filter: [
+            'all',
+            ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+            ['==', ['get', 'leisure'], 'park']
+          ],
+          paint: {
+            'fill-color': '#81C784',
             'fill-opacity': 0.6
           }
         });
 
-        // Roads: LineString features, no filter on 'highway' property to be safe
+        // --- Roads
         mapInstance!.addLayer({
           id: 'roads',
           type: 'line',
           source: 'geojson-data',
-          filter: ['==', '$type', 'LineString'],
+          filter: [
+            'all',
+            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+            ['has', 'highway']
+          ],
           paint: {
-            'line-color': '#888888',
-            'line-width': 1.5
+            'line-color': '#555',
+            'line-width': [
+              'match',
+              ['get', 'highway'],
+              'motorway', 3,
+              'trunk', 2.5,
+              'primary', 2.2,
+              'secondary', 2,
+              'tertiary', 1.5,
+              'unclassified', 1.2,
+              'residential', 1,
+              'living_street', 1,
+              0.8
+            ]
           }
         });
 
-        // Fit map to data bounds with padding
-        const bbox = turf.bbox(geoData);
-        mapInstance!.fitBounds(bbox as [number, number, number, number], {
-          padding: 100,
-          duration: 1000
+        // --- Coastline
+        mapInstance!.addLayer({
+          id: 'coastline',
+          type: 'line',
+          source: 'geojson-data',
+          filter: [
+            'all',
+            ['in', ['geometry-type'], ['literal', ['LineString', 'MultiLineString']]],
+            ['any',
+              ['==', ['get', 'natural'], 'coastline'],
+              ['==', ['get', 'natural'], 'shoreline']
+            ]
+          ],
+          paint: {
+            'line-color': '#5D4037',
+            'line-width': 2
+          }
         });
-
-        setMap(mapInstance);
       });
 
       mapInstance.on('error', e => {
@@ -123,7 +259,7 @@ const MapLibreMap: React.FC = () => {
   return (
     <div
       ref={mapRef}
-      style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: '#f0f0f0' }}
+      style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
     />
   );
 };
