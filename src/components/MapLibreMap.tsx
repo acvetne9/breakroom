@@ -520,12 +520,59 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
       setMap(null);
     };
-  }, [loadGeoJSONData, roadsData, landData, waterData]);
+  }, [loadGeoJSONData]);
 
   // Load geographic data on mount
   useEffect(() => {
     loadGeographicData();
   }, [loadGeographicData]);
+
+  // Add or update geographic sources/layers when data arrives (no map reinit)
+  useEffect(() => {
+    if (!mapLoaded || !map) return;
+
+    const addOrUpdate = (
+      sourceId: string,
+      data: FeatureCollection | null,
+      layer: any
+    ) => {
+      if (!data) return;
+      const existing = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
+      if (existing) {
+        existing.setData(data as any);
+        // Ensure layer exists
+        if (!map.getLayer(layer.id)) {
+          map.addLayer(layer);
+        }
+      } else {
+        map.addSource(sourceId, { type: 'geojson', data });
+        if (!map.getLayer(layer.id)) {
+          map.addLayer(layer);
+        }
+      }
+    };
+
+    addOrUpdate('land-data', landData, {
+      id: 'land-areas',
+      type: 'fill',
+      source: 'land-data',
+      paint: { 'fill-color': '#E0E0E0', 'fill-opacity': 0.9 }
+    } as any);
+
+    addOrUpdate('water-data', waterData, {
+      id: 'water-bodies',
+      type: 'fill',
+      source: 'water-data',
+      paint: { 'fill-color': '#2196F3', 'fill-opacity': 0.9 }
+    } as any);
+
+    addOrUpdate('roads-data', roadsData, {
+      id: 'roads',
+      type: 'line',
+      source: 'roads-data',
+      paint: { 'line-color': '#424242', 'line-width': 2 }
+    } as any);
+  }, [mapLoaded, map, landData, waterData, roadsData]);
 
     // Add business markers to the map
     useEffect(() => {
