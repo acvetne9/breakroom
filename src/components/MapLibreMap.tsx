@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import type { Feature, FeatureCollection, Polygon, MultiPolygon, LineString } from 'geojson';
+import type { Feature, FeatureCollection, Polygon, MultiPolygon, LineString, MultiLineString } from 'geojson';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import * as turf from '@turf/turf';
@@ -75,180 +75,115 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     { name: "Mount Hebron Cemetery", center: [-73.8440, 40.6340], radius: 0.004 }
   ];
 
-  // Create land polygon from coastlines - land is INSIDE coastlines
-  const createLandFromCoastlines = useCallback((geoData: FeatureCollection): FeatureCollection<Polygon | MultiPolygon> => {
-    try {
-      console.log('Creating land from coastlines...');
+  // Better strategy: Process explicit features first, then use intelligent defaults
+  const processGeographicFeatures = useCallback((geoData: FeatureCollection) => {
+    console.log(`Processing ${geoData.features.length} geographic features...`);
+    
+    // 1. Extract explicit water features
+    const explicitWater = geoData.features.filter(feature => {
+      if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
       
-      const coastlines = geoData.features.filter(feature => 
-        feature.geometry.type === 'LineString' && feature.properties?.natural === 'coastline'
-      ) as Feature<LineString, { [name: string]: any }>[];
+      const props = feature.properties || {};
+      const name = (props.name || '').toLowerCase();
+      
+      // Direct water tags
+      if (props.natural === 'water' || props.natural === 'bay') return true;
+      if (props.waterway) return true;
+      if (props.place === 'sea' || props.place === 'ocean') return true;
+      
+      // Named water bodies
+      if (waterKeywords.some(waterName => 
+        name.includes(waterName.toLowerCase()) ||
+        name === waterName.toLowerCase()
+      )) return true;
+      
+      return false;
+    }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
 
-      console.log(`Found ${coastlines.length} coastline features`);
+    // 2. Extract explicit land features (parks, forests, etc.)
+    const explicitLand = geoData.features.filter(feature => {
+      if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
+      
+      const props = feature.properties || {};
+      const name = (props.name || '').toLowerCase();
+      
+      // Parks and leisure
+      if (['park', 'garden', 'recreation_ground', 'playground'].includes(props.leisure)) return true;
+      
+      // Natural land features
+      if (['wood', 'forest', 'grassland', 'scrub', 'sand', 'beach'].includes(props.natural)) return true;
+      
+      // Cemeteries
+      if (props.leisure === 'cemetery' || cemeteryKeywords.some(keyword => name.includes(keyword))) return true;
+      
+      // Famous land areas
+      if (['central park', 'prospect park', 'bryant park', 'governors island', 
+           'staten island', 'liberty island', 'ellis island'].some(landmark => 
+           name.includes(landmark))) return true;
+      
+      return false;
+    }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
 
-      if (coastlines.length === 0) {
-        // Fallback: create default land area
-        const bbox: [number, number, number, number] = [-74.30, 40.50, -73.70, 40.93];
-        const landArea = turf.bboxPolygon(bbox);
-        return {
-          type: 'FeatureCollection',
-          features: [{
-            ...landArea,
-            properties: { landType: 'default-bbox', source: 'fallback' }
-          } as Feature<Polygon, { [name: string]: any }>]
-        };
-      }
+    // 3. Process coastlines for land/water boundaries
+    const coastlines = geoData.features.filter(feature => 
+      feature.geometry.type === 'LineString' && 
+      feature.properties?.natural === 'coastline'
+    ) as Feature<LineString, { [name: string]: any }>[];
 
-      // Process coastlines to create enclosed land polygons
-      let landPolygons: Feature<Polygon | MultiPolygon, { [name: string]: any }>[] = [];
+    console.log(`Found: ${explicitWater.length} water, ${explicitLand.length} land, ${coastlines.length} coastlines`);
+    
+    return { explicitWater, explicitLand, coastlines };
+  }, [waterKeywords, cemeteryKeywords]);
 
-      try {
-        // Attempt to merge all coastline segments
-        let mergedCoastlines;
-        if (coastlines.length > 1) {
-          const combined = turf.combine(turf.featureCollection(coastlines));
-          // Check if combined result has features
-          if (combined.features && combined.features.length > 0) {
-            // Try to convert first feature to polygon
-            mergedCoastlines = turf.lineToPolygon(combined.features[0] as Feature<LineString | MultiLineString>);
-          }
-        } else if (coastlines.length === 1) {
-          mergedCoastlines = turf.lineToPolygon(coastlines[0]);
-        }
-        
-        if (mergedCoastlines) {
-          // Handle both single Feature and FeatureCollection returns from lineToPolygon
-          if (mergedCoastlines.type === 'FeatureCollection') {
-            landPolygons = mergedCoastlines.features.map(feature => ({
-              ...feature,
-              properties: { landType: 'coastline-enclosed', source: 'coastline-processing' }
-            })) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
-          } else if (mergedCoastlines.type === 'Feature') {
-            landPolygons = [{
-              ...mergedCoastlines,
-              properties: { landType: 'coastline-enclosed', source: 'coastline-processing' }
-            }] as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
-          }
-        }
-      } catch (polygonError) {
-        console.warn('Failed to create polygons from coastlines, using buffer method:', polygonError);
-        
-        // Alternative: buffer and union approach
-        try {
-          const bufferedCoastlines = coastlines.map(coastline => {
-            return turf.buffer(coastline, 0.001, { units: 'degrees' });
-          });
-          
-          if (bufferedCoastlines.length > 0) {
-            let unionedLand = bufferedCoastlines[0];
-            for (let i = 1; i < bufferedCoastlines.length; i++) {
-              try {
-                const union = (turf as any).union(unionedLand, bufferedCoastlines[i]);
-                if (union) unionedLand = union;
-              } catch (unionError) {
-                console.warn('Failed to union coastline buffers:', unionError);
-              }
-            }
-            
-            landPolygons = [{
-              ...unionedLand,
-              properties: { landType: 'coastline-buffered', source: 'buffer-method' }
-            } as Feature<Polygon | MultiPolygon, { [name: string]: any }>];
-          }
-        } catch (bufferError) {
-          console.warn('Buffer method also failed:', bufferError);
-        }
-      }
-
-      if (landPolygons.length === 0) {
-        // Final fallback: use bbox
-        const bbox: [number, number, number, number] = [-74.30, 40.50, -73.70, 40.93];
-        const landArea = turf.bboxPolygon(bbox);
-        landPolygons = [{
-          ...landArea,
-          properties: { landType: 'final-fallback', source: 'bbox-fallback' }
-        } as Feature<Polygon, { [name: string]: any }>];
-      }
-
-      console.log(`Created ${landPolygons.length} land polygons from coastlines`);
-      return { type: 'FeatureCollection', features: landPolygons };
-
-    } catch (error) {
-      console.error('Error creating land from coastlines:', error);
-      // Ultimate fallback
-      const bbox: [number, number, number, number] = [-74.30, 40.50, -73.70, 40.93];
+  // Create base land/water from coastlines only when needed
+  const createBaseGeography = useCallback((coastlines: Feature<LineString, { [name: string]: any }>[]) => {
+    const bbox: [number, number, number, number] = [-74.30, 40.50, -73.70, 40.93];
+    
+    if (coastlines.length === 0) {
+      // No coastlines - create simple land area
       const landArea = turf.bboxPolygon(bbox);
       return {
-        type: 'FeatureCollection',
-        features: [{
+        baseLand: [{
           ...landArea,
-          properties: { landType: 'error-fallback', source: 'error-recovery' }
-        } as Feature<Polygon, { [name: string]: any }>]
+          properties: { landType: 'default-area', source: 'no-coastlines' }
+        } as Feature<Polygon, { [name: string]: any }>],
+        baseWater: [] as Feature<Polygon | MultiPolygon, { [name: string]: any }>[]
       };
     }
-  }, []);
 
-  // Create water polygon from coastlines - water is OUTSIDE coastlines  
-  const createWaterFromCoastlines = useCallback((geoData: FeatureCollection, landPolygons: FeatureCollection<Polygon | MultiPolygon>): FeatureCollection<Polygon | MultiPolygon> => {
+    // Try to create land polygons from coastlines
+    let baseLand: Feature<Polygon | MultiPolygon, { [name: string]: any }>[] = [];
+    
     try {
-      console.log('Creating water from coastlines...');
-      
-      // Create a large bounding box that encompasses the entire area
-      const bbox: [number, number, number, number] = [-74.35, 40.45, -73.65, 40.98];
-      let totalWaterArea = turf.bboxPolygon(bbox);
-
-      // Subtract all land polygons from the total area to get water
-      landPolygons.features.forEach(landFeature => {
+      // Buffer coastlines slightly to create land areas
+      const bufferedLand = coastlines.map(coastline => {
         try {
-          const difference = (turf as any).difference(totalWaterArea, landFeature);
-          if (difference) {
-            totalWaterArea = difference;
-          }
+          const buffered = turf.buffer(coastline, 0.002, { units: 'degrees' });
+          return {
+            ...buffered,
+            properties: { landType: 'coastline-buffered', source: 'coastline-processing' }
+          } as Feature<Polygon | MultiPolygon, { [name: string]: any }>;
         } catch (err) {
-          console.warn('Could not subtract land from water area:', err);
+          console.warn('Failed to buffer coastline:', err);
+          return null;
         }
-      });
-
-      // Also add explicit water bodies from the data
-      const explicitWaterBodies = geoData.features.filter(feature => {
-        const props = feature.properties;
-        return props && 
-          (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') &&
-          (props.natural === 'water' || 
-           (props.name && waterKeywords.some(waterName => 
-             props.name.toLowerCase().includes(waterName.toLowerCase()))));
-      }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
-
-      const waterFeatures: Feature<Polygon | MultiPolygon, { [name: string]: any }>[] = [];
+      }).filter(Boolean) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
       
-      // Add the coastline-derived water
-      if (totalWaterArea) {
-        waterFeatures.push({
-          ...totalWaterArea,
-          properties: { waterType: 'coastline-derived', source: 'coastline-subtraction' }
-        } as Feature<Polygon | MultiPolygon, { [name: string]: any }>);
-      }
-
-      // Add explicit water bodies
-      explicitWaterBodies.forEach(waterBody => {
-        waterFeatures.push({
-          ...waterBody,
-          properties: { 
-            ...waterBody.properties, 
-            waterType: 'explicit', 
-            source: 'geojson-data' 
-          }
-        });
-      });
-
-      console.log(`Created ${waterFeatures.length} water polygons from coastlines`);
-      return { type: 'FeatureCollection', features: waterFeatures };
-
+      baseLand = bufferedLand;
     } catch (error) {
-      console.error('Error creating water from coastlines:', error);
-      return { type: 'FeatureCollection', features: [] };
+      console.warn('Coastline processing failed, using bbox:', error);
+      const landArea = turf.bboxPolygon(bbox);
+      baseLand = [{
+        ...landArea,
+        properties: { landType: 'fallback-bbox', source: 'error-recovery' }
+      } as Feature<Polygon, { [name: string]: any }>];
     }
-  }, [waterKeywords]);
+
+    return {
+      baseLand,
+      baseWater: [] as Feature<Polygon | MultiPolygon, { [name: string]: any }>[]
+    };
+  }, []);
 
   const loadGeographicData = useCallback(async () => {
     try {
@@ -270,75 +205,59 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       console.log(`Processing ${mainData.features.length} total features`);
 
-      // Step 1: Create base land from coastlines
-      const coastlineLand = createLandFromCoastlines(mainData);
+      // Process geographic features intelligently
+      const { explicitWater, explicitLand, coastlines } = processGeographicFeatures(mainData);
       
-      // Step 2: Create water from coastlines (everything outside land)
-      const coastlineWater = createWaterFromCoastlines(mainData, coastlineLand);
+      // Create base geography only if we have very few explicit features
+      let baseLand: Feature<Polygon | MultiPolygon, { [name: string]: any }>[] = [];
+      let baseWater: Feature<Polygon | MultiPolygon, { [name: string]: any }>[] = [];
       
-      // Step 3: Process parks and other land features (these go ON TOP of base land)
-      const parkFeatures = mainData.features.filter(feature => {
-        const props = feature.properties;
-        if (!props) return false;
-        
-        // Only include polygon/multipolygon features
-        if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
-        
-        const name = props.name ? props.name.toLowerCase() : '';
-        
-        // Cemetery detection
-        const isCemetery = cemeteryKeywords.some(keyword => name.includes(keyword)) ||
-                          props.leisure === 'cemetery' ||
-                          props.natural === 'cemetery';
-        
-        // Location-based cemetery detection
-        let nearKnownCemetery = false;
-        try {
-          const centroid = turf.centroid(feature);
-          const [lng, lat] = centroid.geometry.coordinates;
-          
-          nearKnownCemetery = knownCemeteryAreas.some(cemetery => {
-            const distance = Math.sqrt(
-              Math.pow(lng - cemetery.center[0], 2) + 
-              Math.pow(lat - cemetery.center[1], 2)
-            );
-            return distance < cemetery.radius;
-          });
-        } catch (err) {
-          // Ignore centroid calculation errors
-        }
+      if (explicitLand.length < 5 || explicitWater.length < 3) {
+        console.log('Creating base geography from coastlines...');
+        const baseGeography = createBaseGeography(coastlines);
+        baseLand = baseGeography.baseLand;
+        baseWater = baseGeography.baseWater;
+      }
+      
+      // Combine explicit and base features
+      const allLandFeatures = [...baseLand, ...explicitLand];
+      const allWaterFeatures = [...baseWater, ...explicitWater];
+      
+      console.log(`Final result: ${allLandFeatures.length} land features, ${allWaterFeatures.length} water features`);
+      
+      // Separate parks from other land for better rendering
+      const parkFeatures = explicitLand.filter(feature => {
+        const props = feature.properties || {};
+        const name = (props.name || '').toLowerCase();
         
         return (
-          // Cemetery detection
-          isCemetery || nearKnownCemetery ||
-          
-          // Leisure areas
-          ['park', 'playground', 'pitch', 'garden', 'golf_course', 'recreation_ground', 
-           'stadium', 'sports_centre', 'nature_reserve'].includes(props.leisure) ||
-          
-          // Natural areas (but not water)
-          ['wood', 'forest', 'grassland', 'scrub', 'heath', 'fell', 'bare_rock', 
-           'scree', 'sand', 'beach'].includes(props.natural) ||
-          
-          // Famous parks
-          (props.name && ['central park', 'prospect park', 'battery park', 'bryant park',
-           'madison square park', 'washington square park', 'riverside park']
-           .some(parkName => props.name.toLowerCase().includes(parkName)))
+          ['park', 'garden', 'recreation_ground', 'playground'].includes(props.leisure) ||
+          props.leisure === 'cemetery' ||
+          cemeteryKeywords.some(keyword => name.includes(keyword)) ||
+          ['central park', 'prospect park', 'bryant park'].some(parkName => name.includes(parkName))
         );
-      }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
+      });
       
-      console.log(`Found ${coastlineLand.features.length} coastline land areas`);
-      console.log(`Found ${coastlineWater.features.length} coastline water areas`);
-      console.log(`Found ${parkFeatures.length} park features`);
+      const nonParkLand = allLandFeatures.filter(feature => {
+        const props = feature.properties || {};
+        const name = (props.name || '').toLowerCase();
+        
+        return !(
+          ['park', 'garden', 'recreation_ground', 'playground'].includes(props.leisure) ||
+          props.leisure === 'cemetery' ||
+          cemeteryKeywords.some(keyword => name.includes(keyword)) ||
+          ['central park', 'prospect park', 'bryant park'].some(parkName => name.includes(parkName))
+        );
+      });
       
-      setLandData(coastlineLand);
-      setWaterData(coastlineWater);
+      setLandData({ type: 'FeatureCollection', features: nonParkLand });
+      setWaterData({ type: 'FeatureCollection', features: allWaterFeatures });
       setParksData({ type: 'FeatureCollection', features: parkFeatures });
       
     } catch (error) {
       console.error('Error loading geographic data:', error);
     }
-  }, [loadGeoJSONData, createLandFromCoastlines, createWaterFromCoastlines, cemeteryKeywords, knownCemeteryAreas]);
+  }, [loadGeoJSONData, processGeographicFeatures, createBaseGeography, cemeteryKeywords]);
 
   // Initialize map
   useEffect(() => {
@@ -489,25 +408,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     });
 
-    // 2. SECOND: Base land areas from coastlines (on top of parks)
+    // 2. SECOND: Base land areas (only non-park land on top of parks)
     addOrUpdateSource('land-data', landData, {
       id: 'land-base',
       type: 'fill',
       source: 'land-data',
       paint: { 
-        'fill-color': '#E8E8E8', // Light gray land color to distinguish from background
-        'fill-opacity': 0.6 // Semi-transparent so parks show through
+        'fill-color': '#D2B48C', // Sandy brown for natural land
+        'fill-opacity': 0.7
       }
     });
 
-    // 3. THIRD: Water bodies (on top of land)
+    // 3. THIRD: Water bodies (only on top where water actually exists)
     addOrUpdateSource('water-data', waterData, {
       id: 'water-bodies',
       type: 'fill',
       source: 'water-data',
       paint: { 
         'fill-color': '#4A90E2', 
-        'fill-opacity': 0.9 // High opacity for water visibility
+        'fill-opacity': 0.8
       }
     });
 
