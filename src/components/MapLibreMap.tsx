@@ -63,9 +63,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const addDirectCemeteryLayer = useCallback((mainData: FeatureCollection) => {
     if (!map || !mapLoaded) return;
     
-    // Remove existing layers if they exist
-    if (map.getLayer('cemeteries-layer')) map.removeLayer('cemeteries-layer');
-    if (map.getLayer('cemeteries-border')) map.removeLayer('cemeteries-border');
+    try {
+      // Remove existing layers if they exist
+      if (map.getLayer('cemeteries-layer')) map.removeLayer('cemeteries-layer');
+      if (map.getLayer('cemeteries-border')) map.removeLayer('cemeteries-border');
     
     // Add cemetery layer from main geojson data
     map.addLayer({
@@ -116,14 +117,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     });
 
-    console.log('Strategy 1: Direct cemetery layer added');
+      console.log('Strategy 1: Direct cemetery layer added');
+    } catch (error) {
+      console.error('Error adding direct cemetery layer:', error);
+    }
   }, [map, mapLoaded]);
 
   // Strategy 2: Comprehensive cemetery detection
   const findAndColorCemeteries = useCallback((mainData: FeatureCollection) => {
     if (!map || !mapLoaded) return;
     
-    // Find ALL features that might be cemeteries using multiple criteria
+    try {
+      // Find ALL features that might be cemeteries using multiple criteria
     const potentialCemeteries = mainData.features.filter(feature => {
       const props = feature.properties;
       if (!props) return false;
@@ -232,6 +237,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           'circle-stroke-width': 2
         }
       });
+    } catch (error) {
+      console.error('Error in addCemeteryOverlay:', error);
+    } catch (error) {
+      console.error('Error in findAndColorCemeteries:', error);
     }
   }, [map, mapLoaded]);
 
@@ -239,7 +248,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const addCemeteryOverlay = useCallback((mainData: FeatureCollection) => {
     if (!map || !mapLoaded) return;
     
-    // Check every single feature with a name for cemetery-like words
+    try {
+      // Check every single feature with a name for cemetery-like words
     const suspiciousCemeteries = mainData.features.filter(feature => {
       const props = feature.properties;
       if (!props || !props.name) return false;
