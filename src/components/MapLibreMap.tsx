@@ -338,7 +338,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         layers: [{
           id: 'background',
           type: 'background' as const,
-          paint: { 'background-color': '#4A90E2' } // Water color as background
+          paint: { 'background-color': '#F5F5DC' } // Land color as background
         }]
       };
 
@@ -449,29 +449,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     // CRITICAL: Add layers in correct rendering order (bottom to top)
     console.log('Adding geographic layers...');
     
-    // 1. FIRST: Water bodies (background is already water color, but add explicit water)
-    addOrUpdateSource('water-data', waterData, {
-      id: 'water-bodies',
-      type: 'fill',
-      source: 'water-data',
-      paint: { 
-        'fill-color': '#4A90E2', 
-        'fill-opacity': 0.8
-      }
-    });
-
-    // 2. SECOND: Base land areas from coastlines
-    addOrUpdateSource('land-data', landData, {
-      id: 'land-base',
-      type: 'fill',
-      source: 'land-data',
-      paint: { 
-        'fill-color': '#F5F5DC', // Beige land color
-        'fill-opacity': 0.9
-      }
-    });
-
-    // 3. THIRD: Parks and special areas (on top of base land)
+    // 1. FIRST: Parks and special areas (bottom layer on top of background)
     addOrUpdateSource('parks-data', parksData, {
       id: 'parks-areas',
       type: 'fill',
@@ -492,6 +470,28 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           '#4CAF50' // Default green
         ],
         'fill-opacity': 0.8
+      }
+    });
+
+    // 2. SECOND: Base land areas from coastlines (on top of parks)
+    addOrUpdateSource('land-data', landData, {
+      id: 'land-base',
+      type: 'fill',
+      source: 'land-data',
+      paint: { 
+        'fill-color': '#E8E8E8', // Light gray land color to distinguish from background
+        'fill-opacity': 0.6 // Semi-transparent so parks show through
+      }
+    });
+
+    // 3. THIRD: Water bodies (on top of land)
+    addOrUpdateSource('water-data', waterData, {
+      id: 'water-bodies',
+      type: 'fill',
+      source: 'water-data',
+      paint: { 
+        'fill-color': '#4A90E2', 
+        'fill-opacity': 0.9 // High opacity for water visibility
       }
     });
 
