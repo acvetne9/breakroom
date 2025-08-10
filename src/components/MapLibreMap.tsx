@@ -120,9 +120,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       
       // Clean up existing layers
       ['cemeteries-layer', 'cemeteries-border', 'cemeteries-points'].forEach(layerId => {
-        if (map.getLayer(layerId)) map.removeLayer(layerId);
+        try {
+          if (map.getLayer(layerId)) map.removeLayer(layerId);
+        } catch (e) {
+          // Layer doesn't exist, ignore
+        }
       });
-      if (map.getSource('cemetery-data')) map.removeSource('cemetery-data');
+      try {
+        if (map.getSource('cemetery-data')) map.removeSource('cemetery-data');
+      } catch (e) {
+        // Source doesn't exist, ignore
+      }
       
       map.addSource('cemetery-data', { type: 'geojson', data: cemeteryFC });
       
@@ -389,13 +397,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const addOrUpdateSource = (sourceId: string, data: FeatureCollection | null, layer: any) => {
       if (!data) return;
       
-      const existing = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
-      if (existing) {
-        existing.setData(data as any);
-        if (!map.getLayer(layer.id)) map.addLayer(layer);
-      } else {
-        map.addSource(sourceId, { type: 'geojson', data });
-        if (!map.getLayer(layer.id)) map.addLayer(layer);
+      try {
+        const existing = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
+        if (existing) {
+          existing.setData(data as any);
+          if (!map.getLayer(layer.id)) map.addLayer(layer);
+        } else {
+          map.addSource(sourceId, { type: 'geojson', data });
+          if (!map.getLayer(layer.id)) map.addLayer(layer);
+        }
+      } catch (e) {
+        // Handle any map operation errors gracefully
+        console.warn(`Error updating source ${sourceId}:`, e);
       }
     };
 
@@ -444,8 +457,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     });
 
     // Ensure businesses layer stays on top
-    if (map.getLayer('businesses-layer')) {
-      map.moveLayer('businesses-layer');
+    try {
+      if (map.getLayer('businesses-layer')) {
+        map.moveLayer('businesses-layer');
+      }
+    } catch (e) {
+      // Layer doesn't exist yet, ignore
     }
   }, [mapLoaded, map, landData, waterData, roadsData, cemeteryKeywords]);
 
@@ -455,8 +472,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     // Clean up existing
     if (map.getSource('businesses')) {
-      map.removeLayer('businesses-layer');
-      map.removeSource('businesses');
+      try {
+        if (map.getLayer('businesses-layer')) {
+          map.removeLayer('businesses-layer');
+        }
+        map.removeSource('businesses');
+      } catch (e) {
+        // Handle cleanup errors gracefully
+        console.warn('Error cleaning up business layer:', e);
+      }
     }
 
     const businessFeatures = businesses.map(business => ({
@@ -513,16 +537,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Selected business highlighting
   useEffect(() => {
-    if (!mapLoaded || !map || !map.getLayer('businesses-layer')) return;
-
-    map.setPaintProperty('businesses-layer', 'circle-color', 
-      selectedBusiness ? [
-        'case',
-        ['==', ['get', 'id'], selectedBusiness.id],
-        '#EF4444',
-        '#FACC15'
-      ] : '#FACC15'
-    );
+    if (!mapLoaded || !map) return;
+    
+    try {
+      if (map.getLayer('businesses-layer')) {
+        map.setPaintProperty('businesses-layer', 'circle-color', 
+          selectedBusiness ? [
+            'case',
+            ['==', ['get', 'id'], selectedBusiness.id],
+            '#EF4444',
+            '#FACC15'
+          ] : '#FACC15'
+        );
+      }
+    } catch (e) {
+      // Layer might not exist yet, ignore
+    }
   }, [mapLoaded, map, selectedBusiness]);
 
   return (
