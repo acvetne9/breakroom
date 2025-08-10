@@ -526,8 +526,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           );
         }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
         
-        // IMPROVED WATER DETECTION - Using only available properties
-        // IMPROVED WATER DETECTION - More comprehensive approach
+        // OPTIMIZED WATER DETECTION - Based on your Overpass query properties
         const waterFeatures = mainData.features.filter(feature => {
           const props = feature.properties;
           if (!props || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
@@ -535,75 +534,56 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           const name = props.name ? props.name.toLowerCase() : '';
           
           return (
-            // Natural water bodies - we have this
+            // Direct natural=water (this is the main one from your Overpass query)
             props.natural === 'water' ||
-            props.natural === 'bay' ||
-            props.natural === 'strait' ||
-            props.water === 'bay' ||
-            props.water === 'river' ||
-            props.place === 'sea' ||
             
-            // Comprehensive name-based detection for major NYC water bodies
-            name.includes('bay') ||
-            name.includes('kill') ||
-            name.includes('river') ||
-            name.includes('sound') ||
-            name.includes('creek') ||
-            name.includes('canal') ||
-            name.includes('inlet') ||
-            name.includes('harbor') ||
-            name.includes('harbour') ||
-            name.includes('water') ||
-            name.includes('sea') ||
-            name.includes('ocean') ||
-            name.includes('pond') ||
-            name.includes('lake') ||
+            // Water property (if it exists)
+            props.water ||
             
-            // Specific NYC water bodies (more flexible matching)
-            name.includes('upper new york') ||
-            name.includes('lower new york') ||
-            name.includes('newark') ||
-            name.includes('jamaica') ||
-            name.includes('long island') ||
-            name.includes('hudson') ||
-            name.includes('east river') ||
-            name.includes('harlem') ||
-            name.includes('arthur') ||
-            name.includes('van kull') ||
-            name.includes('raritan') ||
-            name.includes('sheepshead') ||
-            name.includes('rockaway') ||
-            name.includes('gowanus') ||
-            name.includes('newtown') ||
-            name.includes('atlantic') ||
-            name.includes('gravesend') ||
-            name.includes('flushing') ||
-            name.includes('bronx') ||
-            name.includes('spuyten') ||
-            name.includes('eastchester') ||
+            // Named water bodies that your Overpass query specifically targets
+            name === 'upper new york bay' ||
+            name === 'lower new york bay' ||
+            name === 'newark bay' ||
+            name === 'jamaica bay' ||
+            name === 'long island sound' ||
+            name === 'hudson river' ||
+            name === 'east river' ||
+            name === 'harlem river' ||
+            name === 'arthur kill' ||
+            name === 'kill van kull' ||
+            name === 'raritan bay' ||
+            name === 'sheepshead bay' ||
+            name === 'rockaway inlet' ||
             
-            // Additional water-related properties that might exist
-            props.waterway ||
-            props.place === 'bay' ||
-            props.place === 'strait' ||
+            // Partial matches for the above (in case of slight name variations)
+            (name.includes('new york bay') && (name.includes('upper') || name.includes('lower'))) ||
+            (name.includes('bay') && (name.includes('newark') || name.includes('jamaica') || name.includes('raritan') || name.includes('sheepshead'))) ||
+            (name.includes('sound') && name.includes('long island')) ||
+            (name.includes('river') && (name.includes('hudson') || name.includes('east') || name.includes('harlem'))) ||
+            (name.includes('kill') && (name.includes('arthur') || name.includes('van kull'))) ||
+            (name.includes('inlet') && name.includes('rockaway')) ||
             
-            // Check if it's a large polygon that might be water (size-based heuristic)
+            // Additional common water body patterns that might exist
+            name.includes(' bay') ||
+            name.includes(' river') ||
+            name.includes(' kill') ||
+            name.includes(' sound') ||
+            name.includes(' inlet') ||
+            name.includes(' canal') ||
+            name.includes(' creek') ||
+            
+            // Large unnamed water bodies (size-based detection for natural=water features)
             (() => {
-              try {
-                const area = turf.area(feature);
-                // If it's a very large polygon (>5 sq km) with no clear land designation, 
-                // it might be water
-                return area > 5000000 && 
-                       !props.leisure && 
-                       !props.landuse && 
-                       !props.amenity &&
-                       (!props.name || 
-                        !props.name.toLowerCase().includes('park') &&
-                        !props.name.toLowerCase().includes('cemetery') &&
-                        !props.name.toLowerCase().includes('island'));
-              } catch {
-                return false;
+              if (props.natural === 'water' && !name) {
+                try {
+                  const area = turf.area(feature);
+                  // If it's a large water polygon (>100,000 sq meters = 0.1 sq km), include it
+                  return area > 100000;
+                } catch {
+                  return false;
+                }
               }
+              return false;
             })()
           );
         }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
@@ -620,155 +600,32 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         });
         
-        // Also add a fallback strategy: create water bodies from coastlines
+        // Also add a more targeted fallback strategy based on your Overpass query
         const createWaterBodiesFromCoastlines = (geoData: FeatureCollection): Feature<Polygon | MultiPolygon>[] => {
+          // Since your Overpass query specifically targets named water bodies,
+          // we only need minimal fallback for cases where geometry might be missing
+          const waterBodies: Feature<Polygon | MultiPolygon>[] = [];
+          
+          // Check if we have coastlines from your query
           const coastlines = geoData.features.filter(feature => 
             feature.geometry.type === 'LineString' &&
             feature.properties?.natural === 'coastline'
           );
           
-          if (coastlines.length === 0) return [];
+          console.log(`Found ${coastlines.length} coastline features from Overpass query`);
           
-          const waterBodies: Feature<Polygon | MultiPolygon>[] = [];
-          
-          // NYC bounding box for context
-          const nycBounds = {
-            west: -74.30,
-            south: 40.50, 
-            east: -73.70,
-            north: 40.93
-          };
-          
-          // Create major water body polygons based on known NYC geography
-          const majorWaterAreas = [
-            {
-              name: "Upper New York Bay",
-              coordinates: [[
-                [-74.15, 40.58], [-74.05, 40.58], [-74.05, 40.70], 
-                [-74.15, 40.70], [-74.15, 40.58]
-              ]]
-            },
-            {
-              name: "Lower New York Bay", 
-              coordinates: [[
-                [-74.15, 40.50], [-74.05, 40.50], [-74.05, 40.58],
-                [-74.15, 40.58], [-74.15, 40.50]
-              ]]
-            },
-            {
-              name: "Arthur Kill",
-              coordinates: [[
-                [-74.25, 40.52], [-74.20, 40.52], [-74.20, 40.65],
-                [-74.25, 40.65], [-74.25, 40.52]
-              ]]
-            },
-            {
-              name: "Newark Bay",
-              coordinates: [[
-                [-74.15, 40.65], [-74.10, 40.65], [-74.10, 40.72],
-                [-74.15, 40.72], [-74.15, 40.65]
-              ]]
-            },
-            {
-              name: "Jamaica Bay",
-              coordinates: [[
-                [-73.85, 40.60], [-73.75, 40.60], [-73.75, 40.68],
-                [-73.85, 40.68], [-73.85, 40.60]
-              ]]
-            },
-            {
-              name: "East River",
-              coordinates: [[
-                [-74.02, 40.70], [-73.94, 40.70], [-73.94, 40.78],
-                [-74.02, 40.78], [-74.02, 40.70]
-              ]]
-            }
-          ];
-          
-          majorWaterAreas.forEach(waterArea => {
-            try {
-              const polygon = turf.polygon(waterArea.coordinates);
-              waterBodies.push({
-                ...polygon,
-                properties: {
-                  name: waterArea.name,
-                  natural: 'water',
-                  source: 'synthetic',
-                  waterType: 'major_body'
-                }
-              } as Feature<Polygon>);
-            } catch (err) {
-              console.warn(`Could not create synthetic water body for ${waterArea.name}:`, err);
-            }
-          });
-          
+          // Only add synthetic water if we have very few water features detected
+          // Your Overpass query should have gotten most of them
           return waterBodies;
         };
         
-        // Add synthetic water bodies if we don't have enough real ones
-        if (waterFeatures.length < 5) {
-          console.log('Adding synthetic water bodies due to low detection count...');
-          const syntheticWater = createWaterBodiesFromCoastlines(mainData);
-          waterFeatures.push(...syntheticWater);
-          console.log(`Added ${syntheticWater.length} synthetic water bodies`);
+        // Only add synthetic water bodies if we have very few detected
+        // (Your Overpass query should have gotten the major ones)
+        if (waterFeatures.length < 3) {
+          console.log('Very few water bodies detected, checking if Overpass query worked properly...');
+          console.log('This might indicate an issue with the GeoJSON data or query execution');
+          // Don't add synthetic water - rely on the Overpass query data
         }
-        
-        // Set the water data
-        setWaterData({
-          type: 'FeatureCollection' as const, 
-          features: waterFeatures
-        });
-        
-        // IMPROVED WATER LAYER STYLING - Add this to your useEffect where layers are added:
-        // Replace the existing water layer code with this enhanced version:
-        
-        // Add water bodies with enhanced styling
-        addOrUpdate('water-data', waterData, {
-          id: 'water-bodies',
-          type: 'fill',
-          source: 'water-data',
-          paint: { 
-            'fill-color': [
-              'case',
-              // Darker blue for major water bodies
-              ['any',
-                ['in', 'bay', ['downcase', ['coalesce', ['get', 'name'], '']]],
-                ['in', 'kill', ['downcase', ['coalesce', ['get', 'name'], '']]],
-                ['in', 'sound', ['downcase', ['coalesce', ['get', 'name'], '']]],
-                ['in', 'river', ['downcase', ['coalesce', ['get', 'name'], '']]],
-                ['==', ['get', 'waterType'], 'major_body']
-              ], '#1565C0', // Dark blue for major water bodies
-              
-              // Medium blue for other water
-              '#4A90E2'
-            ],
-            'fill-opacity': 0.85
-          },
-          layout: {
-            // Ensure layer is visible
-            'visibility': 'visible'
-          }
-        } as any);
-        
-        // Add water body borders for better definition
-        addOrUpdate('water-data', waterData, {
-          id: 'water-bodies-border',
-          type: 'line', 
-          source: 'water-data',
-          paint: {
-            'line-color': '#0D47A1', // Very dark blue border
-            'line-width': [
-              'case',
-              ['any',
-                ['in', 'bay', ['downcase', ['coalesce', ['get', 'name'], '']]],
-                ['in', 'kill', ['downcase', ['coalesce', ['get', 'name'], '']]],
-                ['==', ['get', 'waterType'], 'major_body']
-              ], 2, // Thicker border for major water bodies
-              1    // Thinner border for smaller water bodies
-            ],
-            'line-opacity': 0.8
-          }
-        } as any);
         
         console.log(`Found ${landFeatures.length} land features`);
         console.log(`Found ${waterFeatures.length} water features`);
@@ -1193,14 +1050,51 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     } as any);
 
-    // Add water bodies
+    // Add water bodies with enhanced styling
     addOrUpdate('water-data', waterData, {
       id: 'water-bodies',
       type: 'fill',
       source: 'water-data',
       paint: { 
-        'fill-color': '#4A90E2', // Dark blue for water bodies
-        'fill-opacity': 0.8 
+        'fill-color': [
+          'case',
+          // Darker blue for major water bodies
+          ['any',
+            ['in', 'bay', ['downcase', ['coalesce', ['get', 'name'], '']]],
+            ['in', 'kill', ['downcase', ['coalesce', ['get', 'name'], '']]],
+            ['in', 'sound', ['downcase', ['coalesce', ['get', 'name'], '']]],
+            ['in', 'river', ['downcase', ['coalesce', ['get', 'name'], '']]],
+            ['==', ['get', 'waterType'], 'major_body']
+          ], '#1565C0', // Dark blue for major water bodies
+          
+          // Medium blue for other water
+          '#4A90E2'
+        ],
+        'fill-opacity': 0.85
+      },
+      layout: {
+        // Ensure layer is visible
+        'visibility': 'visible'
+      }
+    } as any);
+
+    // Add water body borders for better definition
+    addOrUpdate('water-data', waterData, {
+      id: 'water-bodies-border',
+      type: 'line', 
+      source: 'water-data',
+      paint: {
+        'line-color': '#0D47A1', // Very dark blue border
+        'line-width': [
+          'case',
+          ['any',
+            ['in', 'bay', ['downcase', ['coalesce', ['get', 'name'], '']]],
+            ['in', 'kill', ['downcase', ['coalesce', ['get', 'name'], '']]],
+            ['==', ['get', 'waterType'], 'major_body']
+          ], 2, // Thicker border for major water bodies
+          1    // Thinner border for smaller water bodies
+        ],
+        'line-opacity': 0.8
       }
     } as any);
 
