@@ -201,7 +201,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Unified cemetery detection function
   const detectCemeteries = useCallback((mainData: FeatureCollection) => {
-    if (!map || !mapLoaded) return;
+    if (!map || !mapLoaded) {
+      console.warn('Map not ready for cemetery detection');
+      return;
+    }
 
     const cemeteryFeatures: Feature[] = [];
 
@@ -240,47 +243,57 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     console.log(`Found ${cemeteryFeatures.length} cemetery features`);
 
-    if (cemeteryFeatures.length > 0) {
+    if (cemeteryFeatures.length > 0 && map) {
       const cemeteryFC = { type: 'FeatureCollection' as const, features: cemeteryFeatures };
       
-      // Clean up existing layers
-      ['cemeteries-layer', 'cemeteries-border', 'cemeteries-points'].forEach(layerId => {
-        if (map.getLayer(layerId)) map.removeLayer(layerId);
-      });
-      if (map.getSource('cemetery-data')) map.removeSource('cemetery-data');
-      
-      map.addSource('cemetery-data', { type: 'geojson', data: cemeteryFC });
-      
-      // Polygon cemeteries
-      map.addLayer({
-        id: 'cemeteries-layer',
-        type: 'fill',
-        source: 'cemetery-data',
-        filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-        paint: { 'fill-color': '#2E7D32', 'fill-opacity': 0.9 }
-      });
-      
-      map.addLayer({
-        id: 'cemeteries-border',
-        type: 'line',
-        source: 'cemetery-data',
-        filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-        paint: { 'line-color': '#1B5E20', 'line-width': 2 }
-      });
-      
-      // Point cemeteries
-      map.addLayer({
-        id: 'cemeteries-points',
-        type: 'circle',
-        source: 'cemetery-data',
-        filter: ['==', ['geometry-type'], 'Point'],
-        paint: {
-          'circle-color': '#2E7D32',
-          'circle-radius': 6,
-          'circle-stroke-color': '#1B5E20',
-          'circle-stroke-width': 2
+      try {
+        // Clean up existing layers - check if map still exists before each operation
+        ['cemeteries-layer', 'cemeteries-border', 'cemeteries-points'].forEach(layerId => {
+          if (map && map.getLayer && map.getLayer(layerId)) {
+            map.removeLayer(layerId);
+          }
+        });
+        if (map && map.getSource && map.getSource('cemetery-data')) {
+          map.removeSource('cemetery-data');
         }
-      });
+        
+        if (map && map.addSource) {
+          map.addSource('cemetery-data', { type: 'geojson', data: cemeteryFC });
+          
+          // Polygon cemeteries
+          map.addLayer({
+            id: 'cemeteries-layer',
+            type: 'fill',
+            source: 'cemetery-data',
+            filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+            paint: { 'fill-color': '#2E7D32', 'fill-opacity': 0.9 }
+          });
+          
+          map.addLayer({
+            id: 'cemeteries-border',
+            type: 'line',
+            source: 'cemetery-data',
+            filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+            paint: { 'line-color': '#1B5E20', 'line-width': 2 }
+          });
+          
+          // Point cemeteries
+          map.addLayer({
+            id: 'cemeteries-points',
+            type: 'circle',
+            source: 'cemetery-data',
+            filter: ['==', ['geometry-type'], 'Point'],
+            paint: {
+              'circle-color': '#2E7D32',
+              'circle-radius': 6,
+              'circle-stroke-color': '#1B5E20',
+              'circle-stroke-width': 2
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('Error adding cemetery layers:', err);
+      }
     }
   }, [map, mapLoaded, cemeteryKeywords, knownCemeteryAreas]);
 
@@ -511,15 +524,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (!mapLoaded || !map) return;
 
     const addOrUpdateSource = (sourceId: string, data: FeatureCollection | null, layer: any) => {
-      if (!data) return;
+      if (!data || !map) return;
       
-      const existing = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
-      if (existing) {
-        existing.setData(data as any);
-        if (!map.getLayer(layer.id)) map.addLayer(layer);
-      } else {
-        map.addSource(sourceId, { type: 'geojson', data });
-        if (!map.getLayer(layer.id)) map.addLayer(layer);
+      try {
+        const existing = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
+        if (existing) {
+          existing.setData(data as any);
+          if (!map.getLayer(layer.id)) {
+            map.addLayer(layer);
+          }
+        } else {
+          map.addSource(sourceId, { type: 'geojson', data });
+          if (!map.getLayer(layer.id)) {
+            map.addLayer(layer);
+          }
+        }
+      } catch (err) {
+        console.warn(`Error adding/updating source ${sourceId}:`, err);
       }
     };
 
@@ -577,8 +598,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     });
 
     // Ensure businesses layer stays on top
-    if (map.getLayer('businesses-layer')) {
-      map.moveLayer('businesses-layer');
+    if (map && map.getLayer && map.getLayer('businesses-layer')) {
+      try {
+        map.moveLayer('businesses-layer');
+      } catch (err) {
+        console.warn('Error moving businesses layer:', err);
+      }
     }
   }, [mapLoaded, map, landData, waterData, roadsData, cemeteryKeywords]);
 
@@ -586,76 +611,90 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (!mapLoaded || !businesses || !map) return;
 
-    // Clean up existing
-    if (map.getSource('businesses')) {
-      map.removeLayer('businesses-layer');
-      map.removeSource('businesses');
-    }
-
-    const businessFeatures = businesses.map(business => ({
-      type: 'Feature' as const,
-      geometry: { type: 'Point' as const, coordinates: [business.position.lng, business.position.lat] },
-      properties: { id: business.id, name: business.name, businessType: business.businessType || 'unknown' }
-    }));
-
-    map.addSource('businesses', {
-      type: 'geojson',
-      data: { type: 'FeatureCollection', features: businessFeatures }
-    });
-
-    map.addLayer({
-      id: 'businesses-layer',
-      type: 'circle',
-      source: 'businesses',
-      paint: {
-        'circle-radius': 8,
-        'circle-color': '#FACC15',
-        'circle-stroke-width': 2,
-        'circle-stroke-color': '#FFFFFF'
+    try {
+      // Clean up existing
+      if (map.getSource && map.getSource('businesses')) {
+        if (map.removeLayer) map.removeLayer('businesses-layer');
+        if (map.removeSource) map.removeSource('businesses');
       }
-    });
 
-    // Event handlers
-    if (onBusinessClick) {
-      map.on('click', 'businesses-layer', (e) => {
-        if (e.features?.[0]) {
-          const businessId = e.features[0].properties?.id;
-          const business = businesses.find(b => b.id === businessId);
-          if (business) {
-            map.flyTo({
-              center: [business.position.lng, business.position.lat],
-              zoom: 16,
-              duration: 800,
-              essential: true
-            });
-            onBusinessClick(business);
+      const businessFeatures = businesses.map(business => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [business.position.lng, business.position.lat] },
+        properties: { id: business.id, name: business.name, businessType: business.businessType || 'unknown' }
+      }));
+
+      if (map.addSource) {
+        map.addSource('businesses', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: businessFeatures }
+        });
+
+        map.addLayer({
+          id: 'businesses-layer',
+          type: 'circle',
+          source: 'businesses',
+          paint: {
+            'circle-radius': 8,
+            'circle-color': '#FACC15',
+            'circle-stroke-width': 2,
+            'circle-stroke-color': '#FFFFFF'
           }
+        });
+
+        // Event handlers
+        if (onBusinessClick && map.on) {
+          map.on('click', 'businesses-layer', (e) => {
+            if (e.features?.[0]) {
+              const businessId = e.features[0].properties?.id;
+              const business = businesses.find(b => b.id === businessId);
+              if (business && map.flyTo) {
+                map.flyTo({
+                  center: [business.position.lng, business.position.lat],
+                  zoom: 16,
+                  duration: 800,
+                  essential: true
+                });
+                onBusinessClick(business);
+              }
+            }
+          });
         }
-      });
+
+        if (map.on && map.getCanvas) {
+          map.on('mouseenter', 'businesses-layer', () => {
+            const canvas = map.getCanvas();
+            if (canvas) canvas.style.cursor = 'pointer';
+          });
+
+          map.on('mouseleave', 'businesses-layer', () => {
+            const canvas = map.getCanvas();
+            if (canvas) canvas.style.cursor = '';
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Error setting up business markers:', err);
     }
-
-    map.on('mouseenter', 'businesses-layer', () => {
-      map.getCanvas().style.cursor = 'pointer';
-    });
-
-    map.on('mouseleave', 'businesses-layer', () => {
-      map.getCanvas().style.cursor = '';
-    });
 
   }, [mapLoaded, businesses, onBusinessClick]);
 
   // Selected business highlighting
   useEffect(() => {
-    if (!mapLoaded || !map || !map.getLayer('businesses-layer')) return;
+    if (!mapLoaded || !map || !map.getLayer || !map.getLayer('businesses-layer') || !map.setPaintProperty) return;
 
-    map.setPaintProperty('businesses-layer', 'circle-color', 
-      selectedBusiness ? [
-        'case',
-        ['==', ['get', 'id'], selectedBusiness.id],
-        '#EF4444',
-        '#FACC15'
-      ] : '#FACC15'
-    );
+    try {
+      map.setPaintProperty('businesses-layer', 'circle-color', 
+        selectedBusiness ? [
+          'case',
+          ['==', ['get', 'id'], selectedBusiness.id],
+          '#EF4444',
+          '#FACC15'
+        ] : '#FACC15'
+      );
+    } catch (err) {
+      console.warn('Error updating business highlighting:', err);
+    }
   }, [mapLoaded, map, selectedBusiness]);
 
   return (
