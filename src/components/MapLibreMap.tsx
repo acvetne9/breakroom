@@ -312,7 +312,21 @@ const waterFeatures = mainData.features.filter(feature => {
     return false;
   };
 
-  // Final pass: upgrade certain land polygons to water
+  
+
+      
+      // Generate land from coastlines if needed
+      if (landFeatures.length < 10) {
+        const coastlineGenerated = createLandFromCoastlines(mainData);
+        const typedCoastlineFeatures = coastlineGenerated.features.filter(
+          (feature): feature is Feature<Polygon | MultiPolygon, { [name: string]: any }> => 
+            feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon'
+        );
+        landFeatures.push(...typedCoastlineFeatures);
+      }
+      
+      
+  // Final pass: upgrade certain land polygons to water BEFORE setting state
   (() => {
     const knownWaterPolys = waterFeatures.filter(
       (f): f is Feature<Polygon | MultiPolygon, any> =>
@@ -331,7 +345,6 @@ const waterFeatures = mainData.features.filter(feature => {
       }
     });
 
-    // Remove from landFeatures in place
     toMove.forEach(f => {
       const idx = landFeatures.indexOf(f);
       if (idx !== -1) {
@@ -339,7 +352,6 @@ const waterFeatures = mainData.features.filter(feature => {
       }
     });
 
-    // Add to waterFeatures
     waterFeatures.push(...toMove);
 
     if (toMove.length > 0) {
@@ -347,19 +359,9 @@ const waterFeatures = mainData.features.filter(feature => {
     }
   })();
 
-      
-      // Generate land from coastlines if needed
-      if (landFeatures.length < 10) {
-        const coastlineGenerated = createLandFromCoastlines(mainData);
-        const typedCoastlineFeatures = coastlineGenerated.features.filter(
-          (feature): feature is Feature<Polygon | MultiPolygon, { [name: string]: any }> => 
-            feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon'
-        );
-        landFeatures.push(...typedCoastlineFeatures);
-      }
-      
-      setLandData({ type: 'FeatureCollection', features: landFeatures });
+setLandData({ type: 'FeatureCollection', features: landFeatures });
       setWaterData({ type: 'FeatureCollection', features: waterFeatures });
+
       
     } catch (error) {
       console.error('Error loading geographic data:', error);
