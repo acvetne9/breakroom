@@ -109,7 +109,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, []);
 
   // New function to detect water by adjacency
-  const detectWaterByAdjacency = useCallback((geoData: FeatureCollection): Feature<Polygon | MultiPolygon>[] => {
+  const detectWaterByAdjacency = useCallback((geoData: FeatureCollection): FeatureCollection => {
     console.log('Starting water adjacency detection...');
     
     // Get known water features
@@ -127,23 +127,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     console.log(`Found ${coastlineFeatures.length} coastline features`);
 
-    // Get unknown spaces - features with ALL null/empty properties
-    const unknownSpaces = geoData.features.filter(feature => {
-      if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
-      
-      const props = feature.properties;
-      if (!props) return true;
-
-      // Check if ALL saved columns are empty/null
-      const savedColumns = ['name', 'leisure', 'natural', 'highway', 'water'];
-      return savedColumns.every(col => 
-        props[col] === null || 
-        props[col] === undefined || 
-        props[col] === ''
-      );
-    });
+    // Get unknown spaces (negative spaces)
+    const unknownSpaces = geoData.features.filter(feature => 
+      ['Polygon', 'MultiPolygon'].includes(feature.geometry.type) && isUnknownSpace(feature)
+    );
 
     console.log(`Found ${unknownSpaces.length} unknown spaces to analyze`);
+
+    // Create a buffer around known water features for better detection
+    const waterBuffer = knownWaterFeatures.length > 0 
+      ? turf.buffer(turf.featureCollection(knownWaterFeatures), 0.0001, { units: 'degrees' })
+      : null;
 
     // Analyze each unknown space
     const inferredWaterFeatures: Feature<Polygon | MultiPolygon>[] = [];
@@ -151,43 +145,59 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     unknownSpaces.forEach((unknownFeature, index) => {
       try {
-        // Check if this unknown space touches any known water feature
-        const touchesWater = knownWaterFeatures.some(waterFeature => {
-          try {
-            return turf.booleanIntersects(unknownFeature, waterFeature) ||
-                   turf.booleanTouches(unknownFeature, waterFeature);
-          } catch (err) {
-            return false;
-          }
-        });
-
-        if (touchesWater) {
-          // Check if it also touches any coastline
-          const touchesCoastline = coastlineFeatures.some(coastlineFeature => {
+        const geometry = unknownFeature.geometry as Polygon | MultiPolygon;
+        
+        // Check if this unknown space intersects with the water buffer
+        let bordersWater = false;
+        if (waterBuffer) {
+          bordersWater = waterBuffer.features.some(waterFeature => {
             try {
-              return turf.booleanIntersects(unknownFeature, coastlineFeature) ||
-                     turf.booleanTouches(unknownFeature, coastlineFeature);
+              return turf.booleanIntersects(unknownFeature, waterFeature);
             } catch (err) {
               return false;
             }
           });
+        }
 
-          // If it touches water but NOT coastline, classify as water
-          if (!touchesCoastline) {
+        // Also check direct intersection with known water features
+        if (!bordersWater) {
+          bordersWater = knownWaterFeatures.some(waterFeature => {
+            try {
+              return turf.booleanIntersects(unknownFeature, waterFeature) ||
+                     turf.booleanTouches(unknownFeature, waterFeature);
+            } catch (err) {
+              return false;
+            }
+          });
+        }
+
+        if (bordersWater) {
+          // Check if it also borders coastline (if so, might be land)
+          let bordersCoastline = false;
+          if (coastlineFeatures.length > 0) {
+            bordersCoastline = coastlineFeatures.some(coastlineFeature => {
+              try {
+                return turf.booleanIntersects(unknownFeature, coastlineFeature);
+              } catch (err) {
+                return false;
+              }
+            });
+          }
+
+          // If it borders water but NOT coastline, classify as water
+          if (!bordersCoastline) {
             const waterFeature: Feature<Polygon | MultiPolygon> = {
-              type: 'Feature',
-              geometry: unknownFeature.geometry as Polygon | MultiPolygon,
+              ...unknownFeature,
+              geometry: geometry,
               properties: {
-                inferredWater: true,
+                ...unknownFeature.properties,
+                inferredType: 'water',
                 detectionMethod: 'adjacency',
                 originalIndex: index
               }
             };
             inferredWaterFeatures.push(waterFeature);
             waterCount++;
-            console.log(`Classified unknown space ${index} as water (touches water, not coastline)`);
-          } else {
-            console.log(`Unknown space ${index} touches both water and coastline - skipping`);
           }
         }
       } catch (err) {
@@ -196,15 +206,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     });
 
     console.log(`Inferred ${waterCount} additional water features from adjacency`);
-    return inferredWaterFeatures;
-  }, [isKnownWater]);
+
+    return {
+      type: 'FeatureCollection',
+      features: inferredWaterFeatures
+    };
+  }, [isKnownWater, isUnknownSpace]);
 
   // Unified cemetery detection function
   const detectCemeteries = useCallback((mainData: FeatureCollection) => {
-    if (!map || !mapLoaded) {
-      console.warn('Map not ready for cemetery detection');
-      return;
-    }
+    if (!map || !mapLoaded) return;
 
     const cemeteryFeatures: Feature[] = [];
 
@@ -243,57 +254,47 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     console.log(`Found ${cemeteryFeatures.length} cemetery features`);
 
-    if (cemeteryFeatures.length > 0 && map) {
+    if (cemeteryFeatures.length > 0) {
       const cemeteryFC = { type: 'FeatureCollection' as const, features: cemeteryFeatures };
       
-      try {
-        // Clean up existing layers - check if map still exists before each operation
-        ['cemeteries-layer', 'cemeteries-border', 'cemeteries-points'].forEach(layerId => {
-          if (map && map.getLayer && map.getLayer(layerId)) {
-            map.removeLayer(layerId);
-          }
-        });
-        if (map && map.getSource && map.getSource('cemetery-data')) {
-          map.removeSource('cemetery-data');
+      // Clean up existing layers
+      ['cemeteries-layer', 'cemeteries-border', 'cemeteries-points'].forEach(layerId => {
+        if (map.getLayer(layerId)) map.removeLayer(layerId);
+      });
+      if (map.getSource('cemetery-data')) map.removeSource('cemetery-data');
+      
+      map.addSource('cemetery-data', { type: 'geojson', data: cemeteryFC });
+      
+      // Polygon cemeteries
+      map.addLayer({
+        id: 'cemeteries-layer',
+        type: 'fill',
+        source: 'cemetery-data',
+        filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+        paint: { 'fill-color': '#2E7D32', 'fill-opacity': 0.9 }
+      });
+      
+      map.addLayer({
+        id: 'cemeteries-border',
+        type: 'line',
+        source: 'cemetery-data',
+        filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
+        paint: { 'line-color': '#1B5E20', 'line-width': 2 }
+      });
+      
+      // Point cemeteries
+      map.addLayer({
+        id: 'cemeteries-points',
+        type: 'circle',
+        source: 'cemetery-data',
+        filter: ['==', ['geometry-type'], 'Point'],
+        paint: {
+          'circle-color': '#2E7D32',
+          'circle-radius': 6,
+          'circle-stroke-color': '#1B5E20',
+          'circle-stroke-width': 2
         }
-        
-        if (map && map.addSource) {
-          map.addSource('cemetery-data', { type: 'geojson', data: cemeteryFC });
-          
-          // Polygon cemeteries
-          map.addLayer({
-            id: 'cemeteries-layer',
-            type: 'fill',
-            source: 'cemetery-data',
-            filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-            paint: { 'fill-color': '#2E7D32', 'fill-opacity': 0.9 }
-          });
-          
-          map.addLayer({
-            id: 'cemeteries-border',
-            type: 'line',
-            source: 'cemetery-data',
-            filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-            paint: { 'line-color': '#1B5E20', 'line-width': 2 }
-          });
-          
-          // Point cemeteries
-          map.addLayer({
-            id: 'cemeteries-points',
-            type: 'circle',
-            source: 'cemetery-data',
-            filter: ['==', ['geometry-type'], 'Point'],
-            paint: {
-              'circle-color': '#2E7D32',
-              'circle-radius': 6,
-              'circle-stroke-color': '#1B5E20',
-              'circle-stroke-width': 2
-            }
-          });
-        }
-      } catch (err) {
-        console.warn('Error adding cemetery layers:', err);
-      }
+      });
     }
   }, [map, mapLoaded, cemeteryKeywords, knownCemeteryAreas]);
 
@@ -406,11 +407,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       // Combine explicit and inferred water features
       const allWaterFeatures = [
         ...explicitWaterFeatures,
-        ...inferredWaterFeatures
+        ...inferredWaterFeatures.features as Feature<Polygon | MultiPolygon, { [name: string]: any }>[]
       ];
       
       console.log(`Found ${explicitWaterFeatures.length} explicit water features`);
-      console.log(`Found ${inferredWaterFeatures.length} inferred water features`);
+      console.log(`Found ${inferredWaterFeatures.features.length} inferred water features`);
       console.log(`Total ${allWaterFeatures.length} water features`);
       console.log(`Found ${landFeatures.length} land features`);
       
@@ -524,23 +525,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (!mapLoaded || !map) return;
 
     const addOrUpdateSource = (sourceId: string, data: FeatureCollection | null, layer: any) => {
-      if (!data || !map) return;
+      if (!data) return;
       
-      try {
-        const existing = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
-        if (existing) {
-          existing.setData(data as any);
-          if (!map.getLayer(layer.id)) {
-            map.addLayer(layer);
-          }
-        } else {
-          map.addSource(sourceId, { type: 'geojson', data });
-          if (!map.getLayer(layer.id)) {
-            map.addLayer(layer);
-          }
-        }
-      } catch (err) {
-        console.warn(`Error adding/updating source ${sourceId}:`, err);
+      const existing = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
+      if (existing) {
+        existing.setData(data as any);
+        if (!map.getLayer(layer.id)) map.addLayer(layer);
+      } else {
+        map.addSource(sourceId, { type: 'geojson', data });
+        if (!map.getLayer(layer.id)) map.addLayer(layer);
       }
     };
 
@@ -582,8 +575,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       paint: { 
         'fill-color': [
           'case',
-          ['==', ['get', 'inferredWater'], true],
-          '#1E88E5', // Blue for inferred water from empty spaces
+          ['==', ['get', 'inferredType'], 'water'],
+          '#2E86AB', // Slightly different blue for inferred water
           '#4A90E2'  // Original blue for explicit water
         ],
         'fill-opacity': 0.8 
@@ -598,12 +591,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     });
 
     // Ensure businesses layer stays on top
-    if (map && map.getLayer && map.getLayer('businesses-layer')) {
-      try {
-        map.moveLayer('businesses-layer');
-      } catch (err) {
-        console.warn('Error moving businesses layer:', err);
-      }
+    if (map.getLayer('businesses-layer')) {
+      map.moveLayer('businesses-layer');
     }
   }, [mapLoaded, map, landData, waterData, roadsData, cemeteryKeywords]);
 
@@ -611,90 +600,76 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (!mapLoaded || !businesses || !map) return;
 
-    try {
-      // Clean up existing
-      if (map.getSource && map.getSource('businesses')) {
-        if (map.removeLayer) map.removeLayer('businesses-layer');
-        if (map.removeSource) map.removeSource('businesses');
-      }
-
-      const businessFeatures = businesses.map(business => ({
-        type: 'Feature' as const,
-        geometry: { type: 'Point' as const, coordinates: [business.position.lng, business.position.lat] },
-        properties: { id: business.id, name: business.name, businessType: business.businessType || 'unknown' }
-      }));
-
-      if (map.addSource) {
-        map.addSource('businesses', {
-          type: 'geojson',
-          data: { type: 'FeatureCollection', features: businessFeatures }
-        });
-
-        map.addLayer({
-          id: 'businesses-layer',
-          type: 'circle',
-          source: 'businesses',
-          paint: {
-            'circle-radius': 8,
-            'circle-color': '#FACC15',
-            'circle-stroke-width': 2,
-            'circle-stroke-color': '#FFFFFF'
-          }
-        });
-
-        // Event handlers
-        if (onBusinessClick && map.on) {
-          map.on('click', 'businesses-layer', (e) => {
-            if (e.features?.[0]) {
-              const businessId = e.features[0].properties?.id;
-              const business = businesses.find(b => b.id === businessId);
-              if (business && map.flyTo) {
-                map.flyTo({
-                  center: [business.position.lng, business.position.lat],
-                  zoom: 16,
-                  duration: 800,
-                  essential: true
-                });
-                onBusinessClick(business);
-              }
-            }
-          });
-        }
-
-        if (map.on && map.getCanvas) {
-          map.on('mouseenter', 'businesses-layer', () => {
-            const canvas = map.getCanvas();
-            if (canvas) canvas.style.cursor = 'pointer';
-          });
-
-          map.on('mouseleave', 'businesses-layer', () => {
-            const canvas = map.getCanvas();
-            if (canvas) canvas.style.cursor = '';
-          });
-        }
-      }
-    } catch (err) {
-      console.warn('Error setting up business markers:', err);
+    // Clean up existing
+    if (map.getSource('businesses')) {
+      map.removeLayer('businesses-layer');
+      map.removeSource('businesses');
     }
+
+    const businessFeatures = businesses.map(business => ({
+      type: 'Feature' as const,
+      geometry: { type: 'Point' as const, coordinates: [business.position.lng, business.position.lat] },
+      properties: { id: business.id, name: business.name, businessType: business.businessType || 'unknown' }
+    }));
+
+    map.addSource('businesses', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: businessFeatures }
+    });
+
+    map.addLayer({
+      id: 'businesses-layer',
+      type: 'circle',
+      source: 'businesses',
+      paint: {
+        'circle-radius': 8,
+        'circle-color': '#FACC15',
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#FFFFFF'
+      }
+    });
+
+    // Event handlers
+    if (onBusinessClick) {
+      map.on('click', 'businesses-layer', (e) => {
+        if (e.features?.[0]) {
+          const businessId = e.features[0].properties?.id;
+          const business = businesses.find(b => b.id === businessId);
+          if (business) {
+            map.flyTo({
+              center: [business.position.lng, business.position.lat],
+              zoom: 16,
+              duration: 800,
+              essential: true
+            });
+            onBusinessClick(business);
+          }
+        }
+      });
+    }
+
+    map.on('mouseenter', 'businesses-layer', () => {
+      map.getCanvas().style.cursor = 'pointer';
+    });
+
+    map.on('mouseleave', 'businesses-layer', () => {
+      map.getCanvas().style.cursor = '';
+    });
 
   }, [mapLoaded, businesses, onBusinessClick]);
 
   // Selected business highlighting
   useEffect(() => {
-    if (!mapLoaded || !map || !map.getLayer || !map.getLayer('businesses-layer') || !map.setPaintProperty) return;
+    if (!mapLoaded || !map || !map.getLayer('businesses-layer')) return;
 
-    try {
-      map.setPaintProperty('businesses-layer', 'circle-color', 
-        selectedBusiness ? [
-          'case',
-          ['==', ['get', 'id'], selectedBusiness.id],
-          '#EF4444',
-          '#FACC15'
-        ] : '#FACC15'
-      );
-    } catch (err) {
-      console.warn('Error updating business highlighting:', err);
-    }
+    map.setPaintProperty('businesses-layer', 'circle-color', 
+      selectedBusiness ? [
+        'case',
+        ['==', ['get', 'id'], selectedBusiness.id],
+        '#EF4444',
+        '#FACC15'
+      ] : '#FACC15'
+    );
   }, [mapLoaded, map, selectedBusiness]);
 
   return (
