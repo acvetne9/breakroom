@@ -103,7 +103,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         // Find nearby coastlines to create boundaries
         const nearbyCoastlines = coastlines.filter(coastline => {
           try {
-            const distance = turf.pointToLineDistance(seedPointFeature, coastline, { units: 'kilometers' });
+            const distance = turf.pointToLineDistance(seedPointFeature, coastline as Feature<LineString>, { units: 'kilometers' });
             return distance < 5; // Within 5km
           } catch (err) {
             return false;
@@ -347,7 +347,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
     
     return { type: 'FeatureCollection', features: [] };
-  }, [waterKeywords, createAdditionalWaterFeatures]);
+  }, [waterKeywords, createWaterAreasFromSeeds]);
 
   const loadGeographicData = useCallback(async () => {
     try {
