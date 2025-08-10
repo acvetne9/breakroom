@@ -74,90 +74,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     { name: "Mount Hebron Cemetery", center: [-73.8440, 40.6340], radius: 0.004 }
   ];
 
-  // Unified cemetery detection function - now styles as parks
+  // Cemetery detection function - integrate with land areas instead of separate layers
   const detectCemeteries = useCallback((mainData: FeatureCollection) => {
     if (!map || !mapLoaded) return;
 
-    const cemeteryFeatures: Feature[] = [];
-
-    mainData.features.forEach(feature => {
-      const props = feature.properties;
-      if (!props) return;
-
-      const name = props.name ? props.name.toLowerCase() : '';
-      const isCemetery = cemeteryKeywords.some(keyword => name.includes(keyword)) ||
-                        props.leisure === 'cemetery' ||
-                        props.natural === 'cemetery';
-
-      // Location-based detection
-      let nearKnownCemetery = false;
-      if (['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) {
-        try {
-          const centroid = turf.centroid(feature);
-          const [lng, lat] = centroid.geometry.coordinates;
-          
-          nearKnownCemetery = knownCemeteryAreas.some(cemetery => {
-            const distance = Math.sqrt(
-              Math.pow(lng - cemetery.center[0], 2) + 
-              Math.pow(lat - cemetery.center[1], 2)
-            );
-            return distance < cemetery.radius;
-          });
-        } catch (err) {
-          // Ignore centroid calculation errors
-        }
-      }
-
-      if (isCemetery || nearKnownCemetery) {
-        cemeteryFeatures.push(feature);
-      }
+    // Clean up any existing separate cemetery layers
+    ['cemeteries-layer', 'cemeteries-border', 'cemeteries-points'].forEach(layerId => {
+      if (map.getLayer(layerId)) map.removeLayer(layerId);
     });
+    if (map.getSource('cemetery-data')) map.removeSource('cemetery-data');
 
-    console.log(`Found ${cemeteryFeatures.length} cemetery features`);
-
-    if (cemeteryFeatures.length > 0) {
-      const cemeteryFC = { type: 'FeatureCollection' as const, features: cemeteryFeatures };
-      
-      // Clean up existing layers
-      ['cemeteries-layer', 'cemeteries-border', 'cemeteries-points'].forEach(layerId => {
-        if (map.getLayer(layerId)) map.removeLayer(layerId);
-      });
-      if (map.getSource('cemetery-data')) map.removeSource('cemetery-data');
-      
-      map.addSource('cemetery-data', { type: 'geojson', data: cemeteryFC });
-      
-      // Polygon cemeteries - styled like parks
-      map.addLayer({
-        id: 'cemeteries-layer',
-        type: 'fill',
-        source: 'cemetery-data',
-        filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-        paint: { 'fill-color': '#4CAF50', 'fill-opacity': 0.8 } // Same as parks
-      });
-      
-      map.addLayer({
-        id: 'cemeteries-border',
-        type: 'line',
-        source: 'cemetery-data',
-        filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-        paint: { 'line-color': '#388E3C', 'line-width': 1 } // Subtle border like parks
-      });
-      
-      // Point cemeteries - styled like parks
-      map.addLayer({
-        id: 'cemeteries-points',
-        type: 'circle',
-        source: 'cemetery-data',
-        filter: ['==', ['geometry-type'], 'Point'],
-        paint: {
-          'circle-color': '#4CAF50', // Same as parks
-          'circle-radius': 6,
-          'circle-stroke-color': '#388E3C',
-          'circle-stroke-width': 1
-        }
-      });
-    }
-  }, [map, mapLoaded, cemeteryKeywords, knownCemeteryAreas]);
+    // Cemetery detection is now handled in the main land processing
+    // No separate cemetery layers needed
+  }, [map, mapLoaded]);
 
   const createLandFromCoastlines = useCallback((geoData: FeatureCollection): FeatureCollection<Polygon | MultiPolygon> => {
     try {
@@ -225,18 +154,44 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       console.log(`Processing ${mainData.features.length} total features`);
 
-      // Apply cemetery detection after map is ready
+      // Apply cemetery detection (now just cleanup, as cemeteries are in land data)
       setTimeout(() => detectCemeteries(mainData), 1000);
       
-      // Process land features
+      // Process land features - include cemeteries as polygon land areas
       const landFeatures = mainData.features.filter(feature => {
         const props = feature.properties;
-        if (!props || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
+        if (!props) return false;
+        
+        // Only include polygon/multipolygon features for land areas
+        if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
+        
+        const name = props.name ? props.name.toLowerCase() : '';
+        
+        // Cemetery detection (polygons only)
+        const isCemetery = cemeteryKeywords.some(keyword => name.includes(keyword)) ||
+                          props.leisure === 'cemetery' ||
+                          props.natural === 'cemetery';
+        
+        // Location-based cemetery detection
+        let nearKnownCemetery = false;
+        try {
+          const centroid = turf.centroid(feature);
+          const [lng, lat] = centroid.geometry.coordinates;
+          
+          nearKnownCemetery = knownCemeteryAreas.some(cemetery => {
+            const distance = Math.sqrt(
+              Math.pow(lng - cemetery.center[0], 2) + 
+              Math.pow(lat - cemetery.center[1], 2)
+            );
+            return distance < cemetery.radius;
+          });
+        } catch (err) {
+          // Ignore centroid calculation errors
+        }
         
         return (
           // Cemetery detection
-          (props.name && cemeteryKeywords.some(keyword => 
-            props.name.toLowerCase().includes(keyword))) ||
+          isCemetery || nearKnownCemetery ||
           
           // Leisure areas
           ['park', 'playground', 'pitch', 'garden', 'golf_course', 'recreation_ground', 
