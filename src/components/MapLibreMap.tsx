@@ -88,27 +88,55 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     // No separate cemetery layers needed
   }, [map, mapLoaded]);
 
-  const createLandFromCoastlines = useCallback((geoData: FeatureCollection): FeatureCollection<Polygon | MultiPolygon> => {
+  const createWaterAndLandFromCoastlines = useCallback((geoData: FeatureCollection): {
+    landData: FeatureCollection<Polygon | MultiPolygon>,
+    waterData: FeatureCollection<Polygon | MultiPolygon>
+  } => {
     try {
       const coastlines = geoData.features.filter(feature => 
         feature.geometry.type === 'LineString' && feature.properties?.natural === 'coastline'
       );
 
+      const bbox: [number, number, number, number] = [-74.30, 40.50, -73.70, 40.93];
+      const totalBbox = turf.bboxPolygon(bbox);
+      
       if (coastlines.length === 0) {
-        const bbox: [number, number, number, number] = [-74.30, 40.50, -73.70, 40.93];
-        const landArea = turf.bboxPolygon(bbox);
+        // Fallback: use explicit water bodies to define land/water
+        const explicitWaterBodies = geoData.features.filter(feature => {
+          const props = feature.properties;
+          return props && 
+            (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') &&
+            (props.natural === 'water' || 
+             (props.name && waterKeywords.some(waterName => 
+               props.name.toLowerCase().includes(waterName.toLowerCase()))));
+        }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
+        
+        let landArea = totalBbox;
+        const waterFeatures = [...explicitWaterBodies];
+        
+        explicitWaterBodies.forEach(waterBody => {
+          try {
+            const difference = (turf as any).difference(landArea, waterBody);
+            if (difference) landArea = difference;
+          } catch (err) {
+            console.warn('Could not subtract water body:', err);
+          }
+        });
+        
+        const landFeature = landArea as unknown as Feature<Polygon | MultiPolygon, { [name: string]: any }>;
+        landFeature.properties = { landType: 'comprehensive', source: 'water-subtraction' };
+        
         return {
-          type: 'FeatureCollection',
-          features: [{
-            ...landArea,
-            properties: { landType: 'default-bbox', source: 'fallback' }
-          } as Feature<Polygon, { [name: string]: any }>]
+          landData: { type: 'FeatureCollection', features: [landFeature] },
+          waterData: { type: 'FeatureCollection', features: waterFeatures }
         };
       }
 
-      const bbox: [number, number, number, number] = [-74.30, 40.50, -73.70, 40.93];
-      let totalLandArea = turf.bboxPolygon(bbox);
+      // Create land polygons by using coastlines to define boundaries
+      let landArea = totalBbox;
+      const waterFeatures: Feature<Polygon | MultiPolygon, { [name: string]: any }>[] = [];
       
+      // First, subtract all explicit water bodies from the total area
       const explicitWaterBodies = geoData.features.filter(feature => {
         const props = feature.properties;
         return props && 
@@ -116,28 +144,56 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           (props.natural === 'water' || 
            (props.name && waterKeywords.some(waterName => 
              props.name.toLowerCase().includes(waterName.toLowerCase()))));
-      });
+      }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
       
+      // Add explicit water bodies to water features
+      waterFeatures.push(...explicitWaterBodies);
+      
+      // Subtract water bodies from land
       explicitWaterBodies.forEach(waterBody => {
         try {
-          const difference = (turf as any).difference(totalLandArea, waterBody);
-          if (difference) totalLandArea = difference;
+          const difference = (turf as any).difference(landArea, waterBody);
+          if (difference) landArea = difference;
         } catch (err) {
           console.warn('Could not subtract water body:', err);
         }
       });
       
-      if (totalLandArea) {
-        const landFeature = totalLandArea as unknown as Feature<Polygon | MultiPolygon, { [name: string]: any }>;
-        landFeature.properties = { landType: 'comprehensive', source: 'water-subtraction' };
-        return { type: 'FeatureCollection', features: [landFeature] };
-      }
+      // Try to use coastlines to create additional water areas
+      coastlines.forEach(coastline => {
+        try {
+          // Buffer coastlines slightly to create water areas
+          const buffered = turf.buffer(coastline, 0.001, { units: 'degrees' });
+          if (buffered && (buffered.geometry.type === 'Polygon' || buffered.geometry.type === 'MultiPolygon')) {
+            const waterFeature = buffered as Feature<Polygon | MultiPolygon, { [name: string]: any }>;
+            waterFeature.properties = { waterType: 'coastline-buffer', source: 'coastline' };
+            waterFeatures.push(waterFeature);
+            
+            // Subtract from land
+            const difference = (turf as any).difference(landArea, buffered);
+            if (difference) landArea = difference;
+          }
+        } catch (err) {
+          console.warn('Could not process coastline:', err);
+        }
+      });
+      
+      const landFeature = landArea as unknown as Feature<Polygon | MultiPolygon, { [name: string]: any }>;
+      landFeature.properties = { landType: 'comprehensive', source: 'coastline-based' };
+      
+      return {
+        landData: { type: 'FeatureCollection', features: [landFeature] },
+        waterData: { type: 'FeatureCollection', features: waterFeatures }
+      };
 
     } catch (error) {
-      console.error('Error creating land from coastlines:', error);
+      console.error('Error creating land/water from coastlines:', error);
     }
     
-    return { type: 'FeatureCollection', features: [] };
+    return {
+      landData: { type: 'FeatureCollection', features: [] },
+      waterData: { type: 'FeatureCollection', features: [] }
+    };
   }, [waterKeywords]);
 
   const loadGeographicData = useCallback(async () => {
@@ -157,8 +213,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       // Apply cemetery detection (now just cleanup, as cemeteries are in land data)
       setTimeout(() => detectCemeteries(mainData), 1000);
       
-      // Process land features - include cemeteries as polygon land areas
-      const landFeatures = mainData.features.filter(feature => {
+      // Create comprehensive water/land boundaries using coastlines
+      const { landData: coastlineLand, waterData: coastlineWater } = createWaterAndLandFromCoastlines(mainData);
+      
+      // Process specific land features (parks, cemeteries, etc.) that should be colored differently
+      const specificLandFeatures = mainData.features.filter(feature => {
         const props = feature.properties;
         if (!props) return false;
         
@@ -209,43 +268,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         );
       }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
       
-      // Process water features
-      const waterFeatures = mainData.features.filter(feature => {
-        const props = feature.properties;
-        if (!props || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
-        
-        return (
-          ['water', 'bay', 'strait'].includes(props.natural) ||
-          (props.name && waterKeywords.some(waterName => {
-            const name = props.name.toLowerCase();
-            const water = waterName.toLowerCase();
-            return name === water || name.includes(water) || 
-                   (water.includes('bay') && name.includes('bay')) ||
-                   (water.includes('river') && name.includes('river')) ||
-                   (water.includes('kill') && name.includes('kill'));
-          }))
-        );
-      }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
+      // Combine coastline-based land with specific features
+      const allLandFeatures = [...coastlineLand.features, ...specificLandFeatures];
       
-      console.log(`Found ${landFeatures.length} land features, ${waterFeatures.length} water features`);
+      console.log(`Found ${specificLandFeatures.length} specific land features, ${coastlineWater.features.length} water features`);
+      console.log(`Total land features: ${allLandFeatures.length}`);
       
-      // Generate land from coastlines if needed
-      if (landFeatures.length < 10) {
-        const coastlineGenerated = createLandFromCoastlines(mainData);
-        const typedCoastlineFeatures = coastlineGenerated.features.filter(
-          (feature): feature is Feature<Polygon | MultiPolygon, { [name: string]: any }> => 
-            feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon'
-        );
-        landFeatures.push(...typedCoastlineFeatures);
-      }
-      
-      setLandData({ type: 'FeatureCollection', features: landFeatures });
-      setWaterData({ type: 'FeatureCollection', features: waterFeatures });
+      setLandData({ type: 'FeatureCollection', features: allLandFeatures });
+      setWaterData(coastlineWater);
       
     } catch (error) {
       console.error('Error loading geographic data:', error);
     }
-  }, [loadGeoJSONData, detectCemeteries, createLandFromCoastlines, cemeteryKeywords, waterKeywords]);
+  }, [loadGeoJSONData, detectCemeteries, createWaterAndLandFromCoastlines, cemeteryKeywords, knownCemeteryAreas]);
 
   // Initialize map
   useEffect(() => {
