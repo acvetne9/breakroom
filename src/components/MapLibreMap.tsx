@@ -371,12 +371,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             ['==', ['get', 'leisure'], 'golf_course'],
             ['==', ['get', 'leisure'], 'nature_reserve']
           ], '#4CAF50',
-          // Natural vegetation
-          ['any',
-            ['==', ['get', 'natural'], 'wood'],
-            ['==', ['get', 'natural'], 'forest'],
-           ['==', ['get', 'natural'], 'wetland']
-          ], '#388E3C',
+          // Any natural area
+          ['!=', ['coalesce', ['get', 'natural'], ''], ''],
+          '#388E3C',
           '#E8F5E8' // Default land color
         ],
         'fill-opacity': 0.8  // Consistent with park opacity
