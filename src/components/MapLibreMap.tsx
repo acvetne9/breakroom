@@ -38,51 +38,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [landData, setLandData] = useState<FeatureCollection<Polygon | MultiPolygon> | null>(null);
   const [waterData, setWaterData] = useState<FeatureCollection<Polygon | MultiPolygon> | null>(null);
 
-  // Additional water areas to fill in gaps
-  const additionalWaterAreas = [
-    {
-      name: "Staten Island South Waters",
-      coordinates: [
-        [-74.140, 40.680], [-74.120, 40.680], [-74.115, 40.670], [-74.135, 40.665], [-74.140, 40.680]
-      ]
-    },
-    {
-      name: "Staten Island West Waters", 
-      coordinates: [
-        [-74.140, 40.678], [-74.125, 40.678], [-74.125, 40.668], [-74.140, 40.668], [-74.140, 40.678]
-      ]
-    },
-    {
-      name: "Brooklyn Southeast Waters",
-      coordinates: [
-        [-73.875, 40.615], [-73.860, 40.615], [-73.860, 40.605], [-73.875, 40.605], [-73.875, 40.615]
-      ]
-    },
-    {
-      name: "Brooklyn South Waters",
-      coordinates: [
-        [-73.980, 40.510], [-73.965, 40.510], [-73.965, 40.495], [-73.980, 40.495], [-73.980, 40.510]
-      ]
-    },
-    // Additional comprehensive water coverage
-    {
-      name: "Arthur Kill Waters",
-      coordinates: [
-        [-74.200, 40.650], [-74.180, 40.650], [-74.175, 40.620], [-74.195, 40.620], [-74.200, 40.650]
-      ]
-    },
-    {
-      name: "Raritan Bay Extension",
-      coordinates: [
-        [-74.250, 40.520], [-74.200, 40.520], [-74.200, 40.480], [-74.250, 40.480], [-74.250, 40.520]
-      ]
-    },
-    {
-      name: "Jamaica Bay Extension",
-      coordinates: [
-        [-73.900, 40.620], [-73.850, 40.620], [-73.845, 40.580], [-73.895, 40.580], [-73.900, 40.620]
-      ]
-    }
+  // Specific water coordinates that need to be filled to coastlines
+  const waterSeedPoints = [
+    { lat: 40.685885, lng: -74.127347, name: "Staten Island South Waters" },
+    { lat: 40.674414, lng: -74.131784, name: "Staten Island West Waters" },
+    { lat: 40.610064, lng: -73.867453, name: "Brooklyn Southeast Waters" },
+    { lat: 40.501230, lng: -73.971258, name: "Brooklyn South Waters" }
   ];
 
   const loadGeoJSONData = useCallback(async (): Promise<FeatureCollection | null> => {
@@ -121,21 +82,131 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     { name: "Mount Hebron Cemetery", center: [-73.8440, 40.6340], radius: 0.004 }
   ];
 
-  // Create additional water features from coordinates
-  const createAdditionalWaterFeatures = useCallback((): Feature<Polygon, { [name: string]: any }>[] => {
-    return additionalWaterAreas.map(area => ({
-      type: 'Feature',
-      geometry: {
-        type: 'Polygon',
-        coordinates: [area.coordinates]
-      },
-      properties: {
-        name: area.name,
-        natural: 'water',
-        source: 'additional-water-areas'
+  // Create water areas by flood-filling from seed points to coastlines
+  const createWaterAreasFromSeeds = useCallback((mainData: FeatureCollection): Feature<Polygon, { [name: string]: any }>[] => {
+    const coastlines = mainData.features.filter(feature => 
+      feature.geometry.type === 'LineString' && feature.properties?.natural === 'coastline'
+    );
+
+    if (coastlines.length === 0) {
+      console.warn('No coastlines found for water area detection');
+      return [];
+    }
+
+    const waterFeatures: Feature<Polygon, { [name: string]: any }>[] = [];
+
+    waterSeedPoints.forEach(seedPoint => {
+      try {
+        // Create a point for the seed location
+        const seedPointFeature = turf.point([seedPoint.lng, seedPoint.lat]);
+        
+        // Find nearby coastlines to create boundaries
+        const nearbyCoastlines = coastlines.filter(coastline => {
+          try {
+            const distance = turf.pointToLineDistance(seedPointFeature, coastline, { units: 'kilometers' });
+            return distance < 5; // Within 5km
+          } catch (err) {
+            return false;
+          }
+        });
+
+        if (nearbyCoastlines.length === 0) {
+          // If no nearby coastlines, create a default buffer area
+          const buffered = turf.buffer(seedPointFeature, 1, { units: 'kilometers' });
+          if (buffered) {
+            waterFeatures.push({
+              type: 'Feature',
+              geometry: buffered.geometry as Polygon,
+              properties: {
+                name: seedPoint.name,
+                natural: 'water',
+                source: 'seed-point-buffer'
+              }
+            });
+          }
+          return;
+        }
+
+        // Create a larger buffer around the seed point
+        const largeBuffer = turf.buffer(seedPointFeature, 3, { units: 'kilometers' });
+        if (!largeBuffer) return;
+
+        // Try to clip the buffer by nearby land features to create realistic water boundaries
+        let waterArea = largeBuffer;
+        
+        // Find nearby land features that could act as boundaries
+        const nearbyLandFeatures = mainData.features.filter(feature => {
+          const props = feature.properties;
+          if (!props || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
+          
+          // Check if it's a land feature
+          const isLand = props.natural === 'land' || 
+                        props.place === 'island' ||
+                        props.leisure === 'park' ||
+                        (props.name && ['island', 'land'].some(term => 
+                          props.name.toLowerCase().includes(term)));
+          
+          if (!isLand) return false;
+
+          // Check if it's within reasonable distance
+          try {
+            const distance = turf.distance(seedPointFeature, turf.centroid(feature), { units: 'kilometers' });
+            return distance < 5;
+          } catch (err) {
+            return false;
+          }
+        });
+
+        // Subtract nearby land features from the water area
+        nearbyLandFeatures.forEach(landFeature => {
+          try {
+            const difference = (turf as any).difference(waterArea, landFeature);
+            if (difference) waterArea = difference;
+          } catch (err) {
+            console.warn('Could not subtract land feature from water area:', err);
+          }
+        });
+
+        // Add the resulting water area
+        if (waterArea && waterArea.geometry) {
+          waterFeatures.push({
+            type: 'Feature',
+            geometry: waterArea.geometry as Polygon,
+            properties: {
+              name: seedPoint.name,
+              natural: 'water',
+              source: 'flood-fill-to-coastlines'
+            }
+          });
+        }
+
+      } catch (error) {
+        console.error(`Error creating water area for ${seedPoint.name}:`, error);
+        
+        // Fallback: create a simple buffer
+        try {
+          const seedPointFeature = turf.point([seedPoint.lng, seedPoint.lat]);
+          const fallbackBuffer = turf.buffer(seedPointFeature, 0.5, { units: 'kilometers' });
+          if (fallbackBuffer) {
+            waterFeatures.push({
+              type: 'Feature',
+              geometry: fallbackBuffer.geometry as Polygon,
+              properties: {
+                name: `${seedPoint.name} (fallback)`,
+                natural: 'water',
+                source: 'fallback-buffer'
+              }
+            });
+          }
+        } catch (fallbackError) {
+          console.error(`Fallback failed for ${seedPoint.name}:`, fallbackError);
+        }
       }
-    }));
-  }, []);
+    });
+
+    console.log(`Created ${waterFeatures.length} water areas from seed points`);
+    return waterFeatures;
+  }, [waterSeedPoints]);
 
   // Unified cemetery detection function
   const detectCemeteries = useCallback((mainData: FeatureCollection) => {
@@ -252,9 +323,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
              props.name.toLowerCase().includes(waterName.toLowerCase()))));
       });
       
-      // Add our additional water areas to the subtraction process
-      const additionalWaterFeatures = createAdditionalWaterFeatures();
-      explicitWaterBodies.push(...additionalWaterFeatures);
+      // Add water areas created from seed points to the subtraction process
+      const seedWaterFeatures = createWaterAreasFromSeeds(geoData);
+      explicitWaterBodies.push(...seedWaterFeatures);
       
       explicitWaterBodies.forEach(waterBody => {
         try {
@@ -339,11 +410,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         );
       }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
       
-      // Add our additional water features
-      const additionalWaterFeatures = createAdditionalWaterFeatures();
-      waterFeatures.push(...additionalWaterFeatures);
+      // Add water areas created from seed points
+      const seedWaterFeatures = createWaterAreasFromSeeds(mainData);
+      waterFeatures.push(...seedWaterFeatures);
       
-      console.log(`Found ${landFeatures.length} land features, ${waterFeatures.length} water features (including ${additionalWaterFeatures.length} additional)`);
+      console.log(`Found ${landFeatures.length} land features, ${waterFeatures.length} water features (including ${seedWaterFeatures.length} from seed points)`);
       
       // Generate land from coastlines if needed
       if (landFeatures.length < 10) {
@@ -361,7 +432,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     } catch (error) {
       console.error('Error loading geographic data:', error);
     }
-  }, [loadGeoJSONData, detectCemeteries, createLandFromCoastlines, cemeteryKeywords, waterKeywords, createAdditionalWaterFeatures]);
+  }, [loadGeoJSONData, detectCemeteries, createLandFromCoastlines, cemeteryKeywords, waterKeywords, createWaterAreasFromSeeds]);
 
   // Initialize map
   useEffect(() => {
