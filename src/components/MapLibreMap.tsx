@@ -185,7 +185,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         return props && 
           (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') &&
           (props.natural === 'water' || 
-           props.natural === 'strait' ||  // Explicitly include strait
            (props.name && waterKeywords.some(waterName => 
              props.name.toLowerCase().includes(waterName.toLowerCase()))));
       });
@@ -255,15 +254,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         );
       }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
       
-      // Process water features - Enhanced strait detection
+      // Process water features
       const waterFeatures = mainData.features.filter(feature => {
         const props = feature.properties;
         if (!props || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
         
         return (
-          // Natural water types including strait
           ['water', 'bay', 'strait'].includes(props.natural) ||
-          // Name-based water detection
           (props.name && waterKeywords.some(waterName => {
             const name = props.name.toLowerCase();
             const water = waterName.toLowerCase();
