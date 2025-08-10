@@ -74,7 +74,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     { name: "Mount Hebron Cemetery", center: [-73.8440, 40.6340], radius: 0.004 }
   ];
 
-  // Unified cemetery detection function
+  // Unified cemetery detection function - now styles as parks
   const detectCemeteries = useCallback((mainData: FeatureCollection) => {
     if (!map || !mapLoaded) return;
 
@@ -126,13 +126,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       
       map.addSource('cemetery-data', { type: 'geojson', data: cemeteryFC });
       
-      // Polygon cemeteries
+      // Polygon cemeteries - styled like parks
       map.addLayer({
         id: 'cemeteries-layer',
         type: 'fill',
         source: 'cemetery-data',
         filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-        paint: { 'fill-color': '#2E7D32', 'fill-opacity': 0.9 }
+        paint: { 'fill-color': '#4CAF50', 'fill-opacity': 0.8 } // Same as parks
       });
       
       map.addLayer({
@@ -140,20 +140,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         type: 'line',
         source: 'cemetery-data',
         filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-        paint: { 'line-color': '#1B5E20', 'line-width': 2 }
+        paint: { 'line-color': '#388E3C', 'line-width': 1 } // Subtle border like parks
       });
       
-      // Point cemeteries
+      // Point cemeteries - styled like parks
       map.addLayer({
         id: 'cemeteries-points',
         type: 'circle',
         source: 'cemetery-data',
         filter: ['==', ['geometry-type'], 'Point'],
         paint: {
-          'circle-color': '#2E7D32',
+          'circle-color': '#4CAF50', // Same as parks
           'circle-radius': 6,
-          'circle-stroke-color': '#1B5E20',
-          'circle-stroke-width': 2
+          'circle-stroke-color': '#388E3C',
+          'circle-stroke-width': 1
         }
       });
     }
@@ -396,7 +396,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     };
 
-    // Land areas with enhanced cemetery/park colors
+    // Land areas - cemeteries now styled as parks
     addOrUpdateSource('land-data', landData, {
       id: 'land-areas',
       type: 'fill',
@@ -404,10 +404,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       paint: { 
         'fill-color': [
           'case',
-          // Cemetery detection
+          // Cemetery detection - now uses park color
           ['any', ...cemeteryKeywords.map(keyword => 
             ['in', keyword, ['downcase', ['coalesce', ['get', 'name'], '']]])],
-          '#2E7D32',
+          '#4CAF50', // Same as parks
           // Parks
           ['any',
             ['==', ['get', 'leisure'], 'park'],
@@ -422,7 +422,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           ], '#388E3C',
           '#E8F5E8' // Default land color
         ],
-        'fill-opacity': 0.9 
+        'fill-opacity': 0.8  // Consistent with park opacity
       }
     });
 
