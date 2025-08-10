@@ -104,15 +104,31 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       try {
         // Attempt to merge all coastline segments
-        const mergedCoastlines = coastlines.length > 1 
-          ? turf.lineToPolygon(turf.combine(turf.featureCollection(coastlines))) 
-          : turf.lineToPolygon(coastlines[0]);
+        let mergedCoastlines;
+        if (coastlines.length > 1) {
+          const combined = turf.combine(turf.featureCollection(coastlines));
+          // Check if combined result has features
+          if (combined.features && combined.features.length > 0) {
+            // Try to convert first feature to polygon
+            mergedCoastlines = turf.lineToPolygon(combined.features[0] as Feature<LineString | MultiLineString>);
+          }
+        } else if (coastlines.length === 1) {
+          mergedCoastlines = turf.lineToPolygon(coastlines[0]);
+        }
         
-        if (mergedCoastlines && mergedCoastlines.features) {
-          landPolygons = mergedCoastlines.features.map(feature => ({
-            ...feature,
-            properties: { landType: 'coastline-enclosed', source: 'coastline-processing' }
-          })) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
+        if (mergedCoastlines) {
+          // Handle both single Feature and FeatureCollection returns from lineToPolygon
+          if (mergedCoastlines.type === 'FeatureCollection') {
+            landPolygons = mergedCoastlines.features.map(feature => ({
+              ...feature,
+              properties: { landType: 'coastline-enclosed', source: 'coastline-processing' }
+            })) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
+          } else if (mergedCoastlines.type === 'Feature') {
+            landPolygons = [{
+              ...mergedCoastlines,
+              properties: { landType: 'coastline-enclosed', source: 'coastline-processing' }
+            }] as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
+          }
         }
       } catch (polygonError) {
         console.warn('Failed to create polygons from coastlines, using buffer method:', polygonError);
