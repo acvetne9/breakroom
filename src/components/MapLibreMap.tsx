@@ -364,13 +364,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             ['in', keyword, ['downcase', ['coalesce', ['get', 'name'], '']]])],
           '#4CAF50', // Same as parks
           // Parks and leisure areas
-          ['any',
-            ['==', ['get', 'leisure'], 'park'],
-            ['==', ['get', 'leisure'], 'garden'],
-            ['==', ['get', 'leisure'], 'playground'],
-            ['==', ['get', 'leisure'], 'golf_course'],
-            ['==', ['get', 'leisure'], 'nature_reserve']
-          ], '#4CAF50',
+          // Any leisure area
+          ['!=', ['coalesce', ['get', 'leisure'], ''], ''],
+          '#4CAF50',
           // Any natural area
           ['!=', ['coalesce', ['get', 'natural'], ''], ''],
           '#388E3C',
