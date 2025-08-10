@@ -372,10 +372,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, [loadGeoJSONData]);
 
-  // Load geographic data
+  // Load geographic data - run only once after map is loaded
   useEffect(() => {
-    loadGeographicData();
-  }, [loadGeographicData]);
+    if (mapLoaded && map) {
+      loadGeographicData();
+    }
+  }, [mapLoaded, map]); // Only depend on mapLoaded and map, not the function itself
 
   // Add geographic layers
   useEffect(() => {
