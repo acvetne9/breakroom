@@ -331,7 +331,15 @@ const waterFeatures = mainData.features.filter(feature => {
       }
     });
 
-    landFeatures = landFeatures.filter(f => !toMove.includes(f));
+    // Remove from landFeatures in place
+    toMove.forEach(f => {
+      const idx = landFeatures.indexOf(f);
+      if (idx !== -1) {
+        landFeatures.splice(idx, 1);
+      }
+    });
+
+    // Add to waterFeatures
     waterFeatures.push(...toMove);
 
     if (toMove.length > 0) {
