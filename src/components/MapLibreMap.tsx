@@ -255,22 +255,76 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
       
       // Process water features
-      const waterFeatures = mainData.features.filter(feature => {
-        const props = feature.properties;
-        if (!props || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
-        
-        return (
-          ['water', 'bay', 'strait'].includes(props.natural) ||
-          (props.name && waterKeywords.some(waterName => {
-            const name = props.name.toLowerCase();
-            const water = waterName.toLowerCase();
-            return name === water || name.includes(water) || 
-                   (water.includes('bay') && name.includes('bay')) ||
-                   (water.includes('river') && name.includes('river')) ||
-                   (water.includes('kill') && name.includes('kill'));
-          }))
-        );
-      }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
+      
+  // Helper: check if polygon has a long straight border touching any water polygon
+  const touchesWaterWithStraightEdge = (
+    feature: Feature<Polygon | MultiPolygon, any>,
+    knownWater: Feature<Polygon | MultiPolygon, any>[],
+    minStraightLength = 200, // meters
+    minArea = 50000 // m²
+  ) => {
+    try {
+      const area = turf.area(feature);
+      if (area < minArea) return false; // too small to consider
+
+      const coordsArray = feature.geometry.type === 'Polygon'
+        ? feature.geometry.coordinates
+        : feature.geometry.coordinates.flat();
+
+      // For each ring in the polygon
+      for (const ring of coordsArray) {
+        for (let i = 0; i < ring.length - 1; i++) {
+          const p1 = ring[i];
+          const p2 = ring[i + 1];
+          const segment = turf.lineString([p1, p2]);
+          const length = turf.length(segment, { units: 'meters' });
+
+          if (length >= minStraightLength) {
+            // See if this edge touches any known water polygon
+            for (const water of knownWater) {
+              if (turf.booleanTouches(segment, water)) {
+                return true;
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Error checking straight edge water touch:", err);
+    }
+    return false;
+  };
+
+  const waterFeatures = mainData.features.filter(feature => {
+  const props = feature.properties;
+  if (!props || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
+
+  // Standard detection
+  const isWater = (
+    ['water', 'bay', 'strait'].includes(props.natural) ||
+    (props.name && waterKeywords.some(waterName => {
+      const name = props.name.toLowerCase();
+      const water = waterName.toLowerCase();
+      return name === water || name.includes(water) ||
+             (water.includes('bay') && name.includes('bay')) ||
+             (water.includes('river') && name.includes('river')) ||
+             (water.includes('kill') && name.includes('kill'));
+    }))
+  );
+
+  if (!isWater) {
+    // Narrow known water to polygon/multipolygon
+    const knownWater = mainData.features.filter((f): f is Feature<Polygon | MultiPolygon, any> =>
+      (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon') &&
+      (f.properties?.natural === 'water' ||
+       (f.properties?.name && waterKeywords.some(w =>
+         f.properties!.name.toLowerCase().includes(w.toLowerCase()))))
+    );
+    return touchesWaterWithStraightEdge(feature as Feature<Polygon | MultiPolygon, any>, knownWater);
+  }
+
+  return isWater;
+}) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
       
       console.log(`Found ${landFeatures.length} land features, ${waterFeatures.length} water features`);
       
