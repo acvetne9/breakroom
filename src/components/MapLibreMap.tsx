@@ -256,25 +256,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       
       // Process water features
       
-const waterFeatures = mainData.features.filter(feature => {
-        const props = feature.properties;
-        if (!props || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
-        
-        return (
-          ['water', 'bay', 'strait'].includes(props.natural) ||
-          (props.name && waterKeywords.some(waterName => {
-            const name = props.name.toLowerCase();
-            const water = waterName.toLowerCase();
-            return name === water || name.includes(water) || 
-                   (water.includes('bay') && name.includes('bay')) ||
-                   (water.includes('river') && name.includes('river')) ||
-                   (water.includes('kill') && name.includes('kill'));
-          }))
-        );
-      }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
-      
-      console.log(`Found ${landFeatures.length} land features, ${waterFeatures.length} water features`);
-
   // Helper: check if polygon has a long straight border touching any water polygon
   const touchesWaterWithStraightEdge = (
     feature: Feature<Polygon | MultiPolygon, any>,
@@ -312,8 +293,24 @@ const waterFeatures = mainData.features.filter(feature => {
     return false;
   };
 
-  
-
+  const waterFeatures = mainData.features.filter(feature => {
+        const props = feature.properties;
+        if (!props || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
+        
+        return (
+          ['water', 'bay', 'strait'].includes(props.natural) ||
+          (props.name && waterKeywords.some(waterName => {
+            const name = props.name.toLowerCase();
+            const water = waterName.toLowerCase();
+            return name === water || name.includes(water) || 
+                   (water.includes('bay') && name.includes('bay')) ||
+                   (water.includes('river') && name.includes('river')) ||
+                   (water.includes('kill') && name.includes('kill'));
+          }))
+        );
+      }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
+      
+      console.log(`Found ${landFeatures.length} land features, ${waterFeatures.length} water features`);
       
       // Generate land from coastlines if needed
       if (landFeatures.length < 10) {
@@ -324,44 +321,40 @@ const waterFeatures = mainData.features.filter(feature => {
         );
         landFeatures.push(...typedCoastlineFeatures);
       }
-      
-      
-  // Final pass: upgrade certain land polygons to water BEFORE setting state
-  (() => {
-    const knownWaterPolys = waterFeatures.filter(
-      (f): f is Feature<Polygon | MultiPolygon, any> =>
-        f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'
-    );
+      // Straight-border pass before setting state
+      (() => {
+        const knownWaterPolys = waterFeatures.filter(
+          (f): f is Feature<Polygon | MultiPolygon, any> =>
+            f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'
+        );
 
-    const toMove: Feature<Polygon | MultiPolygon, any>[] = [];
+        const toMove: Feature<Polygon | MultiPolygon, any>[] = [];
 
-    landFeatures.forEach(f => {
-      if (
-        f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'
-      ) {
-        if (touchesWaterWithStraightEdge(f, knownWaterPolys)) {
-          toMove.push(f);
+        landFeatures.forEach(f => {
+          if (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon') {
+            if (touchesWaterWithStraightEdge(f, knownWaterPolys)) {
+              toMove.push(f);
+            }
+          }
+        });
+
+        toMove.forEach(f => {
+          const idx = landFeatures.indexOf(f);
+          if (idx !== -1) {
+            landFeatures.splice(idx, 1);
+          }
+        });
+
+        waterFeatures.push(...toMove);
+
+        if (toMove.length > 0) {
+          console.log(`Moved ${toMove.length} polygons from land to water (straight-border rule).`);
         }
-      }
-    });
+      })();
 
-    toMove.forEach(f => {
-      const idx = landFeatures.indexOf(f);
-      if (idx !== -1) {
-        landFeatures.splice(idx, 1);
-      }
-    });
-
-    waterFeatures.push(...toMove);
-
-    if (toMove.length > 0) {
-      console.log(`Moved ${toMove.length} polygons from land to water (straight-border rule).`);
-    }
-  })();
-
-setLandData({ type: 'FeatureCollection', features: landFeatures });
+      
+      setLandData({ type: 'FeatureCollection', features: landFeatures });
       setWaterData({ type: 'FeatureCollection', features: waterFeatures });
-
       
     } catch (error) {
       console.error('Error loading geographic data:', error);
