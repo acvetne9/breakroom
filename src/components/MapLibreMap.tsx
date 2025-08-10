@@ -256,6 +256,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       
       // Process water features
       
+const waterFeatures = mainData.features.filter(feature => {
+        const props = feature.properties;
+        if (!props || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
+        
+        return (
+          ['water', 'bay', 'strait'].includes(props.natural) ||
+          (props.name && waterKeywords.some(waterName => {
+            const name = props.name.toLowerCase();
+            const water = waterName.toLowerCase();
+            return name === water || name.includes(water) || 
+                   (water.includes('bay') && name.includes('bay')) ||
+                   (water.includes('river') && name.includes('river')) ||
+                   (water.includes('kill') && name.includes('kill'));
+          }))
+        );
+      }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
+      
+      console.log(`Found ${landFeatures.length} land features, ${waterFeatures.length} water features`);
+
   // Helper: check if polygon has a long straight border touching any water polygon
   const touchesWaterWithStraightEdge = (
     feature: Feature<Polygon | MultiPolygon, any>,
@@ -265,13 +284,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   ) => {
     try {
       const area = turf.area(feature);
-      if (area < minArea) return false; // too small to consider
+      if (area < minArea) return false;
 
       const coordsArray = feature.geometry.type === 'Polygon'
         ? feature.geometry.coordinates
         : feature.geometry.coordinates.flat();
 
-      // For each ring in the polygon
       for (const ring of coordsArray) {
         for (let i = 0; i < ring.length - 1; i++) {
           const p1 = ring[i];
@@ -279,9 +297,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           const segment = turf.lineString([p1, p2]);
           const length = turf.length(segment, { units: 'meters' });
 
-          // We treat any 2-point segment as straight for our purposes
           if (length >= minStraightLength) {
-            // See if this edge touches any known water polygon
             for (const water of knownWater) {
               if (turf.booleanTouches(segment, water)) {
                 return true;
@@ -296,40 +312,33 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return false;
   };
 
-  const waterFeatures = mainData.features.filter(feature => {
-  const props = feature.properties;
-  if (!props || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
-
-  // Standard detection
-  const isWater = (
-    ['water', 'bay', 'strait'].includes(props.natural) ||
-    (props.name && waterKeywords.some(waterName => {
-      const name = props.name.toLowerCase();
-      const water = waterName.toLowerCase();
-      return name === water || name.includes(water) ||
-             (water.includes('bay') && name.includes('bay')) ||
-             (water.includes('river') && name.includes('river')) ||
-             (water.includes('kill') && name.includes('kill'));
-    }))
-  );
-
-  // If not already water, apply straight-edge-touch rule
-  if (!isWater) {
-    return touchesWaterWithStraightEdge(feature,
-      mainData.features.filter(f =>
-        f !== feature &&
-        ['Polygon', 'MultiPolygon'].includes(f.geometry.type) &&
-        (f.properties?.natural === 'water' ||
-         (f.properties?.name && waterKeywords.some(w =>
-           f.properties!.name.toLowerCase().includes(w.toLowerCase()))))
-      )
+  // Final pass: upgrade certain land polygons to water
+  (() => {
+    const knownWaterPolys = waterFeatures.filter(
+      (f): f is Feature<Polygon | MultiPolygon, any> =>
+        f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'
     );
-  }
 
-  return isWater;
-}) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
-      
-      console.log(`Found ${landFeatures.length} land features, ${waterFeatures.length} water features`);
+    const toMove: Feature<Polygon | MultiPolygon, any>[] = [];
+
+    landFeatures.forEach(f => {
+      if (
+        f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'
+      ) {
+        if (touchesWaterWithStraightEdge(f, knownWaterPolys)) {
+          toMove.push(f);
+        }
+      }
+    });
+
+    landFeatures = landFeatures.filter(f => !toMove.includes(f));
+    waterFeatures.push(...toMove);
+
+    if (toMove.length > 0) {
+      console.log(`Moved ${toMove.length} polygons from land to water (straight-border rule).`);
+    }
+  })();
+
       
       // Generate land from coastlines if needed
       if (landFeatures.length < 10) {
