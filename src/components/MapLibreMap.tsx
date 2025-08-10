@@ -375,6 +375,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           ['any',
             ['==', ['get', 'natural'], 'wood'],
             ['==', ['get', 'natural'], 'forest']
+           ['==', ['get', 'natural'], 'wetland']
           ], '#388E3C',
           '#E8F5E8' // Default land color
         ],
