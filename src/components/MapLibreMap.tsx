@@ -63,10 +63,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const addDirectCemeteryLayer = useCallback((mainData: FeatureCollection) => {
     if (!map || !mapLoaded) return;
     
-    try {
-      // Remove existing layers if they exist
-      if (map.getLayer('cemeteries-layer')) map.removeLayer('cemeteries-layer');
-      if (map.getLayer('cemeteries-border')) map.removeLayer('cemeteries-border');
+    // Remove existing layers if they exist
+    if (map.getLayer('cemeteries-layer')) map.removeLayer('cemeteries-layer');
+    if (map.getLayer('cemeteries-border')) map.removeLayer('cemeteries-border');
     
     // Add cemetery layer from main geojson data
     map.addLayer({
@@ -117,18 +116,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     });
 
-      console.log('Strategy 1: Direct cemetery layer added');
-    } catch (error) {
-      console.error('Error adding direct cemetery layer:', error);
-    }
+    console.log('Strategy 1: Direct cemetery layer added');
   }, [map, mapLoaded]);
 
   // Strategy 2: Comprehensive cemetery detection
   const findAndColorCemeteries = useCallback((mainData: FeatureCollection) => {
     if (!map || !mapLoaded) return;
     
-    try {
-      // Find ALL features that might be cemeteries using multiple criteria
+    // Find ALL features that might be cemeteries using multiple criteria
     const potentialCemeteries = mainData.features.filter(feature => {
       const props = feature.properties;
       if (!props) return false;
@@ -237,10 +232,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           'circle-stroke-width': 2
         }
       });
-    } catch (error) {
-      console.error('Error in addCemeteryOverlay:', error);
-    } catch (error) {
-      console.error('Error in findAndColorCemeteries:', error);
     }
   }, [map, mapLoaded]);
 
@@ -248,8 +239,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const addCemeteryOverlay = useCallback((mainData: FeatureCollection) => {
     if (!map || !mapLoaded) return;
     
-    try {
-      // Check every single feature with a name for cemetery-like words
+    // Check every single feature with a name for cemetery-like words
     const suspiciousCemeteries = mainData.features.filter(feature => {
       const props = feature.properties;
       if (!props || !props.name) return false;
@@ -536,106 +526,37 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           );
         }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
         
-        // OPTIMIZED WATER DETECTION - Based on your Overpass query properties
+        // IMPROVED WATER DETECTION - Using only available properties
         const waterFeatures = mainData.features.filter(feature => {
           const props = feature.properties;
           if (!props || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
           
-          const name = props.name ? props.name.toLowerCase() : '';
-          
           return (
-            // Direct natural=water (this is the main one from your Overpass query)
+            // Natural water bodies - we have this
             props.natural === 'water' ||
+            props.natural === 'bay' ||
+            props.natural === 'strait' ||
             
-            // Water property (if it exists)
-            props.water ||
-            
-            // Named water bodies that your Overpass query specifically targets
-            name === 'upper new york bay' ||
-            name === 'lower new york bay' ||
-            name === 'newark bay' ||
-            name === 'jamaica bay' ||
-            name === 'long island sound' ||
-            name === 'hudson river' ||
-            name === 'east river' ||
-            name === 'harlem river' ||
-            name === 'arthur kill' ||
-            name === 'kill van kull' ||
-            name === 'raritan bay' ||
-            name === 'sheepshead bay' ||
-            name === 'rockaway inlet' ||
-            
-            // Partial matches for the above (in case of slight name variations)
-            (name.includes('new york bay') && (name.includes('upper') || name.includes('lower'))) ||
-            (name.includes('bay') && (name.includes('newark') || name.includes('jamaica') || name.includes('raritan') || name.includes('sheepshead'))) ||
-            (name.includes('sound') && name.includes('long island')) ||
-            (name.includes('river') && (name.includes('hudson') || name.includes('east') || name.includes('harlem'))) ||
-            (name.includes('kill') && (name.includes('arthur') || name.includes('van kull'))) ||
-            (name.includes('inlet') && name.includes('rockaway')) ||
-            
-            // Additional common water body patterns that might exist
-            name.includes(' bay') ||
-            name.includes(' river') ||
-            name.includes(' kill') ||
-            name.includes(' sound') ||
-            name.includes(' inlet') ||
-            name.includes(' canal') ||
-            name.includes(' creek') ||
-            
-            // Large unnamed water bodies (size-based detection for natural=water features)
-            (() => {
-              if (props.natural === 'water' && !name) {
-                try {
-                  const area = turf.area(feature);
-                  // If it's a large water polygon (>100,000 sq meters = 0.1 sq km), include it
-                  return area > 100000;
-                } catch {
-                  return false;
-                }
-              }
-              return false;
-            })()
+            // Named major water bodies - FIXED for exact and partial matches
+            (props.name && [
+              'Upper New York Bay', 'Lower New York Bay', 'Newark Bay', 'Jamaica Bay',
+              'Long Island Sound', 'Hudson River', 'East River', 'Harlem River',
+              'Arthur Kill', 'Kill Van Kull', 'Raritan Bay', 'Sheepshead Bay',
+              'Rockaway Inlet', 'Gowanus Canal', 'Newtown Creek'
+            ].some(waterName => {
+              if (!props.name) return false;
+              const name = props.name.toLowerCase();
+              const water = waterName.toLowerCase();
+              
+              // Exact match OR contains the water name
+              return name === water || name.includes(water) || 
+                     // Special cases for compound names
+                     (water.includes('bay') && name.includes('bay')) ||
+                     (water.includes('river') && name.includes('river')) ||
+                     (water.includes('kill') && name.includes('kill'));
+            }))
           );
         }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
-        
-        // DEBUGGING: Log what water features we found
-        console.log(`Found ${waterFeatures.length} water features:`);
-        waterFeatures.forEach((feature, index) => {
-          const props = feature.properties;
-          try {
-            const area = turf.area(feature);
-            console.log(`Water feature ${index}: "${props?.name || 'unnamed'}", area: ${Math.round(area)} sq meters, natural: ${props?.natural}, water: ${props?.water}`);
-          } catch (err) {
-            console.log(`Water feature ${index}: "${props?.name || 'unnamed'}", area: unknown, natural: ${props?.natural}, water: ${props?.water}`);
-          }
-        });
-        
-        // Also add a more targeted fallback strategy based on your Overpass query
-        const createWaterBodiesFromCoastlines = (geoData: FeatureCollection): Feature<Polygon | MultiPolygon>[] => {
-          // Since your Overpass query specifically targets named water bodies,
-          // we only need minimal fallback for cases where geometry might be missing
-          const waterBodies: Feature<Polygon | MultiPolygon>[] = [];
-          
-          // Check if we have coastlines from your query
-          const coastlines = geoData.features.filter(feature => 
-            feature.geometry.type === 'LineString' &&
-            feature.properties?.natural === 'coastline'
-          );
-          
-          console.log(`Found ${coastlines.length} coastline features from Overpass query`);
-          
-          // Only add synthetic water if we have very few water features detected
-          // Your Overpass query should have gotten most of them
-          return waterBodies;
-        };
-        
-        // Only add synthetic water bodies if we have very few detected
-        // (Your Overpass query should have gotten the major ones)
-        if (waterFeatures.length < 3) {
-          console.log('Very few water bodies detected, checking if Overpass query worked properly...');
-          console.log('This might indicate an issue with the GeoJSON data or query execution');
-          // Don't add synthetic water - rely on the Overpass query data
-        }
         
         console.log(`Found ${landFeatures.length} land features`);
         console.log(`Found ${waterFeatures.length} water features`);
@@ -1060,51 +981,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     } as any);
 
-    // Add water bodies with enhanced styling
+    // Add water bodies
     addOrUpdate('water-data', waterData, {
       id: 'water-bodies',
       type: 'fill',
       source: 'water-data',
       paint: { 
-        'fill-color': [
-          'case',
-          // Darker blue for major water bodies
-          ['any',
-            ['in', 'bay', ['downcase', ['coalesce', ['get', 'name'], '']]],
-            ['in', 'kill', ['downcase', ['coalesce', ['get', 'name'], '']]],
-            ['in', 'sound', ['downcase', ['coalesce', ['get', 'name'], '']]],
-            ['in', 'river', ['downcase', ['coalesce', ['get', 'name'], '']]],
-            ['==', ['get', 'waterType'], 'major_body']
-          ], '#1565C0', // Dark blue for major water bodies
-          
-          // Medium blue for other water
-          '#4A90E2'
-        ],
-        'fill-opacity': 0.85
-      },
-      layout: {
-        // Ensure layer is visible
-        'visibility': 'visible'
-      }
-    } as any);
-
-    // Add water body borders for better definition
-    addOrUpdate('water-data', waterData, {
-      id: 'water-bodies-border',
-      type: 'line', 
-      source: 'water-data',
-      paint: {
-        'line-color': '#0D47A1', // Very dark blue border
-        'line-width': [
-          'case',
-          ['any',
-            ['in', 'bay', ['downcase', ['coalesce', ['get', 'name'], '']]],
-            ['in', 'kill', ['downcase', ['coalesce', ['get', 'name'], '']]],
-            ['==', ['get', 'waterType'], 'major_body']
-          ], 2, // Thicker border for major water bodies
-          1    // Thinner border for smaller water bodies
-        ],
-        'line-opacity': 0.8
+        'fill-color': '#4A90E2', // Dark blue for water bodies
+        'fill-opacity': 0.8 
       }
     } as any);
 
