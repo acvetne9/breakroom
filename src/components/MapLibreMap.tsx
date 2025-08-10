@@ -74,145 +74,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     { name: "Mount Hebron Cemetery", center: [-73.8440, 40.6340], radius: 0.004 }
   ];
 
-  // Helper function to check if a feature is a known water feature
-  const isKnownWater = useCallback((feature: Feature) => {
-    const props = feature.properties;
-    if (!props) return false;
-
-    return (
-      ['water', 'bay', 'strait'].includes(props.natural) ||
-      props.water !== null && props.water !== undefined ||
-      (props.name && waterKeywords.some(waterName => {
-        const name = props.name.toLowerCase();
-        const water = waterName.toLowerCase();
-        return name === water || name.includes(water) || 
-               (water.includes('bay') && name.includes('bay')) ||
-               (water.includes('river') && name.includes('river')) ||
-               (water.includes('kill') && name.includes('kill'));
-      }))
-    );
-  }, [waterKeywords]);
-
-  // Helper function to check if a feature is an unknown/negative space
-  const isUnknownSpace = useCallback((feature: Feature) => {
-    const props = feature.properties;
-    if (!props) return true;
-
-    // Check if all key properties are null/undefined/empty
-    const keyProps = ['natural', 'water', 'leisure', 'highway', 'name'];
-    return keyProps.every(prop => 
-      props[prop] === null || 
-      props[prop] === undefined || 
-      props[prop] === '' ||
-      (Array.isArray(props[prop]) && props[prop].length === 0)
-    );
-  }, []);
-
-  // New function to detect water by adjacency
-  const detectWaterByAdjacency = useCallback((geoData: FeatureCollection): FeatureCollection => {
-    console.log('Starting water adjacency detection...');
-    
-    // Get known water features
-    const knownWaterFeatures = geoData.features.filter(feature => 
-      ['Polygon', 'MultiPolygon'].includes(feature.geometry.type) && isKnownWater(feature)
-    );
-    
-    console.log(`Found ${knownWaterFeatures.length} known water features`);
-
-    // Get coastline features for exclusion
-    const coastlineFeatures = geoData.features.filter(feature => 
-      feature.geometry.type === 'LineString' && 
-      feature.properties?.natural === 'coastline'
-    );
-
-    console.log(`Found ${coastlineFeatures.length} coastline features`);
-
-    // Get unknown spaces (negative spaces)
-    const unknownSpaces = geoData.features.filter(feature => 
-      ['Polygon', 'MultiPolygon'].includes(feature.geometry.type) && isUnknownSpace(feature)
-    );
-
-    console.log(`Found ${unknownSpaces.length} unknown spaces to analyze`);
-
-    // Create a buffer around known water features for better detection
-    const waterBuffer = knownWaterFeatures.length > 0 
-      ? turf.buffer(turf.featureCollection(knownWaterFeatures), 0.0001, { units: 'degrees' })
-      : null;
-
-    // Analyze each unknown space
-    const inferredWaterFeatures: Feature<Polygon | MultiPolygon>[] = [];
-    let waterCount = 0;
-
-    unknownSpaces.forEach((unknownFeature, index) => {
-      try {
-        const geometry = unknownFeature.geometry as Polygon | MultiPolygon;
-        
-        // Check if this unknown space intersects with the water buffer
-        let bordersWater = false;
-        if (waterBuffer) {
-          bordersWater = waterBuffer.features.some(waterFeature => {
-            try {
-              return turf.booleanIntersects(unknownFeature, waterFeature);
-            } catch (err) {
-              return false;
-            }
-          });
-        }
-
-        // Also check direct intersection with known water features
-        if (!bordersWater) {
-          bordersWater = knownWaterFeatures.some(waterFeature => {
-            try {
-              return turf.booleanIntersects(unknownFeature, waterFeature) ||
-                     turf.booleanTouches(unknownFeature, waterFeature);
-            } catch (err) {
-              return false;
-            }
-          });
-        }
-
-        if (bordersWater) {
-          // Check if it also borders coastline (if so, might be land)
-          let bordersCoastline = false;
-          if (coastlineFeatures.length > 0) {
-            bordersCoastline = coastlineFeatures.some(coastlineFeature => {
-              try {
-                return turf.booleanIntersects(unknownFeature, coastlineFeature);
-              } catch (err) {
-                return false;
-              }
-            });
-          }
-
-          // If it borders water but NOT coastline, classify as water
-          if (!bordersCoastline) {
-            const waterFeature: Feature<Polygon | MultiPolygon> = {
-              ...unknownFeature,
-              geometry: geometry,
-              properties: {
-                ...unknownFeature.properties,
-                inferredType: 'water',
-                detectionMethod: 'adjacency',
-                originalIndex: index
-              }
-            };
-            inferredWaterFeatures.push(waterFeature);
-            waterCount++;
-          }
-        }
-      } catch (err) {
-        console.warn(`Error processing unknown space ${index}:`, err);
-      }
-    });
-
-    console.log(`Inferred ${waterCount} additional water features from adjacency`);
-
-    return {
-      type: 'FeatureCollection',
-      features: inferredWaterFeatures
-    };
-  }, [isKnownWater, isUnknownSpace]);
-
   // Unified cemetery detection function
   const detectCemeteries = useCallback((mainData: FeatureCollection) => {
     if (!map || !mapLoaded) return;
@@ -393,27 +254,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         );
       }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
       
-      // Process explicit water features
-      const explicitWaterFeatures = mainData.features.filter(feature => {
+      // Process water features
+      const waterFeatures = mainData.features.filter(feature => {
         const props = feature.properties;
         if (!props || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
         
-        return isKnownWater(feature);
+        return (
+          ['water', 'bay', 'strait'].includes(props.natural) ||
+          (props.name && waterKeywords.some(waterName => {
+            const name = props.name.toLowerCase();
+            const water = waterName.toLowerCase();
+            return name === water || name.includes(water) || 
+                   (water.includes('bay') && name.includes('bay')) ||
+                   (water.includes('river') && name.includes('river')) ||
+                   (water.includes('kill') && name.includes('kill'));
+          }))
+        );
       }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
-
-      // NEW: Detect additional water features by adjacency
-      const inferredWaterFeatures = detectWaterByAdjacency(mainData);
       
-      // Combine explicit and inferred water features
-      const allWaterFeatures = [
-        ...explicitWaterFeatures,
-        ...inferredWaterFeatures.features as Feature<Polygon | MultiPolygon, { [name: string]: any }>[]
-      ];
-      
-      console.log(`Found ${explicitWaterFeatures.length} explicit water features`);
-      console.log(`Found ${inferredWaterFeatures.features.length} inferred water features`);
-      console.log(`Total ${allWaterFeatures.length} water features`);
-      console.log(`Found ${landFeatures.length} land features`);
+      console.log(`Found ${landFeatures.length} land features, ${waterFeatures.length} water features`);
       
       // Generate land from coastlines if needed
       if (landFeatures.length < 10) {
@@ -426,12 +285,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
       
       setLandData({ type: 'FeatureCollection', features: landFeatures });
-      setWaterData({ type: 'FeatureCollection', features: allWaterFeatures });
+      setWaterData({ type: 'FeatureCollection', features: waterFeatures });
       
     } catch (error) {
       console.error('Error loading geographic data:', error);
     }
-  }, [loadGeoJSONData, detectCemeteries, createLandFromCoastlines, cemeteryKeywords, detectWaterByAdjacency, isKnownWater]);
+  }, [loadGeoJSONData, detectCemeteries, createLandFromCoastlines, cemeteryKeywords, waterKeywords]);
 
   // Initialize map
   useEffect(() => {
@@ -567,20 +426,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     });
 
-    // Water areas with different colors for inferred vs explicit
     addOrUpdateSource('water-data', waterData, {
       id: 'water-bodies',
       type: 'fill',
       source: 'water-data',
-      paint: { 
-        'fill-color': [
-          'case',
-          ['==', ['get', 'inferredType'], 'water'],
-          '#2E86AB', // Slightly different blue for inferred water
-          '#4A90E2'  // Original blue for explicit water
-        ],
-        'fill-opacity': 0.8 
-      }
+      paint: { 'fill-color': '#4A90E2', 'fill-opacity': 0.8 }
     });
 
     addOrUpdateSource('roads-data', roadsData, {
