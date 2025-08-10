@@ -120,14 +120,23 @@ const JobSearchDropdown: React.FC<JobSearchDropdownProps> = ({
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white rounded-lg shadow-lg max-h-48 overflow-y-auto" style={{ border: '1px solid hsl(var(--app-gray-light))' }}>
+        <div className="absolute z-[60] w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto"
+             style={{ 
+               backgroundColor: 'white',
+               boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15), 0 4px 6px rgba(0, 0, 0, 0.1)',
+               border: '1px solid hsl(var(--app-gray-light))'
+             }}>
           {filteredOptions.length > 0 ? (
             filteredOptions.map((option) => (
               <button
                 key={option}
                 type="button"
                 onClick={() => handleOptionSelect(option)}
-                className="w-full px-3 py-2 text-left transition-colors text-app-black hover:bg-gray-50"
+                className="w-full px-3 py-2 text-left transition-colors text-black bg-white hover:bg-gray-50 border-none"
+                style={{ 
+                  backgroundColor: 'white',
+                  color: 'black'
+                }}
               >
                 {option}
               </button>
