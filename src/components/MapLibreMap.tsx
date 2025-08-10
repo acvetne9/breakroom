@@ -38,6 +38,53 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [landData, setLandData] = useState<FeatureCollection<Polygon | MultiPolygon> | null>(null);
   const [waterData, setWaterData] = useState<FeatureCollection<Polygon | MultiPolygon> | null>(null);
 
+  // Additional water areas to fill in gaps
+  const additionalWaterAreas = [
+    {
+      name: "Staten Island South Waters",
+      coordinates: [
+        [-74.140, 40.680], [-74.120, 40.680], [-74.115, 40.670], [-74.135, 40.665], [-74.140, 40.680]
+      ]
+    },
+    {
+      name: "Staten Island West Waters", 
+      coordinates: [
+        [-74.140, 40.678], [-74.125, 40.678], [-74.125, 40.668], [-74.140, 40.668], [-74.140, 40.678]
+      ]
+    },
+    {
+      name: "Brooklyn Southeast Waters",
+      coordinates: [
+        [-73.875, 40.615], [-73.860, 40.615], [-73.860, 40.605], [-73.875, 40.605], [-73.875, 40.615]
+      ]
+    },
+    {
+      name: "Brooklyn South Waters",
+      coordinates: [
+        [-73.980, 40.510], [-73.965, 40.510], [-73.965, 40.495], [-73.980, 40.495], [-73.980, 40.510]
+      ]
+    },
+    // Additional comprehensive water coverage
+    {
+      name: "Arthur Kill Waters",
+      coordinates: [
+        [-74.200, 40.650], [-74.180, 40.650], [-74.175, 40.620], [-74.195, 40.620], [-74.200, 40.650]
+      ]
+    },
+    {
+      name: "Raritan Bay Extension",
+      coordinates: [
+        [-74.250, 40.520], [-74.200, 40.520], [-74.200, 40.480], [-74.250, 40.480], [-74.250, 40.520]
+      ]
+    },
+    {
+      name: "Jamaica Bay Extension",
+      coordinates: [
+        [-73.900, 40.620], [-73.850, 40.620], [-73.845, 40.580], [-73.895, 40.580], [-73.900, 40.620]
+      ]
+    }
+  ];
+
   const loadGeoJSONData = useCallback(async (): Promise<FeatureCollection | null> => {
     try {
       const response = await fetch('/data/example-points.geojson');
@@ -73,6 +120,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     { name: "Evergreens Cemetery", center: [-73.9052, 40.6910], radius: 0.005 },
     { name: "Mount Hebron Cemetery", center: [-73.8440, 40.6340], radius: 0.004 }
   ];
+
+  // Create additional water features from coordinates
+  const createAdditionalWaterFeatures = useCallback((): Feature<Polygon, { [name: string]: any }>[] => {
+    return additionalWaterAreas.map(area => ({
+      type: 'Feature',
+      geometry: {
+        type: 'Polygon',
+        coordinates: [area.coordinates]
+      },
+      properties: {
+        name: area.name,
+        natural: 'water',
+        source: 'additional-water-areas'
+      }
+    }));
+  }, []);
 
   // Unified cemetery detection function
   const detectCemeteries = useCallback((mainData: FeatureCollection) => {
@@ -189,6 +252,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
              props.name.toLowerCase().includes(waterName.toLowerCase()))));
       });
       
+      // Add our additional water areas to the subtraction process
+      const additionalWaterFeatures = createAdditionalWaterFeatures();
+      explicitWaterBodies.push(...additionalWaterFeatures);
+      
       explicitWaterBodies.forEach(waterBody => {
         try {
           const difference = (turf as any).difference(totalLandArea, waterBody);
@@ -209,7 +276,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
     
     return { type: 'FeatureCollection', features: [] };
-  }, [waterKeywords]);
+  }, [waterKeywords, createAdditionalWaterFeatures]);
 
   const loadGeographicData = useCallback(async () => {
     try {
@@ -272,7 +339,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         );
       }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
       
-      console.log(`Found ${landFeatures.length} land features, ${waterFeatures.length} water features`);
+      // Add our additional water features
+      const additionalWaterFeatures = createAdditionalWaterFeatures();
+      waterFeatures.push(...additionalWaterFeatures);
+      
+      console.log(`Found ${landFeatures.length} land features, ${waterFeatures.length} water features (including ${additionalWaterFeatures.length} additional)`);
       
       // Generate land from coastlines if needed
       if (landFeatures.length < 10) {
@@ -290,7 +361,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     } catch (error) {
       console.error('Error loading geographic data:', error);
     }
-  }, [loadGeoJSONData, detectCemeteries, createLandFromCoastlines, cemeteryKeywords, waterKeywords]);
+  }, [loadGeoJSONData, detectCemeteries, createLandFromCoastlines, cemeteryKeywords, waterKeywords, createAdditionalWaterFeatures]);
 
   // Initialize map
   useEffect(() => {
