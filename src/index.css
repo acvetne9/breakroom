@@ -132,6 +132,14 @@
     max-width: 400px;
   }
   
+  /* App Popup Transparent - transparent version for posts */
+  .app-popup-transparent {
+    @apply w-[90vw] bg-white/80 backdrop-blur-sm rounded-xl relative mx-auto;
+    border: 1px solid hsl(var(--app-yellow));
+    box-shadow: var(--app-shadow);
+    max-width: 400px;
+  }
+  
   /* Input fields matching mockup styling */
   .app-input {
     @apply w-full px-4 py-3 bg-white text-black;
