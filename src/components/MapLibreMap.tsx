@@ -35,7 +35,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [roadsData, setRoadsData] = useState<FeatureCollection<LineString> | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [landData, setLandData] = useState<FeatureCollection<Polygon | MultiPolygon> | null>(null);
+  const [waterData, setWaterData] = useState<FeatureCollection<Polygon | MultiPolygon> | null>(null);
 
   const loadGeoJSONData = useCallback(async (): Promise<FeatureCollection | null> => {
     try {
@@ -51,356 +52,431 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, []);
 
-  // Simplified feature processing - only process what we need
-  const processSimpleFeatures = useCallback(async (geoData: FeatureCollection) => {
-    if (isProcessing) return; // Prevent multiple processing
-    setIsProcessing(true);
+  // Cemetery detection keywords
+  const cemeteryKeywords = [
+    'cemetery', 'cemetary', 'calvary', 'green-wood', 'greenwood', 'woodlawn', 
+    'evergreens', 'cypress', 'memorial', 'rest', 'mount', 'saint', 'holy'
+  ];
 
+  const waterKeywords = [
+    'Upper New York Bay', 'Lower New York Bay', 'Newark Bay', 'Jamaica Bay',
+    'Long Island Sound', 'Hudson River', 'East River', 'Harlem River',
+    'Arthur Kill', 'Kill Van Kull', 'Raritan Bay', 'Sheepshead Bay',
+    'Rockaway Inlet', 'Gowanus Canal', 'Newtown Creek'
+  ];
+
+  const knownCemeteryAreas = [
+    { name: "Green-Wood Cemetery", center: [-73.9932, 40.6551], radius: 0.01 },
+    { name: "Calvary Cemetery", center: [-73.9057, 40.7441], radius: 0.008 },
+    { name: "Woodlawn Cemetery", center: [-73.8681, 40.8971], radius: 0.007 },
+    { name: "Cypress Hills Cemetery", center: [-73.8813, 40.6851], radius: 0.006 },
+    { name: "Evergreens Cemetery", center: [-73.9052, 40.6910], radius: 0.005 },
+    { name: "Mount Hebron Cemetery", center: [-73.8440, 40.6340], radius: 0.004 }
+  ];
+
+  // Cemetery detection function - integrate with land areas instead of separate layers
+  const detectCemeteries = useCallback((mainData: FeatureCollection) => {
+    if (!map || !mapLoaded) return;
+
+    // Clean up any existing separate cemetery layers
+    ['cemeteries-layer', 'cemeteries-border', 'cemeteries-points'].forEach(layerId => {
+      if (map.getLayer(layerId)) map.removeLayer(layerId);
+    });
+    if (map.getSource('cemetery-data')) map.removeSource('cemetery-data');
+
+    // Cemetery detection is now handled in the main land processing
+    // No separate cemetery layers needed
+  }, [map, mapLoaded]);
+
+  const createLandFromCoastlines = useCallback((geoData: FeatureCollection): FeatureCollection<Polygon | MultiPolygon> => {
     try {
-      console.log(`Processing ${geoData.features.length} features...`);
+      const coastlines = geoData.features.filter(feature => 
+        feature.geometry.type === 'LineString' && feature.properties?.natural === 'coastline'
+      );
 
-      // Simple water detection with deduplication
-      const waterFeatures = geoData.features.filter(feature => {
-        if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
-        const props = feature.properties || {};
-        const name = (props.name || '').toLowerCase();
-        
-        return (
-          props.natural === 'water' || 
-          props.natural === 'bay' || 
-          props.waterway ||
-          // Named water bodies
-          ['river', 'bay', 'harbor', 'sound', 'creek', 'canal'].some(waterType => 
-            name.includes(waterType)
-          )
-        );
-      });
-
-      // Remove duplicate water features by location
-      const uniqueWaterFeatures = [];
-      const seenLocations = new Set();
-      
-      for (const feature of waterFeatures) {
-        try {
-          const centroid = turf.centroid(feature);
-          const [lng, lat] = centroid.geometry.coordinates;
-          const locationKey = `${Math.round(lng * 10000)}-${Math.round(lat * 10000)}`;
-          
-          if (!seenLocations.has(locationKey)) {
-            seenLocations.add(locationKey);
-            uniqueWaterFeatures.push(feature);
-          }
-        } catch (err) {
-          // If centroid fails, keep the feature anyway
-          uniqueWaterFeatures.push(feature);
-        }
+      if (coastlines.length === 0) {
+        const bbox: [number, number, number, number] = [-74.30, 40.50, -73.70, 40.93];
+        const landArea = turf.bboxPolygon(bbox);
+        return {
+          type: 'FeatureCollection',
+          features: [{
+            ...landArea,
+            properties: { landType: 'default-bbox', source: 'fallback' }
+          } as Feature<Polygon, { [name: string]: any }>]
+        };
       }
 
-      // Simple parks detection
-      const parkFeatures = geoData.features.filter(feature => {
-        if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
-        const props = feature.properties || {};
-        const name = (props.name || '').toLowerCase();
-        
-        return (
-          props.leisure === 'park' || 
-          props.leisure === 'garden' ||
-          props.leisure === 'cemetery' ||
-          name.includes('park') ||
-          name.includes('cemetery')
-        );
+      const bbox: [number, number, number, number] = [-74.30, 40.50, -73.70, 40.93];
+      let totalLandArea = turf.bboxPolygon(bbox);
+      
+      const explicitWaterBodies = geoData.features.filter(feature => {
+        const props = feature.properties;
+        return props && 
+          (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') &&
+          (props.natural === 'water' || 
+           (props.name && waterKeywords.some(waterName => 
+             props.name.toLowerCase().includes(waterName.toLowerCase()))));
       });
-
-      console.log(`Found ${uniqueWaterFeatures.length} unique water features, ${parkFeatures.length} park features`);
-
-      // Add to map if it exists and is loaded
-      if (map && mapLoaded) {
-        // Add water (single layer to prevent overlaps)
-        if (uniqueWaterFeatures.length > 0) {
-          const waterCollection = { type: 'FeatureCollection' as const, features: uniqueWaterFeatures };
-          
-          if (map.getSource('simple-water')) {
-            (map.getSource('simple-water') as maplibregl.GeoJSONSource).setData(waterCollection as any);
-          } else {
-            map.addSource('simple-water', { type: 'geojson', data: waterCollection });
-            map.addLayer({
-              id: 'water-simple',
-              type: 'fill',
-              source: 'simple-water',
-              paint: {
-                'fill-color': '#4A90E2',
-                'fill-opacity': 0.8  // Higher opacity since no overlaps
-              }
-            });
-          }
+      
+      explicitWaterBodies.forEach(waterBody => {
+        try {
+          const difference = (turf as any).difference(totalLandArea, waterBody);
+          if (difference) totalLandArea = difference;
+        } catch (err) {
+          console.warn('Could not subtract water body:', err);
         }
-
-        // Add parks
-        if (parkFeatures.length > 0) {
-          const parksCollection = { type: 'FeatureCollection' as const, features: parkFeatures };
-          
-          if (map.getSource('simple-parks')) {
-            (map.getSource('simple-parks') as maplibregl.GeoJSONSource).setData(parksCollection as any);
-          } else {
-            map.addSource('simple-parks', { type: 'geojson', data: parksCollection });
-            map.addLayer({
-              id: 'parks-simple',
-              type: 'fill',
-              source: 'simple-parks',
-              paint: {
-                'fill-color': '#4CAF50',
-                'fill-opacity': 0.6
-              }
-            }, 'water-simple'); // Insert before water so water shows on top
-          }
-        }
-
-        // Ensure businesses stay on top
-        if (map.getLayer('businesses-layer')) {
-          map.moveLayer('businesses-layer');
-        }
+      });
+      
+      if (totalLandArea) {
+        const landFeature = totalLandArea as unknown as Feature<Polygon | MultiPolygon, { [name: string]: any }>;
+        landFeature.properties = { landType: 'comprehensive', source: 'water-subtraction' };
+        return { type: 'FeatureCollection', features: [landFeature] };
       }
 
     } catch (error) {
-      console.error('Error processing features:', error);
-    } finally {
-      setIsProcessing(false);
+      console.error('Error creating land from coastlines:', error);
     }
-  }, [map, mapLoaded, isProcessing]);
+    
+    return { type: 'FeatureCollection', features: [] };
+  }, [waterKeywords]);
 
   const loadGeographicData = useCallback(async () => {
     try {
-      // Load roads with timeout
-      const roadsPromise = fetch('/data/merged_roads.geojson.gz')
-        .then(response => response.ok ? response.json() : null)
-        .catch(error => {
-          console.warn('Failed to load roads:', error);
-          return null;
-        });
-
-      // Load main data with timeout  
-      const mainDataPromise = loadGeoJSONData();
-
-      // Set timeout for both operations
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Data loading timeout')), 10000)
-      );
-
-      const [roadsResult, mainDataResult] = await Promise.race([
-        Promise.all([roadsPromise, mainDataPromise]),
-        timeoutPromise
-      ]) as [any, FeatureCollection | null];
-
-      if (roadsResult) {
-        setRoadsData(roadsResult);
+      // Load roads
+      const roadsResponse = await fetch('/data/merged_roads.geojson.gz');
+      if (roadsResponse.ok) {
+        const roadsData = await roadsResponse.json();
+        setRoadsData(roadsData);
       }
+      
+      const mainData = await loadGeoJSONData();
+      if (!mainData) return;
 
-      if (mainDataResult && mainDataResult.features.length > 0) {
-        // Process features in small batches to prevent blocking
-        setTimeout(() => processSimpleFeatures(mainDataResult), 100);
+      console.log(`Processing ${mainData.features.length} total features`);
+
+      // Apply cemetery detection (now just cleanup, as cemeteries are in land data)
+      setTimeout(() => detectCemeteries(mainData), 1000);
+      
+      // Process land features - include cemeteries as polygon land areas
+      const landFeatures = mainData.features.filter(feature => {
+        const props = feature.properties;
+        if (!props) return false;
+        
+        // Only include polygon/multipolygon features for land areas
+        if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
+        
+        const name = props.name ? props.name.toLowerCase() : '';
+        
+        // Cemetery detection (polygons only)
+        const isCemetery = cemeteryKeywords.some(keyword => name.includes(keyword)) ||
+                          props.leisure === 'cemetery' ||
+                          props.natural === 'cemetery';
+        
+        // Location-based cemetery detection
+        let nearKnownCemetery = false;
+        try {
+          const centroid = turf.centroid(feature);
+          const [lng, lat] = centroid.geometry.coordinates;
+          
+          nearKnownCemetery = knownCemeteryAreas.some(cemetery => {
+            const distance = Math.sqrt(
+              Math.pow(lng - cemetery.center[0], 2) + 
+              Math.pow(lat - cemetery.center[1], 2)
+            );
+            return distance < cemetery.radius;
+          });
+        } catch (err) {
+          // Ignore centroid calculation errors
+        }
+        
+        return (
+          // Cemetery detection
+          isCemetery || nearKnownCemetery ||
+          
+          // Leisure areas
+          ['park', 'playground', 'pitch', 'garden', 'golf_course', 'recreation_ground', 
+           'stadium', 'sports_centre', 'nature_reserve'].includes(props.leisure) ||
+          
+          // Natural areas
+          ['wood', 'forest', 'grassland', 'scrub', 'heath', 'fell', 'bare_rock', 
+           'scree', 'sand', 'beach', 'land'].includes(props.natural) ||
+          
+          // Famous parks
+          (props.name && ['central park', 'prospect park', 'battery park', 'bryant park',
+           'madison square park', 'washington square park', 'riverside park',
+           'governors island', 'staten island', 'liberty island', 'ellis island']
+           .some(landName => props.name.toLowerCase().includes(landName)))
+        );
+      }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
+      
+      // Process water features
+      const waterFeatures = mainData.features.filter(feature => {
+        const props = feature.properties;
+        if (!props || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
+        
+        return (
+          ['water', 'bay', 'strait'].includes(props.natural) ||
+          (props.name && waterKeywords.some(waterName => {
+            const name = props.name.toLowerCase();
+            const water = waterName.toLowerCase();
+            return name === water || name.includes(water) || 
+                   (water.includes('bay') && name.includes('bay')) ||
+                   (water.includes('river') && name.includes('river')) ||
+                   (water.includes('kill') && name.includes('kill'));
+          }))
+        );
+      }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
+      
+      console.log(`Found ${landFeatures.length} land features, ${waterFeatures.length} water features`);
+      
+      // Generate land from coastlines if needed
+      if (landFeatures.length < 10) {
+        const coastlineGenerated = createLandFromCoastlines(mainData);
+        const typedCoastlineFeatures = coastlineGenerated.features.filter(
+          (feature): feature is Feature<Polygon | MultiPolygon, { [name: string]: any }> => 
+            feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon'
+        );
+        landFeatures.push(...typedCoastlineFeatures);
       }
-
+      
+      setLandData({ type: 'FeatureCollection', features: landFeatures });
+      setWaterData({ type: 'FeatureCollection', features: waterFeatures });
+      
     } catch (error) {
       console.error('Error loading geographic data:', error);
     }
-  }, [loadGeoJSONData, processSimpleFeatures]);
+  }, [loadGeoJSONData, detectCemeteries, createLandFromCoastlines, cemeteryKeywords, waterKeywords]);
 
-  // Initialize map with minimal style
+  // Initialize map
   useEffect(() => {
     if (!mapRef.current) return;
 
     let mapInstance: maplibregl.Map | null = null;
     let cleanedUp = false;
 
-    const initializeMap = () => {
-      try {
-        const baseStyle = {
-          version: 8 as const,
-          sources: {},
-          layers: [{
-            id: 'background',
-            type: 'background' as const,
-            paint: { 'background-color': '#F5F5DC' }
-          }]
-        };
+    const initializeMap = async () => {
+      const baseStyle = {
+        version: 8 as const,
+        sources: {},
+        layers: [{
+          id: 'background',
+          type: 'background' as const,
+          paint: { 'background-color': '#D3D3D3' }
+        }]
+      };
 
-        mapInstance = new maplibregl.Map({
-          container: mapRef.current!,
-          style: baseStyle,
-          center: [-73.9712, 40.7831],
-          zoom: 12,
-          maxZoom: 18,
-          minZoom: 8
+      mapInstance = new maplibregl.Map({
+        container: mapRef.current!,
+        style: baseStyle,
+        center: [-73.9712, 40.7831],
+        zoom: 12
+      });
+
+      mapInstance.setMaxBounds([[-74.25909, 40.477399], [-73.700272, 40.917577]]);
+
+      mapInstance.on('load', async () => {
+        if (cleanedUp) return;
+        setMapLoaded(true);
+
+        const geoData = await loadGeoJSONData();
+        if (!geoData?.features.length) {
+          console.warn('No GeoJSON features loaded.');
+          return;
+        }
+
+        // Fit map to data
+        try {
+          const dataBbox = turf.bbox(geoData) as [number, number, number, number];
+          if (dataBbox[0] !== dataBbox[2] && dataBbox[1] !== dataBbox[3]) {
+            mapInstance!.fitBounds(dataBbox, { padding: 100, duration: 1000 });
+          }
+        } catch (err) {
+          console.warn('Could not calculate bbox:', err);
+        }
+
+        mapInstance!.addSource('geojson-data', { type: 'geojson', data: geoData });
+
+        // Add basic layers
+        const layers = [
+          { id: 'parks', filter: ['==', 'leisure', 'park'], paint: { 'fill-color': '#4CAF50', 'fill-opacity': 0.8 } },
+          { id: 'coastlines', type: 'line', filter: ['==', 'natural', 'coastline'], paint: { 'line-color': '#1976D2', 'line-width': 2 } },
+          { id: 'buildings', filter: ['has', 'building'], paint: { 'fill-color': '#BDBDBD', 'fill-opacity': 0.7 } }
+        ];
+
+        layers.forEach(layer => {
+          mapInstance!.addLayer({
+            id: layer.id,
+            type: layer.type || 'fill',
+            source: 'geojson-data',
+            filter: layer.filter,
+            paint: layer.paint
+          } as any);
         });
+      });
 
-        mapInstance.setMaxBounds([[-74.25909, 40.477399], [-73.700272, 40.917577]]);
-
-        mapInstance.on('load', () => {
-          if (cleanedUp) return;
-          console.log('Map loaded successfully');
-          setMapLoaded(true);
-        });
-
-        mapInstance.on('error', e => {
-          console.error('Map error:', e.error);
-        });
-
-        setMap(mapInstance);
-
-      } catch (error) {
-        console.error('Error initializing map:', error);
-      }
+      mapInstance.on('error', e => console.error('Map error:', e.error));
+      setMap(mapInstance);
     };
 
     initializeMap();
 
     return () => {
       cleanedUp = true;
-      if (mapInstance) {
-        try {
-          mapInstance.remove();
-        } catch (error) {
-          console.error('Error removing map:', error);
-        }
-      }
+      if (mapInstance) mapInstance.remove();
       setMap(null);
-      setMapLoaded(false);
     };
-  }, []);
+  }, [loadGeoJSONData]);
 
-  // Load data after map loads
+  // Load geographic data - run only once after map is loaded
   useEffect(() => {
-    if (mapLoaded && map && !isProcessing) {
-      const timeoutId = setTimeout(() => {
-        loadGeographicData();
-      }, 500); // Small delay to ensure map is fully ready
-
-      return () => clearTimeout(timeoutId);
+    if (mapLoaded && map) {
+      loadGeographicData();
     }
-  }, [mapLoaded, map, loadGeographicData, isProcessing]);
+  }, [mapLoaded, map]); // Only depend on mapLoaded and map, not the function itself
 
-  // Add roads layer
+  // Add geographic layers
   useEffect(() => {
-    if (!mapLoaded || !map || !roadsData) return;
+    if (!mapLoaded || !map) return;
 
-    try {
-      if (map.getSource('roads')) {
-        (map.getSource('roads') as maplibregl.GeoJSONSource).setData(roadsData as any);
+    const addOrUpdateSource = (sourceId: string, data: FeatureCollection | null, layer: any) => {
+      if (!data) return;
+      
+      const existing = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
+      if (existing) {
+        existing.setData(data as any);
+        if (!map.getLayer(layer.id)) map.addLayer(layer);
       } else {
-        map.addSource('roads', { type: 'geojson', data: roadsData });
-        map.addLayer({
-          id: 'roads-layer',
-          type: 'line',
-          source: 'roads',
-          paint: {
-            'line-color': '#666666',
-            'line-width': 1
-          }
-        });
+        map.addSource(sourceId, { type: 'geojson', data });
+        if (!map.getLayer(layer.id)) map.addLayer(layer);
       }
-    } catch (error) {
-      console.error('Error adding roads:', error);
-    }
-  }, [mapLoaded, map, roadsData]);
+    };
 
-  // Business markers - simplified
+    // Land areas - cemeteries now styled as parks
+    addOrUpdateSource('land-data', landData, {
+      id: 'land-areas',
+      type: 'fill',
+      source: 'land-data',
+      paint: { 
+        'fill-color': [
+          'case',
+          // Cemetery detection - now uses park color
+          ['any', ...cemeteryKeywords.map(keyword => 
+            ['in', keyword, ['downcase', ['coalesce', ['get', 'name'], '']]])],
+          '#4CAF50', // Same as parks
+          // Parks and leisure areas
+          // Any leisure area
+          ['!=', ['coalesce', ['get', 'leisure'], ''], ''],
+          '#4CAF50',
+          // Any natural area
+          ['!=', ['coalesce', ['get', 'natural'], ''], ''],
+          '#388E3C',
+          '#E8F5E8' // Default land color
+        ],
+        'fill-opacity': 0.8  // Consistent with park opacity
+      }
+    });
+
+    addOrUpdateSource('water-data', waterData, {
+      id: 'water-bodies',
+      type: 'fill',
+      source: 'water-data',
+      paint: { 'fill-color': '#4A90E2', 'fill-opacity': 0.8 }
+    });
+
+    addOrUpdateSource('roads-data', roadsData, {
+      id: 'roads',
+      type: 'line',
+      source: 'roads-data',
+      paint: { 'line-color': '#666666', 'line-width': 1.5 }
+    });
+
+    // Ensure businesses layer stays on top
+    if (map.getLayer('businesses-layer')) {
+      map.moveLayer('businesses-layer');
+    }
+  }, [mapLoaded, map, landData, waterData, roadsData, cemeteryKeywords]);
+
+  // Business markers
   useEffect(() => {
     if (!mapLoaded || !businesses || !map) return;
 
-    try {
-      // Clean up existing
-      if (map.getSource('businesses')) {
-        if (map.getLayer('businesses-layer')) {
-          map.removeLayer('businesses-layer');
-        }
-        map.removeSource('businesses');
-      }
-
-      const businessFeatures = businesses.map(business => ({
-        type: 'Feature' as const,
-        geometry: { type: 'Point' as const, coordinates: [business.position.lng, business.position.lat] },
-        properties: { id: business.id, name: business.name, businessType: business.businessType || 'unknown' }
-      }));
-
-      map.addSource('businesses', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: businessFeatures }
-      });
-
-      map.addLayer({
-        id: 'businesses-layer',
-        type: 'circle',
-        source: 'businesses',
-        paint: {
-          'circle-radius': 8,
-          'circle-color': selectedBusiness ? [
-            'case',
-            ['==', ['get', 'id'], selectedBusiness.id],
-            '#EF4444',
-            '#FACC15'
-          ] : '#FACC15',
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#FFFFFF'
-        }
-      });
-
-      // Event handlers
-      if (onBusinessClick) {
-        const clickHandler = (e: any) => {
-          if (e.features?.[0]) {
-            const businessId = e.features[0].properties?.id;
-            const business = businesses.find(b => b.id === businessId);
-            if (business) {
-              map.flyTo({
-                center: [business.position.lng, business.position.lat],
-                zoom: 16,
-                duration: 800,
-                essential: true
-              });
-              onBusinessClick(business);
-            }
-          }
-        };
-
-        map.on('click', 'businesses-layer', clickHandler);
-        map.on('mouseenter', 'businesses-layer', () => {
-          map.getCanvas().style.cursor = 'pointer';
-        });
-        map.on('mouseleave', 'businesses-layer', () => {
-          map.getCanvas().style.cursor = '';
-        });
-
-        return () => {
-          map.off('click', 'businesses-layer', clickHandler);
-        };
-      }
-    } catch (error) {
-      console.error('Error adding businesses:', error);
+    // Clean up existing
+    if (map.getSource('businesses')) {
+      map.removeLayer('businesses-layer');
+      map.removeSource('businesses');
     }
-  }, [mapLoaded, businesses, onBusinessClick, map, selectedBusiness]);
+
+    const businessFeatures = businesses.map(business => ({
+      type: 'Feature' as const,
+      geometry: { type: 'Point' as const, coordinates: [business.position.lng, business.position.lat] },
+      properties: { id: business.id, name: business.name, businessType: business.businessType || 'unknown' }
+    }));
+
+    map.addSource('businesses', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: businessFeatures }
+    });
+
+    map.addLayer({
+      id: 'businesses-layer',
+      type: 'circle',
+      source: 'businesses',
+      paint: {
+        'circle-radius': 8,
+        'circle-color': '#FACC15',
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#FFFFFF'
+      }
+    });
+
+    // Event handlers
+    if (onBusinessClick) {
+      map.on('click', 'businesses-layer', (e) => {
+        if (e.features?.[0]) {
+          const businessId = e.features[0].properties?.id;
+          const business = businesses.find(b => b.id === businessId);
+          if (business) {
+            map.flyTo({
+              center: [business.position.lng, business.position.lat],
+              zoom: 16,
+              duration: 800,
+              essential: true
+            });
+            onBusinessClick(business);
+          }
+        }
+      });
+    }
+
+    map.on('mouseenter', 'businesses-layer', () => {
+      map.getCanvas().style.cursor = 'pointer';
+    });
+
+    map.on('mouseleave', 'businesses-layer', () => {
+      map.getCanvas().style.cursor = '';
+    });
+
+  }, [mapLoaded, businesses, onBusinessClick]);
+
+  // Selected business highlighting
+  useEffect(() => {
+    if (!mapLoaded || !map || !map.getLayer('businesses-layer')) return;
+
+    map.setPaintProperty('businesses-layer', 'circle-color', 
+      selectedBusiness ? [
+        'case',
+        ['==', ['get', 'id'], selectedBusiness.id],
+        '#EF4444',
+        '#FACC15'
+      ] : '#FACC15'
+    );
+  }, [mapLoaded, map, selectedBusiness]);
 
   return (
-    <div>
-      {isProcessing && (
-        <div style={{
-          position: 'absolute',
-          top: '10px',
-          left: '10px',
-          background: 'rgba(0,0,0,0.7)',
-          color: 'white',
-          padding: '5px 10px',
-          borderRadius: '4px',
-          zIndex: 1000,
-          fontSize: '12px'
-        }}>
-          Loading map data...
-        </div>
-      )}
-      <div
-        ref={mapRef}
-        style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
-      />
-    </div>
+    <div
+      ref={mapRef}
+      style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
+    />
   );
 };
 
