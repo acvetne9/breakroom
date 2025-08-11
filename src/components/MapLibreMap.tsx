@@ -51,36 +51,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, []);
 
-  // Simplified feature processing - only process what we need
+  // Enhanced feature processing with coastline-aware waterway buffering
   const processSimpleFeatures = useCallback(async (geoData: FeatureCollection) => {
-    if (isProcessing) return; // Prevent multiple processing
-    setIsProcessing(true);
+    if (
 
-    try {
-      console.log(`Processing ${geoData.features.length} features...`);
-
-      // Simple water detection with deduplication
-      const waterFeatures = geoData.features.filter(feature => {
-        if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
-        const props = feature.properties || {};
-        const name = (props.name || '').toLowerCase();
-        
-        return (
-          props.natural === 'water' || 
-          props.natural === 'bay' || 
-          props.waterway ||
-          // Named water bodies
-          ['river', 'bay', 'harbor', 'sound', 'creek', 'canal'].some(waterType => 
-            name.includes(waterType)
-          )
-        );
-      });
+      // Combine water bodies and buffered waterways
+      const allWaterFeatures = [...waterBodyFeatures, ...bufferedWaterways];
 
       // Remove duplicate water features by location
       const uniqueWaterFeatures = [];
       const seenLocations = new Set();
       
-      for (const feature of waterFeatures) {
+      for (const feature of allWaterFeatures) {
         try {
           const centroid = turf.centroid(feature);
           const [lng, lat] = centroid.geometry.coordinates;
@@ -96,7 +78,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         }
       }
 
-      // Simple parks detection
+      // Parks detection
       const parkFeatures = geoData.features.filter(feature => {
         if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
         const props = feature.properties || {};
@@ -111,7 +93,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         );
       });
 
-      console.log(`Found ${uniqueWaterFeatures.length} unique water features, ${parkFeatures.length} park features`);
+      console.log(`Final: ${uniqueWaterFeatures.length} unique water features (${bufferedWaterways.length} buffered waterways), ${parkFeatures.length} park features`);
 
       // Add to map if it exists and is loaded
       if (map && mapLoaded) {
@@ -128,8 +110,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               type: 'fill',
               source: 'simple-water',
               paint: {
-                'fill-color': '#4A90E2',
-                'fill-opacity': 0.8  // Higher opacity since no overlaps
+                'fill-color': [
+                  'case',
+                  ['==', ['get', 'originalType'], 'waterway'],
+                  '#5BA4E8', // Slightly different color for buffered waterways
+                  '#4A90E2'  // Original water body color
+                ],
+                'fill-opacity': [
+                  'case',
+                  ['==', ['get', 'originalType'], 'waterway'],
+                  0.7, // Slightly more transparent for buffered waterways
+                  0.8  // Original opacity for water bodies
+                ]
               }
             });
           }
