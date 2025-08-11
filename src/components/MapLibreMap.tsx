@@ -1,14 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import type { Feature, FeatureCollection, Polygon, MultiPolygon, LineString } from 'geojson';
+import type { Feature, FeatureCollection, Polygon, MultiPolygon, LineString, MultiLineString } from 'geojson';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-
-// Turf imports
 import * as turf from '@turf/turf';
 
-// Props interface combining both functionalities
 interface MapLibreMapProps {
-  // Business data from first script
   businesses: {
     id: string;
     name: string;
@@ -41,6 +37,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [roadsData, setRoadsData] = useState<FeatureCollection<LineString> | null>(null);
   const [landData, setLandData] = useState<FeatureCollection<Polygon | MultiPolygon> | null>(null);
   const [waterData, setWaterData] = useState<FeatureCollection<Polygon | MultiPolygon> | null>(null);
+  const [parksData, setParksData] = useState<FeatureCollection<Polygon | MultiPolygon> | null>(null);
 
   const loadGeoJSONData = useCallback(async (): Promise<FeatureCollection | null> => {
     try {
@@ -49,754 +46,220 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         console.error('Failed to load GeoJSON:', response.statusText);
         return null;
       }
-      const data: FeatureCollection = await response.json();
-      return data;
+      return await response.json();
     } catch (error) {
       console.error('Error loading GeoJSON:', error);
       return null;
     }
   }, []);
 
-  // CEMETERY DETECTION STRATEGIES
-  
-  // Strategy 1: Direct cemetery layer from main data
-  const addDirectCemeteryLayer = useCallback((mainData: FeatureCollection) => {
-    if (!map || !mapLoaded) return;
-    
-    // Remove existing layers if they exist
-    if (map.getLayer('cemeteries-layer')) map.removeLayer('cemeteries-layer');
-    if (map.getLayer('cemeteries-border')) map.removeLayer('cemeteries-border');
-    
-    // Add cemetery layer from main geojson data
-    map.addLayer({
-      id: 'cemeteries-layer',
-      type: 'fill',
-      source: 'geojson-data', // Using the main data source
-      filter: [
-        'any',
-        // Check for cemetery in name (case insensitive)
-        ['in', 'cemetery', ['downcase', ['coalesce', ['get', 'name'], '']]],
-        ['in', 'calvary', ['downcase', ['coalesce', ['get', 'name'], '']]],
-        ['in', 'green-wood', ['downcase', ['coalesce', ['get', 'name'], '']]],
-        ['in', 'greenwood', ['downcase', ['coalesce', ['get', 'name'], '']]],
-        ['in', 'woodlawn', ['downcase', ['coalesce', ['get', 'name'], '']]],
-        ['in', 'evergreen', ['downcase', ['coalesce', ['get', 'name'], '']]],
-        ['in', 'cypress', ['downcase', ['coalesce', ['get', 'name'], '']]],
-        // Also check for common cemetery patterns
-        ['in', 'memorial', ['downcase', ['coalesce', ['get', 'name'], '']]],
-        ['in', 'rest', ['downcase', ['coalesce', ['get', 'name'], '']]], 
-        ['in', 'mount', ['downcase', ['coalesce', ['get', 'name'], '']]], 
-        ['in', 'saint', ['downcase', ['coalesce', ['get', 'name'], '']]], 
-        ['in', 'holy', ['downcase', ['coalesce', ['get', 'name'], '']]]
-      ],
-      paint: {
-        'fill-color': '#2E7D32', // Dark green
-        'fill-opacity': 0.9
-      }
-    });
-    
-    // Add cemetery borders for better visibility
-    map.addLayer({
-      id: 'cemeteries-border',
-      type: 'line',
-      source: 'geojson-data',
-      filter: [
-        'any',
-        ['in', 'cemetery', ['downcase', ['coalesce', ['get', 'name'], '']]],
-        ['in', 'calvary', ['downcase', ['coalesce', ['get', 'name'], '']]],
-        ['in', 'green-wood', ['downcase', ['coalesce', ['get', 'name'], '']]],
-        ['in', 'greenwood', ['downcase', ['coalesce', ['get', 'name'], '']]],
-        ['in', 'woodlawn', ['downcase', ['coalesce', ['get', 'name'], '']]],
-        ['in', 'evergreen', ['downcase', ['coalesce', ['get', 'name'], '']]],
-        ['in', 'cypress', ['downcase', ['coalesce', ['get', 'name'], '']]]
-      ],
-      paint: {
-        'line-color': '#1B5E20', // Darker green border
-        'line-width': 2
-      }
-    });
+  // Cemetery detection keywords
+  const cemeteryKeywords = [
+    'cemetery', 'cemetary', 'calvary', 'green-wood', 'greenwood', 'woodlawn', 
+    'evergreens', 'cypress', 'memorial', 'rest', 'mount', 'saint', 'holy'
+  ];
 
-    console.log('Strategy 1: Direct cemetery layer added');
-  }, [map, mapLoaded]);
+  const waterKeywords = [
+    'Upper New York Bay', 'Lower New York Bay', 'Newark Bay', 'Jamaica Bay',
+    'Long Island Sound', 'Hudson River', 'East River', 'Harlem River',
+    'Arthur Kill', 'Kill Van Kull', 'Raritan Bay', 'Sheepshead Bay',
+    'Rockaway Inlet', 'Gowanus Canal', 'Newtown Creek'
+  ];
 
-  // Strategy 2: Comprehensive cemetery detection
-  const findAndColorCemeteries = useCallback((mainData: FeatureCollection) => {
-    if (!map || !mapLoaded) return;
-    
-    // Find ALL features that might be cemeteries using multiple criteria
-    const potentialCemeteries = mainData.features.filter(feature => {
-      const props = feature.properties;
-      if (!props) return false;
-      
-      // Check geometry type - cemeteries can be points or polygons
-      const isValidGeometry = ['Point', 'Polygon', 'MultiPolygon'].includes(feature.geometry.type);
-      if (!isValidGeometry) return false;
-      
-      const name = props.name ? props.name.toLowerCase() : '';
-      
-      return (
-        // Direct cemetery mentions
-        name.includes('cemetery') ||
-        name.includes('cemetary') || // Common misspelling
-        name.includes('burial') ||
-        name.includes('graveyard') ||
-        
-        // Famous NYC cemeteries by name
-        name.includes('green-wood') ||
-        name.includes('greenwood') ||
-        name.includes('calvary') ||
-        name.includes('woodlawn') ||
-        name.includes('evergreens') ||
-        name.includes('cypress hills') ||
-        name.includes('mount hebron') ||
-        name.includes('beth david') ||
-        name.includes('mount richmond') ||
-        name.includes('moravian') ||
-        name.includes('fresh pond') ||
-        name.includes('mount judah') ||
-        
-        // Religious/memorial keywords
-        name.includes('memorial park') ||
-        name.includes('rest') && (name.includes('park') || name.includes('land')) ||
-        name.includes('mount ') && (name.includes('olivet') || name.includes('zion') || name.includes('carmel')) ||
-        (name.includes('saint') || name.includes('st.') || name.includes('st ')) && name.includes('cemetery') ||
-        name.includes('holy') && (name.includes('cross') || name.includes('sepulchre')) ||
-        
-        // Check if leisure property hints at cemetery
-        props.leisure === 'cemetery' || // Just in case this exists
-        
-        // Check natural property
-        props.natural === 'cemetery' || // Just in case this exists
-        
-        // Highway/area designations that might indicate cemeteries
-        (props.highway && props.highway.includes('cemetery'))
-      );
-    });
-    
-    console.log(`Strategy 2: Found ${potentialCemeteries.length} potential cemetery features:`, 
-                potentialCemeteries.map(f => ({ name: f.properties?.name, geometry: f.geometry.type })));
-    
-    if (potentialCemeteries.length > 0) {
-      // Create a separate geojson source for cemeteries
-      const cemeteryFC = {
-        type: 'FeatureCollection' as const,
-        features: potentialCemeteries
-      };
-      
-      // Remove existing cemetery layers if they exist
-      if (map.getLayer('dedicated-cemeteries')) map.removeLayer('dedicated-cemeteries');
-      if (map.getLayer('dedicated-cemeteries-border')) map.removeLayer('dedicated-cemeteries-border');
-      if (map.getLayer('dedicated-cemeteries-points')) map.removeLayer('dedicated-cemeteries-points');
-      if (map.getSource('cemetery-data')) map.removeSource('cemetery-data');
-      
-      // Add cemetery source
-      map.addSource('cemetery-data', {
-        type: 'geojson',
-        data: cemeteryFC
-      });
-      
-      // Add fill layer for polygon cemeteries
-      map.addLayer({
-        id: 'dedicated-cemeteries',
-        type: 'fill',
-        source: 'cemetery-data',
-        filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-        paint: {
-          'fill-color': '#2E7D32', // Dark green
-          'fill-opacity': 0.9
-        }
-      });
-      
-      // Add border for polygon cemeteries
-      map.addLayer({
-        id: 'dedicated-cemeteries-border',
-        type: 'line',
-        source: 'cemetery-data',
-        filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-        paint: {
-          'line-color': '#1B5E20', // Darker green
-          'line-width': 2
-        }
-      });
-      
-      // Add circles for point cemeteries
-      map.addLayer({
-        id: 'dedicated-cemeteries-points',
-        type: 'circle',
-        source: 'cemetery-data',
-        filter: ['==', ['geometry-type'], 'Point'],
-        paint: {
-          'circle-color': '#2E7D32',
-          'circle-radius': 6,
-          'circle-stroke-color': '#1B5E20',
-          'circle-stroke-width': 2
-        }
-      });
-    }
-  }, [map, mapLoaded]);
+  const knownCemeteryAreas = [
+    { name: "Green-Wood Cemetery", center: [-73.9932, 40.6551], radius: 0.01 },
+    { name: "Calvary Cemetery", center: [-73.9057, 40.7441], radius: 0.008 },
+    { name: "Woodlawn Cemetery", center: [-73.8681, 40.8971], radius: 0.007 },
+    { name: "Cypress Hills Cemetery", center: [-73.8813, 40.6851], radius: 0.006 },
+    { name: "Evergreens Cemetery", center: [-73.9052, 40.6910], radius: 0.005 },
+    { name: "Mount Hebron Cemetery", center: [-73.8440, 40.6340], radius: 0.004 }
+  ];
 
-  // Strategy 3: Brute force - check EVERY polygon feature for cemetery keywords
-  const addCemeteryOverlay = useCallback((mainData: FeatureCollection) => {
-    if (!map || !mapLoaded) return;
+  // Better strategy: Process explicit features first, then use intelligent defaults
+  const processGeographicFeatures = useCallback((geoData: FeatureCollection) => {
+    console.log(`Processing ${geoData.features.length} geographic features...`);
     
-    // Check every single feature with a name for cemetery-like words
-    const suspiciousCemeteries = mainData.features.filter(feature => {
-      const props = feature.properties;
-      if (!props || !props.name) return false;
-      
-      const name = props.name.toLowerCase();
-      const words = name.split(/[\s\-_.,]+/); // Split on various separators
-      
-      // Cemetery-related words
-      const cemeteryWords = [
-        'cemetery', 'cemetary', 'burial', 'grave', 'tomb', 'memorial', 
-        'rest', 'eternal', 'peace', 'mount', 'calvary', 'saint', 'holy',
-        'cross', 'wood', 'lawn', 'hill', 'green', 'cypress', 'pine',
-        'oak', 'elm', 'maple', 'rose', 'garden', 'park'
-      ];
-      
-      // Check if name contains multiple cemetery-related words
-      const matchingWords = words.filter(word => 
-        cemeteryWords.some(cemWord => word.includes(cemWord) || cemWord.includes(word))
-      );
-      
-      // If multiple matches, likely a cemetery
-      return matchingWords.length >= 2 || 
-             words.some(word => ['cemetery', 'cemetary', 'calvary'].includes(word));
-    });
-    
-    console.log('Strategy 3: Suspicious cemetery features found:', 
-                suspiciousCemeteries.map(f => ({ name: f.properties?.name, geometry: f.geometry.type })));
-    
-    if (suspiciousCemeteries.length > 0) {
-      const suspiciousFC = {
-        type: 'FeatureCollection' as const,
-        features: suspiciousCemeteries
-      };
-      
-      // Clean up existing
-      if (map.getLayer('suspicious-cemeteries')) map.removeLayer('suspicious-cemeteries');
-      if (map.getSource('suspicious-cemetery-data')) map.removeSource('suspicious-cemetery-data');
-      
-      map.addSource('suspicious-cemetery-data', {
-        type: 'geojson',
-        data: suspiciousFC
-      });
-      
-      map.addLayer({
-        id: 'suspicious-cemeteries',
-        type: 'fill',
-        source: 'suspicious-cemetery-data',
-        filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]],
-        paint: {
-          'fill-color': '#4A148C', // Purple to distinguish from regular cemeteries
-          'fill-opacity': 0.7
-        }
-      });
-    }
-  }, [map, mapLoaded]);
-
-  // Strategy 4: Geographic approach - find areas that are likely cemeteries by location
-  const findCemeteriesByLocation = useCallback((mainData: FeatureCollection) => {
-    if (!map || !mapLoaded) return;
-    
-    // Known cemetery locations in NYC (approximate coordinates)
-    const knownCemeteryAreas = [
-      { name: "Green-Wood Cemetery", center: [-73.9932, 40.6551], radius: 0.01 },
-      { name: "Calvary Cemetery", center: [-73.9057, 40.7441], radius: 0.008 },
-      { name: "Woodlawn Cemetery", center: [-73.8681, 40.8971], radius: 0.007 },
-      { name: "Cypress Hills Cemetery", center: [-73.8813, 40.6851], radius: 0.006 },
-      { name: "Evergreens Cemetery", center: [-73.9052, 40.6910], radius: 0.005 },
-      { name: "Mount Hebron Cemetery", center: [-73.8440, 40.6340], radius: 0.004 }
-    ];
-    
-    const nearCemeteryFeatures = mainData.features.filter(feature => {
+    // 1. Extract explicit water features
+    const explicitWater = geoData.features.filter(feature => {
       if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
       
-      // Get centroid of feature
-      try {
-        const centroid = turf.centroid(feature);
-        const [lng, lat] = centroid.geometry.coordinates;
-        
-        // Check if feature is near any known cemetery location
-        return knownCemeteryAreas.some(cemetery => {
-          const distance = Math.sqrt(
-            Math.pow(lng - cemetery.center[0], 2) + 
-            Math.pow(lat - cemetery.center[1], 2)
-          );
-          return distance < cemetery.radius;
-        });
-      } catch (err) {
-        return false;
-      }
-    });
+      const props = feature.properties || {};
+      const name = (props.name || '').toLowerCase();
+      
+      // Direct water tags
+      if (props.natural === 'water' || props.natural === 'bay') return true;
+      if (props.waterway) return true;
+      if (props.place === 'sea' || props.place === 'ocean') return true;
+      
+      // Named water bodies
+      if (waterKeywords.some(waterName => 
+        name.includes(waterName.toLowerCase()) ||
+        name === waterName.toLowerCase()
+      )) return true;
+      
+      return false;
+    }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
+
+    // 2. Extract explicit land features (parks, forests, etc.)
+    const explicitLand = geoData.features.filter(feature => {
+      if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
+      
+      const props = feature.properties || {};
+      const name = (props.name || '').toLowerCase();
+      
+      // Parks and leisure
+      if (['park', 'garden', 'recreation_ground', 'playground'].includes(props.leisure)) return true;
+      
+      // Natural land features
+      if (['wood', 'forest', 'grassland', 'scrub', 'sand', 'beach'].includes(props.natural)) return true;
+      
+      // Cemeteries
+      if (props.leisure === 'cemetery' || cemeteryKeywords.some(keyword => name.includes(keyword))) return true;
+      
+      // Famous land areas
+      if (['central park', 'prospect park', 'bryant park', 'governors island', 
+           'staten island', 'liberty island', 'ellis island'].some(landmark => 
+           name.includes(landmark))) return true;
+      
+      return false;
+    }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
+
+    // 3. Process coastlines for land/water boundaries
+    const coastlines = geoData.features.filter(feature => 
+      feature.geometry.type === 'LineString' && 
+      feature.properties?.natural === 'coastline'
+    ) as Feature<LineString, { [name: string]: any }>[];
+
+    console.log(`Found: ${explicitWater.length} water, ${explicitLand.length} land, ${coastlines.length} coastlines`);
     
-    console.log(`Strategy 4: Found ${nearCemeteryFeatures.length} features near known cemetery locations:`, 
-                nearCemeteryFeatures.map(f => ({ name: f.properties?.name })));
+    return { explicitWater, explicitLand, coastlines };
+  }, [waterKeywords, cemeteryKeywords]);
+
+  // Create base land/water from coastlines only when needed
+  const createBaseGeography = useCallback((coastlines: Feature<LineString, { [name: string]: any }>[]) => {
+    const bbox: [number, number, number, number] = [-74.30, 40.50, -73.70, 40.93];
     
-    if (nearCemeteryFeatures.length > 0) {
-      const locationFC = {
-        type: 'FeatureCollection' as const,
-        features: nearCemeteryFeatures
+    if (coastlines.length === 0) {
+      // No coastlines - create simple land area
+      const landArea = turf.bboxPolygon(bbox);
+      return {
+        baseLand: [{
+          ...landArea,
+          properties: { landType: 'default-area', source: 'no-coastlines' }
+        } as Feature<Polygon, { [name: string]: any }>],
+        baseWater: [] as Feature<Polygon | MultiPolygon, { [name: string]: any }>[]
       };
-      
-      // Clean up existing
-      if (map.getLayer('location-based-cemeteries')) map.removeLayer('location-based-cemeteries');
-      if (map.getSource('location-cemetery-data')) map.removeSource('location-cemetery-data');
-      
-      map.addSource('location-cemetery-data', {
-        type: 'geojson',
-        data: locationFC
-      });
-      
-      map.addLayer({
-        id: 'location-based-cemeteries',
-        type: 'fill',
-        source: 'location-cemetery-data',
-        paint: {
-          'fill-color': '#FF6F00', // Orange to distinguish
-          'fill-opacity': 0.8
-        }
-      });
     }
-  }, [map, mapLoaded]);
+
+    // Try to create land polygons from coastlines
+    let baseLand: Feature<Polygon | MultiPolygon, { [name: string]: any }>[] = [];
+    
+    try {
+      // Buffer coastlines slightly to create land areas
+      const bufferedLand = coastlines.map(coastline => {
+        try {
+          const buffered = turf.buffer(coastline, 0.002, { units: 'degrees' });
+          return {
+            ...buffered,
+            properties: { landType: 'coastline-buffered', source: 'coastline-processing' }
+          } as Feature<Polygon | MultiPolygon, { [name: string]: any }>;
+        } catch (err) {
+          console.warn('Failed to buffer coastline:', err);
+          return null;
+        }
+      }).filter(Boolean) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
+      
+      baseLand = bufferedLand;
+    } catch (error) {
+      console.warn('Coastline processing failed, using bbox:', error);
+      const landArea = turf.bboxPolygon(bbox);
+      baseLand = [{
+        ...landArea,
+        properties: { landType: 'fallback-bbox', source: 'error-recovery' }
+      } as Feature<Polygon, { [name: string]: any }>];
+    }
+
+    return {
+      baseLand,
+      baseWater: [] as Feature<Polygon | MultiPolygon, { [name: string]: any }>[]
+    };
+  }, []);
 
   const loadGeographicData = useCallback(async () => {
     try {
-      // Load roads data
+      console.log('Loading geographic data...');
+      
+      // Load roads
       const roadsResponse = await fetch('/data/merged_roads.geojson.gz');
       if (roadsResponse.ok) {
         const roadsData = await roadsResponse.json();
         setRoadsData(roadsData);
+        console.log('Roads data loaded successfully');
       }
       
-      // Extract land and water data from the main GeoJSON
       const mainData = await loadGeoJSONData();
-      if (mainData) {
-        console.log(`Processing ${mainData.features.length} total features`);
-        
-        // DEBUG: Find ALL features with names containing keywords we're looking for
-        const debugResults = {
-          cemeteryFeatures: [] as any[],
-          waterFeatures: [] as any[],
-          allNames: new Set<string>(),
-          geometryTypes: new Map<string, number>(),
-          propertyStats: new Map<string, number>()
-        };
-        
-        mainData.features.forEach((feature, index) => {
-          const props = feature.properties;
-          const geomType = feature.geometry.type;
-          
-          // Track geometry types
-          debugResults.geometryTypes.set(geomType, (debugResults.geometryTypes.get(geomType) || 0) + 1);
-          
-          if (props && props.name) {
-            const name = props.name.toLowerCase();
-            debugResults.allNames.add(props.name);
-            
-            // Look for cemetery-related names
-            if (name.includes('cemetery') || name.includes('calvary') || 
-                name.includes('green-wood') || name.includes('greenwood') || 
-                name.includes('woodlawn') || name.includes('evergreens')) {
-              debugResults.cemeteryFeatures.push({
-                index,
-                name: props.name,
-                geometry: geomType,
-                leisure: props.leisure,
-                natural: props.natural,
-                allProps: props
-              });
-            }
-            
-            // Look for water-related names
-            if (name.includes('bay') || name.includes('kill') || name.includes('river') || 
-                name.includes('newark') || name.includes('arthur') || name.includes('hudson')) {
-              debugResults.waterFeatures.push({
-                index,
-                name: props.name,
-                geometry: geomType,
-                natural: props.natural,
-                water: props.water,
-                allProps: props
-              });
-            }
-          }
-          
-          // Track all property keys
-          if (props) {
-            Object.keys(props).forEach(key => {
-              const propKey = `${key}=${props[key]}`;
-              debugResults.propertyStats.set(propKey, (debugResults.propertyStats.get(propKey) || 0) + 1);
-            });
-          }
-        });
-        
-        console.log('=== DEBUGGING RESULTS ===');
-        console.log('Geometry types:', Object.fromEntries(debugResults.geometryTypes));
-        console.log('Found cemetery features:', debugResults.cemeteryFeatures);
-        console.log('Found water features:', debugResults.waterFeatures);
-        
-        // Show sample of all names to help identify patterns
-        const nameArray = Array.from(debugResults.allNames);
-        console.log(`Total named features: ${nameArray.length}`);
-        console.log('Sample names (first 20):', nameArray.slice(0, 20));
-        
-        // Show water-related names
-        const waterNames = nameArray.filter(name => 
-          name.toLowerCase().includes('bay') || 
-          name.toLowerCase().includes('kill') || 
-          name.toLowerCase().includes('river') ||
-          name.toLowerCase().includes('water')
-        );
-        console.log('All water-related names found:', waterNames);
-        
-        // Show cemetery-related names
-        const cemeteryNames = nameArray.filter(name => 
-          name.toLowerCase().includes('cemetery') || 
-          name.toLowerCase().includes('calvary') || 
-          name.toLowerCase().includes('green') ||
-          name.toLowerCase().includes('wood')
-        );
-        console.log('All cemetery-related names found:', cemeteryNames);
-        
-        // Show top property combinations
-        const sortedProps = Array.from(debugResults.propertyStats.entries())
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 30);
-        console.log('Top 30 property combinations:', sortedProps);
-
-        // TRY ALL CEMETERY DETECTION STRATEGIES HERE
-        console.log('\n=== APPLYING CEMETERY DETECTION STRATEGIES ===');
-        
-        // Wait a bit for map to be ready, then apply all strategies
-        setTimeout(() => {
-          addDirectCemeteryLayer(mainData);
-          findAndColorCemeteries(mainData);
-          addCemeteryOverlay(mainData);
-          findCemeteriesByLocation(mainData);
-        }, 1000);
-        
-        // IMPROVED LAND DETECTION - Working with limited properties
-        const landFeatures = mainData.features.filter(feature => {
-          const props = feature.properties;
-          if (!props || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
-          
-          return (
-            // CEMETERY DETECTION - Name-based only since we don't have landuse/amenity
-            (props.name && props.name.toLowerCase().includes('cemetery')) ||
-            (props.name && props.name.toLowerCase().includes('calvary')) ||
-            (props.name && props.name.toLowerCase().includes('green-wood')) ||
-            (props.name && props.name.toLowerCase().includes('greenwood')) ||
-            (props.name && props.name.toLowerCase().includes('woodlawn')) ||
-            (props.name && props.name.toLowerCase().includes('evergreens')) ||
-            (props.name && props.name.toLowerCase().includes('cypress hills')) ||
-            
-            // Leisure areas (parks, etc.) - these we DO have
-            props.leisure === 'park' ||
-            props.leisure === 'playground' ||
-            props.leisure === 'pitch' ||
-            props.leisure === 'garden' ||
-            props.leisure === 'golf_course' ||
-            props.leisure === 'recreation_ground' ||
-            props.leisure === 'stadium' ||
-            props.leisure === 'sports_centre' ||
-            
-            // Natural land areas - these we DO have
-            props.natural === 'wood' ||
-            props.natural === 'forest' ||
-            props.natural === 'grassland' ||
-            props.natural === 'scrub' ||
-            props.natural === 'heath' ||
-            props.natural === 'fell' ||
-            props.natural === 'bare_rock' ||
-            props.natural === 'scree' ||
-            props.natural === 'sand' ||
-            props.natural === 'beach' ||
-            props.natural === 'land' ||
-            
-            // Name-based detection for major land features
-            (props.name && [
-              'central park', 'prospect park', 'battery park', 'bryant park', 
-              'madison square park', 'washington square park', 'riverside park',
-              'governors island', 'staten island', 'liberty island', 'ellis island'
-            ].some(landName => 
-              props.name.toLowerCase().includes(landName.toLowerCase())
-            ))
-          );
-        }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
-        
-        // IMPROVED WATER DETECTION - Using only available properties
-        const waterFeatures = mainData.features.filter(feature => {
-          const props = feature.properties;
-          if (!props || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
-          
-          return (
-            // Natural water bodies - we have this
-            props.natural === 'water' ||
-            props.natural === 'bay' ||
-            props.natural === 'strait' ||
-            
-            // Named major water bodies - FIXED for exact and partial matches
-            (props.name && [
-              'Upper New York Bay', 'Lower New York Bay', 'Newark Bay', 'Jamaica Bay',
-              'Long Island Sound', 'Hudson River', 'East River', 'Harlem River',
-              'Arthur Kill', 'Kill Van Kull', 'Raritan Bay', 'Sheepshead Bay',
-              'Rockaway Inlet', 'Gowanus Canal', 'Newtown Creek'
-            ].some(waterName => {
-              if (!props.name) return false;
-              const name = props.name.toLowerCase();
-              const water = waterName.toLowerCase();
-              
-              // Exact match OR contains the water name
-              return name === water || name.includes(water) || 
-                     // Special cases for compound names
-                     (water.includes('bay') && name.includes('bay')) ||
-                     (water.includes('river') && name.includes('river')) ||
-                     (water.includes('kill') && name.includes('kill'));
-            }))
-          );
-        }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
-        
-        console.log(`Found ${landFeatures.length} land features`);
-        console.log(`Found ${waterFeatures.length} water features`);
-        
-        // If we have very few explicit land features, try the coastline-based approach
-        if (landFeatures.length < 10) {
-          console.log('Few explicit land features found, trying coastline-based approach...');
-          const coastlineGenerated = createLandFromCoastlines(mainData);
-          if (coastlineGenerated.features.length > 0) {
-            // Ensure all coastline-generated features are properly typed
-            const typedCoastlineFeatures = coastlineGenerated.features.filter(
-              (feature): feature is Feature<Polygon | MultiPolygon, { [name: string]: any }> => 
-                feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon'
-            );
-            landFeatures.push(...typedCoastlineFeatures);
-            console.log(`Added ${typedCoastlineFeatures.length} coastline-generated land features`);
-          }
-        }
-        
-        setLandData({
-          type: 'FeatureCollection' as const,
-          features: landFeatures
-        });
-        
-        setWaterData({
-          type: 'FeatureCollection' as const, 
-          features: waterFeatures
-        });
+      if (!mainData) {
+        console.error('No main data loaded');
+        return;
       }
+
+      console.log(`Processing ${mainData.features.length} total features`);
+
+      // Process geographic features intelligently
+      const { explicitWater, explicitLand, coastlines } = processGeographicFeatures(mainData);
+      
+      // Create base geography only if we have very few explicit features
+      let baseLand: Feature<Polygon | MultiPolygon, { [name: string]: any }>[] = [];
+      let baseWater: Feature<Polygon | MultiPolygon, { [name: string]: any }>[] = [];
+      
+      if (explicitLand.length < 5 || explicitWater.length < 3) {
+        console.log('Creating base geography from coastlines...');
+        const baseGeography = createBaseGeography(coastlines);
+        baseLand = baseGeography.baseLand;
+        baseWater = baseGeography.baseWater;
+      }
+      
+      // Combine explicit and base features
+      const allLandFeatures = [...baseLand, ...explicitLand];
+      const allWaterFeatures = [...baseWater, ...explicitWater];
+      
+      console.log(`Final result: ${allLandFeatures.length} land features, ${allWaterFeatures.length} water features`);
+      
+      // Separate parks from other land for better rendering
+      const parkFeatures = explicitLand.filter(feature => {
+        const props = feature.properties || {};
+        const name = (props.name || '').toLowerCase();
+        
+        return (
+          ['park', 'garden', 'recreation_ground', 'playground'].includes(props.leisure) ||
+          props.leisure === 'cemetery' ||
+          cemeteryKeywords.some(keyword => name.includes(keyword)) ||
+          ['central park', 'prospect park', 'bryant park'].some(parkName => name.includes(parkName))
+        );
+      });
+      
+      const nonParkLand = allLandFeatures.filter(feature => {
+        const props = feature.properties || {};
+        const name = (props.name || '').toLowerCase();
+        
+        return !(
+          ['park', 'garden', 'recreation_ground', 'playground'].includes(props.leisure) ||
+          props.leisure === 'cemetery' ||
+          cemeteryKeywords.some(keyword => name.includes(keyword)) ||
+          ['central park', 'prospect park', 'bryant park'].some(parkName => name.includes(parkName))
+        );
+      });
+      
+      setLandData({ type: 'FeatureCollection', features: nonParkLand });
+      setWaterData({ type: 'FeatureCollection', features: allWaterFeatures });
+      setParksData({ type: 'FeatureCollection', features: parkFeatures });
+      
     } catch (error) {
       console.error('Error loading geographic data:', error);
     }
-  }, [loadGeoJSONData, addDirectCemeteryLayer, findAndColorCemeteries, addCemeteryOverlay, findCemeteriesByLocation]);
+  }, [loadGeoJSONData, processGeographicFeatures, createBaseGeography, cemeteryKeywords]);
 
-  // IMPROVED coastline-to-land conversion strategy
-  const createLandFromCoastlines = useCallback((geoData: FeatureCollection): FeatureCollection<Polygon | MultiPolygon> => {
-    try {
-      const allLandFeatures: Feature<Polygon | MultiPolygon, { [name: string]: any }>[] = [];
-      
-      // Get coastlines
-      const coastlines = geoData.features.filter(feature => 
-        feature.geometry.type === 'LineString' &&
-        feature.properties?.natural === 'coastline'
-      );
-
-      console.log(`Processing ${coastlines.length} coastline features`);
-
-      if (coastlines.length === 0) {
-        // If no coastlines, create a simple bounding box land area
-        console.log('No coastlines found, creating default land area');
-        const bbox: [number, number, number, number] = [-74.30, 40.50, -73.70, 40.93];
-        const landArea = turf.bboxPolygon(bbox);
-        
-        allLandFeatures.push({
-          ...landArea,
-          properties: { 
-            landType: 'default-bbox',
-            source: 'fallback'
-          }
-        } as Feature<Polygon, { [name: string]: any }>);
-        
-        return {
-          type: 'FeatureCollection' as const,
-          features: allLandFeatures
-        };
-      }
-
-      // STRATEGY 1: Create comprehensive water mask, then subtract from bounding box
-      try {
-        const bbox: [number, number, number, number] = [-74.30, 40.50, -73.70, 40.93];
-        let totalLandArea = turf.bboxPolygon(bbox);
-        
-        // Get all water bodies (both explicit and coastline-derived)
-        const explicitWaterBodies = geoData.features.filter(feature => {
-          const props = feature.properties;
-          return props && 
-            (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') &&
-            (
-              props.natural === 'water' ||
-              (props.name && [
-                'Upper New York Bay', 'Lower New York Bay', 'Newark Bay', 'Jamaica Bay',
-                'Long Island Sound', 'Hudson River', 'East River', 'Harlem River'
-              ].some(waterName => props.name.includes(waterName)))
-            );
-        });
-        
-        console.log(`Found ${explicitWaterBodies.length} explicit water bodies`);
-        
-        // Create water polygons from coastline segments using convex hull approach
-        const coastlineWaterBodies: Feature<Polygon | MultiPolygon>[] = [];
-        
-        // Group coastlines by proximity to create coherent water bodies
-        const processedCoastlines = new Set<number>();
-        
-        coastlines.forEach((coastline, index) => {
-          if (processedCoastlines.has(index)) return;
-          
-          try {
-            const coords = (coastline.geometry as any).coordinates;
-            if (!coords || coords.length < 3) return;
-            
-            // Find nearby coastline segments
-            const nearbyCoastlines = [coastline];
-            const currentCoords = [...coords];
-            
-            coastlines.forEach((otherCoastline, otherIndex) => {
-              if (otherIndex === index || processedCoastlines.has(otherIndex)) return;
-              
-              const otherCoords = (otherCoastline.geometry as any).coordinates;
-              if (!otherCoords || otherCoords.length < 3) return;
-              
-              // Check if any endpoint of this coastline is close to any endpoint of the other
-              const endpoints = [
-                coords[0], coords[coords.length - 1],
-                otherCoords[0], otherCoords[otherCoords.length - 1]
-              ];
-              
-              let isNearby = false;
-              for (let i = 0; i < 2; i++) {
-                for (let j = 2; j < 4; j++) {
-                  const dist = turf.distance(endpoints[i], endpoints[j], { units: 'kilometers' });
-                  if (dist < 0.5) { // Within 500m
-                    isNearby = true;
-                    break;
-                  }
-                }
-                if (isNearby) break;
-              }
-              
-              if (isNearby) {
-                nearbyCoastlines.push(otherCoastline);
-                currentCoords.push(...otherCoords);
-                processedCoastlines.add(otherIndex);
-              }
-            });
-            
-            processedCoastlines.add(index);
-            
-            // Create a polygon from all the collected coastline points
-            if (currentCoords.length >= 6) { // Need at least 3 unique points for polygon
-              try {
-                // Use convex hull to create a proper polygon
-                const points = currentCoords.map(coord => turf.point(coord));
-                const pointCollection = turf.featureCollection(points);
-                const hull = (turf as any).convexHull(pointCollection);
-                
-                if (hull && hull.geometry.type === 'Polygon') {
-                  const area = turf.area(hull);
-                  
-                  // Only include significant water bodies (>50,000 sq meters)
-                  if (area > 50000) {
-                    coastlineWaterBodies.push(hull as Feature<Polygon>);
-                    console.log(`Created water body from coastline group ${index}, area: ${Math.round(area)} sq meters`);
-                  }
-                }
-              } catch (hullErr) {
-                console.warn(`Could not create convex hull for coastline group ${index}:`, hullErr);
-              }
-            }
-          } catch (err) {
-            console.warn(`Error processing coastline group ${index}:`, err);
-          }
-        });
-        
-        // Subtract all water bodies from the total land area
-        const allWaterBodies = [...explicitWaterBodies, ...coastlineWaterBodies];
-        console.log(`Subtracting ${allWaterBodies.length} total water bodies from land`);
-        
-        allWaterBodies.forEach((waterBody, index) => {
-          try {
-            const difference = (turf as any).difference(totalLandArea, waterBody);
-            if (difference) {
-              totalLandArea = difference;
-              console.log(`Subtracted water body ${index}`);
-            }
-          } catch (diffErr) {
-            console.warn(`Could not subtract water body ${index}:`, diffErr);
-          }
-        });
-        
-        // Add the resulting land area(s)
-        if (totalLandArea) {
-          // Convert through unknown to avoid TypeScript geometry type conflicts
-          const landFeature = totalLandArea as unknown as Feature<Polygon | MultiPolygon, { [name: string]: any }>;
-          landFeature.properties = landFeature.properties || { landType: 'comprehensive', source: 'water-subtraction' };
-          allLandFeatures.push(landFeature);
-        }
-        
-      } catch (err) {
-        console.warn('Comprehensive land creation failed:', err);
-        
-        // FALLBACK: Simple buffered coastlines
-        try {
-          console.log('Using simple buffer fallback');
-          const allCoastlineCoords: number[][] = [];
-          
-          coastlines.forEach(coastline => {
-            if (coastline.geometry.type === 'LineString') {
-              const coords = (coastline.geometry as any).coordinates;
-              allCoastlineCoords.push(...coords);
-            }
-          });
-          
-          if (allCoastlineCoords.length >= 3) {
-            const points = allCoastlineCoords.map(coord => turf.point(coord));
-            const pointCollection = turf.featureCollection(points);
-            const hull = (turf as any).convexHull(pointCollection);
-            
-            if (hull && hull.geometry.type === 'Polygon') {
-              // Buffer the hull slightly inward to create land
-              const buffered = turf.buffer(hull, -0.001, { units: 'degrees' });
-              if (buffered) {
-                // Convert through unknown to avoid TypeScript geometry type conflicts
-                const bufferedFeature = buffered as unknown as Feature<Polygon | MultiPolygon, { [name: string]: any }>;
-                bufferedFeature.properties = { 
-                  landType: 'coastline-hull-buffered',
-                  source: 'fallback-buffer'
-                };
-                allLandFeatures.push(bufferedFeature);
-              }
-            }
-          }
-        } catch (fallbackErr) {
-          console.warn('Fallback buffer approach also failed:', fallbackErr);
-        }
-      }
-
-      console.log(`Created ${allLandFeatures.length} land features from coastlines`);
-      
-      return {
-        type: 'FeatureCollection' as const,
-        features: allLandFeatures
-      };
-      
-    } catch (error) {
-      console.error('Error creating land from coastlines:', error);
-      return { type: 'FeatureCollection' as const, features: [] };
-    }
-  }, []);
-
+  // Initialize map
   useEffect(() => {
     if (!mapRef.current) return;
 
@@ -807,13 +270,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const baseStyle = {
         version: 8 as const,
         sources: {},
-        layers: [
-          {
-            id: 'background',
-            type: 'background' as const,
-            paint: { 'background-color': '#D3D3D3' } // Light gray background
-          }
-        ]
+        layers: [{
+          id: 'background',
+          type: 'background' as const,
+          paint: { 'background-color': '#F5F5DC' } // Land color as background
+        }]
       };
 
       mapInstance = new maplibregl.Map({
@@ -823,18 +284,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         zoom: 12
       });
 
-      const nycBounds: maplibregl.LngLatBoundsLike = [
-        [-74.25909, 40.477399],
-        [-73.700272, 40.917577]
-      ];
-      mapInstance.setMaxBounds(nycBounds);
+      mapInstance.setMaxBounds([[-74.25909, 40.477399], [-73.700272, 40.917577]]);
 
       mapInstance.on('load', async () => {
         if (cleanedUp) return;
         setMapLoaded(true);
 
         const geoData = await loadGeoJSONData();
-        if (!geoData || !geoData.features.length) {
+        if (!geoData?.features.length) {
           console.warn('No GeoJSON features loaded.');
           return;
         }
@@ -849,51 +306,36 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           console.warn('Could not calculate bbox:', err);
         }
 
-        // Main data source
-        mapInstance!.addSource('geojson-data', {
-          type: 'geojson',
-          data: geoData
-        });
+        // Add original geojson source for compatibility
+        mapInstance!.addSource('geojson-data', { type: 'geojson', data: geoData });
 
-        // Fallback layers from main data (parks, coastlines, etc.)
-        mapInstance!.addLayer({
-          id: 'parks',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: ['==', 'leisure', 'park'] as any,
-          paint: {
-            'fill-color': '#4CAF50',
-            'fill-opacity': 0.8
+        // Add basic layers for backwards compatibility
+        const compatibilityLayers = [
+          { 
+            id: 'coastlines', 
+            type: 'line', 
+            filter: ['==', 'natural', 'coastline'], 
+            paint: { 'line-color': '#1976D2', 'line-width': 2 } 
+          },
+          { 
+            id: 'buildings', 
+            filter: ['has', 'building'], 
+            paint: { 'fill-color': '#BDBDBD', 'fill-opacity': 0.7 } 
           }
-        });
+        ];
 
-        mapInstance!.addLayer({
-          id: 'coastlines',
-          type: 'line',
-          source: 'geojson-data',
-          filter: ['==', 'natural', 'coastline'] as any,
-          paint: {
-            'line-color': '#1976D2',
-            'line-width': 2
-          }
-        });
-
-        mapInstance!.addLayer({
-          id: 'buildings',
-          type: 'fill',
-          source: 'geojson-data',
-          filter: ['has', 'building'] as any,
-          paint: {
-            'fill-color': '#BDBDBD',
-            'fill-opacity': 0.7
-          }
+        compatibilityLayers.forEach(layer => {
+          mapInstance!.addLayer({
+            id: layer.id,
+            type: layer.type || 'fill',
+            source: 'geojson-data',
+            filter: layer.filter,
+            paint: layer.paint
+          } as any);
         });
       });
 
-      mapInstance.on('error', e => {
-        console.error('Map error:', e.error);
-      });
-
+      mapInstance.on('error', e => console.error('Map error:', e.error));
       setMap(mapInstance);
     };
 
@@ -901,148 +343,152 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     return () => {
       cleanedUp = true;
-      if (mapInstance) {
-        mapInstance.remove();
-      }
+      if (mapInstance) mapInstance.remove();
       setMap(null);
     };
   }, [loadGeoJSONData]);
 
-  // Load geographic data on mount
+  // Load geographic data - run only once after map is loaded
   useEffect(() => {
-    loadGeographicData();
-  }, [loadGeographicData]);
+    if (mapLoaded && map) {
+      loadGeographicData();
+    }
+  }, [mapLoaded, map, loadGeographicData]);
 
-  // Add or update geographic sources/layers when data arrives
+  // Add geographic layers in proper order
   useEffect(() => {
     if (!mapLoaded || !map) return;
 
-    const addOrUpdate = (
-      sourceId: string,
-      data: FeatureCollection | null,
-      layer: any
-    ) => {
-      if (!data) return;
-      const existing = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
-      if (existing) {
-        existing.setData(data as any);
-        if (!map.getLayer(layer.id)) {
-          map.addLayer(layer);
+    const addOrUpdateSource = (sourceId: string, data: FeatureCollection | null, layer: any) => {
+      if (!data || data.features.length === 0) return;
+      
+      try {
+        const existing = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
+        if (existing) {
+          existing.setData(data as any);
+          if (!map.getLayer(layer.id)) {
+            map.addLayer(layer);
+          }
+        } else {
+          map.addSource(sourceId, { type: 'geojson', data });
+          if (!map.getLayer(layer.id)) {
+            map.addLayer(layer);
+          }
         }
-      } else {
-        map.addSource(sourceId, { type: 'geojson', data });
-        if (!map.getLayer(layer.id)) {
-          map.addLayer(layer);
-        }
+        console.log(`Added/updated layer: ${layer.id} with ${data.features.length} features`);
+      } catch (error) {
+        console.error(`Error adding layer ${layer.id}:`, error);
       }
     };
 
-    // Add land areas with enhanced color coding for cemeteries and parks
-    addOrUpdate('land-data', landData, {
-      id: 'land-areas',
+    // CRITICAL: Add layers in correct rendering order (bottom to top)
+    console.log('Adding geographic layers...');
+    
+    // 1. FIRST: Parks and special areas (bottom layer on top of background)
+    addOrUpdateSource('parks-data', parksData, {
+      id: 'parks-areas',
       type: 'fill',
-      source: 'land-data',
+      source: 'parks-data',
       paint: { 
         'fill-color': [
           'case',
-          
-          // Cemetery colors (darker green) - Name-based detection only
-          ['any',
-            ['in', 'green-wood', ['downcase', ['coalesce', ['get', 'name'], '']]],
-            ['in', 'greenwood', ['downcase', ['coalesce', ['get', 'name'], '']]],
-            ['in', 'calvary', ['downcase', ['coalesce', ['get', 'name'], '']]],
-            ['in', 'woodlawn', ['downcase', ['coalesce', ['get', 'name'], '']]],
-            ['in', 'cemetery', ['downcase', ['coalesce', ['get', 'name'], '']]],
-            ['in', 'evergreens', ['downcase', ['coalesce', ['get', 'name'], '']]],
-            ['in', 'cypress', ['downcase', ['coalesce', ['get', 'name'], '']]]
-          ], '#2E7D32', // Dark green for cemeteries
-          
-          // Park colors (bright green) - using leisure property we have
-          ['==', ['get', 'leisure'], 'park'], '#4CAF50',
-          ['==', ['get', 'leisure'], 'garden'], '#4CAF50',
-          ['==', ['get', 'leisure'], 'playground'], '#4CAF50',
-          ['==', ['get', 'leisure'], 'golf_course'], '#4CAF50',
-          
-          // Natural vegetation (forest green) - using natural property we have
-          ['==', ['get', 'natural'], 'wood'], '#388E3C',
-          ['==', ['get', 'natural'], 'forest'], '#388E3C',
-          
-          // Famous parks by name (bright green)
-          ['any',
-            ['in', 'central park', ['downcase', ['coalesce', ['get', 'name'], '']]],
-            ['in', 'prospect park', ['downcase', ['coalesce', ['get', 'name'], '']]],
-            ['in', 'battery park', ['downcase', ['coalesce', ['get', 'name'], '']]],
-            ['in', 'bryant park', ['downcase', ['coalesce', ['get', 'name'], '']]]
-          ], '#4CAF50',
-          
-          '#E8F5E8' // Very light green for all other land
+          // Cemetery detection
+          ['any', ...cemeteryKeywords.map(keyword => 
+            ['in', keyword, ['downcase', ['coalesce', ['get', 'name'], '']]])],
+          '#4CAF50', // Green for cemeteries
+          // Parks and leisure areas
+          ['!=', ['coalesce', ['get', 'leisure'], ''], ''],
+          '#4CAF50', // Green for parks
+          // Natural areas
+          ['!=', ['coalesce', ['get', 'natural'], ''], ''],
+          '#388E3C', // Darker green for natural areas
+          '#4CAF50' // Default green
         ],
-        'fill-opacity': 0.9 
+        'fill-opacity': 0.8
       }
-    } as any);
+    });
 
-    // Add water bodies
-    addOrUpdate('water-data', waterData, {
+    // 2. SECOND: Base land areas (only non-park land on top of parks)
+    addOrUpdateSource('land-data', landData, {
+      id: 'land-base',
+      type: 'fill',
+      source: 'land-data',
+      paint: { 
+        'fill-color': '#D2B48C', // Sandy brown for natural land
+        'fill-opacity': 0.7
+      }
+    });
+
+    // 3. THIRD: Water bodies (only on top where water actually exists)
+    addOrUpdateSource('water-data', waterData, {
       id: 'water-bodies',
       type: 'fill',
       source: 'water-data',
       paint: { 
-        'fill-color': '#4A90E2', // Dark blue for water bodies
-        'fill-opacity': 0.8 
+        'fill-color': '#4A90E2', 
+        'fill-opacity': 0.8
       }
-    } as any);
+    });
 
-    // Add roads
-    addOrUpdate('roads-data', roadsData, {
+    // 4. FOURTH: Roads (on top of everything)
+    addOrUpdateSource('roads-data', roadsData, {
       id: 'roads',
       type: 'line',
       source: 'roads-data',
       paint: { 
         'line-color': '#666666', 
-        'line-width': 1.5 
+        'line-width': 1.5,
+        'line-opacity': 0.8
       }
-    } as any);
+    });
 
-    // Ensure businesses layer stays on top
+    // 5. Add water outlines for better definition
+    if (waterData && waterData.features.length > 0 && map.getSource('water-data') && !map.getLayer('water-outlines')) {
+      try {
+        map.addLayer({
+          id: 'water-outlines',
+          type: 'line',
+          source: 'water-data',
+          paint: {
+            'line-color': '#2E7DD2',
+            'line-width': 1.5,
+            'line-opacity': 0.6
+          }
+        }, 'roads'); // Insert before roads layer
+        console.log('Added water outlines');
+      } catch (error) {
+        console.error('Error adding water outlines:', error);
+      }
+    }
+
+    // 6. LAST: Ensure businesses layer stays on top
     if (map.getLayer('businesses-layer')) {
       map.moveLayer('businesses-layer');
     }
-  }, [mapLoaded, map, landData, waterData, roadsData]);
 
-  // Add business markers to the map
+  }, [mapLoaded, map, waterData, landData, parksData, roadsData, cemeteryKeywords]);
+
+  // Business markers
   useEffect(() => {
     if (!mapLoaded || !businesses || !map) return;
 
-    // Remove existing business markers
-    const existingMarkers = map.getSource('businesses');
-    if (existingMarkers) {
-      map.removeLayer('businesses-layer');
+    // Clean up existing
+    if (map.getSource('businesses')) {
+      if (map.getLayer('businesses-layer')) {
+        map.removeLayer('businesses-layer');
+      }
       map.removeSource('businesses');
     }
 
-    // Create GeoJSON from businesses
     const businessFeatures = businesses.map(business => ({
       type: 'Feature' as const,
-      geometry: {
-        type: 'Point' as const,
-        coordinates: [business.position.lng, business.position.lat]
-      },
-      properties: {
-        id: business.id,
-        name: business.name,
-        businessType: business.businessType || 'unknown'
-      }
+      geometry: { type: 'Point' as const, coordinates: [business.position.lng, business.position.lat] },
+      properties: { id: business.id, name: business.name, businessType: business.businessType || 'unknown' }
     }));
 
-    const businessFC = {
-      type: 'FeatureCollection' as const,
-      features: businessFeatures
-    };
-
-    // Add business source and layer
     map.addSource('businesses', {
       type: 'geojson',
-      data: businessFC
+      data: { type: 'FeatureCollection', features: businessFeatures }
     });
 
     map.addLayer({
@@ -1057,10 +503,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     });
 
-    // Add click handler for businesses
+    // Event handlers
     if (onBusinessClick) {
-      map.on('click', 'businesses-layer', (e) => {
-        if (e.features && e.features[0]) {
+      const clickHandler = (e: any) => {
+        if (e.features?.[0]) {
           const businessId = e.features[0].properties?.id;
           const business = businesses.find(b => b.id === businessId);
           if (business) {
@@ -1073,10 +519,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             onBusinessClick(business);
           }
         }
-      });
+      };
+
+      map.on('click', 'businesses-layer', clickHandler);
+      
+      // Clean up on unmount
+      return () => {
+        map.off('click', 'businesses-layer', clickHandler);
+      };
     }
 
-    // Change cursor on hover
     map.on('mouseenter', 'businesses-layer', () => {
       map.getCanvas().style.cursor = 'pointer';
     });
@@ -1085,25 +537,21 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       map.getCanvas().style.cursor = '';
     });
 
-  }, [mapLoaded, businesses, onBusinessClick]);
+  }, [mapLoaded, businesses, onBusinessClick, map]);
 
-  // Handle selected business highlighting
+  // Selected business highlighting
   useEffect(() => {
-    if (!mapLoaded || !map) return;
+    if (!mapLoaded || !map || !map.getLayer('businesses-layer')) return;
 
-    if (map.getLayer('businesses-layer')) {
-      if (selectedBusiness) {
-        map.setPaintProperty('businesses-layer', 'circle-color', [
-          'case',
-          ['==', ['get', 'id'], selectedBusiness.id],
-          '#EF4444',
-          '#FACC15'
-        ]);
-      } else {
-        map.setPaintProperty('businesses-layer', 'circle-color', '#FACC15');
-      }
-    }
-  }, [mapLoaded, selectedBusiness]);
+    map.setPaintProperty('businesses-layer', 'circle-color', 
+      selectedBusiness ? [
+        'case',
+        ['==', ['get', 'id'], selectedBusiness.id],
+        '#EF4444',
+        '#FACC15'
+      ] : '#FACC15'
+    );
+  }, [mapLoaded, map, selectedBusiness]);
 
   return (
     <div
