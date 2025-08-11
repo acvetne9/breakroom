@@ -1,4 +1,33 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+// Buffer waterways with coastline awareness - make them extend to land
+      const bufferedWaterways: Feature<Polygon | MultiPolygon>[] = [];
+      for (const waterway of waterwayFeatures) {
+        try {
+          const props = waterway.properties || {};
+          const name = (props.name || '').toLowerCase();
+          
+          // Determine buffer size based on waterway type - larger buffers to reach land
+          let bufferDistance = 0.05; // Default ~50 meters
+          
+          if (name.includes('river') || props.waterway === 'river') {
+            bufferDistance = 0.2; // ~200 meters for rivers
+          } else if (name.includes('canal') || props.waterway === 'canal') {
+            bufferDistance = 0.1; // ~100 meters for canals
+          } else if (name.includes('stream') || name.includes('creek') || 
+                     props.waterway === 'stream' || props.waterway === 'creek') {
+            bufferDistance = 0.075; // ~75 meters for streams/creeks
+          }
+
+          // Special handling for major NYC waterways - much larger buffers
+          if (name.includes('east river') || name.includes('hudson river') || 
+              name.includes('harlem river') || name.includes('arthur kill')) {
+            bufferDistance = 0.5; // ~500 meters for major waterways
+          }
+
+          // Buffer the linestring to create a polygon
+          let buffered = turf.buffer(waterway, bufferDistance, { units: 'kilometers' });
+          
+          if (buffered && (buffered.geometry.type === 'Polygon' || buffered.geometry.type === 'MultiPolygon')) {
+            // Instead of clipping against land, let waterways extend animport React, { useEffect, useRef, useState, useCallback } from 'react';
 import type { Feature, FeatureCollection, Polygon, MultiPolygon, LineString, Geometry } from 'geojson';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -124,13 +153,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       if (landFeatures.length > 0) {
         try {
           // Union all land features into a single geometry for efficient clipping
-          let combinedLand = landFeatures[0];
+          let combinedLand: Feature<Polygon | MultiPolygon> = turf.feature(landFeatures[0].geometry);
           for (let i = 1; i < Math.min(landFeatures.length, 50); i++) { // Limit to prevent performance issues
             try {
-              const unionResult = turf.union(
-                turf.feature(combinedLand.geometry),
-                turf.feature(landFeatures[i].geometry)
-              );
+              const unionResult = turf.union(combinedLand, turf.feature(landFeatures[i].geometry));
               if (unionResult) combinedLand = unionResult as Feature<Polygon | MultiPolygon>;
             } catch (err) {
               console.warn('Failed to union land feature:', err);
@@ -143,51 +169,50 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         }
       }
 
-      // Buffer waterways with coastline awareness
+      // Buffer waterways with smart sizing - make them extend naturally
       const bufferedWaterways: Feature<Polygon | MultiPolygon>[] = [];
       for (const waterway of waterwayFeatures) {
         try {
           const props = waterway.properties || {};
           const name = (props.name || '').toLowerCase();
           
-          // Determine buffer size based on waterway type
-          let bufferDistance = 0.01; // Default ~10 meters
+          // Determine buffer size based on waterway type - larger buffers to reach shorelines
+          let bufferDistance = 0.05; // Default ~50 meters
           
           if (name.includes('river') || props.waterway === 'river') {
-            bufferDistance = 0.05; // ~50 meters for rivers (increased)
+            bufferDistance = 0.15; // ~150 meters for rivers
           } else if (name.includes('canal') || props.waterway === 'canal') {
-            bufferDistance = 0.03; // ~30 meters for canals (increased)
+            bufferDistance = 0.08; // ~80 meters for canals
           } else if (name.includes('stream') || name.includes('creek') || 
                      props.waterway === 'stream' || props.waterway === 'creek') {
-            bufferDistance = 0.015; // ~15 meters for streams/creeks (increased)
+            bufferDistance = 0.04; // ~40 meters for streams/creeks
           }
 
-          // Special handling for major NYC waterways
+          // Special handling for major NYC waterways - much larger buffers
           if (name.includes('east river') || name.includes('hudson river') || 
               name.includes('harlem river') || name.includes('arthur kill')) {
-            bufferDistance = 0.1; // ~100 meters for major waterways
+            bufferDistance = 0.3; // ~300 meters for major waterways
           }
 
           // Buffer the linestring to create a polygon
           let buffered = turf.buffer(waterway, bufferDistance, { units: 'kilometers' });
           
           if (buffered && (buffered.geometry.type === 'Polygon' || buffered.geometry.type === 'MultiPolygon')) {
-            // Clip buffered waterway against land mask to prevent land overlap
+            // Only clip against land if we have a land mask and want to prevent major overlaps
             if (landMask) {
               try {
-                const clipped = turf.difference(
-                  turf.feature(buffered.geometry),
-                  turf.feature(landMask.geometry)
-                );
-                if (clipped && (clipped.geometry.type === 'Polygon' || clipped.geometry.type === 'MultiPolygon')) {
-                  buffered = clipped as Feature<Polygon>;
-                } else {
-                  // If clipping results in no geometry, use original buffer
-                  console.log('Waterway clipped by land, using original buffer for:', name);
+                // Use intersection instead of difference to keep water areas that touch land
+                const intersection = turf.intersect(buffered, landMask);
+                if (intersection && intersection.geometry.coordinates.length > 0) {
+                  // If there's significant land overlap, try a smaller buffer
+                  const smallerBuffer = turf.buffer(waterway, bufferDistance * 0.7, { units: 'kilometers' });
+                  if (smallerBuffer) {
+                    buffered = smallerBuffer as Feature<Polygon | MultiPolygon>;
+                    console.log('Reduced buffer for waterway to avoid land overlap:', name);
+                  }
                 }
               } catch (clipErr) {
-                console.warn('Failed to clip waterway against land, using original buffer:', clipErr);
-                // Use original buffered waterway if clipping fails
+                console.warn('Failed to check land intersection, using full buffer:', clipErr);
               }
             }
 
@@ -197,13 +222,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 ...props,
                 buffered: true,
                 originalType: 'waterway',
-                clipped: landMask ? true : false
+                bufferSize: bufferDistance
               }
             } as Feature<Polygon | MultiPolygon>);
+            
+            console.log(`Buffered waterway: ${name || 'unnamed'} with ${bufferDistance * 1000}m buffer`);
           }
         } catch (err) {
           console.warn('Failed to buffer waterway:', err);
-          // Skip this waterway if buffering fails
         }
       }
 
