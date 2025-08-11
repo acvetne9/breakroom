@@ -65,6 +65,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         const props = feature.properties || {};
         const name = (props.name || '').toLowerCase();
         
+        // Exclude parks from being classified as water
+        if (name.includes('park')) return false;
+        
         return (
           props.natural === 'water' || 
           props.natural === 'bay' || 
