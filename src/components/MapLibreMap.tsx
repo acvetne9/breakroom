@@ -106,11 +106,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           // Common waterway types
           ['river', 'stream', 'canal', 'creek', 'brook'].some(waterType => 
             name.includes(waterType) || props.waterway === waterType
+          ) ||
+          // Check for specific water bodies by name
+          ['east river', 'arthur kill', 'hudson river', 'harlem river'].some(waterName =>
+            name.includes(waterName)
           )
         );
       });
 
       console.log(`Found ${waterBodyFeatures.length} water bodies, ${waterwayFeatures.length} waterways, ${landFeatures.length} land features`);
+      
+      // Debug: Log some waterway names
+      console.log('Waterway names found:', waterwayFeatures.slice(0, 10).map(f => f.properties?.name || 'unnamed'));
 
       // Create unified land mask for clipping operations
       let landMask: Feature<Polygon | MultiPolygon> | null = null;
@@ -147,18 +154,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           let bufferDistance = 0.01; // Default ~10 meters
           
           if (name.includes('river') || props.waterway === 'river') {
-            bufferDistance = 0.02; // ~20 meters for rivers
+            bufferDistance = 0.05; // ~50 meters for rivers (increased)
           } else if (name.includes('canal') || props.waterway === 'canal') {
-            bufferDistance = 0.015; // ~15 meters for canals  
+            bufferDistance = 0.03; // ~30 meters for canals (increased)
           } else if (name.includes('stream') || name.includes('creek') || 
                      props.waterway === 'stream' || props.waterway === 'creek') {
-            bufferDistance = 0.005; // ~5 meters for streams/creeks
+            bufferDistance = 0.015; // ~15 meters for streams/creeks (increased)
+          }
+
+          // Special handling for major NYC waterways
+          if (name.includes('east river') || name.includes('hudson river') || 
+              name.includes('harlem river') || name.includes('arthur kill')) {
+            bufferDistance = 0.1; // ~100 meters for major waterways
           }
 
           // Buffer the linestring to create a polygon
           let buffered = turf.buffer(waterway, bufferDistance, { units: 'kilometers' });
           
-          if (buffered && buffered.geometry.type === 'Polygon') {
+          if (buffered && (buffered.geometry.type === 'Polygon' || buffered.geometry.type === 'MultiPolygon')) {
             // Clip buffered waterway against land mask to prevent land overlap
             if (landMask) {
               try {
@@ -169,9 +182,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 if (clipped && (clipped.geometry.type === 'Polygon' || clipped.geometry.type === 'MultiPolygon')) {
                   buffered = clipped as Feature<Polygon>;
                 } else {
-                  // If clipping results in no geometry, skip this waterway
-                  console.log('Waterway completely clipped by land, skipping');
-                  continue;
+                  // If clipping results in no geometry, use original buffer
+                  console.log('Waterway clipped by land, using original buffer for:', name);
                 }
               } catch (clipErr) {
                 console.warn('Failed to clip waterway against land, using original buffer:', clipErr);
@@ -258,14 +270,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 'fill-color': [
                   'case',
                   ['==', ['get', 'originalType'], 'waterway'],
-                  '#5BA4E8', // Slightly different color for buffered waterways
-                  '#4A90E2'  // Original water body color
+                  '#4A90E2', // Same blue color for buffered waterways
+                  '#4A90E2'  // Same blue color for water bodies
                 ],
                 'fill-opacity': [
                   'case',
                   ['==', ['get', 'originalType'], 'waterway'],
-                  0.7, // Slightly more transparent for buffered waterways
-                  0.8  // Original opacity for water bodies
+                  0.8, // Same opacity for buffered waterways
+                  0.8  // Same opacity for water bodies
                 ]
               }
             });
