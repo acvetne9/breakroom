@@ -5,7 +5,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import * as turf from '@turf/turf';
 
 interface MapLibreMapProps {
-  businesses: {
+  businesses?: {
     id: string;
     name: string;
     position: { lat: number; lng: number };
@@ -59,22 +59,61 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     allFeatures: Feature[]
   ): Feature<Polygon> | null => {
     try {
-      // Find left coast features
-      const leftFeatures = allFeatures.filter(feature => 
-        leftCoastWays.includes(String(feature.id)) || 
-        leftCoastWays.includes(String(feature.properties?.id)) ||
-        leftCoastWays.includes(String(feature.properties?.['@id']))
-      );
+      console.log('Looking for coastline ways in', allFeatures.length, 'features');
+      console.log('Target left ways:', leftCoastWays);
+      console.log('Target right ways:', rightCoastWays);
 
-      // Find right coast features  
-      const rightFeatures = allFeatures.filter(feature => 
-        rightCoastWays.includes(String(feature.id)) || 
-        rightCoastWays.includes(String(feature.properties?.id)) ||
-        rightCoastWays.includes(String(feature.properties?.['@id']))
-      );
+      // Debug: Log some feature IDs to see the format
+      const sampleFeatures = allFeatures.slice(0, 5);
+      console.log('Sample feature IDs:', sampleFeatures.map(f => ({
+        id: f.id,
+        propId: f.properties?.id,
+        atId: f.properties?.['@id'],
+        osmId: f.properties?.['@osm_id'],
+        wayId: f.properties?.way_id,
+        name: f.properties?.name
+      })));
+
+      // Find left coast features - try multiple ID fields
+      const leftFeatures = allFeatures.filter(feature => {
+        const ids = [
+          String(feature.id || ''),
+          String(feature.properties?.id || ''),
+          String(feature.properties?.['@id'] || ''),
+          String(feature.properties?.['@osm_id'] || ''),
+          String(feature.properties?.way_id || '')
+        ];
+        return leftCoastWays.some(wayId => ids.includes(wayId));
+      });
+
+      // Find right coast features - try multiple ID fields  
+      const rightFeatures = allFeatures.filter(feature => {
+        const ids = [
+          String(feature.id || ''),
+          String(feature.properties?.id || ''),
+          String(feature.properties?.['@id'] || ''),
+          String(feature.properties?.['@osm_id'] || ''),
+          String(feature.properties?.way_id || '')
+        ];
+        return rightCoastWays.some(wayId => ids.includes(wayId));
+      });
+
+      console.log(`Found ${leftFeatures.length} left coast features, ${rightFeatures.length} right coast features`);
 
       if (leftFeatures.length === 0 || rightFeatures.length === 0) {
         console.warn('Could not find coastline features for polygon creation');
+        // Try to find any coastline features for debugging
+        const anyCoastlines = allFeatures.filter(f => 
+          f.properties?.natural === 'coastline' || 
+          f.properties?.waterway ||
+          (f.properties?.name || '').toLowerCase().includes('coast')
+        );
+        console.log('Available coastline-like features:', anyCoastlines.slice(0, 10).map(f => ({
+          id: f.id,
+          name: f.properties?.name,
+          natural: f.properties?.natural,
+          waterway: f.properties?.waterway
+        })));
         return null;
       }
 
@@ -118,6 +157,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         console.warn('Not enough coordinates for valid polygon');
         return null;
       }
+
+      console.log('Successfully created polygon with', cleanCoords.length, 'coordinates');
 
       return {
         type: 'Feature',
@@ -508,7 +549,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Business markers (unchanged)
   useEffect(() => {
-    if (!mapLoaded || !businesses || !map) return;
+    if (!mapLoaded || !businesses || businesses.length === 0 || !map) return;
 
     try {
       // Clean up existing
