@@ -117,7 +117,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       if (map && mapLoaded) {
         // Add water (single layer to prevent overlaps)
         if (uniqueWaterFeatures.length > 0) {
-          const waterCollection = { type: 'FeatureCollection', features: uniqueWaterFeatures };
+          const waterCollection = { type: 'FeatureCollection' as const, features: uniqueWaterFeatures };
           
           if (map.getSource('simple-water')) {
             (map.getSource('simple-water') as maplibregl.GeoJSONSource).setData(waterCollection as any);
@@ -137,7 +137,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
         // Add parks
         if (parkFeatures.length > 0) {
-          const parksCollection = { type: 'FeatureCollection', features: parkFeatures };
+          const parksCollection = { type: 'FeatureCollection' as const, features: parkFeatures };
           
           if (map.getSource('simple-parks')) {
             (map.getSource('simple-parks') as maplibregl.GeoJSONSource).setData(parksCollection as any);
