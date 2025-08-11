@@ -36,6 +36,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [roadsData, setRoadsData] = useState<FeatureCollection<LineString> | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [coastlineData, setCoastlineData] = useState<FeatureCollection | null>(null);
 
   const loadGeoJSONData = useCallback(async (): Promise<FeatureCollection | null> => {
     try {
@@ -51,39 +52,149 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, []);
 
-  // Simplified feature processing - only process what we need
-  const processSimpleFeatures = useCallback(async (geoData: FeatureCollection) => {
-    if (isProcessing) return; // Prevent multiple processing
+  // Buffer waterway lines until they hit coastline
+  const bufferWaterwayToCoastline = useCallback((
+    waterway: Feature<LineString>, 
+    coastlines: Feature[]
+  ): Feature<Polygon | MultiPolygon> | null => {
+    try {
+      const maxBufferDistance = 2000; // 2km max buffer in meters
+      const bufferSteps = [10, 25, 50, 100, 200, 500, 1000, 2000]; // Progressive buffer sizes in meters
+      
+      let currentBuffer = null;
+      
+      for (const bufferSize of bufferSteps) {
+        try {
+          // Create buffer around waterway
+          const buffered = turf.buffer(waterway, bufferSize, { units: 'meters' });
+          
+          if (!buffered) continue;
+          
+          // Check if buffer intersects with any coastline
+          let intersectsCoastline = false;
+          
+          for (const coastline of coastlines) {
+            if (coastline.geometry.type === 'LineString') {
+              try {
+                if (turf.booleanIntersects(buffered, coastline)) {
+                  intersectsCoastline = true;
+                  break;
+                }
+              } catch (err) {
+                // Continue if intersection check fails
+                continue;
+              }
+            }
+          }
+          
+          currentBuffer = buffered;
+          
+          // If we hit coastline, use previous buffer or clip to coastline
+          if (intersectsCoastline) {
+            break;
+          }
+          
+          // Don't go beyond reasonable size for water bodies
+          if (bufferSize >= maxBufferDistance) {
+            break;
+          }
+        } catch (err) {
+          console.warn(`Buffer failed at ${bufferSize}m:`, err);
+          continue;
+        }
+      }
+      
+      return currentBuffer;
+    } catch (error) {
+      console.error('Error buffering waterway:', error);
+      return null;
+    }
+  }, []);
+
+  // Enhanced feature processing with waterway buffering
+  const processWaterFeatures = useCallback(async (geoData: FeatureCollection) => {
+    if (isProcessing) return;
     setIsProcessing(true);
 
     try {
-      console.log(`Processing ${geoData.features.length} features...`);
+      console.log(`Processing ${geoData.features.length} features for water...`);
 
-      // Simple water detection with deduplication
-      const waterFeatures = geoData.features.filter(feature => {
+      // Extract coastlines first for buffering reference
+      const coastlines = geoData.features.filter(feature => 
+        feature.geometry.type === 'LineString' && 
+        feature.properties?.natural === 'coastline'
+      );
+
+      // Process water polygons (existing functionality)
+      const existingWaterPolygons = geoData.features.filter(feature => {
         if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
         const props = feature.properties || {};
         const name = (props.name || '').toLowerCase();
         
         // Exclude parks from being classified as water
-        if (name.includes('park')) return false;
+        if (name.includes('park') && !name.includes('water')) return false;
         
         return (
           props.natural === 'water' || 
           props.natural === 'bay' || 
-          props.waterway ||
+          props.waterway === 'riverbank' ||
+          props.water ||
           // Named water bodies
-          ['river', 'bay', 'harbor', 'sound', 'creek', 'canal'].some(waterType => 
+          ['river', 'bay', 'harbor', 'sound', 'creek', 'canal', 'reach', 'kill'].some(waterType => 
             name.includes(waterType)
           )
         );
       });
 
-      // Remove duplicate water features by location
+      // Process waterway lines that need buffering
+      const waterwayLines = geoData.features.filter(feature => {
+        if (feature.geometry.type !== 'LineString') return false;
+        const props = feature.properties || {};
+        const name = (props.name || '').toLowerCase();
+        
+        return (
+          props.waterway && 
+          props.waterway !== 'riverbank' && // Skip riverbanks as they're already polygons
+          (
+            // Major waterways
+            ['river', 'stream', 'canal', 'tidal_channel', 'channel'].includes(props.waterway) ||
+            // Named waterways that sound like major water bodies
+            ['bay', 'sound', 'harbor', 'reach', 'kill', 'river', 'creek'].some(waterType => 
+              name.includes(waterType)
+            )
+          )
+        );
+      });
+
+      console.log(`Found ${waterwayLines.length} waterway lines to buffer, ${existingWaterPolygons.length} existing water polygons`);
+
+      // Buffer waterway lines
+      const bufferedWaterways: Feature[] = [];
+      for (const waterway of waterwayLines) {
+        if (waterway.geometry.type === 'LineString') {
+          const buffered = bufferWaterwayToCoastline(waterway as Feature<LineString>, coastlines);
+          if (buffered) {
+            // Preserve original properties
+            buffered.properties = {
+              ...waterway.properties,
+              buffered: true,
+              original_waterway: waterway.properties?.waterway
+            };
+            bufferedWaterways.push(buffered);
+          }
+        }
+      }
+
+      console.log(`Successfully buffered ${bufferedWaterways.length} waterways`);
+
+      // Combine existing water polygons with buffered waterways
+      const allWaterFeatures = [...existingWaterPolygons, ...bufferedWaterways];
+
+      // Remove duplicate water features by location (existing logic)
       const uniqueWaterFeatures = [];
       const seenLocations = new Set();
       
-      for (const feature of waterFeatures) {
+      for (const feature of allWaterFeatures) {
         try {
           const centroid = turf.centroid(feature);
           const [lng, lat] = centroid.geometry.coordinates;
@@ -99,7 +210,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         }
       }
 
-      // Simple parks detection
+      // Process parks (existing functionality)
       const parkFeatures = geoData.features.filter(feature => {
         if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
         const props = feature.properties || {};
@@ -109,56 +220,81 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           props.leisure === 'park' || 
           props.leisure === 'garden' ||
           props.leisure === 'cemetery' ||
-          name.includes('park') ||
+          props.landuse === 'cemetery' ||
+          props.amenity === 'grave_yard' ||
+          (name.includes('park') && !name.includes('water')) ||
           name.includes('cemetery')
         );
       });
 
-      console.log(`Found ${uniqueWaterFeatures.length} unique water features, ${parkFeatures.length} park features`);
+      console.log(`Final result: ${uniqueWaterFeatures.length} water features (${bufferedWaterways.length} buffered), ${parkFeatures.length} parks`);
 
       // Add to map if it exists and is loaded
       if (map && mapLoaded) {
-        // Add water (single layer to prevent overlaps)
+        // Add water features
         if (uniqueWaterFeatures.length > 0) {
           const waterCollection = { type: 'FeatureCollection' as const, features: uniqueWaterFeatures };
           
-          if (map.getSource('simple-water')) {
-            (map.getSource('simple-water') as maplibregl.GeoJSONSource).setData(waterCollection as any);
+          if (map.getSource('enhanced-water')) {
+            (map.getSource('enhanced-water') as maplibregl.GeoJSONSource).setData(waterCollection as any);
           } else {
-            map.addSource('simple-water', { type: 'geojson', data: waterCollection });
+            map.addSource('enhanced-water', { type: 'geojson', data: waterCollection });
             map.addLayer({
-              id: 'water-simple',
+              id: 'water-enhanced',
               type: 'fill',
-              source: 'simple-water',
+              source: 'enhanced-water',
               paint: {
-                'fill-color': '#4A90E2',
-                'fill-opacity': 0.8  // Higher opacity since no overlaps
+                'fill-color': [
+                  'case',
+                  ['get', 'buffered'],
+                  '#2196F3', // Slightly different blue for buffered waterways
+                  '#4A90E2'  // Original blue for existing water polygons
+                ],
+                'fill-opacity': [
+                  'case',
+                  ['get', 'buffered'],
+                  0.7,  // Slightly more transparent for buffered areas
+                  0.8   // Standard opacity for existing water
+                ]
+              }
+            });
+
+            // Add subtle stroke for buffered waterways
+            map.addLayer({
+              id: 'water-enhanced-stroke',
+              type: 'line',
+              source: 'enhanced-water',
+              filter: ['==', ['get', 'buffered'], true],
+              paint: {
+                'line-color': '#1976D2',
+                'line-width': 1,
+                'line-opacity': 0.6
               }
             });
           }
         }
 
-        // Add parks
+        // Add parks (existing functionality)
         if (parkFeatures.length > 0) {
           const parksCollection = { type: 'FeatureCollection' as const, features: parkFeatures };
           
-          if (map.getSource('simple-parks')) {
-            (map.getSource('simple-parks') as maplibregl.GeoJSONSource).setData(parksCollection as any);
+          if (map.getSource('enhanced-parks')) {
+            (map.getSource('enhanced-parks') as maplibregl.GeoJSONSource).setData(parksCollection as any);
           } else {
-            map.addSource('simple-parks', { type: 'geojson', data: parksCollection });
+            map.addSource('enhanced-parks', { type: 'geojson', data: parksCollection });
             map.addLayer({
-              id: 'parks-simple',
+              id: 'parks-enhanced',
               type: 'fill',
-              source: 'simple-parks',
+              source: 'enhanced-parks',
               paint: {
                 'fill-color': '#4CAF50',
                 'fill-opacity': 0.6
               }
-            }, 'water-simple'); // Insert before water so water shows on top
+            }, 'water-enhanced'); // Insert before water so water shows on top
           }
         }
 
-        // Add park labels - only for specific parks, excluding Jamaica Bay Reserve
+        // Add park labels (existing functionality)
         if (parkFeatures.length > 0) {
           const labelFeatures = parkFeatures
             .filter(feature => {
@@ -185,14 +321,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           if (labelFeatures.length > 0) {
             const labelsCollection = { type: 'FeatureCollection' as const, features: labelFeatures };
             
-            if (map.getSource('park-labels')) {
-              (map.getSource('park-labels') as maplibregl.GeoJSONSource).setData(labelsCollection as any);
+            if (map.getSource('enhanced-park-labels')) {
+              (map.getSource('enhanced-park-labels') as maplibregl.GeoJSONSource).setData(labelsCollection as any);
             } else {
-              map.addSource('park-labels', { type: 'geojson', data: labelsCollection });
+              map.addSource('enhanced-park-labels', { type: 'geojson', data: labelsCollection });
               map.addLayer({
-                id: 'park-labels-layer',
+                id: 'park-labels-enhanced',
                 type: 'symbol',
-                source: 'park-labels',
+                source: 'enhanced-park-labels',
                 layout: {
                   'text-field': ['get', 'name'],
                   'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
@@ -205,8 +341,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                   'text-color': [
                     'case',
                     ['get', 'isPelhamBayPark'],
-                    '#2E7D1E', // Darker green for Pelham Bay Park
-                    '#1B5E20'  // Standard dark green for other parks
+                    '#2E7D1E',
+                    '#1B5E20'
                   ],
                   'text-halo-color': '#FFFFFF',
                   'text-halo-width': 1
@@ -223,11 +359,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
 
     } catch (error) {
-      console.error('Error processing features:', error);
+      console.error('Error processing water features:', error);
     } finally {
       setIsProcessing(false);
     }
-  }, [map, mapLoaded, isProcessing]);
+  }, [map, mapLoaded, isProcessing, bufferWaterwayToCoastline]);
 
   const loadGeographicData = useCallback(async () => {
     try {
@@ -244,7 +380,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       // Set timeout for both operations
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Data loading timeout')), 10000)
+        setTimeout(() => reject(new Error('Data loading timeout')), 15000) // Increased timeout for processing
       );
 
       const [roadsResult, mainDataResult] = await Promise.race([
@@ -257,16 +393,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
 
       if (mainDataResult && mainDataResult.features.length > 0) {
-        // Process features in small batches to prevent blocking
-        setTimeout(() => processSimpleFeatures(mainDataResult), 100);
+        // Store coastline data for waterway buffering
+        const coastlines = mainDataResult.features.filter(feature => 
+          feature.geometry.type === 'LineString' && 
+          feature.properties?.natural === 'coastline'
+        );
+        if (coastlines.length > 0) {
+          setCoastlineData({ type: 'FeatureCollection', features: coastlines });
+        }
+
+        // Process features with enhanced water handling
+        setTimeout(() => processWaterFeatures(mainDataResult), 100);
       }
 
     } catch (error) {
       console.error('Error loading geographic data:', error);
     }
-  }, [loadGeoJSONData, processSimpleFeatures]);
+  }, [loadGeoJSONData, processWaterFeatures]);
 
-  // Initialize map with minimal style
+  // Initialize map with minimal style (unchanged)
   useEffect(() => {
     if (!mapRef.current) return;
 
@@ -329,18 +474,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, []);
 
-  // Load data after map loads
+  // Load data after map loads (unchanged)
   useEffect(() => {
     if (mapLoaded && map && !isProcessing) {
       const timeoutId = setTimeout(() => {
         loadGeographicData();
-      }, 500); // Small delay to ensure map is fully ready
+      }, 500);
 
       return () => clearTimeout(timeoutId);
     }
   }, [mapLoaded, map, loadGeographicData, isProcessing]);
 
-  // Add roads layer
+  // Add roads layer (unchanged)
   useEffect(() => {
     if (!mapLoaded || !map || !roadsData) return;
 
@@ -364,7 +509,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded, map, roadsData]);
 
-  // Business markers - simplified
+  // Business markers (unchanged)
   useEffect(() => {
     if (!mapLoaded || !businesses || !map) return;
 
@@ -454,7 +599,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           zIndex: 1000,
           fontSize: '12px'
         }}>
-          Loading map data...
+          Processing waterways...
         </div>
       )}
       <div
