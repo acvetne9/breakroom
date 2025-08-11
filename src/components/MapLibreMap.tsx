@@ -1,33 +1,4 @@
-// Buffer waterways with coastline awareness - make them extend to land
-      const bufferedWaterways: Feature<Polygon | MultiPolygon>[] = [];
-      for (const waterway of waterwayFeatures) {
-        try {
-          const props = waterway.properties || {};
-          const name = (props.name || '').toLowerCase();
-          
-          // Determine buffer size based on waterway type - larger buffers to reach land
-          let bufferDistance = 0.05; // Default ~50 meters
-          
-          if (name.includes('river') || props.waterway === 'river') {
-            bufferDistance = 0.2; // ~200 meters for rivers
-          } else if (name.includes('canal') || props.waterway === 'canal') {
-            bufferDistance = 0.1; // ~100 meters for canals
-          } else if (name.includes('stream') || name.includes('creek') || 
-                     props.waterway === 'stream' || props.waterway === 'creek') {
-            bufferDistance = 0.075; // ~75 meters for streams/creeks
-          }
-
-          // Special handling for major NYC waterways - much larger buffers
-          if (name.includes('east river') || name.includes('hudson river') || 
-              name.includes('harlem river') || name.includes('arthur kill')) {
-            bufferDistance = 0.5; // ~500 meters for major waterways
-          }
-
-          // Buffer the linestring to create a polygon
-          let buffered = turf.buffer(waterway, bufferDistance, { units: 'kilometers' });
-          
-          if (buffered && (buffered.geometry.type === 'Polygon' || buffered.geometry.type === 'MultiPolygon')) {
-            // Instead of clipping against land, let waterways extend animport React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import type { Feature, FeatureCollection, Polygon, MultiPolygon, LineString, Geometry } from 'geojson';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -201,7 +172,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             // Only clip against land if we have a land mask and want to prevent major overlaps
             if (landMask) {
               try {
-                // Use intersection instead of difference to keep water areas that touch land
+                // Use intersection to check for land overlap
                 const intersection = turf.intersect(buffered, landMask);
                 if (intersection && intersection.geometry.coordinates.length > 0) {
                   // If there's significant land overlap, try a smaller buffer
