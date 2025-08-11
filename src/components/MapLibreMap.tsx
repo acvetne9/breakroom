@@ -168,8 +168,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         },
         properties: {
           name: 'Channel Water Body',
-          water_type: 'channel',
-          created_from_coastlines: true
+          water_type: 'channel'
         }
       };
 
