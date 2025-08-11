@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import type { Feature, FeatureCollection, Polygon, MultiPolygon, LineString } from 'geojson';
+import type { Feature, FeatureCollection, Polygon, MultiPolygon, LineString, Geometry } from 'geojson';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import * as turf from '@turf/turf';
@@ -60,7 +60,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.log(`Processing ${geoData.features.length} features...`);
 
       // Land/coastline detection - identify land polygons to avoid conflicts
-      const landFeatures = geoData.features.filter(feature => {
+      const landFeatures = geoData.features.filter((feature): feature is Feature<Polygon | MultiPolygon> => {
         if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
         const props = feature.properties || {};
         const name = (props.name || '').toLowerCase();
@@ -78,7 +78,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
 
       // Water body detection (polygons/multipolygons)
-      const waterBodyFeatures = geoData.features.filter(feature => {
+      const waterBodyFeatures = geoData.features.filter((feature): feature is Feature<Polygon | MultiPolygon> => {
         if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
         const props = feature.properties || {};
         const name = (props.name || '').toLowerCase();
@@ -95,7 +95,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
 
       // Waterway detection (linestrings)
-      const waterwayFeatures = geoData.features.filter(feature => {
+      const waterwayFeatures = geoData.features.filter((feature): feature is Feature<LineString> => {
         if (feature.geometry.type !== 'LineString') return false;
         const props = feature.properties || {};
         const name = (props.name || '').toLowerCase();
@@ -113,15 +113,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.log(`Found ${waterBodyFeatures.length} water bodies, ${waterwayFeatures.length} waterways, ${landFeatures.length} land features`);
 
       // Create unified land mask for clipping operations
-      let landMask = null;
+      let landMask: Feature<Polygon | MultiPolygon> | null = null;
       if (landFeatures.length > 0) {
         try {
           // Union all land features into a single geometry for efficient clipping
           let combinedLand = landFeatures[0];
           for (let i = 1; i < Math.min(landFeatures.length, 50); i++) { // Limit to prevent performance issues
             try {
-              const unionResult = turf.union(combinedLand, landFeatures[i]);
-              if (unionResult) combinedLand = unionResult;
+              const unionResult = turf.union(
+                turf.feature(combinedLand.geometry),
+                turf.feature(landFeatures[i].geometry)
+              );
+              if (unionResult) combinedLand = unionResult as Feature<Polygon | MultiPolygon>;
             } catch (err) {
               console.warn('Failed to union land feature:', err);
             }
@@ -134,7 +137,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
 
       // Buffer waterways with coastline awareness
-      const bufferedWaterways = [];
+      const bufferedWaterways: Feature<Polygon | MultiPolygon>[] = [];
       for (const waterway of waterwayFeatures) {
         try {
           const props = waterway.properties || {};
@@ -159,9 +162,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             // Clip buffered waterway against land mask to prevent land overlap
             if (landMask) {
               try {
-                const clipped = turf.difference(buffered, landMask);
+                const clipped = turf.difference(
+                  turf.feature(buffered.geometry),
+                  turf.feature(landMask.geometry)
+                );
                 if (clipped && (clipped.geometry.type === 'Polygon' || clipped.geometry.type === 'MultiPolygon')) {
-                  buffered = clipped;
+                  buffered = clipped as Feature<Polygon>;
                 } else {
                   // If clipping results in no geometry, skip this waterway
                   console.log('Waterway completely clipped by land, skipping');
@@ -181,7 +187,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 originalType: 'waterway',
                 clipped: landMask ? true : false
               }
-            });
+            } as Feature<Polygon | MultiPolygon>);
           }
         } catch (err) {
           console.warn('Failed to buffer waterway:', err);
@@ -192,11 +198,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.log(`Successfully buffered ${bufferedWaterways.length} waterways ${landMask ? 'with coastline clipping' : 'without clipping'}`);
 
       // Combine water bodies and buffered waterways
-      const allWaterFeatures = [...waterBodyFeatures, ...bufferedWaterways];
+      const allWaterFeatures: Feature<Polygon | MultiPolygon>[] = [...waterBodyFeatures, ...bufferedWaterways];
 
       // Remove duplicate water features by location
-      const uniqueWaterFeatures = [];
-      const seenLocations = new Set();
+      const uniqueWaterFeatures: Feature<Polygon | MultiPolygon>[] = [];
+      const seenLocations = new Set<string>();
       
       for (const feature of allWaterFeatures) {
         try {
@@ -215,7 +221,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
 
       // Parks detection
-      const parkFeatures = geoData.features.filter(feature => {
+      const parkFeatures = geoData.features.filter((feature): feature is Feature<Polygon | MultiPolygon> => {
         if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
         const props = feature.properties || {};
         const name = (props.name || '').toLowerCase();
@@ -235,7 +241,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       if (map && mapLoaded) {
         // Add water (single layer to prevent overlaps)
         if (uniqueWaterFeatures.length > 0) {
-          const waterCollection = { type: 'FeatureCollection', features: uniqueWaterFeatures };
+          const waterCollection: FeatureCollection = { 
+            type: 'FeatureCollection', 
+            features: uniqueWaterFeatures 
+          };
           
           if (map.getSource('simple-water')) {
             (map.getSource('simple-water') as maplibregl.GeoJSONSource).setData(waterCollection as any);
@@ -265,7 +274,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
         // Add parks
         if (parkFeatures.length > 0) {
-          const parksCollection = { type: 'FeatureCollection', features: parkFeatures };
+          const parksCollection: FeatureCollection = { 
+            type: 'FeatureCollection', 
+            features: parkFeatures 
+          };
           
           if (map.getSource('simple-parks')) {
             (map.getSource('simple-parks') as maplibregl.GeoJSONSource).setData(parksCollection as any);
