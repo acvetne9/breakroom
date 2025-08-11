@@ -52,93 +52,66 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, []);
 
-  // Create polygon from left and right coastline ways
-  const createPolygonFromCoastlines = useCallback((
-    leftCoastWays: string[],
-    rightCoastWays: string[],
-    allFeatures: Feature[]
-  ): Feature<Polygon> | null => {
+  // Buffer waterway lines until they hit coastline
+  const bufferWaterwayToCoastline = useCallback((
+    waterway: Feature<LineString>, 
+    coastlines: Feature[]
+  ): Feature<Polygon | MultiPolygon> | null => {
     try {
-      // Find left coast features
-      const leftFeatures = allFeatures.filter(feature => 
-        leftCoastWays.includes(String(feature.id)) || 
-        leftCoastWays.includes(String(feature.properties?.id)) ||
-        leftCoastWays.includes(String(feature.properties?.['@id']))
-      );
-
-      // Find right coast features  
-      const rightFeatures = allFeatures.filter(feature => 
-        rightCoastWays.includes(String(feature.id)) || 
-        rightCoastWays.includes(String(feature.properties?.id)) ||
-        rightCoastWays.includes(String(feature.properties?.['@id']))
-      );
-
-      if (leftFeatures.length === 0 || rightFeatures.length === 0) {
-        console.warn('Could not find coastline features for polygon creation');
-        return null;
-      }
-
-      // Extract coordinates from left coast (use inner/reverse order)
-      let leftCoords: number[][] = [];
-      for (const feature of leftFeatures) {
-        if (feature.geometry.type === 'LineString') {
-          // Reverse for inner coast
-          leftCoords.push(...feature.geometry.coordinates.slice().reverse());
+      const maxBufferDistance = 2000; // 2km max buffer in meters
+      const bufferSteps = [10, 25, 50, 100, 200, 500, 1000, 2000]; // Progressive buffer sizes in meters
+      
+      let currentBuffer = null;
+      
+      for (const bufferSize of bufferSteps) {
+        try {
+          // Create buffer around waterway
+          const buffered = turf.buffer(waterway, bufferSize, { units: 'meters' });
+          
+          if (!buffered) continue;
+          
+          // Check if buffer intersects with any coastline
+          let intersectsCoastline = false;
+          
+          for (const coastline of coastlines) {
+            if (coastline.geometry.type === 'LineString') {
+              try {
+                if (turf.booleanIntersects(buffered, coastline)) {
+                  intersectsCoastline = true;
+                  break;
+                }
+              } catch (err) {
+                // Continue if intersection check fails
+                continue;
+              }
+            }
+          }
+          
+          currentBuffer = buffered;
+          
+          // If we hit coastline, use previous buffer or clip to coastline
+          if (intersectsCoastline) {
+            break;
+          }
+          
+          // Don't go beyond reasonable size for water bodies
+          if (bufferSize >= maxBufferDistance) {
+            break;
+          }
+        } catch (err) {
+          console.warn(`Buffer failed at ${bufferSize}m:`, err);
+          continue;
         }
       }
-
-      // Extract coordinates from right coast (normal order)
-      let rightCoords: number[][] = [];
-      for (const feature of rightFeatures) {
-        if (feature.geometry.type === 'LineString') {
-          rightCoords.push(...feature.geometry.coordinates);
-        }
-      }
-
-      if (leftCoords.length === 0 || rightCoords.length === 0) {
-        console.warn('No valid coordinates found for polygon creation');
-        return null;
-      }
-
-      // Create closed polygon: left coast + right coast (reversed) + close
-      const allCoords = [
-        ...leftCoords,
-        ...rightCoords.slice().reverse(),
-        leftCoords[0] // Close the polygon
-      ];
-
-      // Remove duplicate consecutive points
-      const cleanCoords = allCoords.filter((coord, index) => {
-        if (index === 0) return true;
-        const prev = allCoords[index - 1];
-        return !(coord[0] === prev[0] && coord[1] === prev[1]);
-      });
-
-      if (cleanCoords.length < 4) {
-        console.warn('Not enough coordinates for valid polygon');
-        return null;
-      }
-
-      return {
-        type: 'Feature',
-        geometry: {
-          type: 'Polygon',
-          coordinates: [cleanCoords]
-        },
-        properties: {
-          name: 'Channel Water Body',
-          water_type: 'channel',
-          created_from_coastlines: true
-        }
-      };
-
+      
+      return currentBuffer;
     } catch (error) {
-      console.error('Error creating polygon from coastlines:', error);
+      console.error('Error buffering waterway:', error);
       return null;
     }
   }, []);
 
-  // Enhanced feature processing with coastline-based polygon creation
+  // Enhanced feature processing with waterway buffering
   const processWaterFeatures = useCallback(async (geoData: FeatureCollection) => {
     if (isProcessing) return;
     setIsProcessing(true);
@@ -146,21 +119,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     try {
       console.log(`Processing ${geoData.features.length} features for water...`);
 
-      // Define the specific coastline ways for the channel
-      const leftCoastWays = [
-        '432348486', '384689606', '129888488', '415348685', '22703091',
-        '1088087138', '1088087137', '385650493', '27836900', '1014415134',
-        '22702986', '22703085'
-      ];
-      
-      const rightCoastWays = [
-        '35822164', '378250794', '1114974986', '1114975017', '1114974983',
-        '1114974980', '1114826288', '1114826276', '1114826304', '1115280682',
-        '1115280681', '238914181', '563714008', '238914182', '238914184',
-        '1075438714', '1075438717', '53718385'
-      ];
+      // Extract coastlines first for buffering reference
+      const coastlines = geoData.features.filter(feature => 
+        feature.geometry.type === 'LineString' && 
+        feature.properties?.natural === 'coastline'
+      );
 
-      // Process existing water polygons
+      // Process water polygons (existing functionality)
       const existingWaterPolygons = geoData.features.filter(feature => {
         if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
         const props = feature.properties || {};
@@ -181,21 +146,49 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         );
       });
 
-      console.log(`Found ${existingWaterPolygons.length} existing water polygons`);
+      // Process waterway lines that need buffering
+      const waterwayLines = geoData.features.filter(feature => {
+        if (feature.geometry.type !== 'LineString') return false;
+        const props = feature.properties || {};
+        const name = (props.name || '').toLowerCase();
+        
+        return (
+          props.waterway && 
+          props.waterway !== 'riverbank' && // Skip riverbanks as they're already polygons
+          (
+            // Major waterways
+            ['river', 'stream', 'canal', 'tidal_channel', 'channel'].includes(props.waterway) ||
+            // Named waterways that sound like major water bodies
+            ['bay', 'sound', 'harbor', 'reach', 'kill', 'river', 'creek'].some(waterType => 
+              name.includes(waterType)
+            )
+          )
+        );
+      });
 
-      // Create polygon from specified coastlines
-      const channelPolygon = createPolygonFromCoastlines(leftCoastWays, rightCoastWays, geoData.features);
-      
-      const createdPolygons: Feature[] = [];
-      if (channelPolygon) {
-        createdPolygons.push(channelPolygon);
-        console.log('Successfully created channel polygon from coastlines');
-      } else {
-        console.warn('Failed to create channel polygon - coastline ways not found in data');
+      console.log(`Found ${waterwayLines.length} waterway lines to buffer, ${existingWaterPolygons.length} existing water polygons`);
+
+      // Buffer waterway lines
+      const bufferedWaterways: Feature[] = [];
+      for (const waterway of waterwayLines) {
+        if (waterway.geometry.type === 'LineString') {
+          const buffered = bufferWaterwayToCoastline(waterway as Feature<LineString>, coastlines);
+          if (buffered) {
+            // Preserve original properties
+            buffered.properties = {
+              ...waterway.properties,
+              buffered: true,
+              original_waterway: waterway.properties?.waterway
+            };
+            bufferedWaterways.push(buffered);
+          }
+        }
       }
 
-      // Combine existing water polygons with created polygons
-      const allWaterFeatures = [...existingWaterPolygons, ...createdPolygons];
+      console.log(`Successfully buffered ${bufferedWaterways.length} waterways`);
+
+      // Combine existing water polygons with buffered waterways
+      const allWaterFeatures = [...existingWaterPolygons, ...bufferedWaterways];
 
       // Remove duplicate water features by location (existing logic)
       const uniqueWaterFeatures = [];
@@ -234,11 +227,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         );
       });
 
-      console.log(`Final result: ${uniqueWaterFeatures.length} water features (${createdPolygons.length} created), ${parkFeatures.length} parks`);
+      console.log(`Final result: ${uniqueWaterFeatures.length} water features (${bufferedWaterways.length} buffered), ${parkFeatures.length} parks`);
 
       // Add to map if it exists and is loaded
       if (map && mapLoaded) {
-        // Add water features with proper blue styling
+        // Add water features
         if (uniqueWaterFeatures.length > 0) {
           const waterCollection = { type: 'FeatureCollection' as const, features: uniqueWaterFeatures };
           
@@ -251,17 +244,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               type: 'fill',
               source: 'enhanced-water',
               paint: {
-                'fill-color': '#4A90E2', // Blue color for all water
-                'fill-opacity': 0.8
+                'fill-color': [
+                  'case',
+                  ['get', 'buffered'],
+                  '#2196F3', // Slightly different blue for buffered waterways
+                  '#4A90E2'  // Original blue for existing water polygons
+                ],
+                'fill-opacity': [
+                  'case',
+                  ['get', 'buffered'],
+                  0.7,  // Slightly more transparent for buffered areas
+                  0.8   // Standard opacity for existing water
+                ]
               }
             });
 
-            // Add subtle stroke for created polygons
+            // Add subtle stroke for buffered waterways
             map.addLayer({
               id: 'water-enhanced-stroke',
               type: 'line',
               source: 'enhanced-water',
-              filter: ['==', ['get', 'created_from_coastlines'], true],
+              filter: ['==', ['get', 'buffered'], true],
               paint: {
                 'line-color': '#1976D2',
                 'line-width': 1,
@@ -360,7 +363,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     } finally {
       setIsProcessing(false);
     }
-  }, [map, mapLoaded, isProcessing, createPolygonFromCoastlines]);
+  }, [map, mapLoaded, isProcessing, bufferWaterwayToCoastline]);
 
   const loadGeographicData = useCallback(async () => {
     try {

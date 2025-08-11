@@ -1,610 +1,527 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import type { Feature, FeatureCollection, Polygon, MultiPolygon, LineString } from 'geojson';
-import maplibregl from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
-import * as turf from '@turf/turf';
+import React, { useState, useRef, useEffect } from 'react';
+import { motion, PanInfo } from 'framer-motion';
+import InitiationPage from './InitiationPage';
+import HomePage from './HomePage';
+import SettingsPage from './SettingsPage';
+import ExplorePage from './ExplorePage';
 
-interface MapLibreMapProps {
-  businesses: {
-    id: string;
-    name: string;
-    position: { lat: number; lng: number };
-    atmosphere: string[];
-    salary?: string;
-    stories?: { id: string; text: string; author: string }[];
-    businessType?: string;
-    roles?: {
-      role: string;
-      salary: string;
-      upvotes?: number;
-      downvotes?: number;
-      userVote?: 'up' | 'down';
-    }[];
-    place_id?: string;
-  }[];
-  onBusinessClick?: (business: any) => void;
-  selectedBusiness?: any;
+import { useBusinessesData } from '../hooks/useBusinessesData';
+
+interface UserData {
+  salary: string;
+  role: string;
+  location: string;
+  fullLocation?: string;
+  timePeriod: string;
 }
 
-const MapLibreMap: React.FC<MapLibreMapProps> = ({
-  businesses,
-  onBusinessClick,
-  selectedBusiness
-}) => {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const [map, setMap] = useState<maplibregl.Map | null>(null);
-  const [mapLoaded, setMapLoaded] = useState(false);
-  const [roadsData, setRoadsData] = useState<FeatureCollection<LineString> | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [coastlineData, setCoastlineData] = useState<FeatureCollection | null>(null);
+interface Post {
+  id: string;
+  author: string;
+  text: string;
+  businessId?: string;
+  businessName?: string;
+  images?: string[];
+  isStory?: boolean;
+  isJobUpdate?: boolean;
+  linkedLocation?: string;
+  upvotes: number;
+  downvotes: number;
+  userVote?: 'up' | 'down' | null;
+  createdAt: Date;
+}
 
-  const loadGeoJSONData = useCallback(async (): Promise<FeatureCollection | null> => {
-    try {
-      const response = await fetch('/data/example-points.geojson');
-      if (!response.ok) {
-        console.error('Failed to load GeoJSON:', response.statusText);
-        return null;
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Error loading GeoJSON:', error);
-      return null;
+const MobileApp: React.FC = () => {
+  const [currentView, setCurrentView] = useState<'initiation' | 'main'>('initiation');
+  const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [expandedPost, setExpandedPost] = useState<string | null>(null);
+  const [comments, setComments] = useState<{[postId: string]: string[]}>({});
+  const [selectedBusiness, setSelectedBusiness] = useState<any>(null);
+  const [previouslySelectedBusiness, setPreviouslySelectedBusiness] = useState<any>(null);
+  const [filteredBusinessId, setFilteredBusinessId] = useState<string | null>(null);
+  const [filteredUserStories, setFilteredUserStories] = useState(false);
+  
+  const constraintsRef = useRef(null);
+  const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
+
+  const [posts, setPosts] = useState<Post[]>([
+    {
+      id: '1',
+      author: 'BaristaBoss',
+      text: 'Guess what!! I never thought this would happen but my boss brought in donuts today!',
+      isStory: false,
+      upvotes: 0,
+      downvotes: 0,
+      userVote: null,
+      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000) // 2 hours ago
+    },
+    {
+      id: '2',
+      author: 'Cook52345234',
+      text: 'My old manager would always refuse to approve my sick leave :(',
+      isStory: false,
+      upvotes: 0,
+      downvotes: 0,
+      userVote: null,
+      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000) // 1 day ago
     }
-  }, []);
+  ]);
 
-  // Create polygon from left and right coastline ways
-  const createPolygonFromCoastlines = useCallback((
-    leftCoastWays: string[],
-    rightCoastWays: string[],
-    allFeatures: Feature[]
-  ): Feature<Polygon> | null => {
-    try {
-      // Find left coast features
-      const leftFeatures = allFeatures.filter(feature => 
-        leftCoastWays.includes(String(feature.id)) || 
-        leftCoastWays.includes(String(feature.properties?.id)) ||
-        leftCoastWays.includes(String(feature.properties?.['@id']))
-      );
+  const handleInitiationComplete = (data: UserData) => {
+    setUserData(data);
+    setCurrentView('main');
+    
+    // Create automatic job update post
+    const jobUpdatePost: Post = {
+      id: `job-update-${Date.now()}`,
+      author: 'You',
+      text: `New Job Update! ${data.salary}/${data.timePeriod || 'HR'} for ${data.role} 😳`,
+      isJobUpdate: true,
+      isStory: false,
+      linkedLocation: data.fullLocation || data.location,
+      upvotes: 0,
+      downvotes: 0,
+      userVote: null,
+      createdAt: new Date()
+    };
+    setPosts(prevPosts => [jobUpdatePost, ...prevPosts]);
+  };
 
-      // Find right coast features  
-      const rightFeatures = allFeatures.filter(feature => 
-        rightCoastWays.includes(String(feature.id)) || 
-        rightCoastWays.includes(String(feature.properties?.id)) ||
-        rightCoastWays.includes(String(feature.properties?.['@id']))
-      );
+  const handleJobUpdate = (jobData: { salary: string; role: string; location: string; timePeriod: string }) => {
+    const jobUpdatePost: Post = {
+      id: `job-update-${Date.now()}`,
+      author: 'You',
+      text: `New Job Update! ${jobData.salary}/${jobData.timePeriod} for ${jobData.role} 😳`,
+      isJobUpdate: true,
+      isStory: false,
+      linkedLocation: jobData.location,
+      upvotes: 0,
+      downvotes: 0,
+      userVote: null,
+      createdAt: new Date()
+    };
+    setPosts(prevPosts => [jobUpdatePost, ...prevPosts]);
+  };
 
-      if (leftFeatures.length === 0 || rightFeatures.length === 0) {
-        console.warn('Could not find coastline features for polygon creation');
-        return null;
+  // NEW: Handle saving location when user clicks on a business
+  const handleLocationSave = (location: string, fullLocation: string) => {
+    console.log('Saving clicked business location:', { location, fullLocation });
+    setUserData(prev => {
+      if (prev) {
+        return {
+          ...prev,
+          location: location,
+          fullLocation: fullLocation
+        };
       }
+      return prev;
+    });
+  };
 
-      // Extract coordinates from left coast (use inner/reverse order)
-      let leftCoords: number[][] = [];
-      for (const feature of leftFeatures) {
-        if (feature.geometry.type === 'LineString') {
-          // Reverse for inner coast
-          leftCoords.push(...feature.geometry.coordinates.slice().reverse());
-        }
-      }
+  const handlePostSubmit = (text: string, businessId?: string) => {
+    const business = businessId ? businesses.find(b => b.id === businessId) : undefined;
+    
+    // Only create business stories when specifically viewing filtered posts for that business
+    // Otherwise, create regular posts
+    const shouldBeStory = filteredBusinessId && businessId === filteredBusinessId;
+    
+    const newPost: Post = {
+      id: String(posts.length + 1),
+      author: 'You',
+      text,
+      businessId: shouldBeStory ? businessId : undefined,
+      businessName: shouldBeStory ? business?.name : undefined,
+      isStory: shouldBeStory,
+      upvotes: 0,
+      downvotes: 0,
+      userVote: null,
+      createdAt: new Date()
+    };
+    setPosts([newPost, ...posts]);
+  };
 
-      // Extract coordinates from right coast (normal order)
-      let rightCoords: number[][] = [];
-      for (const feature of rightFeatures) {
-        if (feature.geometry.type === 'LineString') {
-          rightCoords.push(...feature.geometry.coordinates);
-        }
-      }
-
-      if (leftCoords.length === 0 || rightCoords.length === 0) {
-        console.warn('No valid coordinates found for polygon creation');
-        return null;
-      }
-
-      // Create closed polygon: left coast + right coast (reversed) + close
-      const allCoords = [
-        ...leftCoords,
-        ...rightCoords.slice().reverse(),
-        leftCoords[0] // Close the polygon
-      ];
-
-      // Remove duplicate consecutive points
-      const cleanCoords = allCoords.filter((coord, index) => {
-        if (index === 0) return true;
-        const prev = allCoords[index - 1];
-        return !(coord[0] === prev[0] && coord[1] === prev[1]);
-      });
-
-      if (cleanCoords.length < 4) {
-        console.warn('Not enough coordinates for valid polygon');
-        return null;
-      }
-
-      return {
-        type: 'Feature',
-        geometry: {
-          type: 'Polygon',
-          coordinates: [cleanCoords]
-        },
-        properties: {
-          name: 'Channel Water Body',
-          water_type: 'channel',
-          created_from_coastlines: true
-        }
-      };
-
-    } catch (error) {
-      console.error('Error creating polygon from coastlines:', error);
-      return null;
+  const handleBusinessClick = async (business: any) => {
+    // Handle null business (close action)
+    if (!business) {
+      setSelectedBusiness(null);
+      setFilteredBusinessId(null);
+      return;
     }
-  }, []);
-
-  // Enhanced feature processing with coastline-based polygon creation
-  const processWaterFeatures = useCallback(async (geoData: FeatureCollection) => {
-    if (isProcessing) return;
-    setIsProcessing(true);
-
-    try {
-      console.log(`Processing ${geoData.features.length} features for water...`);
-
-      // Define the specific coastline ways for the channel
-      const leftCoastWays = [
-        '432348486', '384689606', '129888488', '415348685', '22703091',
-        '1088087138', '1088087137', '385650493', '27836900', '1014415134',
-        '22702986', '22703085'
-      ];
-      
-      const rightCoastWays = [
-        '35822164', '378250794', '1114974986', '1114975017', '1114974983',
-        '1114974980', '1114826288', '1114826276', '1114826304', '1115280682',
-        '1115280681', '238914181', '563714008', '238914182', '238914184',
-        '1075438714', '1075438717', '53718385'
-      ];
-
-      // Process existing water polygons
-      const existingWaterPolygons = geoData.features.filter(feature => {
-        if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
-        const props = feature.properties || {};
-        const name = (props.name || '').toLowerCase();
+    
+    // Check if we need to fetch full details
+    if (!business.atmosphere?.length && !business.roles?.length) {
+      const fullBusiness = await fetchFullBusinessDetails(business.id);
+      if (fullBusiness) {
+        setSelectedBusiness(fullBusiness);
+        // When selecting a business, we're not filtering posts by business
+        setFilteredBusinessId(null);
         
-        // Exclude parks from being classified as water
-        if (name.includes('park') && !name.includes('water')) return false;
-        
-        return (
-          props.natural === 'water' || 
-          props.natural === 'bay' || 
-          props.waterway === 'riverbank' ||
-          props.water ||
-          // Named water bodies
-          ['river', 'bay', 'harbor', 'sound', 'creek', 'canal', 'reach', 'kill'].some(waterType => 
-            name.includes(waterType)
-          )
-        );
-      });
-
-      console.log(`Found ${existingWaterPolygons.length} existing water polygons`);
-
-      // Create polygon from specified coastlines
-      const channelPolygon = createPolygonFromCoastlines(leftCoastWays, rightCoastWays, geoData.features);
-      
-      const createdPolygons: Feature[] = [];
-      if (channelPolygon) {
-        createdPolygons.push(channelPolygon);
-        console.log('Successfully created channel polygon from coastlines');
-      } else {
-        console.warn('Failed to create channel polygon - coastline ways not found in data');
-      }
-
-      // Combine existing water polygons with created polygons
-      const allWaterFeatures = [...existingWaterPolygons, ...createdPolygons];
-
-      // Remove duplicate water features by location (existing logic)
-      const uniqueWaterFeatures = [];
-      const seenLocations = new Set();
-      
-      for (const feature of allWaterFeatures) {
-        try {
-          const centroid = turf.centroid(feature);
-          const [lng, lat] = centroid.geometry.coordinates;
-          const locationKey = `${Math.round(lng * 10000)}-${Math.round(lat * 10000)}`;
-          
-          if (!seenLocations.has(locationKey)) {
-            seenLocations.add(locationKey);
-            uniqueWaterFeatures.push(feature);
-          }
-        } catch (err) {
-          // If centroid fails, keep the feature anyway
-          uniqueWaterFeatures.push(feature);
+        // Save the clicked business location
+        if (fullBusiness.name) {
+          handleLocationSave(fullBusiness.name, fullBusiness.name);
         }
       }
+    } else {
+      setSelectedBusiness(business);
+      // When selecting a business, we're not filtering posts by business
+      setFilteredBusinessId(null);
+      
+      // Save the clicked business location
+      if (business.name) {
+        handleLocationSave(business.name, business.name);
+      }
+    }
+  };
 
-      // Process parks (existing functionality)
-      const parkFeatures = geoData.features.filter(feature => {
-        if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
-        const props = feature.properties || {};
-        const name = (props.name || '').toLowerCase();
-        
-        return (
-          props.leisure === 'park' || 
-          props.leisure === 'garden' ||
-          props.leisure === 'cemetery' ||
-          props.landuse === 'cemetery' ||
-          props.amenity === 'grave_yard' ||
-          (name.includes('park') && !name.includes('water')) ||
-          name.includes('cemetery')
-        );
-      });
+  const handleBusinessStoriesClick = (businessId: string) => {
+    setFilteredBusinessId(businessId);
+    setCurrentSlide(2); // Navigate to explore page
+  };
 
-      console.log(`Final result: ${uniqueWaterFeatures.length} water features (${createdPolygons.length} created), ${parkFeatures.length} parks`);
+  const handleUserStoriesClick = () => {
+    setFilteredUserStories(true);
+    setCurrentSlide(2); // Navigate to explore page
+  };
 
-      // Add to map if it exists and is loaded
-      if (map && mapLoaded) {
-        // Add water features with proper blue styling
-        if (uniqueWaterFeatures.length > 0) {
-          const waterCollection = { type: 'FeatureCollection' as const, features: uniqueWaterFeatures };
-          
-          if (map.getSource('enhanced-water')) {
-            (map.getSource('enhanced-water') as maplibregl.GeoJSONSource).setData(waterCollection as any);
-          } else {
-            map.addSource('enhanced-water', { type: 'geojson', data: waterCollection });
-            map.addLayer({
-              id: 'water-enhanced',
-              type: 'fill',
-              source: 'enhanced-water',
-              paint: {
-                'fill-color': '#4A90E2', // Blue color for all water
-                'fill-opacity': 0.8
-              }
-            });
+  const handleBackToAllPosts = () => {
+    setFilteredBusinessId(null);
+    setFilteredUserStories(false);
+  };
 
-            // Add subtle stroke for created polygons
-            map.addLayer({
-              id: 'water-enhanced-stroke',
-              type: 'line',
-              source: 'enhanced-water',
-              filter: ['==', ['get', 'created_from_coastlines'], true],
-              paint: {
-                'line-color': '#1976D2',
-                'line-width': 1,
-                'line-opacity': 0.6
-              }
-            });
-          }
-        }
+  const handlePostVote = (postId: string, voteType: 'up' | 'down') => {
+    setPosts(prevPosts => {
+      const updatedPosts = prevPosts.map(post => {
+        if (post.id === postId) {
+          let newUpvotes = post.upvotes;
+          let newDownvotes = post.downvotes;
+          let newUserVote: 'up' | 'down' | null = post.userVote;
 
-        // Add parks (existing functionality)
-        if (parkFeatures.length > 0) {
-          const parksCollection = { type: 'FeatureCollection' as const, features: parkFeatures };
-          
-          if (map.getSource('enhanced-parks')) {
-            (map.getSource('enhanced-parks') as maplibregl.GeoJSONSource).setData(parksCollection as any);
-          } else {
-            map.addSource('enhanced-parks', { type: 'geojson', data: parksCollection });
-            map.addLayer({
-              id: 'parks-enhanced',
-              type: 'fill',
-              source: 'enhanced-parks',
-              paint: {
-                'fill-color': '#4CAF50',
-                'fill-opacity': 0.6
-              }
-            }, 'water-enhanced'); // Insert before water so water shows on top
-          }
-        }
-
-        // Add park labels (existing functionality)
-        if (parkFeatures.length > 0) {
-          const labelFeatures = parkFeatures
-            .filter(feature => {
-              const name = feature.properties?.name || '';
-              return name && !name.toLowerCase().includes('jamaica bay reserve');
-            })
-            .map(feature => {
-              try {
-                const centroid = turf.centroid(feature);
-                return {
-                  type: 'Feature' as const,
-                  geometry: centroid.geometry,
-                  properties: { 
-                    name: feature.properties?.name || '',
-                    isPelhamBayPark: feature.properties?.name === 'Pelham Bay Park'
-                  }
-                };
-              } catch (err) {
-                return null;
-              }
-            })
-            .filter(Boolean);
-
-          if (labelFeatures.length > 0) {
-            const labelsCollection = { type: 'FeatureCollection' as const, features: labelFeatures };
-            
-            if (map.getSource('enhanced-park-labels')) {
-              (map.getSource('enhanced-park-labels') as maplibregl.GeoJSONSource).setData(labelsCollection as any);
+          if (voteType === 'up') {
+            if (post.userVote === 'up') {
+              // Remove upvote
+              newUpvotes--;
+              newUserVote = null;
+            } else if (post.userVote === 'down') {
+              // Switch from downvote to upvote
+              newDownvotes--;
+              newUpvotes++;
+              newUserVote = 'up';
             } else {
-              map.addSource('enhanced-park-labels', { type: 'geojson', data: labelsCollection });
-              map.addLayer({
-                id: 'park-labels-enhanced',
-                type: 'symbol',
-                source: 'enhanced-park-labels',
-                layout: {
-                  'text-field': ['get', 'name'],
-                  'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-                  'text-size': 12,
-                  'text-anchor': 'center',
-                  'text-allow-overlap': false,
-                  'text-ignore-placement': false
-                },
-                paint: {
-                  'text-color': [
-                    'case',
-                    ['get', 'isPelhamBayPark'],
-                    '#2E7D1E',
-                    '#1B5E20'
-                  ],
-                  'text-halo-color': '#FFFFFF',
-                  'text-halo-width': 1
+              // Add upvote
+              newUpvotes++;
+              newUserVote = 'up';
+            }
+          } else {
+            if (post.userVote === 'down') {
+              // Remove downvote
+              newDownvotes--;
+              newUserVote = null;
+            } else if (post.userVote === 'up') {
+              // Switch from upvote to downvote
+              newUpvotes--;
+              newDownvotes++;
+              newUserVote = 'down';
+            } else {
+              // Add downvote
+              newDownvotes++;
+              newUserVote = 'down';
+            }
+          }
+
+          return {
+            ...post,
+            upvotes: newUpvotes,
+            downvotes: newDownvotes,
+            userVote: newUserVote
+          };
+        }
+        return post;
+      });
+
+      // Auto-delete posts with score <= -3
+      return updatedPosts.filter(post => (post.upvotes - post.downvotes) > -3);
+    });
+  };
+
+  const handleRoleVote = (businessId: string, roleIndex: number, voteType: 'up' | 'down') => {
+    setBusinesses(prevBusinesses => {
+      const updatedBusinesses = prevBusinesses.map(business => {
+        if (business.id === businessId && business.roles) {
+          const updatedRoles = business.roles.map((role, index) => {
+            if (index === roleIndex) {
+              let newUpvotes = role.upvotes;
+              let newDownvotes = role.downvotes;
+              let newUserVote: 'up' | 'down' | null = role.userVote;
+
+              if (voteType === 'up') {
+                if (role.userVote === 'up') {
+                  newUpvotes--;
+                  newUserVote = null;
+                } else if (role.userVote === 'down') {
+                  newDownvotes--;
+                  newUpvotes++;
+                  newUserVote = 'up';
+                } else {
+                  newUpvotes++;
+                  newUserVote = 'up';
                 }
-              });
+              } else {
+                if (role.userVote === 'down') {
+                  newDownvotes--;
+                  newUserVote = null;
+                } else if (role.userVote === 'up') {
+                  newUpvotes--;
+                  newDownvotes++;
+                  newUserVote = 'down';
+                } else {
+                  newDownvotes++;
+                  newUserVote = 'down';
+                }
+              }
+
+              return {
+                ...role,
+                upvotes: newUpvotes,
+                downvotes: newDownvotes,
+                userVote: newUserVote
+              };
             }
-          }
+            return role;
+          });
+
+          // Auto-delete roles with score <= -3
+          const filteredRoles = updatedRoles.filter(role => (role.upvotes - role.downvotes) > -3);
+
+          return {
+            ...business,
+            roles: filteredRoles
+          };
         }
-
-        // Ensure businesses stay on top
-        if (map.getLayer('businesses-layer')) {
-          map.moveLayer('businesses-layer');
-        }
-      }
-
-    } catch (error) {
-      console.error('Error processing water features:', error);
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [map, mapLoaded, isProcessing, createPolygonFromCoastlines]);
-
-  const loadGeographicData = useCallback(async () => {
-    try {
-      // Load roads with timeout
-      const roadsPromise = fetch('/data/merged_roads.geojson.gz')
-        .then(response => response.ok ? response.json() : null)
-        .catch(error => {
-          console.warn('Failed to load roads:', error);
-          return null;
-        });
-
-      // Load main data with timeout  
-      const mainDataPromise = loadGeoJSONData();
-
-      // Set timeout for both operations
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Data loading timeout')), 15000) // Increased timeout for processing
-      );
-
-      const [roadsResult, mainDataResult] = await Promise.race([
-        Promise.all([roadsPromise, mainDataPromise]),
-        timeoutPromise
-      ]) as [any, FeatureCollection | null];
-
-      if (roadsResult) {
-        setRoadsData(roadsResult);
-      }
-
-      if (mainDataResult && mainDataResult.features.length > 0) {
-        // Store coastline data for waterway buffering
-        const coastlines = mainDataResult.features.filter(feature => 
-          feature.geometry.type === 'LineString' && 
-          feature.properties?.natural === 'coastline'
-        );
-        if (coastlines.length > 0) {
-          setCoastlineData({ type: 'FeatureCollection', features: coastlines });
-        }
-
-        // Process features with enhanced water handling
-        setTimeout(() => processWaterFeatures(mainDataResult), 100);
-      }
-
-    } catch (error) {
-      console.error('Error loading geographic data:', error);
-    }
-  }, [loadGeoJSONData, processWaterFeatures]);
-
-  // Initialize map with minimal style (unchanged)
-  useEffect(() => {
-    if (!mapRef.current) return;
-
-    let mapInstance: maplibregl.Map | null = null;
-    let cleanedUp = false;
-
-    const initializeMap = () => {
-      try {
-        const baseStyle = {
-          version: 8 as const,
-          sources: {},
-          layers: [{
-            id: 'background',
-            type: 'background' as const,
-            paint: { 'background-color': '#F5F5DC' }
-          }]
-        };
-
-        mapInstance = new maplibregl.Map({
-          container: mapRef.current!,
-          style: baseStyle,
-          center: [-73.9712, 40.7831],
-          zoom: 12,
-          maxZoom: 18,
-          minZoom: 8
-        });
-
-        mapInstance.setMaxBounds([[-74.25909, 40.477399], [-73.700272, 40.917577]]);
-
-        mapInstance.on('load', () => {
-          if (cleanedUp) return;
-          console.log('Map loaded successfully');
-          setMapLoaded(true);
-        });
-
-        mapInstance.on('error', e => {
-          console.error('Map error:', e.error);
-        });
-
-        setMap(mapInstance);
-
-      } catch (error) {
-        console.error('Error initializing map:', error);
-      }
-    };
-
-    initializeMap();
-
-    return () => {
-      cleanedUp = true;
-      if (mapInstance) {
-        try {
-          mapInstance.remove();
-        } catch (error) {
-          console.error('Error removing map:', error);
-        }
-      }
-      setMap(null);
-      setMapLoaded(false);
-    };
-  }, []);
-
-  // Load data after map loads (unchanged)
-  useEffect(() => {
-    if (mapLoaded && map && !isProcessing) {
-      const timeoutId = setTimeout(() => {
-        loadGeographicData();
-      }, 500);
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [mapLoaded, map, loadGeographicData, isProcessing]);
-
-  // Add roads layer (unchanged)
-  useEffect(() => {
-    if (!mapLoaded || !map || !roadsData) return;
-
-    try {
-      if (map.getSource('roads')) {
-        (map.getSource('roads') as maplibregl.GeoJSONSource).setData(roadsData as any);
-      } else {
-        map.addSource('roads', { type: 'geojson', data: roadsData });
-        map.addLayer({
-          id: 'roads-layer',
-          type: 'line',
-          source: 'roads',
-          paint: {
-            'line-color': '#666666',
-            'line-width': 1
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Error adding roads:', error);
-    }
-  }, [mapLoaded, map, roadsData]);
-
-  // Business markers (unchanged)
-  useEffect(() => {
-    if (!mapLoaded || !businesses || !map) return;
-
-    try {
-      // Clean up existing
-      if (map.getSource('businesses')) {
-        if (map.getLayer('businesses-layer')) {
-          map.removeLayer('businesses-layer');
-        }
-        map.removeSource('businesses');
-      }
-
-      const businessFeatures = businesses.map(business => ({
-        type: 'Feature' as const,
-        geometry: { type: 'Point' as const, coordinates: [business.position.lng, business.position.lat] },
-        properties: { id: business.id, name: business.name, businessType: business.businessType || 'unknown' }
-      }));
-
-      map.addSource('businesses', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: businessFeatures }
+        return business;
       });
 
-      map.addLayer({
-        id: 'businesses-layer',
-        type: 'circle',
-        source: 'businesses',
-        paint: {
-          'circle-radius': 8,
-          'circle-color': selectedBusiness ? [
-            'case',
-            ['==', ['get', 'id'], selectedBusiness.id],
-            '#EF4444',
-            '#FACC15'
-          ] : '#FACC15',
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#FFFFFF'
-        }
-      });
+      return updatedBusinesses;
+    });
+  };
 
-      // Event handlers
-      if (onBusinessClick) {
-        const clickHandler = (e: any) => {
-          if (e.features?.[0]) {
-            const businessId = e.features[0].properties?.id;
-            const business = businesses.find(b => b.id === businessId);
-            if (business) {
-              map.flyTo({
-                center: [business.position.lng, business.position.lat],
-                zoom: 16,
-                duration: 800,
-                essential: true
-              });
-              onBusinessClick(business);
-            }
-          }
-        };
-
-        map.on('click', 'businesses-layer', clickHandler);
-        map.on('mouseenter', 'businesses-layer', () => {
-          map.getCanvas().style.cursor = 'pointer';
-        });
-        map.on('mouseleave', 'businesses-layer', () => {
-          map.getCanvas().style.cursor = '';
-        });
-
-        return () => {
-          map.off('click', 'businesses-layer', clickHandler);
-        };
+  // Sync selectedBusiness when businesses data changes (for voting updates)
+  useEffect(() => {
+    if (selectedBusiness) {
+      const updatedBusiness = businesses.find(b => b.id === selectedBusiness.id);
+      if (updatedBusiness) {
+        setSelectedBusiness(updatedBusiness);
       }
-    } catch (error) {
-      console.error('Error adding businesses:', error);
     }
-  }, [mapLoaded, businesses, onBusinessClick, map, selectedBusiness]);
+  }, [businesses, selectedBusiness?.id]);
+
+  // Handle business state when sliding to explore/settings and back
+  useEffect(() => {
+    if (currentSlide === 2 || currentSlide === 0) {
+      // Going to explore or settings page - save current business and close it
+      if (selectedBusiness) {
+        setPreviouslySelectedBusiness(selectedBusiness);
+        setSelectedBusiness(null);
+      }
+    } else if (currentSlide === 1 && previouslySelectedBusiness) {
+      // Coming back to home page - restore previously selected business
+      setSelectedBusiness(previouslySelectedBusiness);
+      setPreviouslySelectedBusiness(null);
+    }
+    
+    // Clear user stories filter when navigating away from explore
+    if (currentSlide !== 2 && filteredUserStories) {
+      setFilteredUserStories(false);
+    }
+  }, [currentSlide, selectedBusiness, previouslySelectedBusiness, filteredUserStories]);
+
+  const handleDragEnd = (event: any, info: PanInfo) => {
+    const threshold = 100;
+    const dragStartX = event.clientX || event.touches?.[0]?.clientX || 0;
+    const screenWidth = window.innerWidth;
+    const edgeThreshold = 50; // Only allow swiping within 50px of screen edges
+    
+    // Only allow swiping if drag started near screen edges
+    const isNearLeftEdge = dragStartX < edgeThreshold;
+    const isNearRightEdge = dragStartX > screenWidth - edgeThreshold;
+    
+    if ((isNearLeftEdge || isNearRightEdge)) {
+      if (info.offset.x > threshold && currentSlide > 0) {
+        setCurrentSlide(currentSlide - 1);
+      } else if (info.offset.x < -threshold && currentSlide < 2) {
+        setCurrentSlide(currentSlide + 1);
+      }
+    }
+  };
 
   return (
-    <div>
-      {isProcessing && (
-        <div style={{
-          position: 'absolute',
-          top: '10px',
-          left: '10px',
-          background: 'rgba(0,0,0,0.7)',
-          color: 'white',
-          padding: '5px 10px',
-          borderRadius: '4px',
-          zIndex: 1000,
-          fontSize: '12px'
-        }}>
-          Processing waterways...
-        </div>
-      )}
-      <div
-        ref={mapRef}
-        style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
+    <div className="fixed inset-0 overflow-hidden">
+      {/* Map is always the background */}
+      <HomePage 
+        businesses={businesses} 
+        currentSlide={currentSlide}
+        currentView={currentView}
+        selectedBusiness={selectedBusiness}
+        onBusinessSelect={handleBusinessClick}
+        posts={posts}
+        onBusinessStoriesClick={handleBusinessStoriesClick}
+        onPostClick={(post) => {
+          setExpandedPost(post.id);
+        }}
+        onRoleVote={handleRoleVote}
+        onLocationSave={handleLocationSave} // NEW: Pass the location save handler
       />
+      
+      {/* Initiation Card - slides up and disappears */}
+      {currentView === 'initiation' && (
+        <InitiationPage onComplete={handleInitiationComplete} />
+      )}
+      
+      {/* Settings Card - slides from left */}
+      {currentSlide === 0 && userData && (
+        <motion.div
+          initial={{ x: '-100%' }}
+          animate={{ x: 0 }}
+          exit={{ x: '-100%' }}
+          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          className="absolute inset-0 z-20"
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.1}
+          onDragEnd={(event, info) => {
+            if (info.offset.x < -100) {
+              setCurrentSlide(1);
+            }
+          }}
+        >
+          <SettingsPage 
+            initialData={userData} 
+            userPosts={posts.filter(post => post.author === 'You')}
+            onStoriesClick={handleUserStoriesClick}
+            onPostClick={(post) => {
+              setExpandedPost(post.id);
+              setCurrentSlide(2); // Navigate to explore page
+            }}
+            onJobUpdate={handleJobUpdate}
+          />
+        </motion.div>
+      )}
+
+      {/* Explore Card - slides from right */}
+      {currentSlide === 2 && (
+        <motion.div
+          initial={{ x: '100%' }}
+          animate={{ x: 0 }}
+          exit={{ x: '100%' }}
+          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          className="absolute inset-0 z-20"
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.1}
+          onDragEnd={(event, info) => {
+            if (info.offset.x > 100) {
+              setCurrentSlide(1);
+            }
+          }}
+        >
+          <ExplorePage 
+            posts={posts}
+            filteredBusinessId={filteredBusinessId || undefined}
+            filteredUserStories={filteredUserStories}
+            onBusinessView={(businessId) => {
+              const business = businesses.find(b => b.id === businessId);
+              if (business) {
+                setSelectedBusiness(business);
+                setCurrentSlide(1); // Navigate to home page
+              }
+            }}
+            onExpandedPostChange={(postId) => {
+              setExpandedPost(postId);
+            }}
+            onCommentSubmit={(postId, comment) => {
+              setComments({
+                ...comments,
+                [postId]: [...(comments[postId] || []), comment]
+              });
+            }}
+            onPostSubmit={handlePostSubmit}
+            onBackToAllPosts={handleBackToAllPosts}
+            onPostVote={handlePostVote}
+          />
+        </motion.div>
+      )}
+
+      {/* Swipe detection overlay - only at screen edges */}
+      <div 
+        className="absolute inset-0 z-10 pointer-events-none"
+      >
+        {/* Left edge swipe area */}
+        <div 
+          className="absolute left-0 top-0 w-12 h-full pointer-events-auto"
+          onTouchStart={(e) => {
+            if (currentSlide > 0) {
+              const touch = e.touches[0];
+              const startX = touch.clientX;
+              const handleTouchMove = (moveEvent: TouchEvent) => {
+                const moveTouch = moveEvent.touches[0];
+                const deltaX = moveTouch.clientX - startX;
+                if (deltaX > 100) {
+                  setCurrentSlide(currentSlide - 1);
+                  document.removeEventListener('touchmove', handleTouchMove);
+                  document.removeEventListener('touchend', handleTouchEnd);
+                }
+              };
+              const handleTouchEnd = () => {
+                document.removeEventListener('touchmove', handleTouchMove);
+                document.removeEventListener('touchend', handleTouchEnd);
+              };
+              document.addEventListener('touchmove', handleTouchMove);
+              document.addEventListener('touchend', handleTouchEnd);
+            }
+          }}
+        />
+        
+        {/* Right edge swipe area */}
+        <div 
+          className="absolute right-0 top-0 w-12 h-full pointer-events-auto"
+          onTouchStart={(e) => {
+             if (currentSlide < 2) {
+              const touch = e.touches[0];
+              const startX = touch.clientX;
+              const handleTouchMove = (moveEvent: TouchEvent) => {
+                const moveTouch = moveEvent.touches[0];
+                const deltaX = startX - moveTouch.clientX;
+                if (deltaX > 100) {
+                  setCurrentSlide(currentSlide + 1);
+                  document.removeEventListener('touchmove', handleTouchMove);
+                  document.removeEventListener('touchend', handleTouchEnd);
+                }
+              };
+              const handleTouchEnd = () => {
+                document.removeEventListener('touchmove', handleTouchMove);
+                document.removeEventListener('touchend', handleTouchEnd);
+              };
+              document.addEventListener('touchmove', handleTouchMove);
+              document.addEventListener('touchend', handleTouchEnd);
+            }
+          }}
+        />
+      </div>
+
+      {/* Slide indicators */}
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-50">
+        {[0, 1, 2].map(index => (
+          <button
+            key={index}
+            onClick={() => setCurrentSlide(index)}
+            className={`w-3 h-3 rounded-full transition-colors ${
+              index === currentSlide ? 'bg-app-yellow' : 'bg-app-gray-light'
+            }`}
+          />
+        ))}
+      </div>
     </div>
   );
 };
 
-export default MapLibreMap;
+export default MobileApp;
