@@ -155,6 +155,64 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         }
 
+        // Add park labels - only for specific parks, excluding Jamaica Bay Reserve
+        if (parkFeatures.length > 0) {
+          const labelFeatures = parkFeatures
+            .filter(feature => {
+              const name = feature.properties?.name || '';
+              return name && !name.toLowerCase().includes('jamaica bay reserve');
+            })
+            .map(feature => {
+              try {
+                const centroid = turf.centroid(feature);
+                return {
+                  type: 'Feature' as const,
+                  geometry: centroid.geometry,
+                  properties: { 
+                    name: feature.properties?.name || '',
+                    isPelhamBayPark: feature.properties?.name === 'Pelham Bay Park'
+                  }
+                };
+              } catch (err) {
+                return null;
+              }
+            })
+            .filter(Boolean);
+
+          if (labelFeatures.length > 0) {
+            const labelsCollection = { type: 'FeatureCollection' as const, features: labelFeatures };
+            
+            if (map.getSource('park-labels')) {
+              (map.getSource('park-labels') as maplibregl.GeoJSONSource).setData(labelsCollection as any);
+            } else {
+              map.addSource('park-labels', { type: 'geojson', data: labelsCollection });
+              map.addLayer({
+                id: 'park-labels-layer',
+                type: 'symbol',
+                source: 'park-labels',
+                layout: {
+                  'text-field': ['get', 'name'],
+                  'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                  'text-size': 12,
+                  'text-anchor': 'center',
+                  'text-allow-overlap': false,
+                  'text-ignore-placement': false
+                },
+                paint: {
+                  'text-color': [
+                    'case',
+                    ['get', 'isPelhamBayPark'],
+                    '#2E7D1E', // Darker green for Pelham Bay Park
+                    '#1B5E20'  // Standard dark green for other parks
+                  ],
+                  'text-halo-color': '#FFFFFF',
+                  'text-halo-width': 1
+                }
+              });
+            }
+          }
+        }
+
         // Ensure businesses stay on top
         if (map.getLayer('businesses-layer')) {
           map.moveLayer('businesses-layer');
