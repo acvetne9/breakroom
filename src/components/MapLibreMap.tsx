@@ -115,7 +115,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       // Add to map if it exists and is loaded
       if (map && mapLoaded) {
-        // Add water (positioned after parks so it doesn't override land)
+        // Add water (single layer to prevent overlaps)
         if (uniqueWaterFeatures.length > 0) {
           const waterCollection = { type: 'FeatureCollection' as const, features: uniqueWaterFeatures };
           
@@ -129,9 +129,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               source: 'simple-water',
               paint: {
                 'fill-color': '#4A90E2',
-                'fill-opacity': 0.7  // Slightly reduced opacity to not completely override land
+                'fill-opacity': 0.8  // Higher opacity since no overlaps
               }
-            }, 'parks-labels'); // Insert before park labels so labels show on top
+            });
           }
         }
 
@@ -151,39 +151,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 'fill-color': '#4CAF50',
                 'fill-opacity': 0.6
               }
-            });
-            
-            // Add park labels
-            map.addLayer({
-              id: 'parks-labels',
-              type: 'symbol',
-              source: 'simple-parks',
-              layout: {
-                'text-field': ['get', 'name'],
-                'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-                'text-size': 14,
-                'text-anchor': 'center'
-              },
-              paint: {
-                'text-color': [
-                  'case',
-                  ['==', ['get', 'name'], 'Pelham Bay Park'],
-                  '#2E7D1E', // Darker green for Pelham Bay Park
-                  '#1B5E20'  // Dark green for other parks
-                ],
-                'text-halo-color': '#ffffff',
-                'text-halo-width': 1
-              }
-            });
+            }, 'water-simple'); // Insert before water so water shows on top
           }
         }
 
-        // Ensure businesses stay on top of all layers
+        // Ensure businesses stay on top
         if (map.getLayer('businesses-layer')) {
           map.moveLayer('businesses-layer');
-        }
-        if (map.getLayer('parks-labels')) {
-          map.moveLayer('parks-labels');
         }
       }
 
