@@ -37,6 +37,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [roadsData, setRoadsData] = useState<FeatureCollection<LineString> | null>(null);
   const [landData, setLandData] = useState<FeatureCollection<Polygon | MultiPolygon> | null>(null);
   const [waterData, setWaterData] = useState<FeatureCollection<Polygon | MultiPolygon> | null>(null);
+  const [parksData, setParksData] = useState<FeatureCollection<Polygon | MultiPolygon> | null>(null);
 
   const loadGeoJSONData = useCallback(async (): Promise<FeatureCollection | null> => {
     try {
@@ -74,27 +75,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     { name: "Mount Hebron Cemetery", center: [-73.8440, 40.6340], radius: 0.004 }
   ];
 
-  // Cemetery detection function - integrate with land areas instead of separate layers
-  const detectCemeteries = useCallback((mainData: FeatureCollection) => {
-    if (!map || !mapLoaded) return;
-
-    // Clean up any existing separate cemetery layers
-    ['cemeteries-layer', 'cemeteries-border', 'cemeteries-points'].forEach(layerId => {
-      if (map.getLayer(layerId)) map.removeLayer(layerId);
-    });
-    if (map.getSource('cemetery-data')) map.removeSource('cemetery-data');
-
-    // Cemetery detection is now handled in the main land processing
-    // No separate cemetery layers needed
-  }, [map, mapLoaded]);
-
+  // Create land polygon from coastlines - land is INSIDE coastlines
   const createLandFromCoastlines = useCallback((geoData: FeatureCollection): FeatureCollection<Polygon | MultiPolygon> => {
     try {
+      console.log('Creating land from coastlines...');
+      
       const coastlines = geoData.features.filter(feature => 
         feature.geometry.type === 'LineString' && feature.properties?.natural === 'coastline'
-      );
+      ) as Feature<LineString, { [name: string]: any }>[];
+
+      console.log(`Found ${coastlines.length} coastline features`);
 
       if (coastlines.length === 0) {
+        // Fallback: create default land area
         const bbox: [number, number, number, number] = [-74.30, 40.50, -73.70, 40.93];
         const landArea = turf.bboxPolygon(bbox);
         return {
@@ -106,9 +99,101 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         };
       }
 
+      // Process coastlines to create enclosed land polygons
+      let landPolygons: Feature<Polygon | MultiPolygon, { [name: string]: any }>[] = [];
+
+      try {
+        // Attempt to merge all coastline segments
+        const mergedCoastlines = coastlines.length > 1 
+          ? turf.lineToPolygon(turf.combine(turf.featureCollection(coastlines))) 
+          : turf.lineToPolygon(coastlines[0]);
+        
+        if (mergedCoastlines && mergedCoastlines.features) {
+          landPolygons = mergedCoastlines.features.map(feature => ({
+            ...feature,
+            properties: { landType: 'coastline-enclosed', source: 'coastline-processing' }
+          })) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
+        }
+      } catch (polygonError) {
+        console.warn('Failed to create polygons from coastlines, using buffer method:', polygonError);
+        
+        // Alternative: buffer and union approach
+        try {
+          const bufferedCoastlines = coastlines.map(coastline => {
+            return turf.buffer(coastline, 0.001, { units: 'degrees' });
+          });
+          
+          if (bufferedCoastlines.length > 0) {
+            let unionedLand = bufferedCoastlines[0];
+            for (let i = 1; i < bufferedCoastlines.length; i++) {
+              try {
+                const union = (turf as any).union(unionedLand, bufferedCoastlines[i]);
+                if (union) unionedLand = union;
+              } catch (unionError) {
+                console.warn('Failed to union coastline buffers:', unionError);
+              }
+            }
+            
+            landPolygons = [{
+              ...unionedLand,
+              properties: { landType: 'coastline-buffered', source: 'buffer-method' }
+            } as Feature<Polygon | MultiPolygon, { [name: string]: any }>];
+          }
+        } catch (bufferError) {
+          console.warn('Buffer method also failed:', bufferError);
+        }
+      }
+
+      if (landPolygons.length === 0) {
+        // Final fallback: use bbox
+        const bbox: [number, number, number, number] = [-74.30, 40.50, -73.70, 40.93];
+        const landArea = turf.bboxPolygon(bbox);
+        landPolygons = [{
+          ...landArea,
+          properties: { landType: 'final-fallback', source: 'bbox-fallback' }
+        } as Feature<Polygon, { [name: string]: any }>];
+      }
+
+      console.log(`Created ${landPolygons.length} land polygons from coastlines`);
+      return { type: 'FeatureCollection', features: landPolygons };
+
+    } catch (error) {
+      console.error('Error creating land from coastlines:', error);
+      // Ultimate fallback
       const bbox: [number, number, number, number] = [-74.30, 40.50, -73.70, 40.93];
-      let totalLandArea = turf.bboxPolygon(bbox);
+      const landArea = turf.bboxPolygon(bbox);
+      return {
+        type: 'FeatureCollection',
+        features: [{
+          ...landArea,
+          properties: { landType: 'error-fallback', source: 'error-recovery' }
+        } as Feature<Polygon, { [name: string]: any }>]
+      };
+    }
+  }, []);
+
+  // Create water polygon from coastlines - water is OUTSIDE coastlines  
+  const createWaterFromCoastlines = useCallback((geoData: FeatureCollection, landPolygons: FeatureCollection<Polygon | MultiPolygon>): FeatureCollection<Polygon | MultiPolygon> => {
+    try {
+      console.log('Creating water from coastlines...');
       
+      // Create a large bounding box that encompasses the entire area
+      const bbox: [number, number, number, number] = [-74.35, 40.45, -73.65, 40.98];
+      let totalWaterArea = turf.bboxPolygon(bbox);
+
+      // Subtract all land polygons from the total area to get water
+      landPolygons.features.forEach(landFeature => {
+        try {
+          const difference = (turf as any).difference(totalWaterArea, landFeature);
+          if (difference) {
+            totalWaterArea = difference;
+          }
+        } catch (err) {
+          console.warn('Could not subtract land from water area:', err);
+        }
+      });
+
+      // Also add explicit water bodies from the data
       const explicitWaterBodies = geoData.features.filter(feature => {
         const props = feature.properties;
         return props && 
@@ -116,58 +201,76 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           (props.natural === 'water' || 
            (props.name && waterKeywords.some(waterName => 
              props.name.toLowerCase().includes(waterName.toLowerCase()))));
-      });
+      }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
+
+      const waterFeatures: Feature<Polygon | MultiPolygon, { [name: string]: any }>[] = [];
       
-      explicitWaterBodies.forEach(waterBody => {
-        try {
-          const difference = (turf as any).difference(totalLandArea, waterBody);
-          if (difference) totalLandArea = difference;
-        } catch (err) {
-          console.warn('Could not subtract water body:', err);
-        }
-      });
-      
-      if (totalLandArea) {
-        const landFeature = totalLandArea as unknown as Feature<Polygon | MultiPolygon, { [name: string]: any }>;
-        landFeature.properties = { landType: 'comprehensive', source: 'water-subtraction' };
-        return { type: 'FeatureCollection', features: [landFeature] };
+      // Add the coastline-derived water
+      if (totalWaterArea) {
+        waterFeatures.push({
+          ...totalWaterArea,
+          properties: { waterType: 'coastline-derived', source: 'coastline-subtraction' }
+        } as Feature<Polygon | MultiPolygon, { [name: string]: any }>);
       }
 
+      // Add explicit water bodies
+      explicitWaterBodies.forEach(waterBody => {
+        waterFeatures.push({
+          ...waterBody,
+          properties: { 
+            ...waterBody.properties, 
+            waterType: 'explicit', 
+            source: 'geojson-data' 
+          }
+        });
+      });
+
+      console.log(`Created ${waterFeatures.length} water polygons from coastlines`);
+      return { type: 'FeatureCollection', features: waterFeatures };
+
     } catch (error) {
-      console.error('Error creating land from coastlines:', error);
+      console.error('Error creating water from coastlines:', error);
+      return { type: 'FeatureCollection', features: [] };
     }
-    
-    return { type: 'FeatureCollection', features: [] };
   }, [waterKeywords]);
 
   const loadGeographicData = useCallback(async () => {
     try {
+      console.log('Loading geographic data...');
+      
       // Load roads
       const roadsResponse = await fetch('/data/merged_roads.geojson.gz');
       if (roadsResponse.ok) {
         const roadsData = await roadsResponse.json();
         setRoadsData(roadsData);
+        console.log('Roads data loaded successfully');
       }
       
       const mainData = await loadGeoJSONData();
-      if (!mainData) return;
+      if (!mainData) {
+        console.error('No main data loaded');
+        return;
+      }
 
       console.log(`Processing ${mainData.features.length} total features`);
 
-      // Apply cemetery detection (now just cleanup, as cemeteries are in land data)
-      setTimeout(() => detectCemeteries(mainData), 1000);
+      // Step 1: Create base land from coastlines
+      const coastlineLand = createLandFromCoastlines(mainData);
       
-      // Process land features - include cemeteries as polygon land areas
-      const landFeatures = mainData.features.filter(feature => {
+      // Step 2: Create water from coastlines (everything outside land)
+      const coastlineWater = createWaterFromCoastlines(mainData, coastlineLand);
+      
+      // Step 3: Process parks and other land features (these go ON TOP of base land)
+      const parkFeatures = mainData.features.filter(feature => {
         const props = feature.properties;
         if (!props) return false;
         
-        // Only include polygon/multipolygon features for land areas
+        // Only include polygon/multipolygon features
         if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
         
         const name = props.name ? props.name.toLowerCase() : '';
         
-        // Cemetery detection (polygons only)
+        // Cemetery detection
         const isCemetery = cemeteryKeywords.some(keyword => name.includes(keyword)) ||
                           props.leisure === 'cemetery' ||
                           props.natural === 'cemetery';
@@ -197,55 +300,29 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           ['park', 'playground', 'pitch', 'garden', 'golf_course', 'recreation_ground', 
            'stadium', 'sports_centre', 'nature_reserve'].includes(props.leisure) ||
           
-          // Natural areas
+          // Natural areas (but not water)
           ['wood', 'forest', 'grassland', 'scrub', 'heath', 'fell', 'bare_rock', 
-           'scree', 'sand', 'beach', 'land'].includes(props.natural) ||
+           'scree', 'sand', 'beach'].includes(props.natural) ||
           
           // Famous parks
           (props.name && ['central park', 'prospect park', 'battery park', 'bryant park',
-           'madison square park', 'washington square park', 'riverside park',
-           'governors island', 'staten island', 'liberty island', 'ellis island']
-           .some(landName => props.name.toLowerCase().includes(landName)))
+           'madison square park', 'washington square park', 'riverside park']
+           .some(parkName => props.name.toLowerCase().includes(parkName)))
         );
       }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
       
-      // Process water features
-      const waterFeatures = mainData.features.filter(feature => {
-        const props = feature.properties;
-        if (!props || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
-        
-        return (
-          ['water', 'bay', 'strait'].includes(props.natural) ||
-          (props.name && waterKeywords.some(waterName => {
-            const name = props.name.toLowerCase();
-            const water = waterName.toLowerCase();
-            return name === water || name.includes(water) || 
-                   (water.includes('bay') && name.includes('bay')) ||
-                   (water.includes('river') && name.includes('river')) ||
-                   (water.includes('kill') && name.includes('kill'));
-          }))
-        );
-      }) as Feature<Polygon | MultiPolygon, { [name: string]: any }>[];
+      console.log(`Found ${coastlineLand.features.length} coastline land areas`);
+      console.log(`Found ${coastlineWater.features.length} coastline water areas`);
+      console.log(`Found ${parkFeatures.length} park features`);
       
-      console.log(`Found ${landFeatures.length} land features, ${waterFeatures.length} water features`);
-      
-      // Generate land from coastlines if needed
-      if (landFeatures.length < 10) {
-        const coastlineGenerated = createLandFromCoastlines(mainData);
-        const typedCoastlineFeatures = coastlineGenerated.features.filter(
-          (feature): feature is Feature<Polygon | MultiPolygon, { [name: string]: any }> => 
-            feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon'
-        );
-        landFeatures.push(...typedCoastlineFeatures);
-      }
-      
-      setLandData({ type: 'FeatureCollection', features: landFeatures });
-      setWaterData({ type: 'FeatureCollection', features: waterFeatures });
+      setLandData(coastlineLand);
+      setWaterData(coastlineWater);
+      setParksData({ type: 'FeatureCollection', features: parkFeatures });
       
     } catch (error) {
       console.error('Error loading geographic data:', error);
     }
-  }, [loadGeoJSONData, detectCemeteries, createLandFromCoastlines, cemeteryKeywords, waterKeywords]);
+  }, [loadGeoJSONData, createLandFromCoastlines, createWaterFromCoastlines, cemeteryKeywords, knownCemeteryAreas]);
 
   // Initialize map
   useEffect(() => {
@@ -261,7 +338,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         layers: [{
           id: 'background',
           type: 'background' as const,
-          paint: { 'background-color': '#D3D3D3' }
+          paint: { 'background-color': '#4A90E2' } // Water color as background
         }]
       };
 
@@ -294,16 +371,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           console.warn('Could not calculate bbox:', err);
         }
 
+        // Add original geojson source for compatibility
         mapInstance!.addSource('geojson-data', { type: 'geojson', data: geoData });
 
-        // Add basic layers
-        const layers = [
-          { id: 'parks', filter: ['==', 'leisure', 'park'], paint: { 'fill-color': '#4CAF50', 'fill-opacity': 0.8 } },
-          { id: 'coastlines', type: 'line', filter: ['==', 'natural', 'coastline'], paint: { 'line-color': '#1976D2', 'line-width': 2 } },
-          { id: 'buildings', filter: ['has', 'building'], paint: { 'fill-color': '#BDBDBD', 'fill-opacity': 0.7 } }
+        // Add basic layers for backwards compatibility
+        const compatibilityLayers = [
+          { 
+            id: 'coastlines', 
+            type: 'line', 
+            filter: ['==', 'natural', 'coastline'], 
+            paint: { 'line-color': '#1976D2', 'line-width': 2 } 
+          },
+          { 
+            id: 'buildings', 
+            filter: ['has', 'building'], 
+            paint: { 'fill-color': '#BDBDBD', 'fill-opacity': 0.7 } 
+          }
         ];
 
-        layers.forEach(layer => {
+        compatibilityLayers.forEach(layer => {
           mapInstance!.addLayer({
             id: layer.id,
             type: layer.type || 'fill',
@@ -332,69 +418,120 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (mapLoaded && map) {
       loadGeographicData();
     }
-  }, [mapLoaded, map]); // Only depend on mapLoaded and map, not the function itself
+  }, [mapLoaded, map, loadGeographicData]);
 
-  // Add geographic layers
+  // Add geographic layers in proper order
   useEffect(() => {
     if (!mapLoaded || !map) return;
 
     const addOrUpdateSource = (sourceId: string, data: FeatureCollection | null, layer: any) => {
-      if (!data) return;
+      if (!data || data.features.length === 0) return;
       
-      const existing = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
-      if (existing) {
-        existing.setData(data as any);
-        if (!map.getLayer(layer.id)) map.addLayer(layer);
-      } else {
-        map.addSource(sourceId, { type: 'geojson', data });
-        if (!map.getLayer(layer.id)) map.addLayer(layer);
+      try {
+        const existing = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
+        if (existing) {
+          existing.setData(data as any);
+          if (!map.getLayer(layer.id)) {
+            map.addLayer(layer);
+          }
+        } else {
+          map.addSource(sourceId, { type: 'geojson', data });
+          if (!map.getLayer(layer.id)) {
+            map.addLayer(layer);
+          }
+        }
+        console.log(`Added/updated layer: ${layer.id} with ${data.features.length} features`);
+      } catch (error) {
+        console.error(`Error adding layer ${layer.id}:`, error);
       }
     };
 
-    // Land areas - cemeteries now styled as parks
-    addOrUpdateSource('land-data', landData, {
-      id: 'land-areas',
-      type: 'fill',
-      source: 'land-data',
-      paint: { 
-        'fill-color': [
-          'case',
-          // Cemetery detection - now uses park color
-          ['any', ...cemeteryKeywords.map(keyword => 
-            ['in', keyword, ['downcase', ['coalesce', ['get', 'name'], '']]])],
-          '#4CAF50', // Same as parks
-          // Parks and leisure areas
-          // Any leisure area
-          ['!=', ['coalesce', ['get', 'leisure'], ''], ''],
-          '#4CAF50',
-          // Any natural area
-          ['!=', ['coalesce', ['get', 'natural'], ''], ''],
-          '#388E3C',
-          '#E8F5E8' // Default land color
-        ],
-        'fill-opacity': 0.8  // Consistent with park opacity
-      }
-    });
-
+    // CRITICAL: Add layers in correct rendering order (bottom to top)
+    console.log('Adding geographic layers...');
+    
+    // 1. FIRST: Water bodies (background is already water color, but add explicit water)
     addOrUpdateSource('water-data', waterData, {
       id: 'water-bodies',
       type: 'fill',
       source: 'water-data',
-      paint: { 'fill-color': '#4A90E2', 'fill-opacity': 0.8 }
+      paint: { 
+        'fill-color': '#4A90E2', 
+        'fill-opacity': 0.8
+      }
     });
 
+    // 2. SECOND: Base land areas from coastlines
+    addOrUpdateSource('land-data', landData, {
+      id: 'land-base',
+      type: 'fill',
+      source: 'land-data',
+      paint: { 
+        'fill-color': '#F5F5DC', // Beige land color
+        'fill-opacity': 0.9
+      }
+    });
+
+    // 3. THIRD: Parks and special areas (on top of base land)
+    addOrUpdateSource('parks-data', parksData, {
+      id: 'parks-areas',
+      type: 'fill',
+      source: 'parks-data',
+      paint: { 
+        'fill-color': [
+          'case',
+          // Cemetery detection
+          ['any', ...cemeteryKeywords.map(keyword => 
+            ['in', keyword, ['downcase', ['coalesce', ['get', 'name'], '']]])],
+          '#4CAF50', // Green for cemeteries
+          // Parks and leisure areas
+          ['!=', ['coalesce', ['get', 'leisure'], ''], ''],
+          '#4CAF50', // Green for parks
+          // Natural areas
+          ['!=', ['coalesce', ['get', 'natural'], ''], ''],
+          '#388E3C', // Darker green for natural areas
+          '#4CAF50' // Default green
+        ],
+        'fill-opacity': 0.8
+      }
+    });
+
+    // 4. FOURTH: Roads (on top of everything)
     addOrUpdateSource('roads-data', roadsData, {
       id: 'roads',
       type: 'line',
       source: 'roads-data',
-      paint: { 'line-color': '#666666', 'line-width': 1.5 }
+      paint: { 
+        'line-color': '#666666', 
+        'line-width': 1.5,
+        'line-opacity': 0.8
+      }
     });
 
-    // Ensure businesses layer stays on top
+    // 5. Add water outlines for better definition
+    if (waterData && waterData.features.length > 0 && map.getSource('water-data') && !map.getLayer('water-outlines')) {
+      try {
+        map.addLayer({
+          id: 'water-outlines',
+          type: 'line',
+          source: 'water-data',
+          paint: {
+            'line-color': '#2E7DD2',
+            'line-width': 1.5,
+            'line-opacity': 0.6
+          }
+        }, 'roads'); // Insert before roads layer
+        console.log('Added water outlines');
+      } catch (error) {
+        console.error('Error adding water outlines:', error);
+      }
+    }
+
+    // 6. LAST: Ensure businesses layer stays on top
     if (map.getLayer('businesses-layer')) {
       map.moveLayer('businesses-layer');
     }
-  }, [mapLoaded, map, landData, waterData, roadsData, cemeteryKeywords]);
+
+  }, [mapLoaded, map, waterData, landData, parksData, roadsData, cemeteryKeywords]);
 
   // Business markers
   useEffect(() => {
@@ -402,7 +539,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     // Clean up existing
     if (map.getSource('businesses')) {
-      map.removeLayer('businesses-layer');
+      if (map.getLayer('businesses-layer')) {
+        map.removeLayer('businesses-layer');
+      }
       map.removeSource('businesses');
     }
 
@@ -431,7 +570,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     // Event handlers
     if (onBusinessClick) {
-      map.on('click', 'businesses-layer', (e) => {
+      const clickHandler = (e: any) => {
         if (e.features?.[0]) {
           const businessId = e.features[0].properties?.id;
           const business = businesses.find(b => b.id === businessId);
@@ -445,7 +584,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             onBusinessClick(business);
           }
         }
-      });
+      };
+
+      map.on('click', 'businesses-layer', clickHandler);
+      
+      // Clean up on unmount
+      return () => {
+        map.off('click', 'businesses-layer', clickHandler);
+      };
     }
 
     map.on('mouseenter', 'businesses-layer', () => {
@@ -456,7 +602,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       map.getCanvas().style.cursor = '';
     });
 
-  }, [mapLoaded, businesses, onBusinessClick]);
+  }, [mapLoaded, businesses, onBusinessClick, map]);
 
   // Selected business highlighting
   useEffect(() => {
