@@ -105,9 +105,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         const props = feature.properties || {};
         const name = (props.name || '').toLowerCase();
         
-        // Exclude Jamaica Bay Reserve
-        if (name.includes('jamaica bay reserve')) return false;
-        
         return (
           props.leisure === 'park' || 
           props.leisure === 'garden' ||
