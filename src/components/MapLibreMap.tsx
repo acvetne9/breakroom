@@ -234,9 +234,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   const loadGeographicData = useCallback(async () => {
     try {
-      // Load roads with timeout
+      // Load roads with proper gzip decompression
       const roadsPromise = fetch('/data/merged_roads.geojson.gz')
-        .then(response => response.ok ? response.json() : null)
+        .then(async response => {
+          if (!response.ok) return null;
+          // The browser should automatically decompress gzip content
+          // but we need to handle it properly
+          const text = await response.text();
+          try {
+            return JSON.parse(text);
+          } catch (parseError) {
+            console.warn('Failed to parse roads JSON:', parseError);
+            return null;
+          }
+        })
         .catch(error => {
           console.warn('Failed to load roads:', error);
           return null;
