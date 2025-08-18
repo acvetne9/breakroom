@@ -247,21 +247,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           });
           
           try {
-            // Try to parse as JSON directly first
-            const data = await response.json();
+            // Get response as text first, then parse as JSON
+            const text = await response.text();
+            const data = JSON.parse(text);
             console.log('Successfully loaded roads data');
             return data;
-          } catch (jsonError) {
-            console.warn('Direct JSON parsing failed, trying as text:', jsonError);
-            
-            // Fallback: try to get as text and parse
-            try {
-              const text = await response.text();
-              return JSON.parse(text);
-            } catch (textError) {
-              console.warn('Failed to parse roads JSON:', textError);
-              return null;
-            }
+          } catch (error) {
+            console.warn('Failed to parse roads JSON:', error);
+            return null;
           }
         })
         .catch(error => {
