@@ -14,7 +14,6 @@ interface Post {
   createdAt: Date;
 }
 
-
 interface BusinessDetailsProps {
   business: {
     id: string;
