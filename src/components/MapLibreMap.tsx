@@ -36,6 +36,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [roadsData, setRoadsData] = useState<FeatureCollection<LineString> | null>(null);
+  const [landData, setLandData] = useState<FeatureCollection | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const loadGeoJSONData = useCallback(async (): Promise<FeatureCollection | null> => {
@@ -235,6 +236,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   const loadGeographicData = useCallback(async () => {
     try {
+      // Load NYC land data
+      const landPromise = fetch('/data/nyc_land.geojson')
+        .then(async response => {
+          if (!response.ok) return null;
+          try {
+            return await response.json();
+          } catch (error) {
+            console.warn('Failed to parse land JSON:', error);
+            return null;
+          }
+        })
+        .catch(error => {
+          console.warn('Failed to load land data:', error);
+          return null;
+        });
+
       // Load roads with proper gzip decompression
       const roadsPromise = fetch('/data/merged_roads.geojson.gz')
         .then(async response => {
@@ -271,10 +288,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         setTimeout(() => reject(new Error('Data loading timeout')), 10000)
       );
 
-      const [roadsResult, mainDataResult] = await Promise.race([
-        Promise.all([roadsPromise, mainDataPromise]),
+      const [landResult, roadsResult, mainDataResult] = await Promise.race([
+        Promise.all([landPromise, roadsPromise, mainDataPromise]),
         timeoutPromise
-      ]) as [any, FeatureCollection | null];
+      ]) as [any, any, FeatureCollection | null];
+
+      if (landResult) {
+        setLandData(landResult);
+      }
 
       if (roadsResult) {
         setRoadsData(roadsResult);
@@ -305,7 +326,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           layers: [{
             id: 'background',
             type: 'background' as const,
-            paint: { 'background-color': '#F5F5DC' }
+            paint: { 'background-color': '#B3E5FC' }
           }]
         };
 
@@ -363,6 +384,30 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return () => clearTimeout(timeoutId);
     }
   }, [mapLoaded, map, loadGeographicData, isProcessing]);
+
+  // Add land layer
+  useEffect(() => {
+    if (!mapLoaded || !map || !landData) return;
+
+    try {
+      if (map.getSource('land')) {
+        (map.getSource('land') as maplibregl.GeoJSONSource).setData(landData as any);
+      } else {
+        map.addSource('land', { type: 'geojson', data: landData });
+        map.addLayer({
+          id: 'land-layer',
+          type: 'fill',
+          source: 'land',
+          paint: {
+            'fill-color': '#F5F5DC',
+            'fill-opacity': 1
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error adding land:', error);
+    }
+  }, [mapLoaded, map, landData]);
 
   // Add roads layer
   useEffect(() => {
