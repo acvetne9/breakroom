@@ -61,61 +61,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     try {
       console.log(`Processing ${geoData.features.length} features...`);
 
-      // Separate coastlines from water bodies
-      const coastlineFeatures = geoData.features.filter(feature => {
-        if (feature.geometry.type !== 'LineString') return false;
-        const props = feature.properties || {};
-        const name = (props.name || '').toLowerCase();
-        
-        return (
-          props.natural === 'coastline' ||
-          props.natural === 'shoreline' ||
-          name.includes('coastline') ||
-          name.includes('shoreline')
-        );
-      });
-
-      // Simple water detection with deduplication - exclude coastlines
-      const waterFeatures = geoData.features.filter(feature => {
-        if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
-        const props = feature.properties || {};
-        const name = (props.name || '').toLowerCase();
-        
-        // Exclude parks, Jamaica Bay areas, and coastlines from being classified as water
-        if (name.includes('park') || name.includes('jamaica bay unit') || name.includes('jamaica bay wildlife refuge')) return false;
-        if (props.natural === 'coastline' || props.natural === 'shoreline') return false;
-        
-        return (
-          props.natural === 'water' || 
-          props.natural === 'bay' || 
-          props.waterway ||
-          // Named water bodies
-          ['river', 'bay', 'harbor', 'sound', 'creek', 'canal'].some(waterType => 
-            name.includes(waterType)
-          )
-        );
-      });
-
-      // Remove duplicate water features by location
-      const uniqueWaterFeatures = [];
-      const seenLocations = new Set();
-      
-      for (const feature of waterFeatures) {
-        try {
-          const centroid = turf.centroid(feature);
-          const [lng, lat] = centroid.geometry.coordinates;
-          const locationKey = `${Math.round(lng * 10000)}-${Math.round(lat * 10000)}`;
-          
-          if (!seenLocations.has(locationKey)) {
-            seenLocations.add(locationKey);
-            uniqueWaterFeatures.push(feature);
-          }
-        } catch (err) {
-          // If centroid fails, keep the feature anyway
-          uniqueWaterFeatures.push(feature);
-        }
-      }
-
       // Simple parks detection
       const parkFeatures = geoData.features.filter(feature => {
         if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
@@ -134,50 +79,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         );
       });
 
-      console.log(`Found ${uniqueWaterFeatures.length} unique water features, ${parkFeatures.length} park features, ${coastlineFeatures.length} coastline features`);
+      console.log(`Found ${parkFeatures.length} park features`);
 
       // Add to map if it exists and is loaded
       if (map && mapLoaded) {
-        // Add coastlines (subtle lines, not black roads)
-        if (coastlineFeatures.length > 0) {
-          const coastlineCollection = { type: 'FeatureCollection' as const, features: coastlineFeatures };
-          
-          if (map.getSource('simple-coastlines')) {
-            (map.getSource('simple-coastlines') as maplibregl.GeoJSONSource).setData(coastlineCollection as any);
-          } else {
-            map.addSource('simple-coastlines', { type: 'geojson', data: coastlineCollection });
-            map.addLayer({
-              id: 'coastlines-simple',
-              type: 'line',
-              source: 'simple-coastlines',
-              paint: {
-                'line-color': '#4A90E2', // Subtle blue line for coastlines
-                'line-width': 1,
-                'line-opacity': 0.6
-              }
-            });
-          }
-        }
-
-        // Add water (single layer to prevent overlaps)
-        if (uniqueWaterFeatures.length > 0) {
-          const waterCollection = { type: 'FeatureCollection' as const, features: uniqueWaterFeatures };
-          
-          if (map.getSource('simple-water')) {
-            (map.getSource('simple-water') as maplibregl.GeoJSONSource).setData(waterCollection as any);
-          } else {
-            map.addSource('simple-water', { type: 'geojson', data: waterCollection });
-            map.addLayer({
-              id: 'water-simple',
-              type: 'fill',
-              source: 'simple-water',
-              paint: {
-                'fill-color': '#6CA4E1', // 80% water + 20% wheat
-                'fill-opacity': 1.0
-              }
-            });
-          }
-        }
 
         // Add parks
         if (parkFeatures.length > 0) {
