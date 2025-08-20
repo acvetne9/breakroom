@@ -237,15 +237,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           // Only include NYC roads - exclude coastlines and waterways
           if (props.natural === 'coastline' || props.waterway) return false;
           
-          // Exclude New Jersey roads explicitly
-          if (name.includes('new jersey') || 
-              name.includes('nj ') || 
-              name.includes('jersey') ||
-              name.includes('hoboken') ||
-              name.includes('weehawken') ||
-              name.includes('union city') ||
-              name.includes('palisades')) return false;
-          
           // NYC-specific roads with highway property or NYC naming patterns
           return props.highway || 
                  (props.name && (
