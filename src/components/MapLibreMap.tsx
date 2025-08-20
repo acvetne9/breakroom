@@ -246,6 +246,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               name.includes('union city') ||
               name.includes('palisades')) return false;
           
+          // Exclude roads west of Manhattan and north of Staten Island
+          const coordinates = feature.geometry.coordinates;
+          const hasRestrictedCoordinates = coordinates.some(coord => {
+            const [lng, lat] = coord;
+            return lng < -74.0 || lat > 40.65; // West of Manhattan or north of Staten Island
+          });
+          
+          if (hasRestrictedCoordinates) return false;
+          
           // NYC-specific roads with highway property or NYC naming patterns
           return props.highway || 
                  (props.name && (
