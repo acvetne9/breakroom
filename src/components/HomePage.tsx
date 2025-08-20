@@ -71,7 +71,7 @@ const HomePage: React.FC<HomePageProps> = ({
   const [filteredBusinesses, setFilteredBusinesses] = useState(businesses);
   const [isSearchActive, setIsSearchActive] = useState(false);
   const landmarks = [
-    {lat: 40.688602, lng: -74.044296, emoji: "🗽"},
+    {lat: 40.690292, lng: -74.044917, emoji: "🗽"},
     {lat: 40.705330, lng: -73.995885, emoji: "🌉"},
     {lat: 40.7486, lng: -73.9857, emoji: "🌇"},
     {lat: 40.75266, lng: -73.97729, emoji: "🚇"},
