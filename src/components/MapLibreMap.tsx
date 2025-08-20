@@ -176,14 +176,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       if (mainDataResult && mainDataResult.features.length > 0) {
         const roadFeatures = mainDataResult.features.filter(feature => {
           if (feature.geometry.type !== 'LineString') return false;
-          const props = feature.properties || {};
-          // Look for road-like features, exclude coastlines
-          return props.highway || 
-                 props.name?.toLowerCase().includes('road') ||
-                 props.name?.toLowerCase().includes('street') ||
-                 props.name?.toLowerCase().includes('avenue') ||
-                 props.name?.toLowerCase().includes('drive') ||
-                 (props.name && !props.natural);
+          const props = feature.properties || {} as any;
+          const name = (props.name || '').toLowerCase();
+
+          // Exclude non-road linear features
+          const isWaterRelated = props.waterway || props.natural === 'coastline' || props.natural === 'shoreline' || props.natural === 'water';
+          const isBoundary = props.boundary || props.admin_level;
+          const isRailOrAir = props.railway || props.aeroway;
+          if (isWaterRelated || isBoundary || isRailOrAir) return false;
+
+          // Consider typical road indicators only
+          const roadNameRegex = /\b(road|rd|street|st|avenue|ave|boulevard|blvd|drive|dr|lane|ln|way|parkway|pkwy|place|pl|terrace|ter|court|ct|highway|hwy|route|rt)\b/;
+          return !!props.highway || roadNameRegex.test(name);
         });
 
         if (roadFeatures.length > 0 && map && mapLoaded) {
