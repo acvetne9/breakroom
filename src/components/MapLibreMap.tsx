@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import type { Feature, FeatureCollection, Polygon, MultiPolygon, LineString } from 'geojson';
+import type { Feature, FeatureCollection, Polygon, MultiPolygon } from 'geojson';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import * as turf from '@turf/turf';
@@ -36,7 +36,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
-  const [roadsData, setRoadsData] = useState<FeatureCollection<LineString> | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
 
