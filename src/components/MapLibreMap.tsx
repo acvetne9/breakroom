@@ -179,45 +179,97 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   const loadGeographicData = useCallback(async () => {
     try {
-      // Load roads with proper gzip decompression
-      const roadsPromise = fetch('/data/merged_roads.geojson.gz')
-        .then(async response => {
-          if (!response.ok) return null;
-          
-          console.log('Skipping roads - gzip decompression issues');
-          return null; // Skip roads for now due to decompression issues
-        })
-        .catch(error => {
-          console.warn('Failed to load roads:', error);
-          return null;
-        });
-
       // Load main data with timeout  
       const mainDataPromise = loadGeoJSONData();
 
-      // Set timeout for both operations
+      // Load NYC land data
+      const landPromise = fetch('/data/nyc_land.geojson')
+        .then(async response => {
+          if (!response.ok) return null;
+          try {
+            const data = await response.json();
+            console.log('Successfully loaded NYC land data');
+            return data;
+          } catch (error) {
+            console.warn('Failed to parse NYC land JSON:', error);
+            return null;
+          }
+        })
+        .catch(error => {
+          console.warn('Failed to load NYC land:', error);
+          return null;
+        });
+
+      // Set timeout for operations
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Data loading timeout')), 10000)
       );
 
-      const [roadsResult, mainDataResult] = await Promise.race([
-        Promise.all([roadsPromise, mainDataPromise]),
+      const [mainDataResult, landResult] = await Promise.race([
+        Promise.all([mainDataPromise, landPromise]),
         timeoutPromise
-      ]) as [any, FeatureCollection | null];
+      ]) as [FeatureCollection | null, any];
 
-      if (roadsResult) {
-        setRoadsData(roadsResult);
+      // Add NYC land layer first (wheat colored land)
+      if (landResult && map && mapLoaded) {
+        if (map.getSource('nyc-land')) {
+          (map.getSource('nyc-land') as maplibregl.GeoJSONSource).setData(landResult);
+        } else {
+          map.addSource('nyc-land', { type: 'geojson', data: landResult });
+          map.addLayer({
+            id: 'nyc-land-layer',
+            type: 'fill',
+            source: 'nyc-land',
+            paint: {
+              'fill-color': '#F5F5DC', // Wheat color for land
+              'fill-opacity': 1.0
+            }
+          });
+        }
+        console.log('Added NYC land layer');
       }
 
+      // Extract roads from main data
       if (mainDataResult && mainDataResult.features.length > 0) {
-        // Process features in small batches to prevent blocking
+        const roadFeatures = mainDataResult.features.filter(feature => {
+          if (feature.geometry.type !== 'LineString') return false;
+          const props = feature.properties || {};
+          // Look for road-like features, exclude coastlines
+          return props.highway || 
+                 props.name?.toLowerCase().includes('road') ||
+                 props.name?.toLowerCase().includes('street') ||
+                 props.name?.toLowerCase().includes('avenue') ||
+                 props.name?.toLowerCase().includes('drive') ||
+                 (props.name && !props.natural);
+        });
+
+        if (roadFeatures.length > 0 && map && mapLoaded) {
+          const roadsCollection = { type: 'FeatureCollection' as const, features: roadFeatures };
+          if (map.getSource('roads')) {
+            (map.getSource('roads') as maplibregl.GeoJSONSource).setData(roadsCollection as any);
+          } else {
+            map.addSource('roads', { type: 'geojson', data: roadsCollection });
+            map.addLayer({
+              id: 'roads-layer',
+              type: 'line',
+              source: 'roads',
+              paint: {
+                'line-color': '#666666',
+                'line-width': 2
+              }
+            });
+          }
+          console.log(`Added ${roadFeatures.length} road features`);
+        }
+
+        // Process other features in small batches to prevent blocking
         setTimeout(() => processSimpleFeatures(mainDataResult), 100);
       }
 
     } catch (error) {
       console.error('Error loading geographic data:', error);
     }
-  }, [loadGeoJSONData, processSimpleFeatures]);
+  }, [loadGeoJSONData, processSimpleFeatures, map, mapLoaded]);
 
   // Initialize map with minimal style
   useEffect(() => {
@@ -293,30 +345,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return () => clearTimeout(timeoutId);
     }
   }, [mapLoaded, map, loadGeographicData, isProcessing]);
-
-  // Add roads layer
-  useEffect(() => {
-    if (!mapLoaded || !map || !roadsData) return;
-
-    try {
-      if (map.getSource('roads')) {
-        (map.getSource('roads') as maplibregl.GeoJSONSource).setData(roadsData as any);
-      } else {
-        map.addSource('roads', { type: 'geojson', data: roadsData });
-        map.addLayer({
-          id: 'roads-layer',
-          type: 'line',
-          source: 'roads',
-          paint: {
-            'line-color': '#666666',
-            'line-width': 1
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Error adding roads:', error);
-    }
-  }, [mapLoaded, map, roadsData]);
 
   // Business markers - simplified
   useEffect(() => {
@@ -398,6 +426,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (!mapLoaded || !landmarks || !map) return;
 
+    console.log('Adding emoji landmarks:', landmarks);
+
     // Remove any previous markers
     landmarkMarkersRef.current.forEach(m => m.remove());
     landmarkMarkersRef.current = [];
@@ -405,25 +435,32 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (landmarks.length === 0) return;
 
     try {
-      const newMarkers: maplibregl.Marker[] = landmarks.map((landmark) => {
+      const newMarkers: maplibregl.Marker[] = landmarks.map((landmark, index) => {
+        console.log(`Creating marker ${index}:`, landmark);
+        
         const el = document.createElement('div');
         el.textContent = landmark.emoji;
         Object.assign(el.style, {
-          fontSize: '24px',
-          lineHeight: '24px',
+          fontSize: '32px',
+          lineHeight: '32px',
           userSelect: 'none',
           pointerEvents: 'none',
           textShadow: '0 0 3px rgba(255,255,255,0.9), 0 0 6px rgba(255,255,255,0.7)',
           zIndex: '9999'
         } as CSSStyleDeclaration);
 
+        console.log('Created element:', el, 'with coordinates:', [landmark.lng, landmark.lat]);
+
         const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
           .setLngLat([landmark.lng, landmark.lat])
           .addTo(map);
+        
+        console.log('Added marker to map:', marker);
         return marker;
       });
 
       landmarkMarkersRef.current = newMarkers;
+      console.log(`Successfully added ${newMarkers.length} emoji markers`);
     } catch (error) {
       console.error('Error adding emoji markers:', error);
     }
