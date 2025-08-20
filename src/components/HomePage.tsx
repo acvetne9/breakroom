@@ -73,7 +73,6 @@ const HomePage: React.FC<HomePageProps> = ({
   const landmarks = [
     {lat: 40.688602, lng: -74.044296, emoji: "🗽"},
     {lat: 40.705330, lng: -73.995885, emoji: "🌉"},
-    {lat: 40.7486, lng: -73.9857, emoji: "🌇"},
     {lat: 40.75266, lng: -73.97729, emoji: "🚇"},
     {lat: 40.75058, lng: -73.99358, emoji: "🚇"},
     {lat: 40.548575, lng: -74.0321778, emoji: "🐬"},
@@ -86,7 +85,7 @@ const HomePage: React.FC<HomePageProps> = ({
     {lat: 40.830000, lng: -73.926208, emoji: "🏟️"},
     {lat: 40.45022, lng: -73.59364, emoji: "🏟️"},
     {lat: 40.683047, lng: -73.975912, emoji: "🏟️"},
-    {lat: 40.759111, lng: -73.985294, emoji: "🎹"},
+    {lat: 40.759111, lng: -73.985294, emoji: "🎭"},
     {lat: 40.669823, lng: -73.965892, emoji: "🌺"},
     {lat: 40.572445, lng: -73.983244, emoji: "🎡"},
     {lat: 40.577249, lng: -73.837034, emoji: "🏖️"},
