@@ -159,7 +159,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 'fill-color': '#6EBD6C', // 80% green + 20% wheat
                 'fill-opacity': 0.6
               }
-            }, 'water-simple'); // Insert before water so water shows on top
+            }); // Parks layer added normally
           }
         }
 
@@ -256,7 +256,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 'line-color': '#666666',
                 'line-width': 2
               }
-            });
+            }, 'water-simple'); // Insert roads after water so they appear on top
           }
           console.log(`Added ${roadFeatures.length} road features`);
         }
