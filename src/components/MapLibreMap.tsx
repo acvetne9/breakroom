@@ -134,8 +134,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               type: 'fill',
               source: 'simple-water',
               paint: {
-                'fill-color': '#4A90E2',
-                'fill-opacity': 0.8  // Higher opacity since no overlaps
+                'fill-color': '#6CA4E1', // 80% water + 20% wheat
+                'fill-opacity': 1.0
               }
             });
           }
@@ -154,7 +154,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               type: 'fill',
               source: 'simple-parks',
               paint: {
-                'fill-color': '#4CAF50',
+                'fill-color': '#6EBD6C', // 80% green + 20% wheat
                 'fill-opacity': 0.6
               }
             }, 'water-simple'); // Insert before water so water shows on top
