@@ -61,20 +61,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     try {
       console.log(`Processing ${geoData.features.length} features...`);
 
-      // Simple water detection with deduplication
+      // Simple water detection with deduplication - EXCLUDE waterways
       const waterFeatures = geoData.features.filter(feature => {
         if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
         const props = feature.properties || {};
         const name = (props.name || '').toLowerCase();
         
-        // Exclude parks and Jamaica Bay areas from being classified as water
-        if (name.includes('park') || name.includes('jamaica bay unit') || name.includes('jamaica bay wildlife refuge')) return false;
+        // Exclude parks, Jamaica Bay areas, and waterways from being classified as water
+        if (name.includes('park') || name.includes('jamaica bay unit') || name.includes('jamaica bay wildlife refuge') || props.waterway) return false;
         
         return (
           props.natural === 'water' || 
           props.natural === 'bay' || 
-          props.waterway ||
-          // Named water bodies
+          // Named water bodies (but not waterways)
           ['river', 'bay', 'harbor', 'sound', 'creek', 'canal'].some(waterType => 
             name.includes(waterType)
           )
@@ -235,22 +234,30 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           const props = feature.properties || {};
           const name = (props.name || '').toLowerCase();
           
-          // Exclude coastlines and waterways
+          // Only include NYC roads - exclude coastlines and waterways
           if (props.natural === 'coastline' || props.waterway) return false;
           
-          // Include highways and named roads
+          // NYC-specific roads with highway property or NYC naming patterns
           return props.highway || 
-                 name.includes('road') ||
-                 name.includes('street') ||
-                 name.includes('avenue') ||
-                 name.includes('drive') ||
-                 name.includes('way') ||
-                 name.includes('lane') ||
-                 name.includes('place') ||
-                 name.includes('boulevard') ||
-                 name.includes('parkway') ||
-                 name.includes('expressway') ||
-                 (props.name && !props.natural && !props.waterway);
+                 (props.name && (
+                   name.includes('street') ||
+                   name.includes('avenue') ||
+                   name.includes('road') ||
+                   name.includes('drive') ||
+                   name.includes('way') ||
+                   name.includes('lane') ||
+                   name.includes('place') ||
+                   name.includes('boulevard') ||
+                   name.includes('parkway') ||
+                   name.includes('expressway') ||
+                   name.includes('fdr') ||
+                   name.includes('west side highway') ||
+                   name.includes('henry hudson') ||
+                   name.includes('brooklyn') ||
+                   name.includes('queens') ||
+                   name.includes('manhattan') ||
+                   name.includes('bronx')
+                 )) && !props.natural;
         });
 
         if (roadFeatures.length > 0 && map && mapLoaded) {
@@ -270,6 +277,33 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             }, 'water-simple'); // Insert roads after water so they appear on top
           }
           console.log(`Added ${roadFeatures.length} road features`);
+        }
+
+        // Add waterways as subtle uncolored lines
+        const waterwayFeatures = mainDataResult.features.filter(feature => {
+          if (feature.geometry.type !== 'LineString') return false;
+          const props = feature.properties || {};
+          return props.waterway || props.natural === 'coastline';
+        });
+
+        if (waterwayFeatures.length > 0 && map && mapLoaded) {
+          const waterwaysCollection = { type: 'FeatureCollection' as const, features: waterwayFeatures };
+          if (map.getSource('waterways')) {
+            (map.getSource('waterways') as maplibregl.GeoJSONSource).setData(waterwaysCollection as any);
+          } else {
+            map.addSource('waterways', { type: 'geojson', data: waterwaysCollection });
+            map.addLayer({
+              id: 'waterways-layer',
+              type: 'line',
+              source: 'waterways',
+              paint: {
+                'line-color': '#999999',
+                'line-width': 1,
+                'line-opacity': 0.6
+              }
+            }, 'roads-layer'); // Add before roads
+          }
+          console.log(`Added ${waterwayFeatures.length} waterway features`);
         }
 
         // Process other features in small batches to prevent blocking
