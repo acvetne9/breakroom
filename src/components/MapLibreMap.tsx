@@ -24,12 +24,14 @@ interface MapLibreMapProps {
   }[];
   onBusinessClick?: (business: any) => void;
   selectedBusiness?: any;
+  landmarks?: { lat: number; lng: number; emoji: string }[];
 }
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
   businesses,
   onBusinessClick,
-  selectedBusiness
+  selectedBusiness,
+  landmarks = []
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
@@ -462,6 +464,54 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.error('Error adding businesses:', error);
     }
   }, [mapLoaded, businesses, onBusinessClick, map, selectedBusiness]);
+
+  // Emoji landmarks - render on top of everything
+  useEffect(() => {
+    if (!mapLoaded || !landmarks || !map) return;
+
+    try {
+      // Clean up existing
+      if (map.getSource('landmarks')) {
+        if (map.getLayer('landmarks-layer')) {
+          map.removeLayer('landmarks-layer');
+        }
+        map.removeSource('landmarks');
+      }
+
+      if (landmarks.length === 0) return;
+
+      const landmarkFeatures = landmarks.map((landmark, index) => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [landmark.lng, landmark.lat] },
+        properties: { emoji: landmark.emoji, id: `landmark-${index}` }
+      }));
+
+      map.addSource('landmarks', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: landmarkFeatures }
+      });
+
+      map.addLayer({
+        id: 'landmarks-layer',
+        type: 'symbol',
+        source: 'landmarks',
+        layout: {
+          'text-field': ['get', 'emoji'],
+          'text-size': 24, // Fixed size regardless of zoom
+          'text-anchor': 'center',
+          'text-allow-overlap': true, // Always show emojis
+          'text-ignore-placement': true // Don't hide due to other labels
+        },
+        paint: {
+          'text-halo-color': 'rgba(255, 255, 255, 0.8)',
+          'text-halo-width': 2
+        }
+      });
+
+    } catch (error) {
+      console.error('Error adding landmarks:', error);
+    }
+  }, [mapLoaded, landmarks, map]);
 
   return (
     <div>
