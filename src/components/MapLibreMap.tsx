@@ -274,7 +274,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 'line-color': '#666666',
                 'line-width': 2
               }
-            }, 'water-simple'); // Insert roads after water so they appear on top
+            }); // Remove the before parameter
           }
           console.log(`Added ${roadFeatures.length} road features`);
         }
