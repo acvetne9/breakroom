@@ -26,6 +26,7 @@ interface MapLibreMapProps {
   selectedBusiness?: any;
 }
 
+
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
   businesses,
   onBusinessClick,
