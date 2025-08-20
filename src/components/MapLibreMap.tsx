@@ -233,13 +233,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         const roadFeatures = mainDataResult.features.filter(feature => {
           if (feature.geometry.type !== 'LineString') return false;
           const props = feature.properties || {};
-          // Look for road-like features, exclude coastlines
+          const name = (props.name || '').toLowerCase();
+          
+          // Exclude coastlines and waterways
+          if (props.natural === 'coastline' || props.waterway) return false;
+          
+          // Include highways and named roads
           return props.highway || 
-                 props.name?.toLowerCase().includes('road') ||
-                 props.name?.toLowerCase().includes('street') ||
-                 props.name?.toLowerCase().includes('avenue') ||
-                 props.name?.toLowerCase().includes('drive') ||
-                 (props.name && !props.natural);
+                 name.includes('road') ||
+                 name.includes('street') ||
+                 name.includes('avenue') ||
+                 name.includes('drive') ||
+                 name.includes('way') ||
+                 name.includes('lane') ||
+                 name.includes('place') ||
+                 name.includes('boulevard') ||
+                 name.includes('parkway') ||
+                 name.includes('expressway') ||
+                 (props.name && !props.natural && !props.waterway);
         });
 
         if (roadFeatures.length > 0 && map && mapLoaded) {
