@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import MapLibreMap from './MapLibreMap';
 import BusinessPreview from './BusinessPreview';
 import BusinessDetails from './BusinessDetails';
-import LandmarksControl from './LandmarksControl';
+
 import { searchBusinesses } from '../utils/searchUtils';
 import { isProfane } from '../utils/profanityFilter';
 import { Search } from 'lucide-react';
@@ -70,10 +70,10 @@ const HomePage: React.FC<HomePageProps> = ({
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [filteredBusinesses, setFilteredBusinesses] = useState(businesses);
   const [isSearchActive, setIsSearchActive] = useState(false);
-  const [landmarks, setLandmarks] = useState([
-    { lat: 40.7829, lng: -73.9654, emoji: '🏢' }, // Example landmark
-    { lat: 40.7589, lng: -73.9851, emoji: '🗽' }  // Statue of Liberty area
-  ]);
+  const landmarks = [
+    { lat: 40.7829, lng: -73.9654, emoji: '🏢' },
+    { lat: 40.7589, lng: -73.9851, emoji: '🗽' }
+  ];
   const { toast } = useToast();
 
   // Update filtered businesses when businesses prop changes
@@ -181,11 +181,6 @@ const HomePage: React.FC<HomePageProps> = ({
         landmarks={landmarks}
       />
       
-      {/* Landmarks Control */}
-      <LandmarksControl
-        landmarks={landmarks}
-        onLandmarksChange={setLandmarks}
-      />
       
       {/* Search results dropdown */}
       {searchResults.length > 0 && (
