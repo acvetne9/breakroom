@@ -279,11 +279,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           console.log(`Added ${roadFeatures.length} road features`);
         }
 
-        // Add waterways as subtle uncolored lines
+        // Add waterways as subtle uncolored lines (exclude coastlines)
         const waterwayFeatures = mainDataResult.features.filter(feature => {
           if (feature.geometry.type !== 'LineString') return false;
           const props = feature.properties || {};
-          return props.waterway || props.natural === 'coastline';
+          return props.waterway && props.natural !== 'coastline';
         });
 
         if (waterwayFeatures.length > 0 && map && mapLoaded) {
