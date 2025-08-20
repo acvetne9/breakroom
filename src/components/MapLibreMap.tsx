@@ -237,31 +237,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           // Only include NYC roads - exclude coastlines and waterways
           if (props.natural === 'coastline' || props.waterway) return false;
           
-          // Check if road is in New Jersey by coordinates (west of Hudson River)
-          try {
-            const coordinates = feature.geometry.coordinates;
-            if (coordinates && coordinates.length > 0) {
-              // Check if any point of the line is west of -74.0 (New Jersey territory)
-              const hasNJCoordinates = coordinates.some((coord: any) => {
-                const lng = Array.isArray(coord) ? coord[0] : coord.lng || coord.longitude;
-                return lng < -74.0;
-              });
-              if (hasNJCoordinates) return false;
-            }
-          } catch (e) {
-            // If coordinate check fails, fall back to name filtering
-          }
-          
-          // Exclude New Jersey roads explicitly by name
+          // Exclude New Jersey roads explicitly
           if (name.includes('new jersey') || 
               name.includes('nj ') || 
               name.includes('jersey') ||
               name.includes('hoboken') ||
               name.includes('weehawken') ||
               name.includes('union city') ||
-              name.includes('palisades') ||
-              name.includes('lincoln tunnel') ||
-              name.includes('holland tunnel')) return false;
+              name.includes('palisades')) return false;
           
           // NYC-specific roads with highway property or NYC naming patterns
           return props.highway || 
