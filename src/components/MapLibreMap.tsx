@@ -318,7 +318,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           minZoom: 8
         });
 
-        mapInstance.setMaxBounds([[-74.25909, 40.477399], [-73.700272, 40.917577]]);
+        mapInstance.setMaxBounds([[-74.25909, 40.507399], [-73.700272, 40.917577]]);
 
         mapInstance.on('load', () => {
           if (cleanedUp) return;
