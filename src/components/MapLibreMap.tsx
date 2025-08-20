@@ -61,21 +61,45 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     try {
       console.log(`Processing ${geoData.features.length} features...`);
 
-      // Extract waterways as lines (not colored as water)
-      const waterwayFeatures = geoData.features.filter(feature => {
-        if (feature.geometry.type !== 'LineString') return false;
+      // Simple water detection with deduplication
+      const waterFeatures = geoData.features.filter(feature => {
+        if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
         const props = feature.properties || {};
         const name = (props.name || '').toLowerCase();
         
+        // Exclude parks and Jamaica Bay areas from being classified as water
+        if (name.includes('park') || name.includes('jamaica bay unit') || name.includes('jamaica bay wildlife refuge')) return false;
+        
         return (
+          props.natural === 'water' || 
+          props.natural === 'bay' || 
           props.waterway ||
-          props.natural === 'coastline' ||
-          props.natural === 'shoreline' ||
-          name.includes('river') ||
-          name.includes('creek') ||
-          name.includes('canal')
+          // Named water bodies
+          ['river', 'bay', 'harbor', 'sound', 'creek', 'canal'].some(waterType => 
+            name.includes(waterType)
+          )
         );
       });
+
+      // Remove duplicate water features by location
+      const uniqueWaterFeatures = [];
+      const seenLocations = new Set();
+      
+      for (const feature of waterFeatures) {
+        try {
+          const centroid = turf.centroid(feature);
+          const [lng, lat] = centroid.geometry.coordinates;
+          const locationKey = `${Math.round(lng * 10000)}-${Math.round(lat * 10000)}`;
+          
+          if (!seenLocations.has(locationKey)) {
+            seenLocations.add(locationKey);
+            uniqueWaterFeatures.push(feature);
+          }
+        } catch (err) {
+          // If centroid fails, keep the feature anyway
+          uniqueWaterFeatures.push(feature);
+        }
+      }
 
       // Simple parks detection
       const parkFeatures = geoData.features.filter(feature => {
@@ -95,26 +119,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         );
       });
 
-      console.log(`Found ${waterwayFeatures.length} waterway features, ${parkFeatures.length} park features`);
+      console.log(`Found ${uniqueWaterFeatures.length} unique water features, ${parkFeatures.length} park features`);
 
       // Add to map if it exists and is loaded
       if (map && mapLoaded) {
-        // Add waterways as subtle lines
-        if (waterwayFeatures.length > 0) {
-          const waterwayCollection = { type: 'FeatureCollection' as const, features: waterwayFeatures };
+        // Add water (single layer to prevent overlaps)
+        if (uniqueWaterFeatures.length > 0) {
+          const waterCollection = { type: 'FeatureCollection' as const, features: uniqueWaterFeatures };
           
-          if (map.getSource('simple-waterways')) {
-            (map.getSource('simple-waterways') as maplibregl.GeoJSONSource).setData(waterwayCollection as any);
+          if (map.getSource('simple-water')) {
+            (map.getSource('simple-water') as maplibregl.GeoJSONSource).setData(waterCollection as any);
           } else {
-            map.addSource('simple-waterways', { type: 'geojson', data: waterwayCollection });
+            map.addSource('simple-water', { type: 'geojson', data: waterCollection });
             map.addLayer({
-              id: 'waterways-simple',
-              type: 'line',
-              source: 'simple-waterways',
+              id: 'water-simple',
+              type: 'fill',
+              source: 'simple-water',
               paint: {
-                'line-color': '#AAAAAA', // Subtle gray lines
-                'line-width': 1,
-                'line-opacity': 0.7
+                'fill-color': '#6CA4E1', // 80% water + 20% wheat
+                'fill-opacity': 1.0
               }
             });
           }
@@ -212,18 +235,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       if (mainDataResult && mainDataResult.features.length > 0) {
         const roadFeatures = mainDataResult.features.filter(feature => {
           if (feature.geometry.type !== 'LineString') return false;
-          const props = feature.properties || {} as any;
-          const name = (props.name || '').toLowerCase();
-
-          // Exclude non-road linear features
-          const isWaterRelated = props.waterway || props.natural === 'coastline' || props.natural === 'shoreline' || props.natural === 'water';
-          const isBoundary = props.boundary || props.admin_level;
-          const isRailOrAir = props.railway || props.aeroway;
-          if (isWaterRelated || isBoundary || isRailOrAir) return false;
-
-          // Consider typical road indicators only
-          const roadNameRegex = /\b(road|rd|street|st|avenue|ave|boulevard|blvd|drive|dr|lane|ln|way|parkway|pkwy|place|pl|terrace|ter|court|ct|highway|hwy|route|rt)\b/;
-          return !!props.highway || roadNameRegex.test(name);
+          const props = feature.properties || {};
+          // Look for road-like features, exclude coastlines
+          return props.highway || 
+                 props.name?.toLowerCase().includes('road') ||
+                 props.name?.toLowerCase().includes('street') ||
+                 props.name?.toLowerCase().includes('avenue') ||
+                 props.name?.toLowerCase().includes('drive') ||
+                 (props.name && !props.natural);
         });
 
         if (roadFeatures.length > 0 && map && mapLoaded) {
