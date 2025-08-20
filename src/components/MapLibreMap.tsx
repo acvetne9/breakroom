@@ -38,6 +38,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [roadsData, setRoadsData] = useState<FeatureCollection<LineString> | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
 
   const loadGeoJSONData = useCallback(async (): Promise<FeatureCollection | null> => {
     try {
@@ -393,52 +394,45 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded, businesses, onBusinessClick, map, selectedBusiness]);
 
-  // Emoji landmarks - render on top of everything
+  // Emoji landmarks - render on top of everything using HTML markers (emoji-friendly)
   useEffect(() => {
     if (!mapLoaded || !landmarks || !map) return;
 
+    // Remove any previous markers
+    landmarkMarkersRef.current.forEach(m => m.remove());
+    landmarkMarkersRef.current = [];
+
+    if (landmarks.length === 0) return;
+
     try {
-      // Clean up existing
-      if (map.getSource('landmarks')) {
-        if (map.getLayer('landmarks-layer')) {
-          map.removeLayer('landmarks-layer');
-        }
-        map.removeSource('landmarks');
-      }
+      const newMarkers: maplibregl.Marker[] = landmarks.map((landmark) => {
+        const el = document.createElement('div');
+        el.textContent = landmark.emoji;
+        Object.assign(el.style, {
+          fontSize: '24px',
+          lineHeight: '24px',
+          userSelect: 'none',
+          pointerEvents: 'none',
+          textShadow: '0 0 3px rgba(255,255,255,0.9), 0 0 6px rgba(255,255,255,0.7)',
+          zIndex: '9999'
+        } as CSSStyleDeclaration);
 
-      if (landmarks.length === 0) return;
-
-      const landmarkFeatures = landmarks.map((landmark, index) => ({
-        type: 'Feature' as const,
-        geometry: { type: 'Point' as const, coordinates: [landmark.lng, landmark.lat] },
-        properties: { emoji: landmark.emoji, id: `landmark-${index}` }
-      }));
-
-      map.addSource('landmarks', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: landmarkFeatures }
+        const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([landmark.lng, landmark.lat])
+          .addTo(map);
+        return marker;
       });
 
-      map.addLayer({
-        id: 'landmarks-layer',
-        type: 'symbol',
-        source: 'landmarks',
-        layout: {
-          'text-field': ['get', 'emoji'],
-          'text-size': 24, // Fixed size regardless of zoom
-          'text-anchor': 'center',
-          'text-allow-overlap': true, // Always show emojis
-          'text-ignore-placement': true // Don't hide due to other labels
-        },
-        paint: {
-          'text-halo-color': 'rgba(255, 255, 255, 0.8)',
-          'text-halo-width': 2
-        }
-      });
-
+      landmarkMarkersRef.current = newMarkers;
     } catch (error) {
-      console.error('Error adding landmarks:', error);
+      console.error('Error adding emoji markers:', error);
     }
+
+    // Cleanup on unmount or landmarks change
+    return () => {
+      landmarkMarkersRef.current.forEach(m => m.remove());
+      landmarkMarkersRef.current = [];
+    };
   }, [mapLoaded, landmarks, map]);
 
   return (
