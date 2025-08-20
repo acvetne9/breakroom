@@ -28,7 +28,6 @@ interface MapLibreMapProps {
   landmarks?: { lat: number; lng: number; emoji: string }[];
 }
 
-
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
   businesses,
   onBusinessClick,
