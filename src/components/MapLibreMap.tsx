@@ -163,7 +163,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         }
 
-        // Ensure businesses stay on top
+        // Ensure roads and businesses stay on top
+        if (map.getLayer('roads-layer')) {
+          map.moveLayer('roads-layer');
+        }
         if (map.getLayer('businesses-layer')) {
           map.moveLayer('businesses-layer');
         }
@@ -256,7 +259,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 'line-color': '#666666',
                 'line-width': 2
               }
-            }, 'water-simple'); // Insert roads after water so they appear on top
+            });
+            // Keep roads on top of water/land
+            map.moveLayer('roads-layer');
           }
           console.log(`Added ${roadFeatures.length} road features`);
         }
