@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import type { Feature, FeatureCollection, Polygon, MultiPolygon } from 'geojson';
 import maplibregl from 'maplibre-gl';
@@ -26,6 +27,7 @@ interface MapLibreMapProps {
   selectedBusiness?: any;
   landmarks?: { lat: number; lng: number; emoji: string }[];
 }
+
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
   businesses,
