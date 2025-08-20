@@ -61,6 +61,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     try {
       console.log(`Processing ${geoData.features.length} features...`);
 
+      // Extract waterways as lines (not colored as water)
+      const waterwayFeatures = geoData.features.filter(feature => {
+        if (feature.geometry.type !== 'LineString') return false;
+        const props = feature.properties || {};
+        const name = (props.name || '').toLowerCase();
+        
+        return (
+          props.waterway ||
+          props.natural === 'coastline' ||
+          props.natural === 'shoreline' ||
+          name.includes('river') ||
+          name.includes('creek') ||
+          name.includes('canal')
+        );
+      });
+
       // Simple parks detection
       const parkFeatures = geoData.features.filter(feature => {
         if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
@@ -79,10 +95,30 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         );
       });
 
-      console.log(`Found ${parkFeatures.length} park features`);
+      console.log(`Found ${waterwayFeatures.length} waterway features, ${parkFeatures.length} park features`);
 
       // Add to map if it exists and is loaded
       if (map && mapLoaded) {
+        // Add waterways as subtle lines
+        if (waterwayFeatures.length > 0) {
+          const waterwayCollection = { type: 'FeatureCollection' as const, features: waterwayFeatures };
+          
+          if (map.getSource('simple-waterways')) {
+            (map.getSource('simple-waterways') as maplibregl.GeoJSONSource).setData(waterwayCollection as any);
+          } else {
+            map.addSource('simple-waterways', { type: 'geojson', data: waterwayCollection });
+            map.addLayer({
+              id: 'waterways-simple',
+              type: 'line',
+              source: 'simple-waterways',
+              paint: {
+                'line-color': '#AAAAAA', // Subtle gray lines
+                'line-width': 1,
+                'line-opacity': 0.7
+              }
+            });
+          }
+        }
 
         // Add parks
         if (parkFeatures.length > 0) {
