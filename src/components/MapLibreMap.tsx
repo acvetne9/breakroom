@@ -62,7 +62,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     try {
       console.log(`Processing ${geoData.features.length} features...`);
 
-      // Simple water detection with deduplication - EXCLUDE waterways
+      // Simple water detection with deduplication - EXCLUDE waterways and park features
       const waterFeatures = geoData.features.filter(feature => {
         if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
         const props = feature.properties || {};
@@ -70,6 +70,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         
         // Exclude parks, Jamaica Bay areas, and waterways from being classified as water
         if (name.includes('park') || name.includes('jamaica bay unit') || name.includes('jamaica bay wildlife refuge') || props.waterway) return false;
+        
+        // Exclude park-like features from being colored as water
+        if (props.leisure === 'park' || 
+            props.leisure === 'garden' ||
+            props.leisure === 'cemetery' ||
+            props.leisure === 'nature_reserve' ||
+            props.landuse === 'meadow' ||
+            props.wetland === 'wet_meadow' ||
+            name.includes('cemetery')) return false;
         
         return (
           props.natural === 'water' || 
