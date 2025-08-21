@@ -236,16 +236,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           const name = (props.name || '').toLowerCase();
           
           // Only include NYC roads - exclude coastlines and waterways
-          if (props.natural === 'coastline' || 
-              props.waterway || 
-              props.natural === 'water' ||
-              props.natural === 'bay' ||
-              name.includes('river') ||
-              name.includes('creek') ||
-              name.includes('canal') ||
-              name.includes('bay') ||
-              name.includes('harbor') ||
-              name.includes('sound')) return false;
+          if (props.natural === 'coastline' || props.waterway) return false;
           
           // Exclude bikeways/cycleways from being styled as roads
           if (props.highway === 'cycleway' || props.highway === 'path' || props.bicycle === 'yes') return false;
