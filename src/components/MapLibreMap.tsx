@@ -488,25 +488,42 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (landmarks.length === 0) return;
 
     try {
+      const updateEmojiSize = () => {
+        const zoom = map.getZoom();
+        const baseSize = 16;
+        const scaleFactor = Math.pow(1.2, zoom - 10); // Scale relative to zoom level 10
+        const size = Math.max(12, Math.min(32, baseSize * scaleFactor)); // Min 12px, max 32px
+        
+        landmarkMarkersRef.current.forEach(marker => {
+          const element = marker.getElement();
+          if (element) {
+            element.style.fontSize = `${size}px`;
+            element.style.lineHeight = `${size}px`;
+            element.style.width = `${size}px`;
+            element.style.height = `${size}px`;
+          }
+        });
+      };
+
       const newMarkers: maplibregl.Marker[] = landmarks.map((landmark, index) => {
         console.log(`Creating marker ${index}:`, landmark);
+        
+        const zoom = map.getZoom();
+        const baseSize = 16;
+        const scaleFactor = Math.pow(1.2, zoom - 10);
+        const size = Math.max(12, Math.min(32, baseSize * scaleFactor));
         
         const el = document.createElement('div');
         el.textContent = landmark.emoji;
         Object.assign(el.style, {
-          fontSize: '24px',
-          lineHeight: '24px',
-          width: '24px',
-          height: '24px',
+          fontSize: `${size}px`,
+          lineHeight: `${size}px`,
+          width: `${size}px`,
+          height: `${size}px`,
           userSelect: 'none',
           pointerEvents: 'none',
           textShadow: '0 0 3px rgba(255,255,255,0.9), 0 0 6px rgba(255,255,255,0.7)',
           zIndex: '1',
-          transform: 'none',
-          transformOrigin: 'center',
-          transition: 'none',
-          animation: 'none',
-          scale: '1',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center'
@@ -523,6 +540,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
 
       landmarkMarkersRef.current = newMarkers;
+      
+      // Add zoom listener to update emoji sizes
+      map.on('zoom', updateEmojiSize);
+      
       console.log(`Successfully added ${newMarkers.length} emoji markers`);
     } catch (error) {
       console.error('Error adding emoji markers:', error);
