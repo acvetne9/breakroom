@@ -150,7 +150,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               source: 'simple-parks',
               paint: {
                 'fill-color': '#6EBD6C', // 80% green + 20% wheat
-                'fill-opacity': 0.6
+                'fill-opacity': 1.0
               }
             }); // Parks at bottom
           }
