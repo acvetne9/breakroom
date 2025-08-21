@@ -241,22 +241,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           // Exclude bikeways/cycleways from being styled as roads
           if (props.highway === 'cycleway' || props.highway === 'path' || props.bicycle === 'yes') return false;
           
-          // Exclude New Jersey roads explicitly - comprehensive filtering
+          // Exclude New Jersey roads explicitly
           if (name.includes('new jersey') || 
               name.includes('nj ') || 
               name.includes('jersey') ||
               name.includes('hoboken') ||
               name.includes('weehawken') ||
               name.includes('union city') ||
-              name.includes('palisades') ||
-              name.includes('bergen') ||
-              name.includes('hudson') ||
-               // Check coordinates - if longitude > -74.0, likely NJ
-               (feature.geometry.coordinates && 
-                Array.isArray(feature.geometry.coordinates) && 
-                feature.geometry.coordinates.length > 0 && 
-                Array.isArray(feature.geometry.coordinates[0]) && 
-                feature.geometry.coordinates[0][0] > -74.0)) return false;
+              name.includes('palisades')) return false;
           
           // NYC-specific roads with highway property or NYC naming patterns
           return props.highway || 
