@@ -228,50 +228,33 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         console.log('Added NYC land layer');
       }
 
-      // Extract roads from main data
-      if (mainDataResult && mainDataResult.features.length > 0) {
-        const roadFeatures = mainDataResult.features.filter(feature => {
-          if (feature.geometry.type !== 'LineString') return false;
-          const props = feature.properties || {};
-          const name = (props.name || '').toLowerCase();
-          
-          // Only include NYC roads - exclude coastlines and waterways
-          if (props.natural === 'coastline' || props.waterway) return false;
-          
-          // Exclude bikeways/cycleways from being styled as roads
-          if (props.highway === 'cycleway' || props.highway === 'path' || props.bicycle === 'yes') return false;
-          
-          // Exclude New Jersey roads explicitly
-          if (name.includes('new jersey') || 
-              name.includes('nj ') || 
-              name.includes('jersey') ||
-              name.includes('hoboken') ||
-              name.includes('weehawken') ||
-              name.includes('union city') ||
-              name.includes('palisades')) return false;
-          
-          // NYC-specific roads with highway property or NYC naming patterns
-          return props.highway || 
-                 (props.name && (
-                   name.includes('street') ||
-                   name.includes('avenue') ||
-                   name.includes('road') ||
-                   name.includes('drive') ||
-                   name.includes('way') ||
-                   name.includes('lane') ||
-                   name.includes('place') ||
-                   name.includes('boulevard') ||
-                   name.includes('parkway') ||
-                   name.includes('expressway') ||
-                   name.includes('fdr') ||
-                   name.includes('west side highway') ||
-                   name.includes('henry hudson') ||
-                   name.includes('brooklyn') ||
-                   name.includes('queens') ||
-                   name.includes('manhattan') ||
-                   name.includes('bronx')
-                 )) && !props.natural;
-        });
+        // Extract roads from main data
+        if (mainDataResult && mainDataResult.features.length > 0) {
+          const roadFeatures = mainDataResult.features.filter(feature => {
+            if (feature.geometry.type !== 'LineString') return false;
+            const props = feature.properties || {};
+            const name = (props.name || '').toLowerCase();
+            
+            // Only include features with highway property
+            if (!props.highway) return false;
+            
+            // Exclude coastlines and waterways
+            if (props.natural === 'coastline' || props.waterway) return false;
+            
+            // Exclude bikeways/cycleways from being styled as roads
+            if (props.highway === 'cycleway' || props.highway === 'path' || props.bicycle === 'yes') return false;
+            
+            // Exclude New Jersey roads explicitly
+            if (name.includes('new jersey') || 
+                name.includes('nj ') || 
+                name.includes('jersey') ||
+                name.includes('hoboken') ||
+                name.includes('weehawken') ||
+                name.includes('union city') ||
+                name.includes('palisades')) return false;
+            
+            return true;
+          });
 
         if (roadFeatures.length > 0 && map && mapLoaded) {
           const roadsCollection = { type: 'FeatureCollection' as const, features: roadFeatures };
