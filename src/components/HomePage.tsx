@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import MapLibreMap from './MapLibreMap';
 import BusinessPreview from './BusinessPreview';
 import BusinessDetails from './BusinessDetails';
+
 import { searchBusinesses } from '../utils/searchUtils';
 import { isProfane } from '../utils/profanityFilter';
 import { Search } from 'lucide-react';
@@ -69,6 +70,28 @@ const HomePage: React.FC<HomePageProps> = ({
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [filteredBusinesses, setFilteredBusinesses] = useState(businesses);
   const [isSearchActive, setIsSearchActive] = useState(false);
+  const landmarks = [
+    {lat: 40.688602, lng: -74.044296, emoji: "🗽"},
+    {lat: 40.705330, lng: -73.995885, emoji: "🌉"},
+    {lat: 40.75266, lng: -73.97729, emoji: "🚇"},
+    {lat: 40.75058, lng: -73.99358, emoji: "🚇"},
+    {lat: 40.548575, lng: -74.0321778, emoji: "🐬"},
+    {lat: 40.547303, lng: -73.794261, emoji: "🦈"},
+    {lat: 40.869180, lng: -73.755437, emoji: "🐠"},
+    {lat: 40.781713, lng: -73.966566, emoji: "🪁"},
+    {lat: 40.641540, lng: -73.772358, emoji: "✈️"},
+    {lat: 40.777721, lng: -73.875939, emoji: "✈️"},
+    {lat: 40.756317, lng: -73.847403, emoji: "🏟️"},
+    {lat: 40.830000, lng: -73.926208, emoji: "🏟️"},
+    {lat: 40.45022, lng: -73.59364, emoji: "🏟️"},
+    {lat: 40.683047, lng: -73.975912, emoji: "🏟️"},
+    {lat: 40.759111, lng: -73.985294, emoji: "🎭"},
+    {lat: 40.669823, lng: -73.965892, emoji: "🌺"},
+    {lat: 40.572445, lng: -73.983244, emoji: "🎡"},
+    {lat: 40.577249, lng: -73.837034, emoji: "🏖️"},
+    {lat: 40.574829, lng: -73.959530, emoji: "🏖️"},
+    {lat: 40.573527, lng: -74.082761, emoji: "🏖️"},
+]
   const { toast } = useToast();
 
   // Update filtered businesses when businesses prop changes
@@ -173,7 +196,9 @@ const HomePage: React.FC<HomePageProps> = ({
         businesses={businesses}
         onBusinessClick={handleBusinessClick}
         selectedBusiness={selectedBusiness}
+        landmarks={landmarks}
       />
+      
       
       {/* Search results dropdown */}
       {searchResults.length > 0 && (
