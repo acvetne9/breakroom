@@ -494,12 +494,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         const el = document.createElement('div');
         el.textContent = landmark.emoji;
         Object.assign(el.style, {
-          fontSize: '32px',
-          lineHeight: '32px',
+          fontSize: '24px',
+          lineHeight: '24px',
+          width: '24px',
+          height: '24px',
           userSelect: 'none',
           pointerEvents: 'none',
           textShadow: '0 0 3px rgba(255,255,255,0.9), 0 0 6px rgba(255,255,255,0.7)',
-          zIndex: '1'
+          zIndex: '1',
+          transform: 'none',
+          transformOrigin: 'center',
+          transition: 'none',
+          animation: 'none',
+          scale: '1',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
         } as CSSStyleDeclaration);
 
         console.log('Created element:', el, 'with coordinates:', [landmark.lng, landmark.lat]);
