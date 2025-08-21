@@ -174,7 +174,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 'fill-color': '#6CA4E1', // 80% water + 20% wheat
                 'fill-opacity': 1.0
               }
-            }, 'roads-layer'); // Add water below roads but above parks
+            }); // Water above parks, roads will be added on top
           }
         }
 
