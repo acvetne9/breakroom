@@ -114,6 +114,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           props.leisure === 'park' || 
           props.leisure === 'garden' ||
           props.leisure === 'cemetery' ||
+          props.leisure === 'nature_reserve' ||
+          props.landuse === 'meadow' ||
+          props.wetland === 'wet_meadow' ||
           name.includes('park') ||
           name.includes('cemetery')
         );
