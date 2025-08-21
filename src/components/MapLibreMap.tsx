@@ -235,17 +235,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           const props = feature.properties || {};
           const name = (props.name || '').toLowerCase();
           
-          // Only include NYC roads - exclude coastlines and waterways
-          if (props.natural === 'coastline' || 
-              props.waterway || 
-              props.natural === 'water' ||
-              props.natural === 'bay' ||
-              name.includes('river') ||
-              name.includes('creek') ||
-              name.includes('canal') ||
-              name.includes('bay') ||
-              name.includes('harbor') ||
-              name.includes('sound')) return false;
+          // Only include NYC roads - exclude coastlines and all waterways/tidal channels
+          if (
+            props.natural === 'coastline' ||
+            props.waterway || // any waterway: river, stream, canal, tidal_channel, etc.
+            props.natural === 'water' ||
+            props.natural === 'bay' ||
+            props.natural === 'channel' ||
+            props.natural === 'tidal_channel' ||
+            props.natural === 'strait' ||
+            name.includes('river') ||
+            name.includes('creek') ||
+            name.includes('canal') ||
+            name.includes('bay') ||
+            name.includes('harbor') ||
+            name.includes('sound') ||
+            name.includes('channel') ||
+            name.includes('tidal') ||
+            name.includes('inlet')
+          ) return false;
           
           // Exclude bikeways/cycleways from being styled as roads
           if (props.highway === 'cycleway' || props.highway === 'path' || props.bicycle === 'yes') return false;
