@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import type { Feature, FeatureCollection, Polygon, MultiPolygon } from 'geojson';
 import maplibregl from 'maplibre-gl';
