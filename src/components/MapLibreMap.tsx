@@ -240,12 +240,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               props.waterway || 
               props.natural === 'water' ||
               props.natural === 'bay' ||
+              props.natural === 'tidal_channel' ||
               name.includes('river') ||
               name.includes('creek') ||
               name.includes('canal') ||
               name.includes('bay') ||
               name.includes('harbor') ||
-              name.includes('sound')) return false;
+              name.includes('sound') ||
+              name.includes('tidal') ||
+              name.includes('channel') ||
+              name.includes('jamaica bay') ||
+              name.includes('inlet')) return false;
           
           // Exclude bikeways/cycleways from being styled as roads
           if (props.highway === 'cycleway' || props.highway === 'path' || props.bicycle === 'yes') return false;
