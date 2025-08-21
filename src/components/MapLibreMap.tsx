@@ -149,14 +149,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               type: 'fill',
               source: 'simple-parks',
               paint: {
-                'fill-color': '#6EBD6C', // 80% green + 20% wheat
+                'fill-color': '#87C17A', // 80% green + 20% wheat
                 'fill-opacity': 1.0
               }
             }); // Parks at bottom
           }
         }
 
-        // Add water ABOVE parks but will be below roads when roads are added
+        // Add water ABOVE parks but BELOW roads
         if (uniqueWaterFeatures.length > 0) {
           const waterCollection = { type: 'FeatureCollection' as const, features: uniqueWaterFeatures };
           
@@ -172,7 +172,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 'fill-color': '#6CA4E1', // 80% water + 20% wheat
                 'fill-opacity': 1.0
               }
-            }); // Water above parks
+            }, 'roads-layer'); // Add water below roads but above parks
           }
         }
 
