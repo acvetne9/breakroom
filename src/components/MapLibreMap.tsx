@@ -156,7 +156,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         }
 
-        // Add water ABOVE parks but BELOW roads
+        // Add water ABOVE parks but will be below roads when roads are added
         if (uniqueWaterFeatures.length > 0) {
           const waterCollection = { type: 'FeatureCollection' as const, features: uniqueWaterFeatures };
           
@@ -172,7 +172,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 'fill-color': '#6CA4E1', // 80% water + 20% wheat
                 'fill-opacity': 1.0
               }
-            }, 'roads-layer'); // Add water below roads but above parks
+            }); // Water above parks
           }
         }
 
