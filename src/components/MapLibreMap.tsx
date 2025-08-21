@@ -62,11 +62,40 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     try {
       console.log(`Processing ${geoData.features.length} features...`);
 
-      // Simple water detection with deduplication - EXCLUDE waterways and park-like features
+      // Process parks FIRST to prevent them from being classified as water
+      const parkFeatures = geoData.features.filter(feature => {
+        if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
+        const props = feature.properties || {};
+        const name = (props.name || '').toLowerCase();
+        
+        // Exclude Jamaica Bay Reserve and Jamaica Bay Unit
+        if (name.includes('jamaica bay reserve') || name.includes('jamaica bay unit')) return false;
+        // Exclude specific Jamaica Bay Unit by ID
+        if (props.id === 1232494364 || props.id === '1232494364') return false;
+        
+        return (
+          props.leisure === 'park' || 
+          props.leisure === 'garden' ||
+          props.leisure === 'cemetery' ||
+          props.leisure === 'nature_reserve' ||
+          props.landuse === 'meadow' ||
+          props.wetland === 'wet_meadow' ||
+          name.includes('park') ||
+          name.includes('cemetery')
+        );
+      });
+
+      // Create set of park feature IDs to exclude from water processing
+      const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
+
+      // Water detection - exclude features already classified as parks
       const waterFeatures = geoData.features.filter(feature => {
         if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
         const props = feature.properties || {};
         const name = (props.name || '').toLowerCase();
+        
+        // Exclude if already classified as park
+        if (parkFeatureIds.has(props?.id) || parkFeatureIds.has(feature.id)) return false;
         
         // Exclude parks, Jamaica Bay areas, waterways, and park-like features from being classified as water
         if (name.includes('park') || name.includes('jamaica bay unit') || name.includes('jamaica bay wildlife refuge') || props.waterway) return false;
@@ -104,54 +133,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         }
       }
 
-      // Simple parks detection
-      const parkFeatures = geoData.features.filter(feature => {
-        if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
-        const props = feature.properties || {};
-        const name = (props.name || '').toLowerCase();
-        
-        // Exclude Jamaica Bay Reserve and Jamaica Bay Unit
-        if (name.includes('jamaica bay reserve') || name.includes('jamaica bay unit')) return false;
-        // Exclude specific Jamaica Bay Unit by ID
-        if (props.id === 1232494364 || props.id === '1232494364') return false;
-        
-        return (
-          props.leisure === 'park' || 
-          props.leisure === 'garden' ||
-          props.leisure === 'cemetery' ||
-          props.leisure === 'nature_reserve' ||
-          props.landuse === 'meadow' ||
-          props.wetland === 'wet_meadow' ||
-          name.includes('park') ||
-          name.includes('cemetery')
-        );
-      });
-
-      console.log(`Found ${uniqueWaterFeatures.length} unique water features, ${parkFeatures.length} park features`);
+      console.log(`Found ${parkFeatures.length} park features, ${uniqueWaterFeatures.length} unique water features`);
 
       // Add to map if it exists and is loaded
       if (map && mapLoaded) {
-        // Add water (single layer to prevent overlaps)
-        if (uniqueWaterFeatures.length > 0) {
-          const waterCollection = { type: 'FeatureCollection' as const, features: uniqueWaterFeatures };
-          
-          if (map.getSource('simple-water')) {
-            (map.getSource('simple-water') as maplibregl.GeoJSONSource).setData(waterCollection as any);
-          } else {
-            map.addSource('simple-water', { type: 'geojson', data: waterCollection });
-            map.addLayer({
-              id: 'water-simple',
-              type: 'fill',
-              source: 'simple-water',
-              paint: {
-                'fill-color': '#6CA4E1', // 80% water + 20% wheat
-                'fill-opacity': 1.0
-              }
-            }, 'roads-layer'); // Add water below roads
-          }
-        }
-
-        // Add parks
+        // Add parks FIRST (bottom layer)
         if (parkFeatures.length > 0) {
           const parksCollection = { type: 'FeatureCollection' as const, features: parkFeatures };
           
@@ -167,7 +153,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 'fill-color': '#6EBD6C', // 80% green + 20% wheat
                 'fill-opacity': 0.6
               }
-            }); // Parks layer added normally
+            }); // Parks at bottom
+          }
+        }
+
+        // Add water ABOVE parks but BELOW roads
+        if (uniqueWaterFeatures.length > 0) {
+          const waterCollection = { type: 'FeatureCollection' as const, features: uniqueWaterFeatures };
+          
+          if (map.getSource('simple-water')) {
+            (map.getSource('simple-water') as maplibregl.GeoJSONSource).setData(waterCollection as any);
+          } else {
+            map.addSource('simple-water', { type: 'geojson', data: waterCollection });
+            map.addLayer({
+              id: 'water-simple',
+              type: 'fill',
+              source: 'simple-water',
+              paint: {
+                'fill-color': '#6CA4E1', // 80% water + 20% wheat
+                'fill-opacity': 1.0
+              }
+            }, 'roads-layer'); // Add water below roads but above parks
           }
         }
 
