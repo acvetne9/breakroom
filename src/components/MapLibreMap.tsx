@@ -177,9 +177,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         }
 
-        // Ensure businesses stay on top
+        // Ensure proper layer ordering: businesses first, then roads on top
         if (map.getLayer('businesses-layer')) {
           map.moveLayer('businesses-layer');
+        }
+        if (map.getLayer('roads-layer')) {
+          map.moveLayer('roads-layer');
         }
       }
 
