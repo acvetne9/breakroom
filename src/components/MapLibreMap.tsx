@@ -51,11 +51,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           'pmtiles': {
             type: 'vector',
             url: 'pmtiles://data/neatogeo_nyc.pmtiles'
-          },
-          'pmtiles-raster': {
-            type: 'raster',
-            url: 'pmtiles://data/neatogeo_nyc.pmtiles',
-            tileSize: 256
           }
         },
         layers: [
@@ -65,11 +60,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             paint: {
               'background-color': '#f8f8f8'
             }
-          },
-          {
-            id: 'pmtiles-raster-layer',
-            type: 'raster',
-            source: 'pmtiles-raster'
           },
           {
             id: 'water',
