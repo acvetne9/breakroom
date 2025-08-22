@@ -66,6 +66,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     let cleanedUp = false;
 
     const initializeMap = async () => {
+      console.log('MapLibreMap: initializing map');
       // Add PMTiles protocol
       const protocol = new pmtiles.Protocol();
       maplibregl.addProtocol('pmtiles', protocol.tile);
@@ -157,6 +158,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         maxZoom: 18,
         minZoom: 8
       });
+      console.log('MapLibreMap: map instance created', { center: [-73.986104, 40.715245], zoom: 12.77 });
 
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
 
@@ -262,9 +264,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Handle business markers
   useEffect(() => {
-    if (!mapLoaded || !businesses || !map) return;
+    if (!mapLoaded || !businesses || !map) {
+      console.log('Businesses effect skipped', { mapLoaded, hasBusinesses: !!businesses, mapExists: !!map, count: businesses?.length });
+      return;
+    }
+
+    console.log('Businesses effect running', { count: businesses.length, selectedBusinessId: selectedBusiness?.id });
 
     const cleanup = addBusinessesLayer(map, businesses, selectedBusiness, onBusinessClick);
+    try {
+      console.log('Post addBusinessesLayer. Has layer?', !!map.getLayer('businesses-layer'));
+    } catch (e) {
+      console.log('Error checking businesses-layer presence', e);
+    }
     return cleanup;
   }, [mapLoaded, businesses, onBusinessClick, map, selectedBusiness]);
 
