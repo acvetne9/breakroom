@@ -1,8 +1,6 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { PMTiles, Protocol } from 'pmtiles';
-import { addBusinessesLayer } from '../utils/mapLayers';
 
 interface MapLibreMapProps {
   businesses: {
@@ -27,7 +25,6 @@ interface MapLibreMapProps {
   landmarks?: { lat: number; lng: number; emoji: string }[];
 }
 
-
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
   businesses,
   onBusinessClick,
@@ -36,28 +33,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
-  const [mapLoaded, setMapLoaded] = useState(false);
-  const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
 
-  // Initialize map
   useEffect(() => {
     if (!mapRef.current) return;
 
-    let mapInstance: maplibregl.Map | null = null;
-    let cleanedUp = false;
-
-    const initializeMap = async () => {
-      console.log('MapLibreMap: initializing map with PMTiles protocol');
-
-      // Register PMTiles protocol
-      const protocol = new Protocol();
-      maplibregl.addProtocol('pmtiles', protocol.tile);
-
-      console.log('PMTiles protocol registered');
-
-      // Create a simple basemap style without PMTiles for now
-      const mapStyle: any = {
-        version: 8 as const,
+    const mapInstance = new maplibregl.Map({
+      container: mapRef.current,
+      style: {
+        version: 8,
         sources: {
           'osm': {
             type: 'raster',
@@ -73,164 +56,92 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             source: 'osm'
           }
         ]
-      };
-      console.log('MapLibreMap: creating map instance...');
-      mapInstance = new maplibregl.Map({
-        container: mapRef.current!,
-        style: mapStyle,
-        center: [-73.986104, 40.715245],
-        zoom: 12.77,
-        maxZoom: 18,
-        minZoom: 8
-      });
-      console.log('MapLibreMap: map instance created successfully');
+      },
+      center: [-73.986104, 40.715245], // NYC center
+      zoom: 12
+    });
 
-      mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
-
-      mapInstance.on('load', () => {
-        if (cleanedUp) return;
-        console.log('*** MAP LOAD EVENT FIRED ***');
-        console.log('Map loaded successfully with PMTiles');
-        
-        console.log('Setting mapLoaded to true...');
-        setMapLoaded(true);
-        console.log('mapLoaded state updated');
-      });
-
-      // Log current zoom and center when map moves
-      mapInstance.on('moveend', () => {
-        if (mapInstance) {
-          const zoom = mapInstance.getZoom();
-          const center = mapInstance.getCenter();
-          console.log(`Current zoom: ${zoom.toFixed(2)} | Center: [${center.lng.toFixed(6)}, ${center.lat.toFixed(6)}]`);
-        }
-      });
-
-      mapInstance.on('error', e => {
-        console.error('Map error:', e.error);
-      });
-
-      setMap(mapInstance);
-    };
-
-    initializeMap();
+    setMap(mapInstance);
 
     return () => {
-      cleanedUp = true;
-      if (mapInstance) {
-        try {
-          mapInstance.remove();
-        } catch (error) {
-          console.error('Error removing map:', error);
-        }
-      }
+      mapInstance.remove();
       setMap(null);
-      setMapLoaded(false);
     };
   }, []);
 
-  // No longer needed - vector tiles are loaded directly in map style
-
-  // Handle business markers
+  // Add business markers
   useEffect(() => {
-    if (!mapLoaded || !businesses || !map) {
-      console.log('Businesses effect skipped', { mapLoaded, hasBusinesses: !!businesses, mapExists: !!map, count: businesses?.length });
-      return;
-    }
+    if (!map || !businesses.length) return;
 
-    console.log('Businesses effect running', { count: businesses.length, selectedBusinessId: selectedBusiness?.id });
-
-    const cleanup = addBusinessesLayer(map, businesses, selectedBusiness, onBusinessClick);
-    try {
-      console.log('Post addBusinessesLayer. Has layer?', !!map.getLayer('businesses-layer'));
-    } catch (e) {
-      console.log('Error checking businesses-layer presence', e);
-    }
-    return cleanup;
-  }, [mapLoaded, businesses, onBusinessClick, map, selectedBusiness]);
-
-  // Handle landmark markers
-  useEffect(() => {
-    if (!mapLoaded || !landmarks || !map) return;
-
-    console.log('Adding emoji landmarks:', landmarks);
-
-    // Remove any previous markers
-    landmarkMarkersRef.current.forEach(m => m.remove());
-    landmarkMarkersRef.current = [];
-
-    if (landmarks.length === 0) return;
-
-    try {
-      const updateEmojiSize = () => {
-        const zoom = map.getZoom();
-        const baseSize = 16;
-        const scaleFactor = Math.pow(1.2, zoom - 10);
-        const size = Math.max(12, Math.min(32, baseSize * scaleFactor));
-        
-        landmarkMarkersRef.current.forEach(marker => {
-          const element = marker.getElement();
-          if (element) {
-            element.style.fontSize = `${size}px`;
-            element.style.lineHeight = `${size}px`;
-            element.style.width = `${size}px`;
-            element.style.height = `${size}px`;
-          }
-        });
-      };
-
-      const newMarkers: maplibregl.Marker[] = landmarks.map((landmark, index) => {
-        console.log(`Creating marker ${index}:`, landmark);
-        
-        const zoom = map.getZoom();
-        const baseSize = 16;
-        const scaleFactor = Math.pow(1.2, zoom - 10);
-        const size = Math.max(12, Math.min(32, baseSize * scaleFactor));
-        
-        const el = document.createElement('div');
-        el.textContent = landmark.emoji;
-        Object.assign(el.style, {
-          fontSize: `${size}px`,
-          lineHeight: `${size}px`,
-          width: `${size}px`,
-          height: `${size}px`,
-          userSelect: 'none',
-          pointerEvents: 'none',
-          textShadow: '0 0 3px rgba(255,255,255,0.9), 0 0 6px rgba(255,255,255,0.7)',
-          zIndex: '1',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        } as CSSStyleDeclaration);
-
-        const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
-          .setLngLat([landmark.lng, landmark.lat])
-          .addTo(map);
-        
-        return marker;
+    // Add business markers as simple HTML markers
+    const markers: maplibregl.Marker[] = [];
+    
+    businesses.forEach(business => {
+      const el = document.createElement('div');
+      el.style.cssText = `
+        width: 20px;
+        height: 20px;
+        background-color: ${selectedBusiness?.id === business.id ? '#ff0000' : '#ffaa00'};
+        border: 2px solid white;
+        border-radius: 50%;
+        cursor: pointer;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      `;
+      
+      el.addEventListener('click', () => {
+        if (onBusinessClick) {
+          onBusinessClick(business);
+        }
       });
 
-      landmarkMarkersRef.current = newMarkers;
+      const marker = new maplibregl.Marker(el)
+        .setLngLat([business.position.lng, business.position.lat])
+        .addTo(map);
       
-      // Add zoom listener to update emoji sizes
-      map.on('zoom', updateEmojiSize);
-      
-      console.log(`Successfully added ${newMarkers.length} emoji markers`);
-    } catch (error) {
-      console.error('Error adding emoji markers:', error);
-    }
+      markers.push(marker);
+    });
 
-    // Cleanup on unmount or landmarks change
     return () => {
-      landmarkMarkersRef.current.forEach(m => m.remove());
-      landmarkMarkersRef.current = [];
+      markers.forEach(marker => marker.remove());
     };
-  }, [mapLoaded, landmarks, map]);
+  }, [map, businesses, selectedBusiness, onBusinessClick]);
+
+  // Add landmark emojis
+  useEffect(() => {
+    if (!map || !landmarks.length) return;
+
+    const markers: maplibregl.Marker[] = [];
+    
+    landmarks.forEach(landmark => {
+      const el = document.createElement('div');
+      el.textContent = landmark.emoji;
+      el.style.cssText = `
+        font-size: 24px;
+        cursor: default;
+        user-select: none;
+        text-shadow: 0 0 3px rgba(255,255,255,0.9);
+      `;
+
+      const marker = new maplibregl.Marker(el)
+        .setLngLat([landmark.lng, landmark.lat])
+        .addTo(map);
+      
+      markers.push(marker);
+    });
+
+    return () => {
+      markers.forEach(marker => marker.remove());
+    };
+  }, [map, landmarks]);
 
   return (
     <div
       ref={mapRef}
-      style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
+      style={{ 
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#f0f0f0'
+      }}
     />
   );
 };
