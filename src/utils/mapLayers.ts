@@ -109,12 +109,12 @@ export const addRoadsLayer = (map: maplibregl.Map, roadFeatures: any[]) => {
 };
 
 export const ensureLayerOrder = (map: maplibregl.Map) => {
-  // Ensure proper layer ordering: businesses first, then roads on top
-  if (map.getLayer('businesses-layer')) {
-    map.moveLayer('businesses-layer');
-  }
+  // Ensure proper layer ordering: roads over water/parks, businesses over roads
   if (map.getLayer('roads-layer')) {
     map.moveLayer('roads-layer');
+  }
+  if (map.getLayer('businesses-layer')) {
+    map.moveLayer('businesses-layer');
   }
 };
 
