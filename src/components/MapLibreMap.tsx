@@ -112,8 +112,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     mapInstance = new maplibregl.Map({
       container: mapRef.current!,
       style: baseStyle,
-      center: [-73.9712, 40.7831],
-      zoom: 12,
+      center: [-73.986104, 40.715245],
+      zoom: 12.77,
       maxZoom: 18,
       minZoom: 8
     });
