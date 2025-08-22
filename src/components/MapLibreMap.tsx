@@ -126,6 +126,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       setMapLoaded(true);
     });
 
+    // Log current zoom and center when map moves
+    mapInstance.on('moveend', () => {
+      if (mapInstance) {
+        const zoom = mapInstance.getZoom();
+        const center = mapInstance.getCenter();
+        console.log(`Current zoom: ${zoom.toFixed(2)} | Center: [${center.lng.toFixed(6)}, ${center.lat.toFixed(6)}]`);
+      }
+    });
+
     mapInstance.on('error', e => {
       console.error('Map error:', e.error);
     });
