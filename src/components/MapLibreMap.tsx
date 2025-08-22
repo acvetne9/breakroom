@@ -60,7 +60,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         sources: {
           'nyc': {
             type: 'vector' as const,
-            url: 'pmtiles://data/nyc.mbtiles'
+            url: 'pmtiles://data/neatogeo_nyc.pmtiles'
           }
         },
         layers: [
