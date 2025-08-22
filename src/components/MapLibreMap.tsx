@@ -51,6 +51,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           'pmtiles': {
             type: 'vector',
             url: 'pmtiles://data/neatogeo_nyc.pmtiles'
+          },
+          'pmtiles-raster': {
+            type: 'raster',
+            url: 'pmtiles://data/neatogeo_nyc.pmtiles',
+            tileSize: 256
           }
         },
         layers: [
@@ -60,6 +65,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             paint: {
               'background-color': '#f8f8f8'
             }
+          },
+          {
+            id: 'pmtiles-raster-layer',
+            type: 'raster',
+            source: 'pmtiles-raster'
           },
           {
             id: 'water',
@@ -154,6 +164,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         }
       });
 
+      el.className = 'hover-scale';
+      el.textContent = '🏢';
+
       const marker = new maplibregl.Marker(el)
         .setLngLat([business.position.lng, business.position.lat])
         .addTo(map);
@@ -184,6 +197,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         transform: scale(1);
         transition: transform 0.2s ease;
       `;
+      
+      el.className = 'hover-scale';
       
       el.addEventListener('mouseenter', () => {
         el.style.transform = 'scale(1.2)';
