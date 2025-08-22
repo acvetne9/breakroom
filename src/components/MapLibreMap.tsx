@@ -46,31 +46,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     let cleanedUp = false;
 
     const initializeMap = async () => {
-      console.log('MapLibreMap: initializing map with local PMTiles');
+      console.log('MapLibreMap: initializing map with PMTiles protocol');
 
       // Register PMTiles protocol
       const protocol = new Protocol();
       maplibregl.addProtocol('pmtiles', protocol.tile);
 
-      // Create PMTiles instance for local file
-      const pmtiles = new PMTiles('/data/nyc.mbtiles');
-      protocol.add(pmtiles);
-
-      console.log('PMTiles protocol registered and local file loaded');
+      console.log('PMTiles protocol registered');
 
       const mapStyle = {
         version: 8 as const,
         sources: {
-          'nyc-tiles': {
+          'nyc': {
             type: 'vector' as const,
-            url: 'pmtiles:///data/nyc.mbtiles'
+            url: 'pmtiles://data/nyc.mbtiles'
           }
         },
         layers: [
           {
             id: 'water',
             type: 'fill' as const,
-            source: 'nyc-tiles',
+            source: 'nyc',
             'source-layer': 'water',
             paint: {
               'fill-color': '#74ccf4'
@@ -79,7 +75,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           {
             id: 'buildings',
             type: 'fill' as const,
-            source: 'nyc-tiles',
+            source: 'nyc',
             'source-layer': 'building',
             paint: {
               'fill-color': '#e6e6e6',
@@ -89,10 +85,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           {
             id: 'roads',
             type: 'line' as const,
-            source: 'nyc-tiles',
-            'source-layer': 'transportation',
+            source: 'nyc',
+            'source-layer': 'roads',
             paint: {
-              'line-color': '#ffffff',
+              'line-color': '#888',
               'line-width': 1
             }
           }
