@@ -16,18 +16,12 @@ export default defineConfig(({ mode }) => ({
     mode === 'development' && {
       name: 'pmtiles-range-middleware',
       configureServer(server: any) {
-        server.middlewares.use(async (req: any, res: any, next: any) => {
-          const url = req.url || '';
-          if (!url.startsWith('/data/') || !url.endsWith('.pmtiles')) return next();
+        server.middlewares.use('/data', (req: any, res: any, next: any) => {
+          if (!req.url?.endsWith('.pmtiles')) return next();
 
-          const filePath = path.join(process.cwd(), 'public', url);
-          if (!fs.existsSync(filePath)) {
-            res.statusCode = 404;
-            res.end('Not Found');
-            return;
-          }
-
-          // CORS & Range headers
+          const filePath = path.join(process.cwd(), 'public/data', req.url);
+          
+          // CORS headers
           res.setHeader('Access-Control-Allow-Origin', '*');
           res.setHeader('Access-Control-Allow-Headers', 'Range, Origin, X-Requested-With, Content-Type, Accept');
           res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -39,42 +33,52 @@ export default defineConfig(({ mode }) => ({
             return;
           }
 
+          if (!fs.existsSync(filePath)) {
+            res.statusCode = 404;
+            res.end('Not Found');
+            return;
+          }
+
           const stat = fs.statSync(filePath);
-          const range = req.headers.range as string | undefined;
+          const range = req.headers.range;
 
           if (!range) {
-            res.setHeader('Content-Length', stat.size);
+            // No range requested, send full file
             res.setHeader('Content-Type', 'application/octet-stream');
+            res.setHeader('Content-Length', stat.size.toString());
+            res.statusCode = 200;
             fs.createReadStream(filePath).pipe(res);
             return;
           }
 
-          const match = /^bytes=(\d+)-(\d+)?$/.exec(range);
-          if (!match) {
+          // Parse range header
+          const rangeMatch = range.match(/bytes=(\d+)-(\d*)/);
+          if (!rangeMatch) {
             res.statusCode = 416;
+            res.setHeader('Content-Range', `bytes */${stat.size}`);
             res.end('Invalid Range');
             return;
           }
 
-          const start = parseInt(match[1], 10);
-          let end = match[2] ? parseInt(match[2], 10) : stat.size - 1;
+          const start = parseInt(rangeMatch[1], 10);
+          const end = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : stat.size - 1;
 
-          if (start >= stat.size) {
+          if (start >= stat.size || end >= stat.size || start > end) {
             res.statusCode = 416;
             res.setHeader('Content-Range', `bytes */${stat.size}`);
-            res.end();
+            res.end('Range Not Satisfiable');
             return;
           }
 
-          end = Math.min(end, stat.size - 1);
           const chunkSize = end - start + 1;
-
+          
           res.statusCode = 206;
-          res.setHeader('Content-Range', `bytes ${start}-${end}/${stat.size}`);
-          res.setHeader('Content-Length', chunkSize);
           res.setHeader('Content-Type', 'application/octet-stream');
-
-          fs.createReadStream(filePath, { start, end }).pipe(res);
+          res.setHeader('Content-Length', chunkSize.toString());
+          res.setHeader('Content-Range', `bytes ${start}-${end}/${stat.size}`);
+          
+          const stream = fs.createReadStream(filePath, { start, end });
+          stream.pipe(res);
         });
       }
     }
