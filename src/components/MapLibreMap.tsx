@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { PMTiles, Protocol } from 'pmtiles';
 
 interface MapLibreMapProps {
   businesses: {
@@ -37,6 +38,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (!mapRef.current) return;
 
+    // Register PMTiles protocol
+    const protocol = new Protocol();
+    maplibregl.addProtocol('pmtiles', protocol.tile);
+    console.log('PMTiles protocol registered');
+
     const mapInstance = new maplibregl.Map({
       container: mapRef.current,
       style: {
@@ -44,7 +50,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         sources: {
           'pmtiles': {
             type: 'vector',
-            url: 'pmtiles:///data/neatogeo_nyc.pmtiles'
+            url: 'pmtiles://data/neatogeo_nyc.pmtiles'
           }
         },
         layers: [
@@ -91,7 +97,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     setMap(mapInstance);
 
+    // Add error handling and debugging
+    mapInstance.on('error', (e) => {
+      console.error('Map error:', e);
+    });
+
+    mapInstance.on('sourcedata', (e) => {
+      if (e.sourceId === 'pmtiles') {
+        console.log('PMTiles source loaded:', e);
+      }
+    });
+
+    mapInstance.on('load', () => {
+      console.log('Map loaded successfully');
+    });
+
     return () => {
+      maplibregl.removeProtocol('pmtiles');
       mapInstance.remove();
       setMap(null);
     };
@@ -107,14 +129,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     businesses.forEach(business => {
       const el = document.createElement('div');
       el.style.cssText = `
-        width: 20px;
-        height: 20px;
-        background-color: ${selectedBusiness?.id === business.id ? '#ff0000' : '#ffaa00'};
-        border: 2px solid white;
+        width: 24px;
+        height: 24px;
+        background: ${selectedBusiness?.id === business.id ? 
+          'linear-gradient(135deg, #ff4444, #cc0000)' : 
+          'linear-gradient(135deg, #4CAF50, #2E7D32)'};
+        border: 3px solid white;
         border-radius: 50%;
         cursor: pointer;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        color: white;
+        font-weight: bold;
+        transition: all 0.2s ease;
       `;
+      el.textContent = '🏢';
       
       el.addEventListener('click', () => {
         if (onBusinessClick) {
@@ -144,11 +176,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const el = document.createElement('div');
       el.textContent = landmark.emoji;
       el.style.cssText = `
-        font-size: 24px;
+        font-size: 32px;
         cursor: default;
         user-select: none;
-        text-shadow: 0 0 3px rgba(255,255,255,0.9);
+        text-shadow: 0 0 8px rgba(255,255,255,0.9), 0 0 16px rgba(0,0,0,0.3);
+        filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));
+        transform: scale(1);
+        transition: transform 0.2s ease;
       `;
+      
+      el.addEventListener('mouseenter', () => {
+        el.style.transform = 'scale(1.2)';
+      });
+      
+      el.addEventListener('mouseleave', () => {
+        el.style.transform = 'scale(1)';
+      });
 
       const marker = new maplibregl.Marker(el)
         .setLngLat([landmark.lng, landmark.lat])
