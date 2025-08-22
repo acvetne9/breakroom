@@ -93,20 +93,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             paint: { 'background-color': '#B3E5FC' }
           },
           {
-            id: 'land',
-            type: 'fill' as const,
-            source: 'nyc',
-            'source-layer': 'land',
-            paint: {
-              'fill-color': '#F5F5DC',
-              'fill-opacity': 1.0
-            }
-          },
-          {
             id: 'parks',
             type: 'fill' as const,
             source: 'nyc',
-            'source-layer': 'parks',
+            'source-layer': 'polygon',
+            filter: ['==', ['get', 'leisure'], 'park'] as any,
             paint: {
               'fill-color': '#87C17A',
               'fill-opacity': 1.0
@@ -116,28 +107,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             id: 'water',
             type: 'fill' as const,
             source: 'nyc',
-            'source-layer': 'water',
+            'source-layer': 'polygon',
+            filter: ['any', 
+              ['==', ['get', 'natural'], 'water'],
+              ['==', ['get', 'water'], 'lake'],
+              ['==', ['get', 'water'], 'pond'],
+              ['==', ['get', 'water'], 'river']
+            ] as any,
             paint: {
               'fill-color': '#6CA4E1',
               'fill-opacity': 1.0
             }
           },
           {
-            id: 'waterways',
-            type: 'line' as const,
-            source: 'nyc',
-            'source-layer': 'waterways',
-            paint: {
-              'line-color': '#999999',
-              'line-width': 1,
-              'line-opacity': 0.6
-            }
-          },
-          {
             id: 'roads',
             type: 'line' as const,
             source: 'nyc',
-            'source-layer': 'roads',
+            'source-layer': 'polygon',
+            filter: ['has', 'highway'] as any,
             paint: {
               'line-color': '#666666',
               'line-width': 2
@@ -187,11 +174,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         if (e.sourceId === 'nyc' && e.isSourceLoaded) {
           console.log('NYC vector tiles loaded');
           // Try to detect source layers by inspecting features
-          const layers = ['land', 'parks', 'water', 'waterways', 'roads'];
+          const layers = ['polygon'];
           layers.forEach(layer => {
             try {
               const features = mapInstance.querySourceFeatures('nyc', { sourceLayer: layer });
               console.log(`Source layer '${layer}': ${features.length} features`);
+              if (features.length > 0) {
+                console.log('Sample feature properties:', features[0].properties);
+              }
             } catch (err) {
               console.log(`Source layer '${layer}': not found or error`);
             }
