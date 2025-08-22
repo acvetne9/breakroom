@@ -38,25 +38,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
-  const [tilesUrl, setTilesUrl] = useState<string | null>(null);
 
-  // Get Supabase Storage URL for nyc.mbtiles
-  const getTilesUrl = useCallback(async () => {
-    try {
-      const { data } = await supabase.storage
-        .from('nyc-map-storage-files')
-        .getPublicUrl('nyc.mbtiles');
-      
-      if (data?.publicUrl) {
-        console.log('Tiles URL:', data.publicUrl);
-        setTilesUrl(data.publicUrl);
-        return data.publicUrl;
-      }
-    } catch (error) {
-      console.error('Error getting tiles URL:', error);
-    }
-    return null;
-  }, []);
+  // Use Supabase storage URL directly
+  const tilesUrl = 'https://hyygpxhwkvyxtbjnnpqk.supabase.co/storage/v1/object/public/nyc-map-storage-files/nyc.mbtiles';
 
   // Initialize map
   useEffect(() => {
@@ -66,25 +50,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     let cleanedUp = false;
 
     const initializeMap = async () => {
-      console.log('MapLibreMap: initializing map');
+      console.log('MapLibreMap: initializing map with tilesUrl:', tilesUrl);
       // Add PMTiles protocol
       const protocol = new pmtiles.Protocol();
       maplibregl.addProtocol('pmtiles', protocol.tile);
 
-      // Get tiles URL from Supabase Storage
-      const url = await getTilesUrl();
-      if (!url) {
-        console.error('Failed to get tiles URL');
-        return;
-      }
-
+      console.log('Creating map style with PMTiles source...');
       const mapStyle = {
         version: 8 as const,
         glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
         sources: {
           nyc: {
             type: 'vector' as const,
-            url: `pmtiles://${url}`
+            url: `pmtiles://${tilesUrl}`
           }
         },
         layers: [
@@ -150,6 +128,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         ]
       };
 
+      console.log('MapLibreMap: creating map instance...');
       mapInstance = new maplibregl.Map({
         container: mapRef.current!,
         style: mapStyle,
@@ -158,20 +137,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         maxZoom: 18,
         minZoom: 8
       });
-      console.log('MapLibreMap: map instance created', { center: [-73.986104, 40.715245], zoom: 12.77 });
+      console.log('MapLibreMap: map instance created successfully');
 
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
 
       mapInstance.on('load', () => {
         if (cleanedUp) return;
-        console.log('Map loaded successfully with PMTiles');
+        console.log('*** MAP LOAD EVENT FIRED ***');
+        console.log('Map loaded successfully with PMTiles from:', tilesUrl);
         
         // Log available source layers for debugging
         if (mapInstance.getSource('nyc')) {
-          console.log('NYC vector source loaded');
+          console.log('NYC vector source loaded successfully');
+        } else {
+          console.error('NYC vector source NOT found!');
         }
         
+        console.log('Setting mapLoaded to true...');
         setMapLoaded(true);
+        console.log('mapLoaded state updated');
       });
 
       // Log current zoom and center when map moves
@@ -258,7 +242,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       setMap(null);
       setMapLoaded(false);
     };
-  }, [getTilesUrl]);
+  }, []);
 
   // No longer needed - vector tiles are loaded directly in map style
 
