@@ -244,27 +244,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [mapLoaded, landmarks, map]);
 
   return (
-    <div>
-      {isProcessing && (
-        <div style={{
-          position: 'absolute',
-          top: '10px',
-          left: '10px',
-          background: 'rgba(0,0,0,0.7)',
-          color: 'white',
-          padding: '5px 10px',
-          borderRadius: '4px',
-          zIndex: 1000,
-          fontSize: '12px'
-        }}>
-          Loading map data...
-        </div>
-      )}
-      <div
-        ref={mapRef}
-        style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
-      />
-    </div>
+    <div
+      ref={mapRef}
+      style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
+    />
   );
 };
 
