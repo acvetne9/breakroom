@@ -98,8 +98,44 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     setMap(mapInstance);
 
     // Add error handling and debugging
+    const switchToRasterFallback = () => {
+      try {
+        maplibregl.removeProtocol('pmtiles');
+      } catch {}
+      if (!mapRef.current) return;
+      console.warn('Switching to raster fallback (OSM) due to byte-range unsupported.');
+      const fallback = new maplibregl.Map({
+        container: mapRef.current,
+        style: {
+          version: 8,
+          sources: {
+            'raster-tiles': {
+              type: 'raster',
+              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+              tileSize: 256,
+              attribution: '© OpenStreetMap contributors'
+            }
+          },
+          layers: [
+            { id: 'osm-tiles', type: 'raster', source: 'raster-tiles' }
+          ]
+        },
+        center: [-73.986104, 40.715245], // NYC center
+        zoom: 12
+      });
+      setMap(fallback);
+      fallback.on('load', () => {
+        console.log('Fallback raster map loaded successfully');
+      });
+    };
+
     mapInstance.on('error', (e) => {
       console.error('Map error:', e);
+      const msg = (e as any)?.error?.message || (e as any)?.message || String(e);
+      if (msg?.toLowerCase().includes('byte serving') || msg?.toLowerCase().includes('content-length')) {
+        try { mapInstance.remove(); } catch {}
+        switchToRasterFallback();
+      }
     });
 
     mapInstance.on('sourcedata', (e) => {
