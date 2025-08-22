@@ -93,6 +93,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             paint: { 'background-color': '#B3E5FC' }
           },
           {
+            id: 'all-features',
+            type: 'fill' as const,
+            source: 'nyc',
+            'source-layer': 'polygon',
+            paint: {
+              'fill-color': '#F5F5DC',
+              'fill-opacity': 0.8,
+              'fill-outline-color': '#cccccc'
+            }
+          },
+          {
             id: 'parks',
             type: 'fill' as const,
             source: 'nyc',
