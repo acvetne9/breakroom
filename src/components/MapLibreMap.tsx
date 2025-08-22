@@ -42,18 +42,46 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       style: {
         version: 8,
         sources: {
-          'osm': {
-            type: 'raster',
-            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-            tileSize: 256,
-            attribution: '© OpenStreetMap contributors'
+          'pmtiles': {
+            type: 'vector',
+            url: 'pmtiles:///data/neatogeo_nyc.pmtiles'
           }
         },
         layers: [
           {
-            id: 'osm-tiles',
-            type: 'raster',
-            source: 'osm'
+            id: 'background',
+            type: 'background',
+            paint: {
+              'background-color': '#f8f8f8'
+            }
+          },
+          {
+            id: 'water',
+            type: 'fill',
+            source: 'pmtiles',
+            'source-layer': 'water',
+            paint: {
+              'fill-color': '#a8d8ea'
+            }
+          },
+          {
+            id: 'landuse',
+            type: 'fill',
+            source: 'pmtiles',
+            'source-layer': 'landuse',
+            paint: {
+              'fill-color': '#e8f5e8'
+            }
+          },
+          {
+            id: 'roads',
+            type: 'line',
+            source: 'pmtiles',
+            'source-layer': 'transportation',
+            paint: {
+              'line-color': '#ffffff',
+              'line-width': 2
+            }
           }
         ]
       },
