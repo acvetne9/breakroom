@@ -1,22 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useMapData } from '../hooks/useMapData';
-import { 
-  extractParkFeatures, 
-  extractWaterFeatures, 
-  extractRoadFeatures, 
-  extractWaterwayFeatures 
-} from '../utils/featureProcessing';
-import {
-  addLandLayer,
-  addParksLayer,
-  addWaterLayer,
-  addWaterwaysLayer,
-  addRoadsLayer,
-  addBusinessesLayer,
-  ensureLayerOrder
-} from '../utils/mapLayers';
+import * as pmtiles from 'pmtiles';
+import { supabase } from '@/integrations/supabase/client';
+import { addBusinessesLayer } from '../utils/mapLayers';
 
 interface MapLibreMapProps {
   businesses: {
@@ -51,45 +38,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
-  const { isProcessing, setIsProcessing, loadAllMapData } = useMapData();
+  const [tilesUrl, setTilesUrl] = useState<string | null>(null);
 
-  const processMapFeatures = useCallback(async () => {
-    if (!map || !mapLoaded || isProcessing) return;
-    
-    setIsProcessing(true);
+  // Get Supabase Storage URL for nyc.mbtiles
+  const getTilesUrl = useCallback(async () => {
     try {
-      const { mainData, landData } = await loadAllMapData();
-
-      // Add land layer first
-      if (landData) {
-        addLandLayer(map, landData);
-      }
-
-      if (mainData?.features?.length) {
-        // Extract features
-        const parkFeatures = extractParkFeatures(mainData);
-        const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
-        const waterFeatures = extractWaterFeatures(mainData, parkFeatureIds);
-        const roadFeatures = extractRoadFeatures(mainData);
-        const waterwayFeatures = extractWaterwayFeatures(mainData);
-
-        console.log(`Found ${parkFeatures.length} park features, ${waterFeatures.length} water features, ${roadFeatures.length} road features`);
-
-        // Add layers in order: parks, water, waterways, roads
-        addParksLayer(map, parkFeatures);
-        addWaterLayer(map, waterFeatures);
-        addWaterwaysLayer(map, waterwayFeatures);
-        addRoadsLayer(map, roadFeatures);
-
-        // Ensure proper layer ordering
-        ensureLayerOrder(map);
+      const { data } = await supabase.storage
+        .from('nyc-map-storage-files')
+        .getPublicUrl('nyc.mbtiles');
+      
+      if (data?.publicUrl) {
+        console.log('Tiles URL:', data.publicUrl);
+        setTilesUrl(data.publicUrl);
+        return data.publicUrl;
       }
     } catch (error) {
-      console.error('Error processing map features:', error);
-    } finally {
-      setIsProcessing(false);
+      console.error('Error getting tiles URL:', error);
     }
-  }, [map, mapLoaded, isProcessing, loadAllMapData, setIsProcessing]);
+    return null;
+  }, []);
 
   // Initialize map
   useEffect(() => {
@@ -98,48 +65,144 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     let mapInstance: maplibregl.Map | null = null;
     let cleanedUp = false;
 
-    const baseStyle = {
-      version: 8 as const,
-      sources: {},
-      glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
-      layers: [{
-        id: 'background',
-        type: 'background' as const,
-        paint: { 'background-color': '#B3E5FC' }
-      }]
+    const initializeMap = async () => {
+      // Add PMTiles protocol
+      const protocol = new pmtiles.Protocol();
+      maplibregl.addProtocol('pmtiles', protocol.tile);
+
+      // Get tiles URL from Supabase Storage
+      const url = await getTilesUrl();
+      if (!url) {
+        console.error('Failed to get tiles URL');
+        return;
+      }
+
+      const mapStyle = {
+        version: 8 as const,
+        glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
+        sources: {
+          nyc: {
+            type: 'vector' as const,
+            url: `pmtiles://${url}`
+          }
+        },
+        layers: [
+          {
+            id: 'background',
+            type: 'background' as const,
+            paint: { 'background-color': '#B3E5FC' }
+          },
+          {
+            id: 'land',
+            type: 'fill' as const,
+            source: 'nyc',
+            'source-layer': 'land',
+            paint: {
+              'fill-color': '#F5F5DC',
+              'fill-opacity': 1.0
+            }
+          },
+          {
+            id: 'parks',
+            type: 'fill' as const,
+            source: 'nyc',
+            'source-layer': 'parks',
+            paint: {
+              'fill-color': '#87C17A',
+              'fill-opacity': 1.0
+            }
+          },
+          {
+            id: 'water',
+            type: 'fill' as const,
+            source: 'nyc',
+            'source-layer': 'water',
+            paint: {
+              'fill-color': '#6CA4E1',
+              'fill-opacity': 1.0
+            }
+          },
+          {
+            id: 'waterways',
+            type: 'line' as const,
+            source: 'nyc',
+            'source-layer': 'waterways',
+            paint: {
+              'line-color': '#999999',
+              'line-width': 1,
+              'line-opacity': 0.6
+            }
+          },
+          {
+            id: 'roads',
+            type: 'line' as const,
+            source: 'nyc',
+            'source-layer': 'roads',
+            paint: {
+              'line-color': '#666666',
+              'line-width': 2
+            }
+          }
+        ]
+      };
+
+      mapInstance = new maplibregl.Map({
+        container: mapRef.current!,
+        style: mapStyle,
+        center: [-73.986104, 40.715245],
+        zoom: 12.77,
+        maxZoom: 18,
+        minZoom: 8
+      });
+
+      mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
+
+      mapInstance.on('load', () => {
+        if (cleanedUp) return;
+        console.log('Map loaded successfully with PMTiles');
+        
+        // Log available source layers for debugging
+        if (mapInstance.getSource('nyc')) {
+          console.log('NYC vector source loaded');
+        }
+        
+        setMapLoaded(true);
+      });
+
+      // Log current zoom and center when map moves
+      mapInstance.on('moveend', () => {
+        if (mapInstance) {
+          const zoom = mapInstance.getZoom();
+          const center = mapInstance.getCenter();
+          console.log(`Current zoom: ${zoom.toFixed(2)} | Center: [${center.lng.toFixed(6)}, ${center.lat.toFixed(6)}]`);
+        }
+      });
+
+      mapInstance.on('error', e => {
+        console.error('Map error:', e.error);
+      });
+
+      // Log source layer diagnostics
+      mapInstance.on('sourcedata', (e) => {
+        if (e.sourceId === 'nyc' && e.isSourceLoaded) {
+          console.log('NYC vector tiles loaded');
+          // Try to detect source layers by inspecting features
+          const layers = ['land', 'parks', 'water', 'waterways', 'roads'];
+          layers.forEach(layer => {
+            try {
+              const features = mapInstance.querySourceFeatures('nyc', { sourceLayer: layer });
+              console.log(`Source layer '${layer}': ${features.length} features`);
+            } catch (err) {
+              console.log(`Source layer '${layer}': not found or error`);
+            }
+          });
+        }
+      });
+
+      setMap(mapInstance);
     };
 
-    mapInstance = new maplibregl.Map({
-      container: mapRef.current!,
-      style: baseStyle,
-      center: [-73.986104, 40.715245],
-      zoom: 12.77,
-      maxZoom: 18,
-      minZoom: 8
-    });
-
-    mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
-
-    mapInstance.on('load', () => {
-      if (cleanedUp) return;
-      console.log('Map loaded successfully');
-      setMapLoaded(true);
-    });
-
-    // Log current zoom and center when map moves
-    mapInstance.on('moveend', () => {
-      if (mapInstance) {
-        const zoom = mapInstance.getZoom();
-        const center = mapInstance.getCenter();
-        console.log(`Current zoom: ${zoom.toFixed(2)} | Center: [${center.lng.toFixed(6)}, ${center.lat.toFixed(6)}]`);
-      }
-    });
-
-    mapInstance.on('error', e => {
-      console.error('Map error:', e.error);
-    });
-
-    setMap(mapInstance);
+    initializeMap();
 
     return () => {
       cleanedUp = true;
@@ -153,18 +216,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       setMap(null);
       setMapLoaded(false);
     };
-  }, []);
+  }, [getTilesUrl]);
 
-  // Load map data after initialization
-  useEffect(() => {
-    if (mapLoaded && map && !isProcessing) {
-      const timeoutId = setTimeout(() => {
-        processMapFeatures();
-      }, 500);
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [mapLoaded, map, processMapFeatures, isProcessing]);
+  // No longer needed - vector tiles are loaded directly in map style
 
   // Handle business markers
   useEffect(() => {
