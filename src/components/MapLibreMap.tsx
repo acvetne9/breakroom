@@ -93,30 +93,33 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             paint: { 'background-color': '#B3E5FC' }
           },
           {
-            id: 'all-features',
-            type: 'fill' as const,
+            id: 'debug-points',
+            type: 'circle' as const,
             source: 'nyc',
             'source-layer': 'polygon',
             paint: {
-              'fill-color': '#F5F5DC',
-              'fill-opacity': 0.8,
-              'fill-outline-color': '#cccccc'
+              'circle-color': '#F5F5DC',
+              'circle-opacity': 0.9,
+              'circle-stroke-color': '#cccccc',
+              'circle-stroke-width': 0.5,
+              'circle-radius': 2.5
             }
           },
           {
             id: 'parks',
-            type: 'fill' as const,
+            type: 'circle' as const,
             source: 'nyc',
             'source-layer': 'polygon',
             filter: ['==', ['get', 'leisure'], 'park'] as any,
             paint: {
-              'fill-color': '#87C17A',
-              'fill-opacity': 1.0
+              'circle-color': '#87C17A',
+              'circle-opacity': 1.0,
+              'circle-radius': 2.8
             }
           },
           {
             id: 'water',
-            type: 'fill' as const,
+            type: 'circle' as const,
             source: 'nyc',
             'source-layer': 'polygon',
             filter: ['any', 
@@ -126,19 +129,21 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ['==', ['get', 'water'], 'river']
             ] as any,
             paint: {
-              'fill-color': '#6CA4E1',
-              'fill-opacity': 1.0
+              'circle-color': '#6CA4E1',
+              'circle-opacity': 1.0,
+              'circle-radius': 2.8
             }
           },
           {
             id: 'roads',
-            type: 'line' as const,
+            type: 'circle' as const,
             source: 'nyc',
             'source-layer': 'polygon',
             filter: ['has', 'highway'] as any,
             paint: {
-              'line-color': '#666666',
-              'line-width': 2
+              'circle-color': '#666666',
+              'circle-opacity': 0.9,
+              'circle-radius': 1.8
             }
           }
         ]
@@ -180,6 +185,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         console.error('Map error:', e.error);
       });
 
+      // Extra diagnostics for style/state
+      mapInstance.on('styledata', () => {
+        console.log('Style data event fired. Current style layers:', mapInstance.getStyle().layers?.map(l => l.id));
+      });
+
+      mapInstance.on('dataloading', (e: any) => {
+        if (e?.dataType === 'source' && e?.sourceId === 'nyc') {
+          console.log('Loading data for source nyc...', { tileID: e?.tile?.tileID, coord: e?.tile?.tileID?.canonical });
+        }
+      });
+
+      mapInstance.on('data', (e: any) => {
+        if (e?.dataType === 'source' && e?.sourceId === 'nyc') {
+          console.log('Data event for source nyc. isSourceLoaded:', e?.isSourceLoaded);
+        }
+      });
+
       // Log source layer diagnostics
       mapInstance.on('sourcedata', (e) => {
         if (e.sourceId === 'nyc' && e.isSourceLoaded) {
@@ -197,6 +219,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               console.log(`Source layer '${layer}': not found or error`);
             }
           });
+        }
+      });
+
+      mapInstance.on('idle', () => {
+        try {
+          const renderedAll = mapInstance.queryRenderedFeatures(undefined, { layers: ['debug-points'] });
+          const renderedParks = mapInstance.queryRenderedFeatures(undefined, { layers: ['parks'] });
+          const renderedWater = mapInstance.queryRenderedFeatures(undefined, { layers: ['water'] });
+          const renderedRoads = mapInstance.queryRenderedFeatures(undefined, { layers: ['roads'] });
+          console.log('Rendered feature counts:', {
+            debug_points: renderedAll.length,
+            parks: renderedParks.length,
+            water: renderedWater.length,
+            roads: renderedRoads.length,
+          });
+        } catch (err) {
+          console.log('Error querying rendered features:', err);
         }
       });
 
