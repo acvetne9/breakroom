@@ -55,72 +55,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       console.log('PMTiles protocol registered');
 
-      const p = new PMTiles('/data/neatogeo_nyc.pmtiles');
-
-      // Try to detect layer names from PMTiles metadata so the basemap renders
-      let detectedLayers: string[] = [];
-      try {
-        const meta = await p.getMetadata();
-        const json = (meta as any)?.json;
-        if (json) {
-          const parsed = JSON.parse(json);
-          detectedLayers = (parsed?.vector_layers || []).map((l: any) => l.id || l.name).filter(Boolean);
-          console.log('Detected vector layers in PMTiles:', detectedLayers);
-        }
-      } catch (e) {
-        console.warn('Could not read PMTiles metadata, using fallback layer names', e);
-      }
-
-      const findLayerLike = (candidates: string[]) =>
-        detectedLayers.find((n) => candidates.some((c) => n?.toLowerCase().includes(c))) || undefined;
-
-      const waterLayerName = findLayerLike(['water']);
-      const buildingLayerName = findLayerLike(['building']);
-      const roadsLayerName = findLayerLike(['road', 'transportation', 'highway', 'street']);
-
+      // Create a simple basemap style without PMTiles for now
       const mapStyle: any = {
         version: 8 as const,
         sources: {
-          nyc: {
-            type: 'vector' as const,
-            url: 'pmtiles://data/neatogeo_nyc.pmtiles'
+          'osm': {
+            type: 'raster',
+            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            tileSize: 256,
+            attribution: '© OpenStreetMap contributors'
           }
         },
         layers: [
-          // Subtle background so the map area is visible even if tiles fail
           {
-            id: 'background',
-            type: 'background' as const,
-            paint: { 'background-color': '#f5f7fb' }
-          },
-          // Detected layers (added only if present)
-          ...(waterLayerName
-            ? [{
-                id: 'water',
-                type: 'fill' as const,
-                source: 'nyc',
-                'source-layer': waterLayerName,
-                paint: { 'fill-color': '#74ccf4' }
-              }]
-            : []),
-          ...(buildingLayerName
-            ? [{
-                id: 'buildings',
-                type: 'fill' as const,
-                source: 'nyc',
-                'source-layer': buildingLayerName,
-                paint: { 'fill-color': '#e6e6e6', 'fill-outline-color': '#d4d4d4' }
-              }]
-            : []),
-          ...(roadsLayerName
-            ? [{
-                id: 'roads',
-                type: 'line' as const,
-                source: 'nyc',
-                'source-layer': roadsLayerName,
-                paint: { 'line-color': '#888', 'line-width': 1 }
-              }]
-            : [])
+            id: 'osm-tiles',
+            type: 'raster',
+            source: 'osm'
+          }
         ]
       };
       console.log('MapLibreMap: creating map instance...');
