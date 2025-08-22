@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { PMTiles, Protocol } from 'pmtiles';
 import { addBusinessesLayer } from '../utils/mapLayers';
 
 interface MapLibreMapProps {
@@ -45,27 +46,55 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     let cleanedUp = false;
 
     const initializeMap = async () => {
-      console.log('MapLibreMap: initializing map with OpenStreetMap tiles');
+      console.log('MapLibreMap: initializing map with local PMTiles');
+
+      // Register PMTiles protocol
+      const protocol = new Protocol();
+      maplibregl.addProtocol('pmtiles', protocol.tile);
+
+      // Create PMTiles instance for local file
+      const pmtiles = new PMTiles('/data/nyc.mbtiles');
+      protocol.add(pmtiles);
+
+      console.log('PMTiles protocol registered and local file loaded');
 
       const mapStyle = {
         version: 8 as const,
         sources: {
-          'osm-raster': {
-            type: 'raster' as const,
-            tiles: [
-              'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-            ],
-            tileSize: 256,
-            attribution: '© OpenStreetMap contributors'
+          'nyc-tiles': {
+            type: 'vector' as const,
+            url: 'pmtiles:///data/nyc.mbtiles'
           }
         },
         layers: [
           {
-            id: 'osm-tiles',
-            type: 'raster' as const,
-            source: 'osm-raster',
-            minzoom: 0,
-            maxzoom: 22
+            id: 'water',
+            type: 'fill' as const,
+            source: 'nyc-tiles',
+            'source-layer': 'water',
+            paint: {
+              'fill-color': '#74ccf4'
+            }
+          },
+          {
+            id: 'buildings',
+            type: 'fill' as const,
+            source: 'nyc-tiles',
+            'source-layer': 'building',
+            paint: {
+              'fill-color': '#e6e6e6',
+              'fill-outline-color': '#d4d4d4'
+            }
+          },
+          {
+            id: 'roads',
+            type: 'line' as const,
+            source: 'nyc-tiles',
+            'source-layer': 'transportation',
+            paint: {
+              'line-color': '#ffffff',
+              'line-width': 1
+            }
           }
         ]
       };
@@ -86,7 +115,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       mapInstance.on('load', () => {
         if (cleanedUp) return;
         console.log('*** MAP LOAD EVENT FIRED ***');
-        console.log('Map loaded successfully with OpenStreetMap tiles');
+        console.log('Map loaded successfully with PMTiles');
         
         console.log('Setting mapLoaded to true...');
         setMapLoaded(true);
