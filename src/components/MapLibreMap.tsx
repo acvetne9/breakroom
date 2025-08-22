@@ -1,8 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import * as pmtiles from 'pmtiles';
-import { supabase } from '@/integrations/supabase/client';
 import { addBusinessesLayer } from '../utils/mapLayers';
 
 interface MapLibreMapProps {
@@ -39,9 +37,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [mapLoaded, setMapLoaded] = useState(false);
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
 
-  // Use Supabase storage URL directly
-  const tilesUrl = 'https://hyygpxhwkvyxtbjnnpqk.supabase.co/storage/v1/object/public/nyc-map-storage-files/nyc.mbtiles';
-
   // Initialize map
   useEffect(() => {
     if (!mapRef.current) return;
@@ -50,80 +45,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     let cleanedUp = false;
 
     const initializeMap = async () => {
-      console.log('MapLibreMap: initializing map with tilesUrl:', tilesUrl);
-      // Add PMTiles protocol
-      const protocol = new pmtiles.Protocol();
-      maplibregl.addProtocol('pmtiles', protocol.tile);
+      console.log('MapLibreMap: initializing map with OpenStreetMap tiles');
 
-      console.log('Creating map style with PMTiles source...');
       const mapStyle = {
         version: 8 as const,
-        glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
         sources: {
-          nyc: {
-            type: 'vector' as const,
-            url: `pmtiles://${tilesUrl}`
+          'osm-raster': {
+            type: 'raster' as const,
+            tiles: [
+              'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+            ],
+            tileSize: 256,
+            attribution: '© OpenStreetMap contributors'
           }
         },
         layers: [
           {
-            id: 'background',
-            type: 'background' as const,
-            paint: { 'background-color': '#B3E5FC' }
-          },
-          {
-            id: 'debug-points',
-            type: 'circle' as const,
-            source: 'nyc',
-            'source-layer': 'polygon',
-            paint: {
-              'circle-color': '#F5F5DC',
-              'circle-opacity': 0.9,
-              'circle-stroke-color': '#cccccc',
-              'circle-stroke-width': 0.5,
-              'circle-radius': 2.5
-            }
-          },
-          {
-            id: 'parks',
-            type: 'circle' as const,
-            source: 'nyc',
-            'source-layer': 'polygon',
-            filter: ['==', ['get', 'leisure'], 'park'] as any,
-            paint: {
-              'circle-color': '#87C17A',
-              'circle-opacity': 1.0,
-              'circle-radius': 2.8
-            }
-          },
-          {
-            id: 'water',
-            type: 'circle' as const,
-            source: 'nyc',
-            'source-layer': 'polygon',
-            filter: ['any', 
-              ['==', ['get', 'natural'], 'water'],
-              ['==', ['get', 'water'], 'lake'],
-              ['==', ['get', 'water'], 'pond'],
-              ['==', ['get', 'water'], 'river']
-            ] as any,
-            paint: {
-              'circle-color': '#6CA4E1',
-              'circle-opacity': 1.0,
-              'circle-radius': 2.8
-            }
-          },
-          {
-            id: 'roads',
-            type: 'circle' as const,
-            source: 'nyc',
-            'source-layer': 'polygon',
-            filter: ['has', 'highway'] as any,
-            paint: {
-              'circle-color': '#666666',
-              'circle-opacity': 0.9,
-              'circle-radius': 1.8
-            }
+            id: 'osm-tiles',
+            type: 'raster' as const,
+            source: 'osm-raster',
+            minzoom: 0,
+            maxzoom: 22
           }
         ]
       };
@@ -144,14 +86,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       mapInstance.on('load', () => {
         if (cleanedUp) return;
         console.log('*** MAP LOAD EVENT FIRED ***');
-        console.log('Map loaded successfully with PMTiles from:', tilesUrl);
-        
-        // Log available source layers for debugging
-        if (mapInstance.getSource('nyc')) {
-          console.log('NYC vector source loaded successfully');
-        } else {
-          console.error('NYC vector source NOT found!');
-        }
+        console.log('Map loaded successfully with OpenStreetMap tiles');
         
         console.log('Setting mapLoaded to true...');
         setMapLoaded(true);
@@ -169,60 +104,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       mapInstance.on('error', e => {
         console.error('Map error:', e.error);
-      });
-
-      // Extra diagnostics for style/state
-      mapInstance.on('styledata', () => {
-        console.log('Style data event fired. Current style layers:', mapInstance.getStyle().layers?.map(l => l.id));
-      });
-
-      mapInstance.on('dataloading', (e: any) => {
-        if (e?.dataType === 'source' && e?.sourceId === 'nyc') {
-          console.log('Loading data for source nyc...', { tileID: e?.tile?.tileID, coord: e?.tile?.tileID?.canonical });
-        }
-      });
-
-      mapInstance.on('data', (e: any) => {
-        if (e?.dataType === 'source' && e?.sourceId === 'nyc') {
-          console.log('Data event for source nyc. isSourceLoaded:', e?.isSourceLoaded);
-        }
-      });
-
-      // Log source layer diagnostics
-      mapInstance.on('sourcedata', (e) => {
-        if (e.sourceId === 'nyc' && e.isSourceLoaded) {
-          console.log('NYC vector tiles loaded');
-          // Try to detect source layers by inspecting features
-          const layers = ['polygon'];
-          layers.forEach(layer => {
-            try {
-              const features = mapInstance.querySourceFeatures('nyc', { sourceLayer: layer });
-              console.log(`Source layer '${layer}': ${features.length} features`);
-              if (features.length > 0) {
-                console.log('Sample feature properties:', features[0].properties);
-              }
-            } catch (err) {
-              console.log(`Source layer '${layer}': not found or error`);
-            }
-          });
-        }
-      });
-
-      mapInstance.on('idle', () => {
-        try {
-          const renderedAll = mapInstance.queryRenderedFeatures(undefined, { layers: ['debug-points'] });
-          const renderedParks = mapInstance.queryRenderedFeatures(undefined, { layers: ['parks'] });
-          const renderedWater = mapInstance.queryRenderedFeatures(undefined, { layers: ['water'] });
-          const renderedRoads = mapInstance.queryRenderedFeatures(undefined, { layers: ['roads'] });
-          console.log('Rendered feature counts:', {
-            debug_points: renderedAll.length,
-            parks: renderedParks.length,
-            water: renderedWater.length,
-            roads: renderedRoads.length,
-          });
-        } catch (err) {
-          console.log('Error querying rendered features:', err);
-        }
       });
 
       setMap(mapInstance);
