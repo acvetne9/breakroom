@@ -340,7 +340,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         right: 0,
         width: '100%',
         height: '100%',
-        zIndex: 1
+        zIndex: 1,
+        backgroundColor: 'hsl(var(--muted))' // Fallback background while tiles/layers load
       }}
     />
   );
