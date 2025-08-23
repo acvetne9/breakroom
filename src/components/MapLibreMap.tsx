@@ -1,22 +1,7 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useMapData } from '../hooks/useMapData';
-import { 
-  extractParkFeatures, 
-  extractWaterFeatures, 
-  extractRoadFeatures, 
-  extractWaterwayFeatures 
-} from '../utils/featureProcessing';
-import {
-  addLandLayer,
-  addParksLayer,
-  addWaterLayer,
-  addWaterwaysLayer,
-  addRoadsLayer,
-  addBusinessesLayer,
-  ensureLayerOrder
-} from '../utils/mapLayers';
+import { PMTiles, Protocol } from 'pmtiles';
 
 interface MapLibreMapProps {
   businesses: {
@@ -49,222 +34,227 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
-  const [mapLoaded, setMapLoaded] = useState(false);
-  const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
-  const { isProcessing, setIsProcessing, loadAllMapData } = useMapData();
 
-  const processMapFeatures = useCallback(async () => {
-    if (!map || !mapLoaded || isProcessing) return;
-    
-    setIsProcessing(true);
-    try {
-      const { mainData, landData } = await loadAllMapData();
-
-      // Add land layer first
-      if (landData) {
-        addLandLayer(map, landData);
-      }
-
-      if (mainData?.features?.length) {
-        // Extract features
-        const parkFeatures = extractParkFeatures(mainData);
-        const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
-        const waterFeatures = extractWaterFeatures(mainData, parkFeatureIds);
-        const roadFeatures = extractRoadFeatures(mainData);
-        const waterwayFeatures = extractWaterwayFeatures(mainData);
-
-        console.log(`Found ${parkFeatures.length} park features, ${waterFeatures.length} water features, ${roadFeatures.length} road features`);
-
-        // Add layers in order: parks, water, waterways, roads
-        addParksLayer(map, parkFeatures);
-        addWaterLayer(map, waterFeatures);
-        addWaterwaysLayer(map, waterwayFeatures);
-        addRoadsLayer(map, roadFeatures);
-
-        // Ensure proper layer ordering
-        ensureLayerOrder(map);
-      }
-    } catch (error) {
-      console.error('Error processing map features:', error);
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [map, mapLoaded, isProcessing, loadAllMapData, setIsProcessing]);
-
-  // Initialize map
   useEffect(() => {
     if (!mapRef.current) return;
 
-    let mapInstance: maplibregl.Map | null = null;
-    let cleanedUp = false;
+    // Register PMTiles protocol
+    const protocol = new Protocol();
+    maplibregl.addProtocol('pmtiles', protocol.tile);
+    console.log('PMTiles protocol registered');
 
-    const baseStyle = {
-      version: 8 as const,
-      sources: {},
-      glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
-      layers: [{
-        id: 'background',
-        type: 'background' as const,
-        paint: { 'background-color': '#B3E5FC' }
-      }]
-    };
-
-    mapInstance = new maplibregl.Map({
-      container: mapRef.current!,
-      style: baseStyle,
-      center: [-73.9712, 40.7831],
-      zoom: 12,
-      maxZoom: 18,
-      minZoom: 8
-    });
-
-    mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
-
-    mapInstance.on('load', () => {
-      if (cleanedUp) return;
-      console.log('Map loaded successfully');
-      setMapLoaded(true);
-    });
-
-    mapInstance.on('error', e => {
-      console.error('Map error:', e.error);
+    const mapInstance = new maplibregl.Map({
+      container: mapRef.current,
+      style: {
+        version: 8,
+        sources: {
+          'pmtiles': {
+            type: 'vector',
+            url: 'pmtiles://data/neatogeo_nyc.pmtiles'
+          }
+        },
+        layers: [
+          {
+            id: 'background',
+            type: 'background',
+            paint: {
+              'background-color': '#f8f8f8'
+            }
+          },
+          {
+            id: 'water',
+            type: 'fill',
+            source: 'pmtiles',
+            'source-layer': 'water',
+            paint: {
+              'fill-color': '#a8d8ea'
+            }
+          },
+          {
+            id: 'landuse',
+            type: 'fill',
+            source: 'pmtiles',
+            'source-layer': 'landuse',
+            paint: {
+              'fill-color': '#e8f5e8'
+            }
+          },
+          {
+            id: 'roads',
+            type: 'line',
+            source: 'pmtiles',
+            'source-layer': 'transportation',
+            paint: {
+              'line-color': '#ffffff',
+              'line-width': 2
+            }
+          }
+        ]
+      },
+      center: [-73.986104, 40.715245], // NYC center
+      zoom: 12
     });
 
     setMap(mapInstance);
 
-    return () => {
-      cleanedUp = true;
-      if (mapInstance) {
-        try {
-          mapInstance.remove();
-        } catch (error) {
-          console.error('Error removing map:', error);
-        }
+    // Add error handling and debugging
+    const switchToRasterFallback = () => {
+      try {
+        maplibregl.removeProtocol('pmtiles');
+      } catch {}
+      if (!mapRef.current) return;
+      console.warn('Switching to raster fallback (OSM) due to byte-range unsupported.');
+      const fallback = new maplibregl.Map({
+        container: mapRef.current,
+        style: {
+          version: 8,
+          sources: {
+            'raster-tiles': {
+              type: 'raster',
+              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+              tileSize: 256,
+              attribution: '© OpenStreetMap contributors'
+            }
+          },
+          layers: [
+            { id: 'osm-tiles', type: 'raster', source: 'raster-tiles' }
+          ]
+        },
+        center: [-73.986104, 40.715245], // NYC center
+        zoom: 12
+      });
+      setMap(fallback);
+      fallback.on('load', () => {
+        console.log('Fallback raster map loaded successfully');
+      });
+    };
+
+    mapInstance.on('error', (e) => {
+      console.error('Map error:', e);
+      const msg = (e as any)?.error?.message || (e as any)?.message || String(e);
+      if (msg?.toLowerCase().includes('byte serving') || msg?.toLowerCase().includes('content-length')) {
+        try { mapInstance.remove(); } catch {}
+        switchToRasterFallback();
       }
+    });
+
+    mapInstance.on('sourcedata', (e) => {
+      if (e.sourceId === 'pmtiles') {
+        console.log('PMTiles source loaded:', e);
+      }
+    });
+
+    mapInstance.on('load', () => {
+      console.log('Map loaded successfully');
+    });
+
+    return () => {
+      maplibregl.removeProtocol('pmtiles');
+      mapInstance.remove();
       setMap(null);
-      setMapLoaded(false);
     };
   }, []);
 
-  // Load map data after initialization
+  // Add business markers
   useEffect(() => {
-    if (mapLoaded && map && !isProcessing) {
-      const timeoutId = setTimeout(() => {
-        processMapFeatures();
-      }, 500);
+    if (!map || !businesses.length) return;
 
-      return () => clearTimeout(timeoutId);
-    }
-  }, [mapLoaded, map, processMapFeatures, isProcessing]);
-
-  // Handle business markers
-  useEffect(() => {
-    if (!mapLoaded || !businesses || !map) return;
-
-    const cleanup = addBusinessesLayer(map, businesses, selectedBusiness, onBusinessClick);
-    return cleanup;
-  }, [mapLoaded, businesses, onBusinessClick, map, selectedBusiness]);
-
-  // Handle landmark markers
-  useEffect(() => {
-    if (!mapLoaded || !landmarks || !map) return;
-
-    console.log('Adding emoji landmarks:', landmarks);
-
-    // Remove any previous markers
-    landmarkMarkersRef.current.forEach(m => m.remove());
-    landmarkMarkersRef.current = [];
-
-    if (landmarks.length === 0) return;
-
-    try {
-      const updateEmojiSize = () => {
-        const zoom = map.getZoom();
-        const baseSize = 16;
-        const scaleFactor = Math.pow(1.2, zoom - 10);
-        const size = Math.max(12, Math.min(32, baseSize * scaleFactor));
-        
-        landmarkMarkersRef.current.forEach(marker => {
-          const element = marker.getElement();
-          if (element) {
-            element.style.fontSize = `${size}px`;
-            element.style.lineHeight = `${size}px`;
-            element.style.width = `${size}px`;
-            element.style.height = `${size}px`;
-          }
-        });
-      };
-
-      const newMarkers: maplibregl.Marker[] = landmarks.map((landmark, index) => {
-        console.log(`Creating marker ${index}:`, landmark);
-        
-        const zoom = map.getZoom();
-        const baseSize = 16;
-        const scaleFactor = Math.pow(1.2, zoom - 10);
-        const size = Math.max(12, Math.min(32, baseSize * scaleFactor));
-        
-        const el = document.createElement('div');
-        el.textContent = landmark.emoji;
-        Object.assign(el.style, {
-          fontSize: `${size}px`,
-          lineHeight: `${size}px`,
-          width: `${size}px`,
-          height: `${size}px`,
-          userSelect: 'none',
-          pointerEvents: 'none',
-          textShadow: '0 0 3px rgba(255,255,255,0.9), 0 0 6px rgba(255,255,255,0.7)',
-          zIndex: '1',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        } as CSSStyleDeclaration);
-
-        const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
-          .setLngLat([landmark.lng, landmark.lat])
-          .addTo(map);
-        
-        return marker;
+    // Add business markers as simple HTML markers
+    const markers: maplibregl.Marker[] = [];
+    
+    businesses.forEach(business => {
+      const el = document.createElement('div');
+      el.style.cssText = `
+        width: 24px;
+        height: 24px;
+        background: ${selectedBusiness?.id === business.id ? 
+          'linear-gradient(135deg, #ff4444, #cc0000)' : 
+          'linear-gradient(135deg, #4CAF50, #2E7D32)'};
+        border: 3px solid white;
+        border-radius: 50%;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        color: white;
+        font-weight: bold;
+        transition: all 0.2s ease;
+      `;
+      el.textContent = '🏢';
+      
+      el.addEventListener('click', () => {
+        if (onBusinessClick) {
+          onBusinessClick(business);
+        }
       });
 
-      landmarkMarkersRef.current = newMarkers;
-      
-      // Add zoom listener to update emoji sizes
-      map.on('zoom', updateEmojiSize);
-      
-      console.log(`Successfully added ${newMarkers.length} emoji markers`);
-    } catch (error) {
-      console.error('Error adding emoji markers:', error);
-    }
+      el.className = 'hover-scale';
+      el.textContent = '🏢';
 
-    // Cleanup on unmount or landmarks change
+      const marker = new maplibregl.Marker(el)
+        .setLngLat([business.position.lng, business.position.lat])
+        .addTo(map);
+      
+      markers.push(marker);
+    });
+
     return () => {
-      landmarkMarkersRef.current.forEach(m => m.remove());
-      landmarkMarkersRef.current = [];
+      markers.forEach(marker => marker.remove());
     };
-  }, [mapLoaded, landmarks, map]);
+  }, [map, businesses, selectedBusiness, onBusinessClick]);
+
+  // Add landmark emojis
+  useEffect(() => {
+    if (!map || !landmarks.length) return;
+
+    const markers: maplibregl.Marker[] = [];
+    
+    landmarks.forEach(landmark => {
+      const el = document.createElement('div');
+      el.textContent = landmark.emoji;
+      el.style.cssText = `
+        font-size: 32px;
+        cursor: default;
+        user-select: none;
+        text-shadow: 0 0 8px rgba(255,255,255,0.9), 0 0 16px rgba(0,0,0,0.3);
+        filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));
+        transform: scale(1);
+        transition: transform 0.2s ease;
+      `;
+      
+      el.className = 'hover-scale';
+      
+      el.addEventListener('mouseenter', () => {
+        el.style.transform = 'scale(1.2)';
+      });
+      
+      el.addEventListener('mouseleave', () => {
+        el.style.transform = 'scale(1)';
+      });
+
+      const marker = new maplibregl.Marker(el)
+        .setLngLat([landmark.lng, landmark.lat])
+        .addTo(map);
+      
+      markers.push(marker);
+    });
+
+    return () => {
+      markers.forEach(marker => marker.remove());
+    };
+  }, [map, landmarks]);
 
   return (
-    <div>
-      {isProcessing && (
-        <div style={{
-          position: 'absolute',
-          top: '10px',
-          left: '10px',
-          background: 'rgba(0,0,0,0.7)',
-          color: 'white',
-          padding: '5px 10px',
-          borderRadius: '4px',
-          zIndex: 1000,
-          fontSize: '12px'
-        }}>
-          Loading map data...
-        </div>
-      )}
-      <div
-        ref={mapRef}
-        style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
-      />
-    </div>
+    <div
+      ref={mapRef}
+      style={{ 
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#f0f0f0'
+      }}
+    />
   );
 };
 
