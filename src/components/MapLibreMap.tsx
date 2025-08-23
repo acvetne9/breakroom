@@ -122,6 +122,28 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return;
     }
 
+    // DEBUG: Check container dimensions and visibility
+    const container = mapRef.current;
+    const computedStyle = window.getComputedStyle(container);
+    const rect = container.getBoundingClientRect();
+    
+    console.log('Map container debug info:', {
+      width: rect.width,
+      height: rect.height,
+      display: computedStyle.display,
+      visibility: computedStyle.visibility,
+      opacity: computedStyle.opacity,
+      zIndex: computedStyle.zIndex,
+      position: computedStyle.position,
+      top: computedStyle.top,
+      left: computedStyle.left,
+      transform: computedStyle.transform
+    });
+
+    if (rect.width === 0 || rect.height === 0) {
+      console.error('Map container has zero dimensions!', { width: rect.width, height: rect.height });
+    }
+
     console.log('Initializing map with container:', mapRef.current);
     let mapInstance: maplibregl.Map | null = null;
     let cleanedUp = false;
