@@ -51,32 +51,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
-  const { isProcessing, setIsProcessing, loadViewportData } = useViewportMapData();
+  const { isProcessing, setIsProcessing, loadAllDataCenterOut, allDataLoaded } = useViewportMapData();
   const lastLoadedBoundsRef = useRef<string | null>(null);
 
   const processMapFeatures = useCallback(async () => {
-    if (!map || !mapLoaded || isProcessing) return;
+    if (!map || !mapLoaded || isProcessing || allDataLoaded) return;
     
-    const bounds = map.getBounds();
-    const viewportBounds = {
-      north: bounds.getNorth(),
-      south: bounds.getSouth(),
-      east: bounds.getEast(),
-      west: bounds.getWest()
-    };
-
-    // Create a bounds key to avoid redundant loads
-    const boundsKey = `${viewportBounds.north.toFixed(4)}-${viewportBounds.south.toFixed(4)}-${viewportBounds.east.toFixed(4)}-${viewportBounds.west.toFixed(4)}`;
-    if (lastLoadedBoundsRef.current === boundsKey) {
-      return; // Already loaded this viewport
-    }
-
-    console.log('Loading data for viewport:', viewportBounds);
+    console.log('Loading all map data center-out...');
     setIsProcessing(true);
     
     try {
-      const { features, landData } = await loadViewportData(viewportBounds);
-      lastLoadedBoundsRef.current = boundsKey;
+      const { features, landData } = await loadAllDataCenterOut();
 
       // Add land layer first
       if (landData) {
@@ -113,7 +98,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     } finally {
       setIsProcessing(false);
     }
-  }, [map, mapLoaded, isProcessing, loadViewportData, setIsProcessing]);
+  }, [map, mapLoaded, isProcessing, allDataLoaded, loadAllDataCenterOut, setIsProcessing]);
 
   // Initialize map
   useEffect(() => {
@@ -214,34 +199,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, []);
 
-  // Load map data after initialization and on viewport changes
+  // Load map data after initialization (only once)
   useEffect(() => {
-    if (mapLoaded && map && !isProcessing) {
+    if (mapLoaded && map && !isProcessing && !allDataLoaded) {
       const timeoutId = setTimeout(() => {
         processMapFeatures();
       }, 500);
 
       return () => clearTimeout(timeoutId);
     }
-  }, [mapLoaded, map, processMapFeatures, isProcessing]);
+  }, [mapLoaded, map, processMapFeatures, isProcessing, allDataLoaded]);
 
-  // Load additional chunks when map moves
-  useEffect(() => {
-    if (!map || !mapLoaded) return;
-
-    const handleMoveEnd = () => {
-      // Debounce the viewport data loading
-      const timeoutId = setTimeout(() => {
-        processMapFeatures();
-      }, 300);
-      return () => clearTimeout(timeoutId);
-    };
-
-    map.on('moveend', handleMoveEnd);
-    return () => {
-      map.off('moveend', handleMoveEnd);
-    };
-  }, [map, mapLoaded, processMapFeatures]);
+  // Remove viewport change loading since we load everything at once
 
   // Handle business markers
   useEffect(() => {

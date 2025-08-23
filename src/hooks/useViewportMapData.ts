@@ -20,6 +20,7 @@ export const useViewportMapData = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [loadedChunks, setLoadedChunks] = useState<Map<string, MapChunk>>(new Map());
   const [currentFeatures, setCurrentFeatures] = useState<Feature[]>([]);
+  const [allDataLoaded, setAllDataLoaded] = useState(false);
   const loadingChunksRef = useRef<Set<string>>(new Set());
 
   // NYC bounds for chunking
@@ -56,38 +57,35 @@ export const useViewportMapData = () => {
     };
   }, []);
 
-  const getRequiredChunks = useCallback((viewportBounds: ViewportBounds): string[] => {
+  const getAllChunksInCenterOutOrder = useCallback((): string[] => {
     const chunks: string[] = [];
+    const centerX = Math.floor(GRID_SIZE / 2);
+    const centerY = Math.floor(GRID_SIZE / 2);
     
-    // Expand viewport slightly for preloading adjacent chunks
-    const buffer = 0.01; // ~1km buffer
-    const expandedBounds = {
-      north: Math.min(viewportBounds.north + buffer, NYC_BOUNDS.north),
-      south: Math.max(viewportBounds.south - buffer, NYC_BOUNDS.south),
-      east: Math.min(viewportBounds.east + buffer, NYC_BOUNDS.east),
-      west: Math.max(viewportBounds.west - buffer, NYC_BOUNDS.west)
-    };
-
-    // Find all chunks that intersect with the expanded viewport
-    for (let x = 0; x < GRID_SIZE; x++) {
-      for (let y = 0; y < GRID_SIZE; y++) {
-        const chunkBounds = {
-          west: NYC_BOUNDS.west + (x * CHUNK_WIDTH),
-          east: NYC_BOUNDS.west + ((x + 1) * CHUNK_WIDTH),
-          south: NYC_BOUNDS.south + (y * CHUNK_HEIGHT),
-          north: NYC_BOUNDS.south + ((y + 1) * CHUNK_HEIGHT)
-        };
-
-        // Check if chunk intersects with expanded viewport
-        if (chunkBounds.east >= expandedBounds.west &&
-            chunkBounds.west <= expandedBounds.east &&
-            chunkBounds.north >= expandedBounds.south &&
-            chunkBounds.south <= expandedBounds.north) {
-          chunks.push(`${x}-${y}`);
+    // Add center chunks first, then spiral outward
+    const addedChunks = new Set<string>();
+    
+    // Start with center chunk
+    const centerChunk = `${centerX}-${centerY}`;
+    chunks.push(centerChunk);
+    addedChunks.add(centerChunk);
+    
+    // Add remaining chunks in concentric rings
+    for (let ring = 1; ring < GRID_SIZE; ring++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        for (let y = 0; y < GRID_SIZE; y++) {
+          const distance = Math.max(Math.abs(x - centerX), Math.abs(y - centerY));
+          if (distance === ring) {
+            const chunkId = `${x}-${y}`;
+            if (!addedChunks.has(chunkId)) {
+              chunks.push(chunkId);
+              addedChunks.add(chunkId);
+            }
+          }
         }
       }
     }
-
+    
     return chunks;
   }, []);
 
@@ -160,96 +158,81 @@ export const useViewportMapData = () => {
     }
   }, [getChunkBounds]);
 
-  const loadViewportData = useCallback(async (viewportBounds: ViewportBounds) => {
-    const requiredChunks = getRequiredChunks(viewportBounds);
-    const chunksToLoad = requiredChunks.filter(chunkId => 
-      !loadedChunks.has(chunkId) && !loadingChunksRef.current.has(chunkId)
-    );
-
-    if (chunksToLoad.length === 0) {
-      // All required chunks are already loaded, just update current features
-      const allFeatures: Feature[] = [];
-      requiredChunks.forEach(chunkId => {
-        const chunk = loadedChunks.get(chunkId);
-        if (chunk?.loaded) {
-          allFeatures.push(...chunk.features);
-        }
-      });
-      setCurrentFeatures(allFeatures);
-      return { features: allFeatures, landData: null };
-    }
-
+  const loadAllDataCenterOut = useCallback(async () => {
+    if (allDataLoaded || isProcessing) return { features: currentFeatures, landData: null };
+    
     setIsProcessing(true);
-
-    // Mark chunks as loading
-    chunksToLoad.forEach(chunkId => loadingChunksRef.current.add(chunkId));
-
+    
     try {
-      // Load chunks in parallel
-      const chunkDataPromises = chunksToLoad.map(async (chunkId) => {
-        const features = await loadChunkData(chunkId);
-        return { chunkId, features };
-      });
-
-      const chunkResults = await Promise.all(chunkDataPromises);
-
-      // Update loaded chunks
-      setLoadedChunks(prev => {
-        const newChunks = new Map(prev);
-        
-        chunkResults.forEach(({ chunkId, features }) => {
-          newChunks.set(chunkId, {
-            id: chunkId,
-            bounds: getChunkBounds(chunkId),
-            features,
-            loaded: true
-          });
-          loadingChunksRef.current.delete(chunkId);
-        });
-
-        return newChunks;
-      });
-
-      // Compile all features for current viewport
+      const allChunks = getAllChunksInCenterOutOrder();
+      console.log('Loading all chunks center-out:', allChunks);
+      
+      // Load chunks one by one from center outward
       const allFeatures: Feature[] = [];
-      requiredChunks.forEach(chunkId => {
-        const chunkResult = chunkResults.find(r => r.chunkId === chunkId);
-        if (chunkResult) {
-          allFeatures.push(...chunkResult.features);
+      let landData = null;
+      
+      for (const chunkId of allChunks) {
+        if (!loadedChunks.has(chunkId)) {
+          console.log(`Loading chunk ${chunkId}...`);
+          const features = await loadChunkData(chunkId);
+          
+          // Update loaded chunks immediately
+          setLoadedChunks(prev => {
+            const newChunks = new Map(prev);
+            newChunks.set(chunkId, {
+              id: chunkId,
+              bounds: getChunkBounds(chunkId),
+              features,
+              loaded: true
+            });
+            return newChunks;
+          });
+          
+          allFeatures.push(...features);
         } else {
+          // Chunk already loaded, add its features
           const existingChunk = loadedChunks.get(chunkId);
           if (existingChunk?.loaded) {
             allFeatures.push(...existingChunk.features);
           }
         }
-      });
-
-      setCurrentFeatures(allFeatures);
+      }
       
-      // Return in expected format (mainData contains all features, landData separate)
+      // Separate land and main features
       const landFeatures = allFeatures.filter(f => f.properties?.name === 'New York City Land');
       const mainFeatures = allFeatures.filter(f => f.properties?.name !== 'New York City Land');
       
-      return {
-        features: mainFeatures,
-        landData: landFeatures.length > 0 ? { type: 'FeatureCollection', features: landFeatures } : null
-      };
-
+      if (landFeatures.length > 0) {
+        landData = { type: 'FeatureCollection', features: landFeatures };
+      }
+      
+      setCurrentFeatures(allFeatures);
+      setAllDataLoaded(true);
+      
+      console.log(`Loaded all ${allChunks.length} chunks with ${allFeatures.length} total features`);
+      
+      return { features: mainFeatures, landData };
+      
     } catch (error) {
-      console.error('Error loading viewport data:', error);
+      console.error('Error loading all map data:', error);
       return { features: [], landData: null };
     } finally {
       setIsProcessing(false);
-      // Clean up loading markers
-      chunksToLoad.forEach(chunkId => loadingChunksRef.current.delete(chunkId));
     }
-  }, [getRequiredChunks, loadedChunks, loadChunkData, getChunkBounds]);
+  }, [allDataLoaded, isProcessing, currentFeatures, getAllChunksInCenterOutOrder, loadedChunks, loadChunkData, getChunkBounds]);
+
+  const loadViewportData = useCallback(async (viewportBounds: ViewportBounds) => {
+    // Always load all data center-out instead of viewport-specific chunks
+    return loadAllDataCenterOut();
+  }, [loadAllDataCenterOut]);
 
   return {
     isProcessing,
     setIsProcessing,
     loadViewportData,
+    loadAllDataCenterOut,
     currentFeatures,
-    loadedChunks: Array.from(loadedChunks.values())
+    loadedChunks: Array.from(loadedChunks.values()),
+    allDataLoaded
   };
 };
