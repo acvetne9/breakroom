@@ -93,8 +93,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Initialize map
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapRef.current) {
+      console.error('Map container not found');
+      return;
+    }
 
+    console.log('Initializing map with container:', mapRef.current);
     let mapInstance: maplibregl.Map | null = null;
     let cleanedUp = false;
 
@@ -109,14 +113,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }]
     };
 
-    mapInstance = new maplibregl.Map({
-      container: mapRef.current!,
-      style: baseStyle,
-      center: [-73.986104, 40.715245],
-      zoom: 12.77,
-      maxZoom: 18,
-      minZoom: 8
-    });
+    try {
+      console.log('Creating MapLibre instance...');
+      mapInstance = new maplibregl.Map({
+        container: mapRef.current!,
+        style: baseStyle,
+        center: [-73.986104, 40.715245],
+        zoom: 12.77,
+        maxZoom: 18,
+        minZoom: 8,
+        renderWorldCopies: false,
+        attributionControl: false
+      });
+      console.log('MapLibre instance created:', mapInstance);
+    } catch (error) {
+      console.error('Error creating map instance:', error);
+      return;
+    }
 
     mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
 
@@ -255,7 +268,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   return (
     <div
       ref={mapRef}
-      style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
+      style={{ 
+        position: 'absolute', 
+        top: 0, 
+        bottom: 0, 
+        left: 0, 
+        right: 0,
+        width: '100%',
+        height: '100%',
+        zIndex: 1
+      }}
     />
   );
 };
