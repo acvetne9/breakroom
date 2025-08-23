@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useMapData } from '../hooks/useMapData';
+import { useViewportMapData } from '../hooks/useViewportMapData';
 import { 
   extractParkFeatures, 
   extractWaterFeatures, 
@@ -51,21 +51,45 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
-  const { isProcessing, setIsProcessing, loadAllMapData } = useMapData();
+  const { isProcessing, setIsProcessing, loadViewportData } = useViewportMapData();
+  const lastLoadedBoundsRef = useRef<string | null>(null);
 
   const processMapFeatures = useCallback(async () => {
     if (!map || !mapLoaded || isProcessing) return;
     
+    const bounds = map.getBounds();
+    const viewportBounds = {
+      north: bounds.getNorth(),
+      south: bounds.getSouth(),
+      east: bounds.getEast(),
+      west: bounds.getWest()
+    };
+
+    // Create a bounds key to avoid redundant loads
+    const boundsKey = `${viewportBounds.north.toFixed(4)}-${viewportBounds.south.toFixed(4)}-${viewportBounds.east.toFixed(4)}-${viewportBounds.west.toFixed(4)}`;
+    if (lastLoadedBoundsRef.current === boundsKey) {
+      return; // Already loaded this viewport
+    }
+
+    console.log('Loading data for viewport:', viewportBounds);
     setIsProcessing(true);
+    
     try {
-      const { mainData, landData } = await loadAllMapData();
+      const { features, landData } = await loadViewportData(viewportBounds);
+      lastLoadedBoundsRef.current = boundsKey;
 
       // Add land layer first
       if (landData) {
         addLandLayer(map, landData);
       }
 
-      if (mainData?.features?.length) {
+      if (features?.length) {
+        // Create feature collection for processing
+        const mainData = {
+          type: 'FeatureCollection' as const,
+          features
+        };
+
         // Extract features
         const parkFeatures = extractParkFeatures(mainData);
         const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
@@ -89,7 +113,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     } finally {
       setIsProcessing(false);
     }
-  }, [map, mapLoaded, isProcessing, loadAllMapData, setIsProcessing]);
+  }, [map, mapLoaded, isProcessing, loadViewportData, setIsProcessing]);
 
   // Initialize map
   useEffect(() => {
@@ -168,7 +192,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, []);
 
-  // Load map data after initialization
+  // Load map data after initialization and on viewport changes
   useEffect(() => {
     if (mapLoaded && map && !isProcessing) {
       const timeoutId = setTimeout(() => {
@@ -178,6 +202,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return () => clearTimeout(timeoutId);
     }
   }, [mapLoaded, map, processMapFeatures, isProcessing]);
+
+  // Load additional chunks when map moves
+  useEffect(() => {
+    if (!map || !mapLoaded) return;
+
+    const handleMoveEnd = () => {
+      // Debounce the viewport data loading
+      const timeoutId = setTimeout(() => {
+        processMapFeatures();
+      }, 300);
+      return () => clearTimeout(timeoutId);
+    };
+
+    map.on('moveend', handleMoveEnd);
+    return () => {
+      map.off('moveend', handleMoveEnd);
+    };
+  }, [map, mapLoaded, processMapFeatures]);
 
   // Handle business markers
   useEffect(() => {
