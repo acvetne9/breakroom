@@ -127,7 +127,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
           <div className="space-y-6">
             <div>
               <div className="flex items-center space-x-3">
-                <input type="text" value={salary} onChange={e => handleSalaryChange(e.target.value)} onBlur={checkForCompletion} placeholder="$14" className="app-input text-center text-lg flex-1 !py-0 h-12" />
+                <input type="text" inputMode="numeric" value={salary} onChange={e => handleSalaryChange(e.target.value)} onBlur={checkForCompletion} placeholder="$14" className="app-input text-center text-lg flex-1 !py-0 h-12" />
                 <select value={timePeriod} onChange={e => setTimePeriod(e.target.value)} className="app-input text-lg w-auto !py-0 h-12">
                   <option value="HR">HR</option>
                   <option value="MO">MO</option>
