@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import type { FeatureCollection, Feature } from 'geojson';
 import * as turf from '@turf/turf';
-import { fetchAndDecompressGzip } from '../utils/compressionUtils';
 
 interface ViewportBounds {
   north: number;
@@ -94,16 +93,25 @@ export const useViewportMapData = () => {
     const chunkBounds = getChunkBounds(chunkId);
     
     try {
-      console.log(`Loading chunk ${chunkId} with bounds:`, chunkBounds);
+      console.log(`🗺️ Loading chunk ${chunkId} with bounds:`, chunkBounds);
       
-      // Load full dataset (compressed version for better performance)
+      // Load full dataset (using uncompressed version for debugging)
+      console.log(`📊 Loading main data and land data...`);
       const [mainData, landData]: [FeatureCollection, FeatureCollection] = await Promise.all([
-        fetchAndDecompressGzip('/data/example-points.geojson.gz'),
+        fetch('/data/example-points.geojson').then(res => {
+          if (!res.ok) throw new Error('Failed to fetch main data');
+          console.log(`📍 Main data loaded successfully`);
+          return res.json();
+        }),
         fetch('/data/nyc_land.geojson').then(res => {
           if (!res.ok) throw new Error('Failed to fetch land data');
+          console.log(`🏞️ Land data loaded successfully`);
           return res.json();
         })
       ]);
+      
+      console.log(`📍 Main data loaded: ${mainData.features?.length || 0} features`);
+      console.log(`🏞️ Land data loaded: ${landData.features?.length || 0} features`);
 
       // Filter features to only include those within chunk bounds
       const chunkFeatures: Feature[] = [];
@@ -145,10 +153,10 @@ export const useViewportMapData = () => {
         }
       }
 
-      console.log(`Chunk ${chunkId} loaded with ${chunkFeatures.length} features`);
+      console.log(`✅ Chunk ${chunkId} loaded with ${chunkFeatures.length} features`);
       return chunkFeatures;
     } catch (error) {
-      console.error(`Error loading chunk ${chunkId}:`, error);
+      console.error(`❌ Error loading chunk ${chunkId}:`, error);
       return [];
     }
   }, [getChunkBounds]);
