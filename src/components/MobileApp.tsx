@@ -1,9 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, Suspense } from 'react';
 import { motion, PanInfo } from 'framer-motion';
-import InitiationPage from './InitiationPage';
-import HomePage from './HomePage';
-import SettingsPage from './SettingsPage';
-import ExplorePage from './ExplorePage';
+import { Skeleton } from "@/components/ui/skeleton";
+
+const InitiationPage = React.lazy(() => import('./InitiationPage'));
+const HomePage = React.lazy(() => import('./HomePage'));
+const SettingsPage = React.lazy(() => import('./SettingsPage'));
+const ExplorePage = React.lazy(() => import('./ExplorePage'));
 
 import { useBusinessesData } from '../hooks/useBusinessesData';
 
@@ -357,24 +359,28 @@ const MobileApp: React.FC = () => {
   return (
     <div className="fixed inset-0 overflow-hidden">
       {/* Map is always the background */}
-      <HomePage 
-        businesses={businesses} 
-        currentSlide={currentSlide}
-        currentView={currentView}
-        selectedBusiness={selectedBusiness}
-        onBusinessSelect={handleBusinessClick}
-        posts={posts}
-        onBusinessStoriesClick={handleBusinessStoriesClick}
-        onPostClick={(post) => {
-          setExpandedPost(post.id);
-        }}
-        onRoleVote={handleRoleVote}
-        onLocationSave={handleLocationSave} // NEW: Pass the location save handler
-      />
+      <Suspense fallback={<Skeleton className="w-full h-full" />}>
+        <HomePage 
+          businesses={businesses} 
+          currentSlide={currentSlide}
+          currentView={currentView}
+          selectedBusiness={selectedBusiness}
+          onBusinessSelect={handleBusinessClick}
+          posts={posts}
+          onBusinessStoriesClick={handleBusinessStoriesClick}
+          onPostClick={(post) => {
+            setExpandedPost(post.id);
+          }}
+          onRoleVote={handleRoleVote}
+          onLocationSave={handleLocationSave} // NEW: Pass the location save handler
+        />
+      </Suspense>
       
       {/* Initiation Card - slides up and disappears */}
       {currentView === 'initiation' && (
-        <InitiationPage onComplete={handleInitiationComplete} />
+        <Suspense fallback={<Skeleton className="w-full h-full rounded-t-lg" />}>
+          <InitiationPage onComplete={handleInitiationComplete} />
+        </Suspense>
       )}
       
       {/* Settings Card - slides from left */}
@@ -394,16 +400,18 @@ const MobileApp: React.FC = () => {
             }
           }}
         >
-          <SettingsPage 
-            initialData={userData} 
-            userPosts={posts.filter(post => post.author === 'You')}
-            onStoriesClick={handleUserStoriesClick}
-            onPostClick={(post) => {
-              setExpandedPost(post.id);
-              setCurrentSlide(2); // Navigate to explore page
-            }}
-            onJobUpdate={handleJobUpdate}
-          />
+          <Suspense fallback={<Skeleton className="w-full h-full" />}>
+            <SettingsPage 
+              initialData={userData} 
+              userPosts={posts.filter(post => post.author === 'You')}
+              onStoriesClick={handleUserStoriesClick}
+              onPostClick={(post) => {
+                setExpandedPost(post.id);
+                setCurrentSlide(2); // Navigate to explore page
+              }}
+              onJobUpdate={handleJobUpdate}
+            />
+          </Suspense>
         </motion.div>
       )}
 
@@ -424,30 +432,32 @@ const MobileApp: React.FC = () => {
             }
           }}
         >
-          <ExplorePage 
-            posts={posts}
-            filteredBusinessId={filteredBusinessId || undefined}
-            filteredUserStories={filteredUserStories}
-            onBusinessView={(businessId) => {
-              const business = businesses.find(b => b.id === businessId);
-              if (business) {
-                setSelectedBusiness(business);
-                setCurrentSlide(1); // Navigate to home page
-              }
-            }}
-            onExpandedPostChange={(postId) => {
-              setExpandedPost(postId);
-            }}
-            onCommentSubmit={(postId, comment) => {
-              setComments({
-                ...comments,
-                [postId]: [...(comments[postId] || []), comment]
-              });
-            }}
-            onPostSubmit={handlePostSubmit}
-            onBackToAllPosts={handleBackToAllPosts}
-            onPostVote={handlePostVote}
-          />
+          <Suspense fallback={<Skeleton className="w-full h-full" />}>
+            <ExplorePage 
+              posts={posts}
+              filteredBusinessId={filteredBusinessId || undefined}
+              filteredUserStories={filteredUserStories}
+              onBusinessView={(businessId) => {
+                const business = businesses.find(b => b.id === businessId);
+                if (business) {
+                  setSelectedBusiness(business);
+                  setCurrentSlide(1); // Navigate to home page
+                }
+              }}
+              onExpandedPostChange={(postId) => {
+                setExpandedPost(postId);
+              }}
+              onCommentSubmit={(postId, comment) => {
+                setComments({
+                  ...comments,
+                  [postId]: [...(comments[postId] || []), comment]
+                });
+              }}
+              onPostSubmit={handlePostSubmit}
+              onBackToAllPosts={handleBackToAllPosts}
+              onPostVote={handlePostVote}
+            />
+          </Suspense>
         </motion.div>
       )}
 

@@ -29,8 +29,13 @@ export const extractParkFeatures = (geoData: FeatureCollection) => {
 export const extractWaterFeatures = (geoData: FeatureCollection, parkFeatureIds: Set<any>) => {
   const waterFeatures = geoData.features.filter(feature => {
     if (!['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
-    const props = feature.properties || {};
+    const props = feature.properties || {} as any;
     const name = (props.name || '').toLowerCase();
+    const id = (props.id ?? feature.id ?? props.osm_id) as any;
+
+    // Explicit exclusions
+    if (id === 146402114 || id === '146402114') return false; // Do not color this way as water
+    if (props.landuse === 'residential') return false; // Never treat residential landuse as water
     
     // Exclude if already classified as park
     if (parkFeatureIds.has(props?.id) || parkFeatureIds.has(feature.id)) return false;
@@ -52,13 +57,13 @@ export const extractWaterFeatures = (geoData: FeatureCollection, parkFeatureIds:
   });
 
   // Remove duplicate water features by location
-  const uniqueWaterFeatures = [];
-  const seenLocations = new Set();
+  const uniqueWaterFeatures = [] as any[];
+  const seenLocations = new Set<string>();
   
   for (const feature of waterFeatures) {
     try {
       const centroid = turf.centroid(feature);
-      const [lng, lat] = centroid.geometry.coordinates;
+      const [lng, lat] = centroid.geometry.coordinates as [number, number];
       const locationKey = `${Math.round(lng * 10000)}-${Math.round(lat * 10000)}`;
       
       if (!seenLocations.has(locationKey)) {

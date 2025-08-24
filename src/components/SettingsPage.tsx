@@ -338,6 +338,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             <div className="flex items-center space-x-3">
               <input 
                 type="text" 
+                inputMode="numeric"
                 value={currentJob.salary} 
                 onChange={e => handleSalaryChange(e.target.value)}
                 onBlur={handleCurrentSalaryBlur}
@@ -405,6 +406,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 <div className="flex items-center space-x-3">
                   <input 
                     type="text" 
+                    inputMode="numeric"
                     value={job.salary} 
                     onChange={e => updatePastJob(job.id, 'salary', e.target.value)} 
                     className="app-input flex-1" 

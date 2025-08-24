@@ -125,14 +125,12 @@ export const addBusinessesLayer = (
   onBusinessClick?: (business: any) => void
 ) => {
   try {
-    console.log('addBusinessesLayer called', { count: businesses?.length ?? 0, selectedId: selectedBusiness?.id });
     // Clean up existing
     if (map.getSource('businesses')) {
       if (map.getLayer('businesses-layer')) {
         map.removeLayer('businesses-layer');
       }
       map.removeSource('businesses');
-      console.log('Removed existing businesses source/layer');
     }
 
     const businessFeatures = businesses.map(business => ({
@@ -140,13 +138,11 @@ export const addBusinessesLayer = (
       geometry: { type: 'Point' as const, coordinates: [business.position.lng, business.position.lat] },
       properties: { id: business.id, name: business.name, businessType: business.businessType || 'unknown' }
     }));
-    console.log('Prepared business features:', businessFeatures.length);
 
     map.addSource('businesses', {
       type: 'geojson',
       data: { type: 'FeatureCollection', features: businessFeatures }
     });
-    console.log('Added businesses source. Source exists:', !!map.getSource('businesses'));
 
     map.addLayer({
       id: 'businesses-layer',
@@ -164,15 +160,9 @@ export const addBusinessesLayer = (
         'circle-stroke-color': '#FFFFFF'
       }
     });
-    try {
-      console.log('Added businesses-layer. Current layers:', map.getStyle().layers?.map(l => l.id));
-    } catch (e) {
-      console.log('Could not read style layers after adding businesses-layer', e);
-    }
 
     // Event handlers
     if (onBusinessClick) {
-      console.log('Attaching click/hover handlers for businesses-layer');
       const clickHandler = (e: any) => {
         if (e.features?.[0]) {
           const businessId = e.features[0].properties?.id;
@@ -199,7 +189,6 @@ export const addBusinessesLayer = (
 
       return () => {
         map.off('click', 'businesses-layer', clickHandler);
-        console.log('Detached click handler for businesses-layer');
       };
     }
   } catch (error) {
