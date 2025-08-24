@@ -68,7 +68,11 @@ const JobSearchDropdown: React.FC<JobSearchDropdownProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setSearchTerm(newValue);
-    onChange(newValue);
+    // Only send valid options to parent, not custom text
+    const isValidOption = JOB_OPTIONS.includes(newValue);
+    if (isValidOption) {
+      onChange(newValue);
+    }
     setIsOpen(true);
   };
 

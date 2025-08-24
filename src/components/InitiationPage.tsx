@@ -33,13 +33,15 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   };
   const checkForCompletion = () => {
     const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
+    const isValidRole = JOB_OPTIONS.includes(role.trim());
     console.log('checkForCompletion called:', {
       salary,
       role,
       location,
-      allFilled
+      allFilled,
+      isValidRole
     });
-    if (allFilled && !isComplete) {
+    if (allFilled && isValidRole && !isComplete) {
       console.log('Setting isComplete to true');
       setIsComplete(true);
 
