@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import type { FeatureCollection, Feature } from 'geojson';
 import * as turf from '@turf/turf';
+import { loadGeoJSON } from '../utils/compressionUtils';
 
 interface ViewportBounds {
   north: number;
@@ -95,19 +96,10 @@ export const useViewportMapData = () => {
     try {
       console.log(`Loading chunk ${chunkId} with bounds:`, chunkBounds);
       
-      // Load full dataset (in production, this would be chunk-specific endpoints)
-      const [mainResponse, landResponse] = await Promise.all([
-        fetch('/data/example-points.geojson'),
-        fetch('/data/nyc_land.geojson')
-      ]);
-
-      if (!mainResponse.ok || !landResponse.ok) {
-        throw new Error('Failed to fetch data');
-      }
-
+      // Load compressed GeoJSON files (will fallback to uncompressed if .gz not available)
       const [mainData, landData]: [FeatureCollection, FeatureCollection] = await Promise.all([
-        mainResponse.json(),
-        landResponse.json()
+        loadGeoJSON('/data/example-points.geojson'),
+        loadGeoJSON('/data/nyc_land.geojson')
       ]);
 
       // Filter features to only include those within chunk bounds
