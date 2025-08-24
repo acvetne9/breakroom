@@ -95,7 +95,7 @@ export const useViewportMapData = () => {
     try {
       console.log(`Loading chunk ${chunkId} with bounds:`, chunkBounds);
       
-      // Load regular GeoJSON files
+      // Load full dataset (in production, this would be chunk-specific endpoints)
       const [mainResponse, landResponse] = await Promise.all([
         fetch('/data/example-points.geojson'),
         fetch('/data/nyc_land.geojson')
