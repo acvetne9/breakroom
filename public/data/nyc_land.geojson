@@ -2,23 +2,20 @@
   "type": "FeatureCollection",
   "features": [
     {
-      "type": "Feature",
-      "geometry": {
-        "type": "MultiPolygon",
-        "coordinates": [
-          [
-            [
-              [-74.2591, 40.4774],
-              [-73.7003, 40.4774],
-              [-73.7003, 40.9176],
-              [-74.2591, 40.9176],
-              [-74.2591, 40.4774]
-            ]
-          ]
-        ]
-      },
+      "type": "Feature", 
       "properties": {
-        "name": "New York City Land"
+        "name": "New York City Land",
+        "landuse": "mixed"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-74.25, 40.47],
+          [-73.70, 40.47], 
+          [-73.70, 40.92],
+          [-74.25, 40.92],
+          [-74.25, 40.47]
+        ]]
       }
     }
   ]

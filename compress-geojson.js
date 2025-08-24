@@ -34,7 +34,7 @@ function compressGeoJSON(inputFile, outputFile) {
   });
 }
 
-// Main function
+// Main function - run compression immediately
 async function main() {
   const filesToCompress = [
     'public/data/example-points.geojson',
@@ -53,7 +53,12 @@ async function main() {
   }
   
   console.log('✨ Compression complete!');
-  console.log('\nYour app will now automatically use compressed versions when available.');
+  console.log('\nCompressed files created:');
+  console.log('- public/data/example-points.geojson.gz');
+  console.log('- public/data/nyc_land.geojson.gz');
 }
 
-main().catch(console.error);
+// Run immediately
+main().then(() => {
+  console.log('\n🚀 Your app will now load compressed GeoJSON automatically!');
+}).catch(console.error);
