@@ -27,6 +27,7 @@ export const useViewportMapData = () => {
   const mainDataRef = useRef<FeatureCollection | null>(null);
   const landDataRef = useRef<FeatureCollection | null>(null);
   const chunkIndexRef = useRef<Map<string, Feature[]>>(new Map());
+  const startedRef = useRef(false);
 
   // NYC bounds for chunking
   const NYC_BOUNDS = {
@@ -157,12 +158,19 @@ export const useViewportMapData = () => {
   }, [ensureDataLoaded]);
 
   const loadAllDataCenterOut = useCallback(async () => {
+    // Global guard to ensure we load only once per session
+    if (startedRef.current) {
+      await ensureDataLoaded();
+      const cached = currentFeatures.length ? currentFeatures : (mainDataRef.current?.features as Feature[] | undefined) || [];
+      return { features: cached, landData: landDataRef.current };
+    }
     if (allDataLoaded || isProcessing) {
       await ensureDataLoaded();
       const cached = currentFeatures.length ? currentFeatures : (mainDataRef.current?.features as Feature[] | undefined) || [];
       return { features: cached, landData: landDataRef.current };
     }
     
+    startedRef.current = true;
     setIsProcessing(true);
     
     try {
