@@ -108,6 +108,64 @@ export const addRoadsLayer = (map: maplibregl.Map, roadFeatures: any[]) => {
   console.log(`Added ${roadFeatures.length} road features`);
 };
 
+export const addRoadsLayerChunked = async (map: maplibregl.Map, roadFeatures: any[], isMobile: boolean = false) => {
+  if (roadFeatures.length === 0) return;
+  
+  const chunkSize = isMobile ? 2000 : 10000; // Smaller chunks on mobile
+  const delay = isMobile ? 100 : 50; // Longer delays on mobile
+  
+  console.log(`🛣️ Loading ${roadFeatures.length} roads in chunks of ${chunkSize} (mobile: ${isMobile})`);
+  
+  // Remove existing roads layer if it exists
+  if (map.getSource('roads')) {
+    if (map.getLayer('roads-layer')) {
+      map.removeLayer('roads-layer');
+    }
+    map.removeSource('roads');
+  }
+  
+  // Add empty source first
+  map.addSource('roads', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] }
+  });
+  
+  map.addLayer({
+    id: 'roads-layer',
+    type: 'line',
+    source: 'roads',
+    paint: {
+      'line-color': '#666666',
+      'line-width': 2
+    }
+  });
+  
+  // Load roads in chunks with delays
+  const chunks = [];
+  for (let i = 0; i < roadFeatures.length; i += chunkSize) {
+    chunks.push(roadFeatures.slice(i, i + chunkSize));
+  }
+  
+  let loadedFeatures: any[] = [];
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    loadedFeatures.push(...chunk);
+    
+    // Update the map data
+    const roadsCollection = { type: 'FeatureCollection' as const, features: loadedFeatures };
+    (map.getSource('roads') as maplibregl.GeoJSONSource).setData(roadsCollection);
+    
+    console.log(`🛣️ Loaded road chunk ${i + 1}/${chunks.length} (${loadedFeatures.length}/${roadFeatures.length} total)`);
+    
+    // Add delay between chunks to prevent memory spikes
+    if (i < chunks.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  console.log(`✅ All ${roadFeatures.length} road features loaded successfully`);
+};
+
 export const ensureLayerOrder = (map: maplibregl.Map) => {
   // Ensure proper layer ordering: roads over water/parks, businesses over roads
   if (map.getLayer('roads-layer')) {

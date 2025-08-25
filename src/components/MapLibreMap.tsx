@@ -15,6 +15,7 @@ import {
   addWaterLayer,
   addWaterwaysLayer,
   addRoadsLayer,
+  addRoadsLayerChunked,
   addBusinessesLayer,
   ensureLayerOrder
 } from '../utils/mapLayers';
@@ -101,37 +102,40 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         };
 
         if (isMobile) {
-          // Mobile mode: Load essential features + major roads only
-          console.log('📱 Mobile mode: Loading essential features + major roads only');
+          // Mobile mode: Load all features with chunked roads
+          console.log('📱 Mobile mode: Loading all features with chunked road loading');
           const parkFeatures = extractParkFeatures(mainData);
           const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
           const waterFeatures = extractWaterFeatures(mainData, parkFeatureIds);
-          const roadFeatures = extractRoadFeatures(mainData, true); // Pass isMobile=true
+          const roadFeatures = extractRoadFeatures(mainData);
           const waterwayFeatures = extractWaterwayFeatures(mainData);
 
           console.log(`🎯 Mobile extracted features:
             - Parks: ${parkFeatures.length}
             - Water: ${waterFeatures.length} 
-            - Roads: ${roadFeatures.length} (major roads only)
+            - Roads: ${roadFeatures.length} (will load in chunks)
             - Waterways: ${waterwayFeatures.length}`);
 
-          // Add layers for mobile
-          console.log('🎨 Adding mobile layers...');
+          // Add non-road layers first
+          console.log('🎨 Adding non-road layers...');
           addParksLayer(map, parkFeatures);
           console.log('✅ Parks layer added');
           addWaterLayer(map, waterFeatures);
           console.log('✅ Water layer added');
           addWaterwaysLayer(map, waterwayFeatures);
           console.log('✅ Waterways layer added');
-          addRoadsLayer(map, roadFeatures);
-          console.log('✅ Major roads layer added');
+          
+          // Load roads in chunks to prevent memory crash
+          console.log('🛣️ Starting chunked road loading...');
+          await addRoadsLayerChunked(map, roadFeatures, true);
+          console.log('✅ All roads loaded via chunking');
         } else {
           // Desktop mode: Load all features
           console.log('🖥️ Desktop mode: Loading all features');
           const parkFeatures = extractParkFeatures(mainData);
           const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
           const waterFeatures = extractWaterFeatures(mainData, parkFeatureIds);
-          const roadFeatures = extractRoadFeatures(mainData, false); // Pass isMobile=false
+          const roadFeatures = extractRoadFeatures(mainData);
           const waterwayFeatures = extractWaterwayFeatures(mainData);
 
           console.log(`🎯 Desktop extracted features:
