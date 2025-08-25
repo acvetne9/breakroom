@@ -53,14 +53,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
   const { isProcessing, setIsProcessing, loadAllDataCenterOut, allDataLoaded } = useViewportMapData();
   const lastLoadedBoundsRef = useRef<string | null>(null);
+  const processedRef = useRef(false);
 
   const processMapFeatures = useCallback(async () => {
+    // Prevent duplicate processing across re-mounts (StrictMode/dev or crashes)
+    const alreadyGlobalProcessed = (window as any).__MAP_FEATURES_PROCESSED__ === true;
+    if (processedRef.current || alreadyGlobalProcessed) {
+      console.log('🚫 Map features already processed (guard). Skipping.');
+      return;
+    }
     if (!map || !mapLoaded || isProcessing || allDataLoaded) {
       console.log(`🚫 Skipping map processing - map: ${!!map}, mapLoaded: ${mapLoaded}, isProcessing: ${isProcessing}, allDataLoaded: ${allDataLoaded}`);
       return;
     }
     
     console.log('🗺️ Loading all map data center-out...');
+    processedRef.current = true; // prevent duplicate runs in this mount
+    (window as any).__MAP_FEATURES_PROCESSED__ = true; // prevent duplicate runs across mounts
     setIsProcessing(true);
     
     try {
@@ -234,7 +243,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     console.log(`🎯 Map data loading effect triggered - mapLoaded: ${mapLoaded}, map: ${!!map}, isProcessing: ${isProcessing}, allDataLoaded: ${allDataLoaded}`);
     
-    if (mapLoaded && map && !isProcessing && !allDataLoaded) {
+    if (mapLoaded && map && !isProcessing && !allDataLoaded && !processedRef.current) {
       console.log('⏰ Setting timeout to process map features...');
       const timeoutId = setTimeout(() => {
         console.log('⏰ Timeout fired, calling processMapFeatures');
@@ -271,7 +280,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (landmarks.length === 0) return;
 
     try {
-      const updateEmojiSize = () => {
+      let updateEmojiSize: (() => void) | null = null;
+      updateEmojiSize = () => {
         const zoom = map.getZoom();
         const baseSize = 16;
         const scaleFactor = Math.pow(1.2, zoom - 10);
@@ -325,15 +335,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       map.on('zoom', updateEmojiSize);
       
       console.log(`Successfully added ${newMarkers.length} emoji markers`);
+
+      // Cleanup on unmount or landmarks change
+      return () => {
+        landmarkMarkersRef.current.forEach(m => m.remove());
+        landmarkMarkersRef.current = [];
+        if (updateEmojiSize) map.off('zoom', updateEmojiSize);
+      };
     } catch (error) {
       console.error('Error adding emoji markers:', error);
     }
-
-    // Cleanup on unmount or landmarks change
-    return () => {
-      landmarkMarkersRef.current.forEach(m => m.remove());
-      landmarkMarkersRef.current = [];
-    };
   }, [mapLoaded, landmarks, map]);
 
   return (
