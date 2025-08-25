@@ -86,11 +86,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       // Add land layer first
       if (landData) {
-        console.log('🏞️ Adding land layer...');
+        console.log(`🏞️ Adding land layer (${landData.features?.length} features)...`);
         addLandLayer(map, landData);
         console.log('✅ Land layer added');
       } else {
-        console.log('⚠️ No land data available');
+        console.log('⚠️ No land data available - this will cause visibility issues!');
       }
 
       if (features?.length) {
@@ -119,16 +119,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           // Add non-road layers first
           console.log('🎨 Adding non-road layers...');
           addParksLayer(map, parkFeatures);
-          console.log('✅ Parks layer added');
+          console.log(`✅ Parks layer added (${parkFeatures.length} features)`);
           addWaterLayer(map, waterFeatures);
-          console.log('✅ Water layer added');
+          console.log(`✅ Water layer added (${waterFeatures.length} features)`);
           addWaterwaysLayer(map, waterwayFeatures);
-          console.log('✅ Waterways layer added');
+          console.log(`✅ Waterways layer added (${waterwayFeatures.length} features)`);
           
           // Load roads in chunks to prevent memory crash
           console.log('🛣️ Starting chunked road loading...');
           await addRoadsLayerChunked(map, roadFeatures, true);
-          console.log('✅ All roads loaded via chunking');
+          console.log(`✅ All roads loaded via chunking (${roadFeatures.length} features)`);
         } else {
           // Desktop mode: Load all features
           console.log('🖥️ Desktop mode: Loading all features');
@@ -147,13 +147,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           // Add all layers for desktop
           console.log('🎨 Adding all desktop layers...');
           addParksLayer(map, parkFeatures);
-          console.log('✅ Parks layer added');
+          console.log(`✅ Parks layer added (${parkFeatures.length} features)`);
           addWaterLayer(map, waterFeatures);
-          console.log('✅ Water layer added');
+          console.log(`✅ Water layer added (${waterFeatures.length} features)`);
           addWaterwaysLayer(map, waterwayFeatures);
-          console.log('✅ Waterways layer added');
+          console.log(`✅ Waterways layer added (${waterwayFeatures.length} features)`);
           addRoadsLayer(map, roadFeatures);
-          console.log('✅ Roads layer added');
+          console.log(`✅ Roads layer added (${roadFeatures.length} features)`);
         }
 
         // Ensure proper layer ordering
@@ -162,7 +162,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         
         // Log current map layers
         const mapLayers = map.getStyle().layers || [];
-        console.log('🗺️ Current map layers:', mapLayers.map(l => l.id));
+        console.log('🗺️ Current map layers:', mapLayers.map(l => `${l.id} (${l.type})`));
+        
+        // Check if map is in correct bounds
+        const bounds = map.getBounds();
+        const center = map.getCenter();
+        console.log('🎯 Map bounds:', bounds.toArray());
+        console.log('🎯 Map center:', [center.lng, center.lat]);
+        console.log('🎯 Map zoom:', map.getZoom());
       } else {
         console.log('⚠️ No main features to process');
       }
