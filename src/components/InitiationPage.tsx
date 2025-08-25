@@ -76,7 +76,9 @@ const JOB_OPTIONS = [
     "Water Quality Technician", "Traffic Signal Technician", "Road Maintenance Worker", "City Arborist",
 
     "Crew Member", "Associate", "Team Member", "Helper", "Laborer", "Worker", "Staff Member",
-    "General Worker", "Operator", "Technician", "Specialist", "Coordinator", "Agent", "Assistant"
+    "General Worker", "Operator", "Technician", "Specialist", "Coordinator", "Agent", "Assistant",
+  
+    "Personal Trainer", "Psychiatrist", 
 ]
 
   
