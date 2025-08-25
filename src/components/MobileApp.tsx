@@ -70,9 +70,18 @@ const MobileApp: React.FC = () => {
     }
   ]);
 
-  const handleInitiationComplete = (data: UserData) => {
+  const handleInitiationComplete = async (data: UserData) => {
     setUserData(data);
     setCurrentView('main');
+    
+    // Save job data to database
+    try {
+      const { createOrUpdateBusinessRole } = await import('../services/businesses');
+      await createOrUpdateBusinessRole(data.location, data.role, data.salary);
+      console.log('Job role saved to database:', { location: data.location, role: data.role, salary: data.salary });
+    } catch (error) {
+      console.error('Error saving job role to database:', error);
+    }
     
     // Create automatic job update post
     const jobUpdatePost: Post = {
@@ -90,7 +99,16 @@ const MobileApp: React.FC = () => {
     setPosts(prevPosts => [jobUpdatePost, ...prevPosts]);
   };
 
-  const handleJobUpdate = (jobData: { salary: string; role: string; location: string; timePeriod: string }) => {
+  const handleJobUpdate = async (jobData: { salary: string; role: string; location: string; timePeriod: string }) => {
+    // Save job data to database
+    try {
+      const { createOrUpdateBusinessRole } = await import('../services/businesses');
+      await createOrUpdateBusinessRole(jobData.location, jobData.role, jobData.salary);
+      console.log('Job role updated in database:', jobData);
+    } catch (error) {
+      console.error('Error updating job role in database:', error);
+    }
+    
     const jobUpdatePost: Post = {
       id: `job-update-${Date.now()}`,
       author: 'You',
