@@ -162,7 +162,21 @@ export const useViewportMapData = () => {
   }, [getChunkBounds]);
 
   const loadAllDataCenterOut = useCallback(async () => {
-    if (allDataLoaded || isProcessing) return { features: currentFeatures, landData: null };
+    if (allDataLoaded || isProcessing) {
+      // Get current features from loaded chunks instead of state
+      const allFeatures: Feature[] = [];
+      Array.from(loadedChunks.values()).forEach(chunk => {
+        if (chunk.loaded) {
+          allFeatures.push(...chunk.features);
+        }
+      });
+      
+      const landFeatures = allFeatures.filter(f => f.properties?.name === 'New York City Land');
+      const mainFeatures = allFeatures.filter(f => f.properties?.name !== 'New York City Land');
+      const landData = landFeatures.length > 0 ? { type: 'FeatureCollection', features: landFeatures } : null;
+      
+      return { features: mainFeatures, landData };
+    }
     
     setIsProcessing(true);
     
@@ -222,7 +236,7 @@ export const useViewportMapData = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [allDataLoaded, isProcessing, currentFeatures, getAllChunksInCenterOutOrder, loadedChunks, loadChunkData, getChunkBounds]);
+  }, [allDataLoaded, isProcessing, getAllChunksInCenterOutOrder, loadedChunks, loadChunkData, getChunkBounds]);
 
   const loadViewportData = useCallback(async (viewportBounds: ViewportBounds) => {
     // Always load all data center-out instead of viewport-specific chunks

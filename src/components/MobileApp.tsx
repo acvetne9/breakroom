@@ -74,13 +74,14 @@ const MobileApp: React.FC = () => {
     setUserData(data);
     setCurrentView('main');
     
-    // Save job data to database
+    // Save job data to database (only if authenticated)
     try {
       const { createOrUpdateBusinessRole } = await import('../services/businesses');
       await createOrUpdateBusinessRole(data.location, data.role, data.salary);
       console.log('Job role saved to database:', { location: data.location, role: data.role, salary: data.salary });
     } catch (error) {
-      console.error('Error saving job role to database:', error);
+      console.warn('Could not save job role to database (user not authenticated):', error);
+      // Continue without showing error to user since this is optional functionality
     }
     
     // Create automatic job update post
