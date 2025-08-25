@@ -68,11 +68,8 @@ const JobSearchDropdown: React.FC<JobSearchDropdownProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setSearchTerm(newValue);
-    // Only send valid options to parent, not custom text
-    const isValidOption = JOB_OPTIONS.includes(newValue);
-    if (isValidOption) {
-      onChange(newValue);
-    }
+    // Always update parent with the current value (including empty string)
+    onChange(newValue);
     setIsOpen(true);
   };
 
@@ -136,13 +133,22 @@ const JobSearchDropdown: React.FC<JobSearchDropdownProps> = ({
                 {option}
               </button>
             ))
+          ) : searchTerm && !searchTerm.match(/\d/) ? (
+            <button
+              key="other"
+              type="button"
+              onClick={() => handleOptionSelect("Other")}
+              className="w-full px-3 py-2 text-left transition-colors text-app-black hover:bg-gray-50"
+            >
+              Other
+            </button>
           ) : searchTerm ? (
             <div className="px-3 py-2 text-app-gray-medium text-sm">
-              Press Enter to use "{searchTerm}"
+              No matching jobs found
             </div>
           ) : (
             <div className="px-3 py-2 text-app-gray-medium text-sm">
-              No matching jobs found
+              Start typing to search jobs
             </div>
           )}
         </div>
