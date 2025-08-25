@@ -55,20 +55,33 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const lastLoadedBoundsRef = useRef<string | null>(null);
 
   const processMapFeatures = useCallback(async () => {
-    if (!map || !mapLoaded || isProcessing || allDataLoaded) return;
+    if (!map || !mapLoaded || isProcessing || allDataLoaded) {
+      console.log(`🚫 Skipping map processing - map: ${!!map}, mapLoaded: ${mapLoaded}, isProcessing: ${isProcessing}, allDataLoaded: ${allDataLoaded}`);
+      return;
+    }
     
-    console.log('Loading all map data center-out...');
+    console.log('🗺️ Loading all map data center-out...');
     setIsProcessing(true);
     
     try {
       const { features, landData } = await loadAllDataCenterOut();
+      console.log('📦 Received data from loadAllDataCenterOut:', {
+        featuresCount: features?.length || 0,
+        landDataExists: !!landData,
+        landFeatureCount: landData?.features?.length || 0
+      });
 
       // Add land layer first
       if (landData) {
+        console.log('🏞️ Adding land layer...');
         addLandLayer(map, landData);
+        console.log('✅ Land layer added');
+      } else {
+        console.log('⚠️ No land data available');
       }
 
       if (features?.length) {
+        console.log(`📍 Processing ${features.length} main features...`);
         // Create feature collection for processing
         const mainData = {
           type: 'FeatureCollection' as const,
@@ -82,19 +95,37 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         const roadFeatures = extractRoadFeatures(mainData);
         const waterwayFeatures = extractWaterwayFeatures(mainData);
 
-        console.log(`Found ${parkFeatures.length} park features, ${waterFeatures.length} water features, ${roadFeatures.length} road features`);
+        console.log(`🎯 Extracted features:
+          - Parks: ${parkFeatures.length}
+          - Water: ${waterFeatures.length} 
+          - Roads: ${roadFeatures.length}
+          - Waterways: ${waterwayFeatures.length}`);
 
         // Add layers in order: parks, water, waterways, roads
+        console.log('🎨 Adding map layers...');
         addParksLayer(map, parkFeatures);
+        console.log('✅ Parks layer added');
         addWaterLayer(map, waterFeatures);
+        console.log('✅ Water layer added');
         addWaterwaysLayer(map, waterwayFeatures);
+        console.log('✅ Waterways layer added');
         addRoadsLayer(map, roadFeatures);
+        console.log('✅ Roads layer added');
 
         // Ensure proper layer ordering
         ensureLayerOrder(map);
+        console.log('✅ Layer ordering ensured');
+        
+        // Log current map layers
+        const mapLayers = map.getStyle().layers || [];
+        console.log('🗺️ Current map layers:', mapLayers.map(l => l.id));
+      } else {
+        console.log('⚠️ No main features to process');
       }
+      
+      console.log('🎉 Map processing completed successfully');
     } catch (error) {
-      console.error('Error processing map features:', error);
+      console.error('❌ Error processing map features:', error);
     } finally {
       setIsProcessing(false);
     }
@@ -201,12 +232,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Load map data after initialization (only once)
   useEffect(() => {
+    console.log(`🎯 Map data loading effect triggered - mapLoaded: ${mapLoaded}, map: ${!!map}, isProcessing: ${isProcessing}, allDataLoaded: ${allDataLoaded}`);
+    
     if (mapLoaded && map && !isProcessing && !allDataLoaded) {
+      console.log('⏰ Setting timeout to process map features...');
       const timeoutId = setTimeout(() => {
+        console.log('⏰ Timeout fired, calling processMapFeatures');
         processMapFeatures();
       }, 500);
 
-      return () => clearTimeout(timeoutId);
+      return () => {
+        console.log('🧹 Clearing map processing timeout');
+        clearTimeout(timeoutId);
+      };
     }
   }, [mapLoaded, map, processMapFeatures, isProcessing, allDataLoaded]);
 
