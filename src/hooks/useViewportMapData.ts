@@ -22,6 +22,10 @@ export const useViewportMapData = () => {
   const [currentFeatures, setCurrentFeatures] = useState<Feature[]>([]);
   const [allDataLoaded, setAllDataLoaded] = useState(false);
   const loadingChunksRef = useRef<Set<string>>(new Set());
+  // Caches to avoid refetching and reduce memory duplication
+  const mainDataRef = useRef<FeatureCollection | null>(null);
+  const landDataRef = useRef<FeatureCollection | null>(null);
+  const chunkIndexRef = useRef<Map<string, Feature[]>>(new Map());
 
   // NYC bounds for chunking
   const NYC_BOUNDS = {
@@ -89,77 +93,56 @@ export const useViewportMapData = () => {
     return chunks;
   }, []);
 
-  const loadChunkData = useCallback(async (chunkId: string): Promise<Feature[]> => {
-    const chunkBounds = getChunkBounds(chunkId);
-    
-    try {
-      console.log(`🗺️ Loading chunk ${chunkId} with bounds:`, chunkBounds);
-      
-      // Load full dataset (using uncompressed version for debugging)
-      console.log(`📊 Loading main data and land data...`);
-      const [mainData, landData]: [FeatureCollection, FeatureCollection] = await Promise.all([
-        fetch('/data/example-points.geojson').then(res => {
-          if (!res.ok) throw new Error('Failed to fetch main data');
-          console.log(`📍 Main data loaded successfully`);
-          return res.json();
-        }),
-        fetch('/data/nyc_land.geojson').then(res => {
-          if (!res.ok) throw new Error('Failed to fetch land data');
-          console.log(`🏞️ Land data loaded successfully`);
-          return res.json();
-        })
-      ]);
-      
-      console.log(`📍 Main data loaded: ${mainData.features?.length || 0} features`);
-      console.log(`🏞️ Land data loaded: ${landData.features?.length || 0} features`);
-
-      // Filter features to only include those within chunk bounds
-      const chunkFeatures: Feature[] = [];
-      
-      // Add land features (usually covers entire NYC, so include in every chunk)
-      chunkFeatures.push(...landData.features);
-
-      // Filter main data features by bounds
-      for (const feature of mainData.features) {
-        try {
-          let includeFeature = false;
-
-          if (feature.geometry.type === 'Point') {
-            const [lng, lat] = feature.geometry.coordinates as [number, number];
-            includeFeature = lng >= chunkBounds.west && lng <= chunkBounds.east &&
-                           lat >= chunkBounds.south && lat <= chunkBounds.north;
-          } else if (['Polygon', 'MultiPolygon', 'LineString'].includes(feature.geometry.type)) {
-            // For complex geometries, check if they intersect with chunk bounds
-            const chunkBoundingBox = turf.bboxPolygon([
-              chunkBounds.west, chunkBounds.south, chunkBounds.east, chunkBounds.north
-            ]);
-            
-            try {
-              const intersects = turf.booleanIntersects(feature, chunkBoundingBox);
-              includeFeature = intersects;
-            } catch {
-              // If intersection check fails, include the feature (better safe than sorry)
-              includeFeature = true;
-            }
-          }
-
-          if (includeFeature) {
-            chunkFeatures.push(feature);
-          }
-        } catch (error) {
-          console.warn('Error processing feature for chunk:', error);
-          // Include feature if processing fails
-          chunkFeatures.push(feature);
+  // Load and cache main/land data once, and pre-index features by chunk
+  const ensureDataLoaded = useCallback(async () => {
+    if (!mainDataRef.current) {
+      const res = await fetch('/data/example-points.geojson');
+      if (!res.ok) throw new Error('Failed to fetch main data');
+      mainDataRef.current = await res.json();
+      console.log(`📍 Main data loaded once: ${mainDataRef.current.features?.length || 0} features`);
+    }
+    if (!landDataRef.current) {
+      const res = await fetch('/data/nyc_land.geojson');
+      if (!res.ok) throw new Error('Failed to fetch land data');
+      landDataRef.current = await res.json();
+      console.log(`🏞️ Land data loaded once: ${landDataRef.current.features?.length || 0} features`);
+    }
+    // Build chunk index once
+    if (chunkIndexRef.current.size === 0 && mainDataRef.current) {
+      console.log('🧩 Building chunk index for features...');
+      const index = new Map<string, Feature[]>();
+      for (let x = 0; x < GRID_SIZE; x++) {
+        for (let y = 0; y < GRID_SIZE; y++) {
+          index.set(`${x}-${y}`, []);
         }
       }
-
-      console.log(`✅ Chunk ${chunkId} loaded with ${chunkFeatures.length} features`);
-      return chunkFeatures;
-    } catch (error) {
-      console.error(`❌ Error loading chunk ${chunkId}:`, error);
-      return [];
+      for (const feature of mainDataRef.current.features) {
+        try {
+          if (feature.geometry?.type === 'Point') {
+            const [lng, lat] = feature.geometry.coordinates as [number, number];
+            const x = Math.min(Math.max(Math.floor((lng - NYC_BOUNDS.west) / CHUNK_WIDTH), 0), GRID_SIZE - 1);
+            const y = Math.min(Math.max(Math.floor((lat - NYC_BOUNDS.south) / CHUNK_HEIGHT), 0), GRID_SIZE - 1);
+            const id = `${x}-${y}`;
+            index.get(id)!.push(feature);
+          } else {
+            // Skip non-point features here; land polygons are handled separately
+          }
+        } catch (e) {
+          // Skip problematic feature
+        }
+      }
+      chunkIndexRef.current = index;
+      console.log('✅ Chunk index built');
     }
-  }, [getChunkBounds]);
+  }, []);
+
+  const loadChunkData = useCallback(async (chunkId: string): Promise<Feature[]> => {
+    console.log(`🗺️ Loading chunk ${chunkId} (from cache)`);
+    await ensureDataLoaded();
+    const features = chunkIndexRef.current.get(chunkId) || [];
+    console.log(`✅ Chunk ${chunkId} loaded with ${features.length} features (cached, no refetch)`);
+    return features;
+  }, [ensureDataLoaded]);
 
   const loadAllDataCenterOut = useCallback(async () => {
     if (allDataLoaded || isProcessing) {
@@ -170,12 +153,8 @@ export const useViewportMapData = () => {
           allFeatures.push(...chunk.features);
         }
       });
-      
-      const landFeatures = allFeatures.filter(f => f.properties?.name === 'New York City Land');
-      const mainFeatures = allFeatures.filter(f => f.properties?.name !== 'New York City Land');
-      const landData = landFeatures.length > 0 ? { type: 'FeatureCollection', features: landFeatures } : null;
-      
-      return { features: mainFeatures, landData };
+      const landData = landDataRef.current;
+      return { features: allFeatures, landData };
     }
     
     setIsProcessing(true);
@@ -186,7 +165,6 @@ export const useViewportMapData = () => {
       
       // Load chunks one by one from center outward
       const allFeatures: Feature[] = [];
-      let landData = null;
       
       for (const chunkId of allChunks) {
         if (!loadedChunks.has(chunkId)) {
@@ -215,20 +193,12 @@ export const useViewportMapData = () => {
         }
       }
       
-      // Separate land and main features
-      const landFeatures = allFeatures.filter(f => f.properties?.name === 'New York City Land');
-      const mainFeatures = allFeatures.filter(f => f.properties?.name !== 'New York City Land');
-      
-      if (landFeatures.length > 0) {
-        landData = { type: 'FeatureCollection', features: landFeatures };
-      }
-      
+      // Use cached land data and aggregated features
+      const landData = landDataRef.current;
       setCurrentFeatures(allFeatures);
       setAllDataLoaded(true);
-      
       console.log(`Loaded all ${allChunks.length} chunks with ${allFeatures.length} total features`);
-      
-      return { features: mainFeatures, landData };
+      return { features: allFeatures, landData };
       
     } catch (error) {
       console.error('Error loading all map data:', error);
