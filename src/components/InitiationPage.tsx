@@ -5,7 +5,7 @@ import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 
 // Import the predefined job options to check against
-const JOB_OPTIONS = jobs = [
+const JOB_OPTIONS = [
     "Software Engineer", "Frontend Developer", "Backend Developer", "Full Stack Developer", "Mobile App Developer",
     "Web Developer", "UI Designer", "UX Designer", "Data Scientist", "Machine Learning Engineer",
     "AI Researcher", "Cloud Architect", "DevOps Engineer", "Systems Administrator", "Network Engineer",
