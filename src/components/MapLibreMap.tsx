@@ -101,31 +101,37 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         };
 
         if (isMobile) {
-          // Mobile-lite mode: Only parks and water, skip roads/waterways to prevent crash
-          console.log('📱 Mobile mode: Loading only essential features to prevent crashes');
+          // Mobile mode: Load essential features + major roads only
+          console.log('📱 Mobile mode: Loading essential features + major roads only');
           const parkFeatures = extractParkFeatures(mainData);
           const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
           const waterFeatures = extractWaterFeatures(mainData, parkFeatureIds);
+          const roadFeatures = extractRoadFeatures(mainData, true); // Pass isMobile=true
+          const waterwayFeatures = extractWaterwayFeatures(mainData);
 
           console.log(`🎯 Mobile extracted features:
             - Parks: ${parkFeatures.length}
             - Water: ${waterFeatures.length} 
-            - Roads: SKIPPED (mobile mode)
-            - Waterways: SKIPPED (mobile mode)`);
+            - Roads: ${roadFeatures.length} (major roads only)
+            - Waterways: ${waterwayFeatures.length}`);
 
-          // Add only essential layers for mobile
-          console.log('🎨 Adding essential mobile layers...');
+          // Add layers for mobile
+          console.log('🎨 Adding mobile layers...');
           addParksLayer(map, parkFeatures);
           console.log('✅ Parks layer added');
           addWaterLayer(map, waterFeatures);
           console.log('✅ Water layer added');
+          addWaterwaysLayer(map, waterwayFeatures);
+          console.log('✅ Waterways layer added');
+          addRoadsLayer(map, roadFeatures);
+          console.log('✅ Major roads layer added');
         } else {
           // Desktop mode: Load all features
           console.log('🖥️ Desktop mode: Loading all features');
           const parkFeatures = extractParkFeatures(mainData);
           const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
           const waterFeatures = extractWaterFeatures(mainData, parkFeatureIds);
-          const roadFeatures = extractRoadFeatures(mainData);
+          const roadFeatures = extractRoadFeatures(mainData, false); // Pass isMobile=false
           const waterwayFeatures = extractWaterwayFeatures(mainData);
 
           console.log(`🎯 Desktop extracted features:

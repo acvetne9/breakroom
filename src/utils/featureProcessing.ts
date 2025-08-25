@@ -79,7 +79,7 @@ export const extractWaterFeatures = (geoData: FeatureCollection, parkFeatureIds:
   return uniqueWaterFeatures;
 };
 
-export const extractRoadFeatures = (geoData: FeatureCollection) => {
+export const extractRoadFeatures = (geoData: FeatureCollection, isMobile: boolean = false) => {
   return geoData.features.filter(feature => {
     if (feature.geometry.type !== 'LineString') return false;
     const props = feature.properties || {};
@@ -102,6 +102,20 @@ export const extractRoadFeatures = (geoData: FeatureCollection) => {
         name.includes('weehawken') ||
         name.includes('union city') ||
         name.includes('palisades')) return false;
+    
+    // Mobile filtering: Only include major roads to reduce memory usage
+    if (isMobile) {
+      const majorRoadTypes = [
+        'motorway', 'trunk', 'primary', 'secondary', 
+        'motorway_link', 'trunk_link', 'primary_link', 'secondary_link'
+      ];
+      
+      // Only include major roads on mobile
+      if (!majorRoadTypes.includes(props.highway)) return false;
+      
+      // Skip roads without names (usually less important)
+      if (!props.name) return false;
+    }
     
     return true;
   });
