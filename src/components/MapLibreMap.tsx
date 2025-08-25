@@ -61,12 +61,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const processMapFeatures = useCallback(async () => {
     // Prevent duplicate processing across re-mounts (StrictMode/dev or crashes)
     const alreadyGlobalProcessed = (window as any).__MAP_FEATURES_PROCESSED__ === true;
-    if (processedRef.current || alreadyGlobalProcessed) {
-      console.log('🚫 Map features already processed (guard). Skipping.');
+    if (processedRef.current || alreadyGlobalProcessed || isProcessing) {
+      console.log('🚫 Map features already processed or processing. Skipping.');
       return;
     }
-    if (!map || !mapLoaded || isProcessing || allDataLoaded) {
-      console.log(`🚫 Skipping map processing - map: ${!!map}, mapLoaded: ${mapLoaded}, isProcessing: ${isProcessing}, allDataLoaded: ${allDataLoaded}`);
+    if (!map || !mapLoaded) {
+      console.log(`🚫 Skipping map processing - map: ${!!map}, mapLoaded: ${mapLoaded}`);
       return;
     }
     
@@ -170,10 +170,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.log('🎉 Map processing completed successfully');
     } catch (error) {
       console.error('❌ Error processing map features:', error);
+      // On error, reset flags so user can retry
+      processedRef.current = false;
+      (window as any).__MAP_FEATURES_PROCESSED__ = false;
     } finally {
       setIsProcessing(false);
     }
-  }, [map, mapLoaded, isProcessing, allDataLoaded, loadAllDataCenterOut, setIsProcessing, isMobile]);
+  }, [map, mapLoaded, isMobile]); // Removed dependencies that could cause re-runs
 
   // Initialize map
   useEffect(() => {
@@ -278,21 +281,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Load map data after initialization (only once)
   useEffect(() => {
-    console.log(`🎯 Map data loading effect triggered - mapLoaded: ${mapLoaded}, map: ${!!map}, isProcessing: ${isProcessing}, allDataLoaded: ${allDataLoaded}`);
+    console.log(`🎯 Map data loading effect triggered - mapLoaded: ${mapLoaded}, map: ${!!map}, isProcessing: ${isProcessing}, processed: ${processedRef.current}`);
     
-    if (mapLoaded && map && !isProcessing && !allDataLoaded && !processedRef.current) {
-      console.log('⏰ Setting timeout to process map features...');
-      const timeoutId = setTimeout(() => {
-        console.log('⏰ Timeout fired, calling processMapFeatures');
-        processMapFeatures();
-      }, 500);
-
-      return () => {
-        console.log('🧹 Clearing map processing timeout');
-        clearTimeout(timeoutId);
-      };
+    if (mapLoaded && map && !isProcessing && !processedRef.current) {
+      console.log('⏰ Calling processMapFeatures immediately');
+      processMapFeatures();
     }
-  }, [mapLoaded, map, processMapFeatures, isProcessing, allDataLoaded]);
+  }, [mapLoaded, map, processMapFeatures]); // Only depend on map, mapLoaded, and the callback
 
   // Remove viewport change loading since we load everything at once
 
