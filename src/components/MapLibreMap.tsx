@@ -232,16 +232,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         attributionControl: false
       });
       console.log('MapLibre instance created:', mapInstance);
+      
+      // Set bounds immediately after creation
+      mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
+      
     } catch (error) {
       console.error('Error creating map instance:', error);
       return;
     }
 
-    mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
-
     mapInstance.on('load', () => {
       if (cleanedUp) return;
-      console.log('Map loaded successfully');
+      console.log('🗺️ Map loaded and visible - blue background should be showing');
       setMapLoaded(true);
     });
 
@@ -394,7 +396,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         width: '100%',
         height: '100%',
         zIndex: 1,
-        backgroundColor: 'hsl(var(--muted))' // Fallback background while tiles/layers load
+        backgroundColor: '#B3E5FC' // Light blue fallback while map loads
       }}
     />
   );
