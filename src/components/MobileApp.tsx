@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, Suspense } from 'react';
 import { motion, PanInfo } from 'framer-motion';
 import { Skeleton } from "@/components/ui/skeleton";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const InitiationPage = React.lazy(() => import('./InitiationPage'));
 const HomePage = React.lazy(() => import('./HomePage'));
@@ -34,6 +35,7 @@ interface Post {
 }
 
 const MobileApp: React.FC = () => {
+  const isMobile = useIsMobile();
   const [currentView, setCurrentView] = useState<'initiation' | 'main'>('initiation');
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -537,18 +539,20 @@ const MobileApp: React.FC = () => {
         />
       </div>
 
-      {/* Slide indicators */}
-      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-50">
-        {[0, 1, 2].map(index => (
-          <button
-            key={index}
-            onClick={() => setCurrentSlide(index)}
-            className={`w-3 h-3 rounded-full transition-colors ${
-              index === currentSlide ? 'bg-app-yellow' : 'bg-app-gray-light'
-            }`}
-          />
-        ))}
-      </div>
+      {/* Slide indicators - only show on desktop */}
+      {!isMobile && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-50">
+          {[0, 1, 2].map(index => (
+            <button
+              key={index}
+              onClick={() => setCurrentSlide(index)}
+              className={`w-3 h-3 rounded-full transition-colors ${
+                index === currentSlide ? 'bg-app-yellow' : 'bg-app-gray-light'
+              }`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
