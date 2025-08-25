@@ -146,59 +146,21 @@ export const useViewportMapData = () => {
 
   const loadAllDataCenterOut = useCallback(async () => {
     if (allDataLoaded || isProcessing) {
-      // Get current features from loaded chunks instead of state
-      const allFeatures: Feature[] = [];
-      Array.from(loadedChunks.values()).forEach(chunk => {
-        if (chunk.loaded) {
-          allFeatures.push(...chunk.features);
-        }
-      });
-      const landData = landDataRef.current;
-      return { features: allFeatures, landData };
+      await ensureDataLoaded();
+      const cached = currentFeatures.length ? currentFeatures : (mainDataRef.current?.features as Feature[] | undefined) || [];
+      return { features: cached, landData: landDataRef.current };
     }
     
     setIsProcessing(true);
     
     try {
-      const allChunks = getAllChunksInCenterOutOrder();
-      console.log('Loading all chunks center-out:', allChunks);
-      
-      // Load chunks one by one from center outward
-      const allFeatures: Feature[] = [];
-      
-      for (const chunkId of allChunks) {
-        if (!loadedChunks.has(chunkId)) {
-          console.log(`Loading chunk ${chunkId}...`);
-          const features = await loadChunkData(chunkId);
-          
-          // Update loaded chunks immediately
-          setLoadedChunks(prev => {
-            const newChunks = new Map(prev);
-            newChunks.set(chunkId, {
-              id: chunkId,
-              bounds: getChunkBounds(chunkId),
-              features,
-              loaded: true
-            });
-            return newChunks;
-          });
-          
-          allFeatures.push(...features);
-        } else {
-          // Chunk already loaded, add its features
-          const existingChunk = loadedChunks.get(chunkId);
-          if (existingChunk?.loaded) {
-            allFeatures.push(...existingChunk.features);
-          }
-        }
-      }
-      
-      // Use cached land data and aggregated features
-      const landData = landDataRef.current;
-      setCurrentFeatures(allFeatures);
+      // Load full dataset once (cached) and return
+      await ensureDataLoaded();
+      const features = (mainDataRef.current?.features as Feature[]) || [];
+      setCurrentFeatures(features);
       setAllDataLoaded(true);
-      console.log(`Loaded all ${allChunks.length} chunks with ${allFeatures.length} total features`);
-      return { features: allFeatures, landData };
+      console.log(`Loaded full dataset once: ${features.length} features`);
+      return { features, landData: landDataRef.current };
       
     } catch (error) {
       console.error('Error loading all map data:', error);
