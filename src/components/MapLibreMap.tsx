@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useViewportMapData } from '../hooks/useViewportMapData';
+import { useIsMobile } from '../hooks/use-mobile';
 import { 
   extractParkFeatures, 
   extractWaterFeatures, 
@@ -47,6 +48,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   selectedBusiness,
   landmarks = []
 }) => {
+  const isMobile = useIsMobile();
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -67,7 +69,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return;
     }
     
-    console.log('🗺️ Loading all map data center-out...');
+    console.log(`🗺️ Loading map data ${isMobile ? '(mobile-lite mode)' : '(full desktop mode)'}...`);
     processedRef.current = true; // prevent duplicate runs in this mount
     (window as any).__MAP_FEATURES_PROCESSED__ = true; // prevent duplicate runs across mounts
     setIsProcessing(true);
@@ -77,7 +79,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.log('📦 Received data from loadAllDataCenterOut:', {
         featuresCount: features?.length || 0,
         landDataExists: !!landData,
-        landFeatureCount: landData?.features?.length || 0
+        landFeatureCount: landData?.features?.length || 0,
+        isMobile
       });
 
       // Add land layer first
@@ -97,29 +100,51 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           features
         };
 
-        // Extract features
-        const parkFeatures = extractParkFeatures(mainData);
-        const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
-        const waterFeatures = extractWaterFeatures(mainData, parkFeatureIds);
-        const roadFeatures = extractRoadFeatures(mainData);
-        const waterwayFeatures = extractWaterwayFeatures(mainData);
+        if (isMobile) {
+          // Mobile-lite mode: Only parks and water, skip roads/waterways to prevent crash
+          console.log('📱 Mobile mode: Loading only essential features to prevent crashes');
+          const parkFeatures = extractParkFeatures(mainData);
+          const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
+          const waterFeatures = extractWaterFeatures(mainData, parkFeatureIds);
 
-        console.log(`🎯 Extracted features:
-          - Parks: ${parkFeatures.length}
-          - Water: ${waterFeatures.length} 
-          - Roads: ${roadFeatures.length}
-          - Waterways: ${waterwayFeatures.length}`);
+          console.log(`🎯 Mobile extracted features:
+            - Parks: ${parkFeatures.length}
+            - Water: ${waterFeatures.length} 
+            - Roads: SKIPPED (mobile mode)
+            - Waterways: SKIPPED (mobile mode)`);
 
-        // Add layers in order: parks, water, waterways, roads
-        console.log('🎨 Adding map layers...');
-        addParksLayer(map, parkFeatures);
-        console.log('✅ Parks layer added');
-        addWaterLayer(map, waterFeatures);
-        console.log('✅ Water layer added');
-        addWaterwaysLayer(map, waterwayFeatures);
-        console.log('✅ Waterways layer added');
-        addRoadsLayer(map, roadFeatures);
-        console.log('✅ Roads layer added');
+          // Add only essential layers for mobile
+          console.log('🎨 Adding essential mobile layers...');
+          addParksLayer(map, parkFeatures);
+          console.log('✅ Parks layer added');
+          addWaterLayer(map, waterFeatures);
+          console.log('✅ Water layer added');
+        } else {
+          // Desktop mode: Load all features
+          console.log('🖥️ Desktop mode: Loading all features');
+          const parkFeatures = extractParkFeatures(mainData);
+          const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
+          const waterFeatures = extractWaterFeatures(mainData, parkFeatureIds);
+          const roadFeatures = extractRoadFeatures(mainData);
+          const waterwayFeatures = extractWaterwayFeatures(mainData);
+
+          console.log(`🎯 Desktop extracted features:
+            - Parks: ${parkFeatures.length}
+            - Water: ${waterFeatures.length} 
+            - Roads: ${roadFeatures.length}
+            - Waterways: ${waterwayFeatures.length}`);
+
+          // Add all layers for desktop
+          console.log('🎨 Adding all desktop layers...');
+          addParksLayer(map, parkFeatures);
+          console.log('✅ Parks layer added');
+          addWaterLayer(map, waterFeatures);
+          console.log('✅ Water layer added');
+          addWaterwaysLayer(map, waterwayFeatures);
+          console.log('✅ Waterways layer added');
+          addRoadsLayer(map, roadFeatures);
+          console.log('✅ Roads layer added');
+        }
 
         // Ensure proper layer ordering
         ensureLayerOrder(map);
@@ -138,7 +163,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     } finally {
       setIsProcessing(false);
     }
-  }, [map, mapLoaded, isProcessing, allDataLoaded, loadAllDataCenterOut, setIsProcessing]);
+  }, [map, mapLoaded, isProcessing, allDataLoaded, loadAllDataCenterOut, setIsProcessing, isMobile]);
 
   // Initialize map
   useEffect(() => {
