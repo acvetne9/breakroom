@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import type { FeatureCollection, Feature } from 'geojson';
 import * as turf from '@turf/turf';
+import { ungzip } from 'pako';
 
 interface ViewportBounds {
   north: number;
@@ -96,10 +97,21 @@ export const useViewportMapData = () => {
   // Load and cache main/land data once, and pre-index features by chunk
   const ensureDataLoaded = useCallback(async () => {
     if (!mainDataRef.current) {
-      const res = await fetch('/data/example-points.geojson');
-      if (!res.ok) throw new Error('Failed to fetch main data');
-      mainDataRef.current = await res.json();
-      console.log(`📍 Main data loaded once: ${mainDataRef.current.features?.length || 0} features`);
+      // Try loading compressed first for mobile reliability
+      try {
+        const gzRes = await fetch('/data/example-points.geojson.gz');
+        if (!gzRes.ok) throw new Error('Failed to fetch gz main data');
+        const buf = await gzRes.arrayBuffer();
+        const text = ungzip(new Uint8Array(buf), { to: 'string' }) as string;
+        mainDataRef.current = JSON.parse(text);
+        console.log(`📍 Main data loaded once (gz): ${mainDataRef.current.features?.length || 0} features`);
+      } catch (gzErr) {
+        console.warn('gz main data load failed, falling back to uncompressed:', gzErr);
+        const res = await fetch('/data/example-points.geojson');
+        if (!res.ok) throw new Error('Failed to fetch main data');
+        mainDataRef.current = await res.json();
+        console.log(`📍 Main data loaded once (json): ${mainDataRef.current.features?.length || 0} features`);
+      }
     }
     if (!landDataRef.current) {
       const res = await fetch('/data/nyc_land.geojson');
