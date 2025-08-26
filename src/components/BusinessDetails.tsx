@@ -37,6 +37,7 @@ interface BusinessDetailsProps {
   };
   posts: Post[];
   onClose: () => void;
+  onBackToPreview?: () => void;
   onStoriesClick?: () => void;
   onPostClick?: (post: Post) => void;
   onRoleVote?: (businessId: string, roleIndex: number, voteType: 'up' | 'down') => void;
@@ -45,6 +46,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
   business,
   posts,
   onClose,
+  onBackToPreview,
   onStoriesClick,
   onPostClick,
   onRoleVote
@@ -70,13 +72,18 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
   const handleCardClick = (e: React.MouseEvent) => {
     // Stop propagation to prevent the background click handler from firing
     e.stopPropagation();
+    
+    // Go back to preview when clicking on the main card area
+    onBackToPreview?.();
   };
 
-  const handleStoryClick = (post: Post) => {
+  const handleStoryClick = (post: Post, e: React.MouseEvent) => {
+    e.stopPropagation();
     onPostClick?.(post);
   };
 
-  const handleRoleVote = (roleIndex: number, voteType: 'up' | 'down') => {
+  const handleRoleVote = (roleIndex: number, voteType: 'up' | 'down', e?: React.MouseEvent) => {
+    e?.stopPropagation();
     onRoleVote?.(business.id, roleIndex, voteType);
   };
   return <div className="fixed inset-0 z-40 flex items-start justify-center" style={{ paddingTop: '8vh' }} onClick={handleBackgroundClick}>
@@ -101,7 +108,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
           <div className="space-y-3">
             {business.roles ? business.roles.map((role, index) => <div key={index} className="flex justify-between items-center">
                 <span className="text-app-black">{role.role}</span>
-                <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
                   <span className="font-medium text-app-black">
                     {role.salary}
                     {!role.salary.includes('/') && (
@@ -117,7 +124,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
                 </div>
               </div>) : <div className="flex justify-between items-center">
                 <span className="text-app-black">Barista</span>
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
                   <span className="font-medium text-app-black">{business.salary || '$13.6'}</span>
                   <VotingComponent
                     upvotes={0}
@@ -140,7 +147,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
             {businessStories.length > 0 ? (
               <>
                 {businessStories.slice(0, 5).map(story => (
-                  <div key={story.id} className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded relative" onClick={() => handleStoryClick(story)}>
+                  <div key={story.id} className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded relative" onClick={(e) => handleStoryClick(story, e)}>
                     <p className="text-app-gray-dark text-sm pb-4">
                       {story.text.length > 100 ? `${story.text.substring(0, 100)}...` : story.text}
                     </p>
@@ -149,7 +156,10 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
                 ))}
                 {businessStories.length > 5 && (
                   <button 
-                    onClick={onStoriesClick} 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onStoriesClick?.();
+                    }} 
                     className="w-full mt-3 px-4 py-2 bg-app-yellow text-app-black rounded hover:bg-app-yellow/90 transition-colors"
                   >
                     View all Stories ({businessStories.length})
@@ -157,7 +167,10 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
                 )}
               </>
             ) : (
-              <div className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={() => onStoriesClick?.()}>
+              <div className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={(e) => {
+                e.stopPropagation();
+                onStoriesClick?.();
+              }}>
                 <p className="text-app-gray-dark text-sm font-medium">
                   Be the first to post! 🚀
                 </p>

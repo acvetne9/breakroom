@@ -108,6 +108,92 @@ export const addRoadsLayer = (map: maplibregl.Map, roadFeatures: any[]) => {
   console.log(`Added ${roadFeatures.length} road features`);
 };
 
+export const addRoadsLayerChunked = async (map: maplibregl.Map, roadFeatures: any[], isMobile: boolean = false) => {
+  if (roadFeatures.length === 0) return;
+  
+  const chunkSize = isMobile ? 2000 : 10000;
+  const delay = isMobile ? 100 : 50;
+  
+  console.log(`🛣️ Loading ${roadFeatures.length} roads in center-out chunks of ${chunkSize} (mobile: ${isMobile})`);
+  
+  // Remove existing roads layer if it exists
+  if (map.getSource('roads')) {
+    if (map.getLayer('roads-layer')) {
+      map.removeLayer('roads-layer');
+    }
+    map.removeSource('roads');
+  }
+  
+  // Add empty source first
+  map.addSource('roads', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] }
+  });
+  
+  map.addLayer({
+    id: 'roads-layer',
+    type: 'line',
+    source: 'roads',
+    paint: {
+      'line-color': '#666666',
+      'line-width': 2
+    }
+  });
+  
+  // Get map center to sort roads by distance from center
+  const center = map.getCenter();
+  const mapCenterLng = center.lng;
+  const mapCenterLat = center.lat;
+  
+  // Sort roads by distance from map center (closest first)
+  const roadsWithDistance = roadFeatures.map(feature => {
+    let distance = Infinity;
+    try {
+      if (feature.geometry.type === 'LineString') {
+        const coords = feature.geometry.coordinates;
+        if (coords && coords.length > 0) {
+          // Use midpoint of line for distance calculation
+          const midIndex = Math.floor(coords.length / 2);
+          const [lng, lat] = coords[midIndex];
+          distance = Math.sqrt(Math.pow(lng - mapCenterLng, 2) + Math.pow(lat - mapCenterLat, 2));
+        }
+      }
+    } catch (e) {
+      // Keep infinite distance for problematic features
+    }
+    return { feature, distance };
+  });
+  
+  // Sort by distance (closest first)
+  roadsWithDistance.sort((a, b) => a.distance - b.distance);
+  const sortedRoads = roadsWithDistance.map(item => item.feature);
+  
+  // Load roads in chunks from center outward
+  const chunks = [];
+  for (let i = 0; i < sortedRoads.length; i += chunkSize) {
+    chunks.push(sortedRoads.slice(i, i + chunkSize));
+  }
+  
+  let loadedFeatures: any[] = [];
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    loadedFeatures.push(...chunk);
+    
+    // Update the map data
+    const roadsCollection = { type: 'FeatureCollection' as const, features: loadedFeatures };
+    (map.getSource('roads') as maplibregl.GeoJSONSource).setData(roadsCollection);
+    
+    console.log(`🛣️ Loaded center-out road chunk ${i + 1}/${chunks.length} (${loadedFeatures.length}/${sortedRoads.length} total)`);
+    
+    // Add delay between chunks to prevent memory spikes
+    if (i < chunks.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  console.log(`✅ All ${sortedRoads.length} road features loaded center-out successfully`);
+};
+
 export const ensureLayerOrder = (map: maplibregl.Map) => {
   // Ensure proper layer ordering: roads over water/parks, businesses over roads
   if (map.getLayer('roads-layer')) {

@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import type { FeatureCollection, Feature } from 'geojson';
 import * as turf from '@turf/turf';
+import { ungzip } from 'pako';
 
 interface ViewportBounds {
   north: number;
@@ -22,6 +23,11 @@ export const useViewportMapData = () => {
   const [currentFeatures, setCurrentFeatures] = useState<Feature[]>([]);
   const [allDataLoaded, setAllDataLoaded] = useState(false);
   const loadingChunksRef = useRef<Set<string>>(new Set());
+  // Caches to avoid refetching and reduce memory duplication
+  const mainDataRef = useRef<FeatureCollection | null>(null);
+  const landDataRef = useRef<FeatureCollection | null>(null);
+  const chunkIndexRef = useRef<Map<string, Feature[]>>(new Map());
+  const startedRef = useRef(false);
 
   // NYC bounds for chunking
   const NYC_BOUNDS = {
@@ -89,132 +95,92 @@ export const useViewportMapData = () => {
     return chunks;
   }, []);
 
-  const loadChunkData = useCallback(async (chunkId: string): Promise<Feature[]> => {
-    const chunkBounds = getChunkBounds(chunkId);
-    
-    try {
-      console.log(`🗺️ Loading chunk ${chunkId} with bounds:`, chunkBounds);
-      
-      // Load full dataset (using uncompressed version for debugging)
-      console.log(`📊 Loading main data and land data...`);
-      const [mainData, landData]: [FeatureCollection, FeatureCollection] = await Promise.all([
-        fetch('/data/example-points.geojson').then(res => {
-          if (!res.ok) throw new Error('Failed to fetch main data');
-          console.log(`📍 Main data loaded successfully`);
-          return res.json();
-        }),
-        fetch('/data/nyc_land.geojson').then(res => {
-          if (!res.ok) throw new Error('Failed to fetch land data');
-          console.log(`🏞️ Land data loaded successfully`);
-          return res.json();
-        })
-      ]);
-      
-      console.log(`📍 Main data loaded: ${mainData.features?.length || 0} features`);
-      console.log(`🏞️ Land data loaded: ${landData.features?.length || 0} features`);
-
-      // Filter features to only include those within chunk bounds
-      const chunkFeatures: Feature[] = [];
-      
-      // Add land features (usually covers entire NYC, so include in every chunk)
-      chunkFeatures.push(...landData.features);
-
-      // Filter main data features by bounds
-      for (const feature of mainData.features) {
-        try {
-          let includeFeature = false;
-
-          if (feature.geometry.type === 'Point') {
-            const [lng, lat] = feature.geometry.coordinates as [number, number];
-            includeFeature = lng >= chunkBounds.west && lng <= chunkBounds.east &&
-                           lat >= chunkBounds.south && lat <= chunkBounds.north;
-          } else if (['Polygon', 'MultiPolygon', 'LineString'].includes(feature.geometry.type)) {
-            // For complex geometries, check if they intersect with chunk bounds
-            const chunkBoundingBox = turf.bboxPolygon([
-              chunkBounds.west, chunkBounds.south, chunkBounds.east, chunkBounds.north
-            ]);
-            
-            try {
-              const intersects = turf.booleanIntersects(feature, chunkBoundingBox);
-              includeFeature = intersects;
-            } catch {
-              // If intersection check fails, include the feature (better safe than sorry)
-              includeFeature = true;
-            }
-          }
-
-          if (includeFeature) {
-            chunkFeatures.push(feature);
-          }
-        } catch (error) {
-          console.warn('Error processing feature for chunk:', error);
-          // Include feature if processing fails
-          chunkFeatures.push(feature);
+  // Load and cache main/land data once, and pre-index features by chunk
+  const ensureDataLoaded = useCallback(async () => {
+    if (!mainDataRef.current) {
+      // Try loading compressed first for mobile reliability
+      try {
+        const gzRes = await fetch('/data/example-points.geojson.gz');
+        if (!gzRes.ok) throw new Error('Failed to fetch gz main data');
+        const buf = await gzRes.arrayBuffer();
+        const text = ungzip(new Uint8Array(buf), { to: 'string' }) as string;
+        mainDataRef.current = JSON.parse(text);
+        console.log(`📍 Main data loaded once (gz): ${mainDataRef.current.features?.length || 0} features`);
+      } catch (gzErr) {
+        console.warn('gz main data load failed, falling back to uncompressed:', gzErr);
+        const res = await fetch('/data/example-points.geojson');
+        if (!res.ok) throw new Error('Failed to fetch main data');
+        mainDataRef.current = await res.json();
+        console.log(`📍 Main data loaded once (json): ${mainDataRef.current.features?.length || 0} features`);
+      }
+    }
+    if (!landDataRef.current) {
+      const res = await fetch('/data/nyc_land.geojson');
+      if (!res.ok) throw new Error('Failed to fetch land data');
+      landDataRef.current = await res.json();
+      console.log(`🏞️ Land data loaded once: ${landDataRef.current.features?.length || 0} features`);
+    }
+    // Build chunk index once
+    if (chunkIndexRef.current.size === 0 && mainDataRef.current) {
+      console.log('🧩 Building chunk index for features...');
+      const index = new Map<string, Feature[]>();
+      for (let x = 0; x < GRID_SIZE; x++) {
+        for (let y = 0; y < GRID_SIZE; y++) {
+          index.set(`${x}-${y}`, []);
         }
       }
-
-      console.log(`✅ Chunk ${chunkId} loaded with ${chunkFeatures.length} features`);
-      return chunkFeatures;
-    } catch (error) {
-      console.error(`❌ Error loading chunk ${chunkId}:`, error);
-      return [];
+      for (const feature of mainDataRef.current.features) {
+        try {
+          if (feature.geometry?.type === 'Point') {
+            const [lng, lat] = feature.geometry.coordinates as [number, number];
+            const x = Math.min(Math.max(Math.floor((lng - NYC_BOUNDS.west) / CHUNK_WIDTH), 0), GRID_SIZE - 1);
+            const y = Math.min(Math.max(Math.floor((lat - NYC_BOUNDS.south) / CHUNK_HEIGHT), 0), GRID_SIZE - 1);
+            const id = `${x}-${y}`;
+            index.get(id)!.push(feature);
+          } else {
+            // Skip non-point features here; land polygons are handled separately
+          }
+        } catch (e) {
+          // Skip problematic feature
+        }
+      }
+      chunkIndexRef.current = index;
+      console.log('✅ Chunk index built');
     }
-  }, [getChunkBounds]);
+  }, []);
+
+  const loadChunkData = useCallback(async (chunkId: string): Promise<Feature[]> => {
+    console.log(`🗺️ Loading chunk ${chunkId} (from cache)`);
+    await ensureDataLoaded();
+    const features = chunkIndexRef.current.get(chunkId) || [];
+    console.log(`✅ Chunk ${chunkId} loaded with ${features.length} features (cached, no refetch)`);
+    return features;
+  }, [ensureDataLoaded]);
 
   const loadAllDataCenterOut = useCallback(async () => {
-    if (allDataLoaded || isProcessing) return { features: currentFeatures, landData: null };
+    // Global guard to ensure we load only once per session
+    if (startedRef.current) {
+      await ensureDataLoaded();
+      const cached = currentFeatures.length ? currentFeatures : (mainDataRef.current?.features as Feature[] | undefined) || [];
+      return { features: cached, landData: landDataRef.current };
+    }
+    if (allDataLoaded || isProcessing) {
+      await ensureDataLoaded();
+      const cached = currentFeatures.length ? currentFeatures : (mainDataRef.current?.features as Feature[] | undefined) || [];
+      return { features: cached, landData: landDataRef.current };
+    }
     
+    startedRef.current = true;
     setIsProcessing(true);
     
     try {
-      const allChunks = getAllChunksInCenterOutOrder();
-      console.log('Loading all chunks center-out:', allChunks);
-      
-      // Load chunks one by one from center outward
-      const allFeatures: Feature[] = [];
-      let landData = null;
-      
-      for (const chunkId of allChunks) {
-        if (!loadedChunks.has(chunkId)) {
-          console.log(`Loading chunk ${chunkId}...`);
-          const features = await loadChunkData(chunkId);
-          
-          // Update loaded chunks immediately
-          setLoadedChunks(prev => {
-            const newChunks = new Map(prev);
-            newChunks.set(chunkId, {
-              id: chunkId,
-              bounds: getChunkBounds(chunkId),
-              features,
-              loaded: true
-            });
-            return newChunks;
-          });
-          
-          allFeatures.push(...features);
-        } else {
-          // Chunk already loaded, add its features
-          const existingChunk = loadedChunks.get(chunkId);
-          if (existingChunk?.loaded) {
-            allFeatures.push(...existingChunk.features);
-          }
-        }
-      }
-      
-      // Separate land and main features
-      const landFeatures = allFeatures.filter(f => f.properties?.name === 'New York City Land');
-      const mainFeatures = allFeatures.filter(f => f.properties?.name !== 'New York City Land');
-      
-      if (landFeatures.length > 0) {
-        landData = { type: 'FeatureCollection', features: landFeatures };
-      }
-      
-      setCurrentFeatures(allFeatures);
+      // Load full dataset once (cached) and return
+      await ensureDataLoaded();
+      const features = (mainDataRef.current?.features as Feature[]) || [];
+      setCurrentFeatures(features);
       setAllDataLoaded(true);
-      
-      console.log(`Loaded all ${allChunks.length} chunks with ${allFeatures.length} total features`);
-      
-      return { features: mainFeatures, landData };
+      console.log(`Loaded full dataset once: ${features.length} features`);
+      return { features, landData: landDataRef.current };
       
     } catch (error) {
       console.error('Error loading all map data:', error);
@@ -222,7 +188,7 @@ export const useViewportMapData = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [allDataLoaded, isProcessing, currentFeatures, getAllChunksInCenterOutOrder, loadedChunks, loadChunkData, getChunkBounds]);
+  }, [allDataLoaded, isProcessing, getAllChunksInCenterOutOrder, loadedChunks, loadChunkData, getChunkBounds]);
 
   const loadViewportData = useCallback(async (viewportBounds: ViewportBounds) => {
     // Always load all data center-out instead of viewport-specific chunks

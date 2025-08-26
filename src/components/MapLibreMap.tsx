@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useViewportMapData } from '../hooks/useViewportMapData';
+import { useIsMobile } from '../hooks/use-mobile';
 import { 
   extractParkFeatures, 
   extractWaterFeatures, 
@@ -14,6 +15,7 @@ import {
   addWaterLayer,
   addWaterwaysLayer,
   addRoadsLayer,
+  addRoadsLayerChunked,
   addBusinessesLayer,
   ensureLayerOrder
 } from '../utils/mapLayers';
@@ -47,20 +49,30 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   selectedBusiness,
   landmarks = []
 }) => {
+  const isMobile = useIsMobile();
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
   const { isProcessing, setIsProcessing, loadAllDataCenterOut, allDataLoaded } = useViewportMapData();
   const lastLoadedBoundsRef = useRef<string | null>(null);
+  const processedRef = useRef(false);
 
   const processMapFeatures = useCallback(async () => {
-    if (!map || !mapLoaded || isProcessing || allDataLoaded) {
-      console.log(`🚫 Skipping map processing - map: ${!!map}, mapLoaded: ${mapLoaded}, isProcessing: ${isProcessing}, allDataLoaded: ${allDataLoaded}`);
+    // Prevent duplicate processing across re-mounts (StrictMode/dev or crashes)
+    const alreadyGlobalProcessed = (window as any).__MAP_FEATURES_PROCESSED__ === true;
+    if (processedRef.current || alreadyGlobalProcessed || isProcessing) {
+      console.log('🚫 Map features already processed or processing. Skipping.');
+      return;
+    }
+    if (!map || !mapLoaded) {
+      console.log(`🚫 Skipping map processing - map: ${!!map}, mapLoaded: ${mapLoaded}`);
       return;
     }
     
-    console.log('🗺️ Loading all map data center-out...');
+    console.log(`🗺️ Loading map data ${isMobile ? '(mobile-lite mode)' : '(full desktop mode)'}...`);
+    processedRef.current = true; // prevent duplicate runs in this mount
+    (window as any).__MAP_FEATURES_PROCESSED__ = true; // prevent duplicate runs across mounts
     setIsProcessing(true);
     
     try {
@@ -68,16 +80,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.log('📦 Received data from loadAllDataCenterOut:', {
         featuresCount: features?.length || 0,
         landDataExists: !!landData,
-        landFeatureCount: landData?.features?.length || 0
+        landFeatureCount: landData?.features?.length || 0,
+        isMobile
       });
 
       // Add land layer first
       if (landData) {
-        console.log('🏞️ Adding land layer...');
+        console.log(`🏞️ Adding land layer (${landData.features?.length} features)...`);
         addLandLayer(map, landData);
         console.log('✅ Land layer added');
       } else {
-        console.log('⚠️ No land data available');
+        console.log('⚠️ No land data available - this will cause visibility issues!');
       }
 
       if (features?.length) {
@@ -88,29 +101,60 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           features
         };
 
-        // Extract features
-        const parkFeatures = extractParkFeatures(mainData);
-        const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
-        const waterFeatures = extractWaterFeatures(mainData, parkFeatureIds);
-        const roadFeatures = extractRoadFeatures(mainData);
-        const waterwayFeatures = extractWaterwayFeatures(mainData);
+        if (isMobile) {
+          // Mobile mode: Load all features with chunked roads
+          console.log('📱 Mobile mode: Loading all features with chunked road loading');
+          const parkFeatures = extractParkFeatures(mainData);
+          const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
+          const waterFeatures = extractWaterFeatures(mainData, parkFeatureIds);
+          const roadFeatures = extractRoadFeatures(mainData);
+          const waterwayFeatures = extractWaterwayFeatures(mainData);
 
-        console.log(`🎯 Extracted features:
-          - Parks: ${parkFeatures.length}
-          - Water: ${waterFeatures.length} 
-          - Roads: ${roadFeatures.length}
-          - Waterways: ${waterwayFeatures.length}`);
+          console.log(`🎯 Mobile extracted features:
+            - Parks: ${parkFeatures.length}
+            - Water: ${waterFeatures.length} 
+            - Roads: ${roadFeatures.length} (will load in chunks)
+            - Waterways: ${waterwayFeatures.length}`);
 
-        // Add layers in order: parks, water, waterways, roads
-        console.log('🎨 Adding map layers...');
-        addParksLayer(map, parkFeatures);
-        console.log('✅ Parks layer added');
-        addWaterLayer(map, waterFeatures);
-        console.log('✅ Water layer added');
-        addWaterwaysLayer(map, waterwayFeatures);
-        console.log('✅ Waterways layer added');
-        addRoadsLayer(map, roadFeatures);
-        console.log('✅ Roads layer added');
+          // Add non-road layers first
+          console.log('🎨 Adding non-road layers...');
+          addParksLayer(map, parkFeatures);
+          console.log(`✅ Parks layer added (${parkFeatures.length} features)`);
+          addWaterLayer(map, waterFeatures);
+          console.log(`✅ Water layer added (${waterFeatures.length} features)`);
+          addWaterwaysLayer(map, waterwayFeatures);
+          console.log(`✅ Waterways layer added (${waterwayFeatures.length} features)`);
+          
+          // Load roads in chunks to prevent memory crash
+          console.log('🛣️ Starting chunked road loading...');
+          await addRoadsLayerChunked(map, roadFeatures, true);
+          console.log(`✅ All roads loaded via chunking (${roadFeatures.length} features)`);
+        } else {
+          // Desktop mode: Load all features
+          console.log('🖥️ Desktop mode: Loading all features');
+          const parkFeatures = extractParkFeatures(mainData);
+          const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
+          const waterFeatures = extractWaterFeatures(mainData, parkFeatureIds);
+          const roadFeatures = extractRoadFeatures(mainData);
+          const waterwayFeatures = extractWaterwayFeatures(mainData);
+
+          console.log(`🎯 Desktop extracted features:
+            - Parks: ${parkFeatures.length}
+            - Water: ${waterFeatures.length} 
+            - Roads: ${roadFeatures.length}
+            - Waterways: ${waterwayFeatures.length}`);
+
+          // Add all layers for desktop
+          console.log('🎨 Adding all desktop layers...');
+          addParksLayer(map, parkFeatures);
+          console.log(`✅ Parks layer added (${parkFeatures.length} features)`);
+          addWaterLayer(map, waterFeatures);
+          console.log(`✅ Water layer added (${waterFeatures.length} features)`);
+          addWaterwaysLayer(map, waterwayFeatures);
+          console.log(`✅ Waterways layer added (${waterwayFeatures.length} features)`);
+          addRoadsLayer(map, roadFeatures);
+          console.log(`✅ Roads layer added (${roadFeatures.length} features)`);
+        }
 
         // Ensure proper layer ordering
         ensureLayerOrder(map);
@@ -118,7 +162,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         
         // Log current map layers
         const mapLayers = map.getStyle().layers || [];
-        console.log('🗺️ Current map layers:', mapLayers.map(l => l.id));
+        console.log('🗺️ Current map layers:', mapLayers.map(l => `${l.id} (${l.type})`));
+        
+        // Check if map is in correct bounds
+        const bounds = map.getBounds();
+        const center = map.getCenter();
+        console.log('🎯 Map bounds:', bounds.toArray());
+        console.log('🎯 Map center:', [center.lng, center.lat]);
+        console.log('🎯 Map zoom:', map.getZoom());
       } else {
         console.log('⚠️ No main features to process');
       }
@@ -126,10 +177,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.log('🎉 Map processing completed successfully');
     } catch (error) {
       console.error('❌ Error processing map features:', error);
+      // On error, reset flags so user can retry
+      processedRef.current = false;
+      (window as any).__MAP_FEATURES_PROCESSED__ = false;
     } finally {
       setIsProcessing(false);
     }
-  }, [map, mapLoaded, isProcessing, allDataLoaded, loadAllDataCenterOut, setIsProcessing]);
+  }, [map, mapLoaded, isMobile]); // Removed dependencies that could cause re-runs
 
   // Initialize map
   useEffect(() => {
@@ -188,16 +242,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         attributionControl: false
       });
       console.log('MapLibre instance created:', mapInstance);
+      
+      // Set bounds immediately after creation
+      mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
+      
     } catch (error) {
       console.error('Error creating map instance:', error);
       return;
     }
 
-    mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
-
     mapInstance.on('load', () => {
       if (cleanedUp) return;
-      console.log('Map loaded successfully');
+      console.log('🗺️ Map loaded and visible - blue background should be showing');
       setMapLoaded(true);
     });
 
@@ -232,21 +288,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Load map data after initialization (only once)
   useEffect(() => {
-    console.log(`🎯 Map data loading effect triggered - mapLoaded: ${mapLoaded}, map: ${!!map}, isProcessing: ${isProcessing}, allDataLoaded: ${allDataLoaded}`);
+    console.log(`🎯 Map data loading effect triggered - mapLoaded: ${mapLoaded}, map: ${!!map}, isProcessing: ${isProcessing}, processed: ${processedRef.current}`);
     
-    if (mapLoaded && map && !isProcessing && !allDataLoaded) {
-      console.log('⏰ Setting timeout to process map features...');
-      const timeoutId = setTimeout(() => {
-        console.log('⏰ Timeout fired, calling processMapFeatures');
-        processMapFeatures();
-      }, 500);
-
-      return () => {
-        console.log('🧹 Clearing map processing timeout');
-        clearTimeout(timeoutId);
-      };
+    if (mapLoaded && map && !isProcessing && !processedRef.current) {
+      console.log('⏰ Calling processMapFeatures immediately');
+      processMapFeatures();
     }
-  }, [mapLoaded, map, processMapFeatures, isProcessing, allDataLoaded]);
+  }, [mapLoaded, map, processMapFeatures]); // Only depend on map, mapLoaded, and the callback
 
   // Remove viewport change loading since we load everything at once
 
@@ -271,7 +319,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (landmarks.length === 0) return;
 
     try {
-      const updateEmojiSize = () => {
+      let updateEmojiSize: (() => void) | null = null;
+      updateEmojiSize = () => {
         const zoom = map.getZoom();
         const baseSize = 16;
         const scaleFactor = Math.pow(1.2, zoom - 10);
@@ -325,15 +374,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       map.on('zoom', updateEmojiSize);
       
       console.log(`Successfully added ${newMarkers.length} emoji markers`);
+
+      // Cleanup on unmount or landmarks change
+      return () => {
+        landmarkMarkersRef.current.forEach(m => m.remove());
+        landmarkMarkersRef.current = [];
+        if (updateEmojiSize) map.off('zoom', updateEmojiSize);
+      };
     } catch (error) {
       console.error('Error adding emoji markers:', error);
     }
-
-    // Cleanup on unmount or landmarks change
-    return () => {
-      landmarkMarkersRef.current.forEach(m => m.remove());
-      landmarkMarkersRef.current = [];
-    };
   }, [mapLoaded, landmarks, map]);
 
   return (
@@ -348,7 +398,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         width: '100%',
         height: '100%',
         zIndex: 1,
-        backgroundColor: 'hsl(var(--muted))' // Fallback background while tiles/layers load
+        backgroundColor: '#B3E5FC' // Light blue fallback while map loads
       }}
     />
   );

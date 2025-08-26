@@ -83,3 +83,69 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
 
   return fullBusiness;
 }
+
+export async function createOrUpdateBusinessRole(businessLocation: string, role: string, salary: string): Promise<void> {
+  // First, try to find an existing business by name (location)
+  let businessId: string;
+  
+  const { data: existingBusiness, error: findError } = await supabase
+    .from('businesses')
+    .select('id')
+    .ilike('name', businessLocation)
+    .single();
+
+  if (findError && findError.code !== 'PGRST116') {
+    // Error other than "not found"
+    throw findError;
+  }
+
+  if (existingBusiness) {
+    businessId = existingBusiness.id;
+  } else {
+    // Create new business if it doesn't exist
+    // For now, we'll create a placeholder business with default coordinates
+    const { data: newBusiness, error: createBusinessError } = await supabase
+      .from('businesses')
+      .insert({
+        name: businessLocation,
+        business_type: 'Unknown',
+        lat: 40.7128, // Default NYC coordinates
+        lng: -74.0060,
+        atmosphere: [],
+        salary: salary
+      })
+      .select('id')
+      .single();
+
+    if (createBusinessError) throw createBusinessError;
+    businessId = newBusiness.id;
+  }
+
+  // Check if this exact role already exists for this business
+  const { data: existingRole, error: roleCheckError } = await supabase
+    .from('business_roles')
+    .select('id')
+    .eq('business_id', businessId)
+    .eq('role', role)
+    .eq('salary', salary)
+    .single();
+
+  if (roleCheckError && roleCheckError.code !== 'PGRST116') {
+    throw roleCheckError;
+  }
+
+  if (!existingRole) {
+    // Create new role if it doesn't exist
+    const { error: createRoleError } = await supabase
+      .from('business_roles')
+      .insert({
+        business_id: businessId,
+        role: role,
+        salary: salary,
+        upvotes: 0,
+        downvotes: 0
+      });
+
+    if (createRoleError) throw createRoleError;
+  }
+}

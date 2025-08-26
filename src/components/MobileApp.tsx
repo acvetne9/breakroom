@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, Suspense } from 'react';
 import { motion, PanInfo } from 'framer-motion';
 import { Skeleton } from "@/components/ui/skeleton";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const InitiationPage = React.lazy(() => import('./InitiationPage'));
 const HomePage = React.lazy(() => import('./HomePage'));
@@ -34,6 +35,7 @@ interface Post {
 }
 
 const MobileApp: React.FC = () => {
+  const isMobile = useIsMobile();
   const [currentView, setCurrentView] = useState<'initiation' | 'main'>('initiation');
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -70,9 +72,19 @@ const MobileApp: React.FC = () => {
     }
   ]);
 
-  const handleInitiationComplete = (data: UserData) => {
+  const handleInitiationComplete = async (data: UserData) => {
     setUserData(data);
     setCurrentView('main');
+    
+    // Save job data to database (only if authenticated)
+    try {
+      const { createOrUpdateBusinessRole } = await import('../services/businesses');
+      await createOrUpdateBusinessRole(data.location, data.role, data.salary);
+      console.log('Job role saved to database:', { location: data.location, role: data.role, salary: data.salary });
+    } catch (error) {
+      console.warn('Could not save job role to database (user not authenticated):', error);
+      // Continue without showing error to user since this is optional functionality
+    }
     
     // Create automatic job update post
     const jobUpdatePost: Post = {
@@ -90,7 +102,16 @@ const MobileApp: React.FC = () => {
     setPosts(prevPosts => [jobUpdatePost, ...prevPosts]);
   };
 
-  const handleJobUpdate = (jobData: { salary: string; role: string; location: string; timePeriod: string }) => {
+  const handleJobUpdate = async (jobData: { salary: string; role: string; location: string; timePeriod: string }) => {
+    // Save job data to database
+    try {
+      const { createOrUpdateBusinessRole } = await import('../services/businesses');
+      await createOrUpdateBusinessRole(jobData.location, jobData.role, jobData.salary);
+      console.log('Job role updated in database:', jobData);
+    } catch (error) {
+      console.error('Error updating job role in database:', error);
+    }
+    
     const jobUpdatePost: Post = {
       id: `job-update-${Date.now()}`,
       author: 'You',
@@ -518,18 +539,20 @@ const MobileApp: React.FC = () => {
         />
       </div>
 
-      {/* Slide indicators */}
-      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-50">
-        {[0, 1, 2].map(index => (
-          <button
-            key={index}
-            onClick={() => setCurrentSlide(index)}
-            className={`w-3 h-3 rounded-full transition-colors ${
-              index === currentSlide ? 'bg-app-yellow' : 'bg-app-gray-light'
-            }`}
-          />
-        ))}
-      </div>
+      {/* Slide indicators - only show on desktop */}
+      {!isMobile && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-50">
+          {[0, 1, 2].map(index => (
+            <button
+              key={index}
+              onClick={() => setCurrentSlide(index)}
+              className={`w-3 h-3 rounded-full transition-colors ${
+                index === currentSlide ? 'bg-app-yellow' : 'bg-app-gray-light'
+              }`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
