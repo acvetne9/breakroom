@@ -355,7 +355,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           userSelect: 'none',
           pointerEvents: 'none',
           textShadow: '0 0 3px rgba(255,255,255,0.9), 0 0 6px rgba(255,255,255,0.7)',
-          zIndex: '1',
+          zIndex: '0',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center'
