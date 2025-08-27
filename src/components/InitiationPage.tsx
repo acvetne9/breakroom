@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+// framer-motion removed to prevent dynamic import parse issue
 import JobSearchDropdown from './JobSearchDropdown';
 import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
@@ -112,14 +112,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       checkForCompletion();
     }, 10);
   };
-  return <motion.div initial={{
-    y: 0
-  }} animate={{
-    y: isComplete ? '-100vh' : 0
-  }} transition={{
-    duration: 0.5,
-    ease: 'easeInOut'
-  }} className="absolute inset-0 z-50 flex items-center justify-center">
+  return <div className="absolute inset-0 z-50 flex items-center justify-center">
       <div className="app-card flex flex-col justify-center px-8 py-12">
         <div className="space-y-6">
           <div className="text-center">
@@ -160,6 +153,6 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
           </div>
         </div>
       </div>
-    </motion.div>;
+    </div>;
 };
 export default InitiationPage;
