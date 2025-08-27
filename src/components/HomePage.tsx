@@ -92,6 +92,8 @@ const HomePage: React.FC<HomePageProps> = ({
     {lat: 40.574829, lng: -73.959530, emoji: "🏖️"},
     {lat: 40.573527, lng: -74.082761, emoji: "🏖️"},
     {lat: 40.708890, lng: -74.008396, emoji: "🏦"},
+    {lat: 40.850103, lng: -73.876716, emoji: "🐾"},
+    {lat: 40.625569, lng: -74.115425, emoji: "🐾"},
      
 ]
   const { toast } = useToast();
