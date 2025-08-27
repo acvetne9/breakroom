@@ -118,8 +118,8 @@
 @layer components {
   /* App Card - large UI box matching mockups exactly */
   .app-card {
-    @apply w-[90vw] h-[85vh] bg-white/80 backdrop-blur-sm rounded-2xl relative mx-auto;
-    border: 4px solid hsl(var(--app-yellow));
+    @apply w-[90vw] h-[85vh] bg-white/100 backdrop-blur-sm rounded-2xl relative mx-auto;
+    border: 2px solid hsl(var(--app-yellow));
     box-shadow: var(--app-shadow);
     max-width: 400px;
   }
@@ -127,14 +127,14 @@
   /* App Popup - smaller version of card */
   .app-popup {
     @apply w-[90vw] bg-white rounded-xl relative mx-auto;
-    border: 1px solid hsl(var(--app-yellow));
+    border: 2px solid hsl(var(--app-yellow));
     box-shadow: var(--app-shadow);
     max-width: 400px;
   }
   
   /* App Popup Transparent - transparent version for posts */
   .app-popup-transparent {
-    @apply w-[90vw] bg-white/80 backdrop-blur-sm rounded-xl relative mx-auto;
+    @apply w-[90vw] bg-white/100 backdrop-blur-sm rounded-xl relative mx-auto;
     border: 1px solid hsl(var(--app-yellow));
     box-shadow: var(--app-shadow);
     max-width: 400px;
