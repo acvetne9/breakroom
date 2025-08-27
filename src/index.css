@@ -119,7 +119,7 @@
   /* App Card - large UI box matching mockups exactly */
   .app-card {
     @apply w-[90vw] h-[85vh] bg-white/80 backdrop-blur-sm rounded-2xl relative mx-auto;
-    border: 1px solid hsl(var(--app-yellow));
+    border: 4px solid hsl(var(--app-yellow));
     box-shadow: var(--app-shadow);
     max-width: 400px;
   }
