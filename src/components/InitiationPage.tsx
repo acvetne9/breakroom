@@ -123,8 +123,8 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       <div className="app-card flex flex-col justify-center px-8 py-12">
         <div className="space-y-6">
           <div className="text-center">
-            <h1 className="text-app-black mb-6 font-normal text-lg">Make A Difference!
- Share A Past Or Current Job</h1>
+            <h1 className="text-app-black mb-6 font-normal text-lg">Make A Difference!</h1>
+            <h1 className="text-app-black mb-6 font-normal text-lg">Share A Past Or Current Job</h1>
           </div>
 
           <div className="space-y-6">
