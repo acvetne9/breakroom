@@ -123,8 +123,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       <div className="app-card flex flex-col justify-center px-8 py-12">
         <div className="space-y-6">
           <div className="text-center">
-            <h1 className="text-app-black mb-6 font-normal text-lg">Make A Difference!</h1>
-            <h1 className="text-app-black mb-6 font-normal text-lg">Share A Past Or Current Job</h1>
+            <h1 className="text-app-black mb-6 font-normal text-lg">Make A Difference! ❤️<br>Share A Past Or Current Job</h1>
           </div>
 
           <div className="space-y-6">
@@ -140,7 +139,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
             </div>
 
             <div className="text-center">
-              <p className="text-app-black mb-4 text-lg font-normal">3 Easy Questions.</p>
+              <p className="text-app-black mb-4 text-lg font-normal">3 Easy Questions. Kept Anonomous 🤐</p>
             </div>
 
             <div>
@@ -148,7 +147,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
             </div>
 
             <div className="text-center">
-              <p className="text-app-black mb-4 text-lg">Find Neighborhood Income Trends.</p>
+              <p className="text-app-black mb-4 text-lg">Find Work That Works For You 👷‍♀️</p>
             </div>
 
             <div>
@@ -156,7 +155,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
             </div>
 
             <div className="text-center mt-8">
-              <p className="text-app-black text-lg">Grow Your Community.</p>
+              <p className="text-app-black text-lg">Don't worry, your boss won't find out 😉</p>
             </div>
           </div>
         </div>
