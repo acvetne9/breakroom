@@ -78,7 +78,7 @@ const JOB_OPTIONS = [
     "Crew Member", "Associate", "Team Member", "Helper", "Laborer", "Worker", "Staff Member",
     "General Worker", "Operator", "Technician", "Specialist", "Coordinator", "Agent", "Assistant",
   
-    "Personal Trainer", "Psychiatrist"
+    "Personal Trainer", "Psychiatrist", "Consultant"
 ]
 
   

@@ -175,7 +175,11 @@ const JobSearchDropdown: React.FC<JobSearchDropdownProps> = ({
 
       {isOpen && (
         <div className="absolute z-50 w-full mt-1 bg-white rounded-lg shadow-lg max-h-48 overflow-y-auto" style={{ border: '1px solid hsl(var(--app-gray-light))' }}>
-          {filteredOptions.length > 0 ? (
+          {searchTerm.length < 4 ? (
+            <div className="px-3 py-2 text-app-gray-medium text-sm">
+              Type at least 4 characters to search
+            </div>
+          ) : filteredOptions.length > 0 ? (
             filteredOptions.map((option) => (
               <button
                 key={option}
@@ -195,13 +199,9 @@ const JobSearchDropdown: React.FC<JobSearchDropdownProps> = ({
             >
               Other
             </button>
-          ) : searchTerm ? (
-            <div className="px-3 py-2 text-app-gray-medium text-sm">
-              No matching jobs found
-            </div>
           ) : (
             <div className="px-3 py-2 text-app-gray-medium text-sm">
-              Start typing to search jobs
+              No matching jobs found
             </div>
           )}
         </div>
