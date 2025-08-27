@@ -135,7 +135,7 @@
   /* App Popup Transparent - transparent version for posts */
   .app-popup-transparent {
     @apply w-[90vw] bg-white/100 backdrop-blur-sm rounded-xl relative mx-auto;
-    border: 1px solid hsl(var(--app-yellow));
+    border: 2px solid hsl(var(--app-yellow));
     box-shadow: var(--app-shadow);
     max-width: 400px;
   }
@@ -143,7 +143,7 @@
   /* Input fields matching mockup styling */
   .app-input {
     @apply w-full px-4 py-3 bg-white text-black;
-    border: 1px solid hsl(var(--app-gray-light));
+    border: 2px solid hsl(var(--app-gray-light));
     border-radius: 0.5rem !important;
     font-size: 16px;
   }
@@ -155,7 +155,7 @@
   /* Search bar styling with button support - standardized to match card width */
   .search-bar {
     @apply w-[90vw] mx-auto px-4 py-3 bg-white;
-    border: 1px solid hsl(var(--app-gray-light));
+    border: 2px solid hsl(var(--app-gray-light));
     border-radius: 0.5rem !important;
     font-size: 16px;
     max-width: 400px;
