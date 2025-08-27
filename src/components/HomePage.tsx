@@ -71,7 +71,7 @@ const HomePage: React.FC<HomePageProps> = ({
   const [filteredBusinesses, setFilteredBusinesses] = useState(businesses);
   const [isSearchActive, setIsSearchActive] = useState(false);
   const landmarks = [
-    {lat: 40.688602, lng: -74.044296, emoji: "🗽"},
+    {lat: 40.690331, lng: -74.045414, emoji: "🗽"},
     //{lat: 40.705330, lng: -73.995885, emoji: "🌉"},
     {lat: 40.75266, lng: -73.97729, emoji: "🚃"},
     {lat: 40.75058, lng: -73.99358, emoji: "🚃"},
@@ -91,6 +91,8 @@ const HomePage: React.FC<HomePageProps> = ({
     {lat: 40.577249, lng: -73.837034, emoji: "🏖️"},
     {lat: 40.574829, lng: -73.959530, emoji: "🏖️"},
     {lat: 40.573527, lng: -74.082761, emoji: "🏖️"},
+    {lat: 40.708890, lng: -74.008396, emoji: "🏦"},
+     
 ]
   const { toast } = useToast();
 
