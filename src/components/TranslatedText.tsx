@@ -19,17 +19,29 @@ export function TranslatedText({ text, className = '', showIndicator = true }: T
 
   useEffect(() => {
     const loadTranslation = async () => {
+      if (!text || !text.trim()) {
+        setIsLoading(false)
+        return
+      }
+
       setIsLoading(true)
-      const result = await translateText(text)
-      setTranslationResult(result)
-      setIsLoading(false)
+      try {
+        const result = await translateText(text)
+        setTranslationResult(result)
+      } catch (error) {
+        console.error('Translation component error:', error)
+        // Fallback to show original text
+        setTranslationResult({
+          translatedText: text,
+          sourceLanguage: 'unknown',
+          isTranslated: false
+        })
+      } finally {
+        setIsLoading(false)
+      }
     }
 
-    if (text && text.trim()) {
-      loadTranslation()
-    } else {
-      setIsLoading(false)
-    }
+    loadTranslation()
   }, [text, translateText])
 
   if (isLoading) {

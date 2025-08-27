@@ -5,9 +5,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// LibreTranslate API endpoint (using public instance)
-const LIBRETRANSLATE_URL = 'https://libretranslate.de/translate'
-const DETECT_URL = 'https://libretranslate.de/detect'
+// LibreTranslate API endpoints with fallbacks
+const LIBRETRANSLATE_INSTANCES = [
+  'https://libretranslate.com',
+  'https://translate.terraprint.co',
+  'https://libretranslate.de'
+]
+
+let currentInstanceIndex = 0
 
 interface TranslationRequest {
   text: string
@@ -21,64 +26,91 @@ interface TranslationResponse {
 }
 
 async function detectLanguage(text: string): Promise<string> {
-  try {
-    const response = await fetch(DETECT_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        q: text
+  // Try multiple instances
+  for (let i = 0; i < LIBRETRANSLATE_INSTANCES.length; i++) {
+    const instanceUrl = LIBRETRANSLATE_INSTANCES[(currentInstanceIndex + i) % LIBRETRANSLATE_INSTANCES.length]
+    try {
+      const response = await fetch(`${instanceUrl}/detect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          q: text
+        })
       })
-    })
 
-    if (!response.ok) {
-      throw new Error(`Detection failed: ${response.status}`)
+      if (!response.ok) {
+        throw new Error(`Detection failed: ${response.status}`)
+      }
+
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Invalid response format - expected JSON')
+      }
+
+      const result = await response.json()
+      console.log('Language detection result:', result)
+      
+      // LibreTranslate returns an array of detected languages with confidence scores
+      return result[0]?.language || 'en'
+    } catch (error) {
+      console.error(`Language detection error with ${instanceUrl}:`, error)
+      continue
     }
-
-    const result = await response.json()
-    console.log('Language detection result:', result)
-    
-    // LibreTranslate returns an array of detected languages with confidence scores
-    return result[0]?.language || 'en'
-  } catch (error) {
-    console.error('Language detection error:', error)
-    return 'en' // Default to English if detection fails
   }
+  
+  console.error('All translation services failed for language detection')
+  return 'en' // Default to English if all services fail
 }
 
 async function translateText(text: string, sourceLanguage: string, targetLanguage: string): Promise<string> {
-  try {
-    // Don't translate if source and target are the same
-    if (sourceLanguage === targetLanguage) {
-      return text
-    }
-
-    const response = await fetch(LIBRETRANSLATE_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        q: text,
-        source: sourceLanguage,
-        target: targetLanguage,
-        format: 'text'
-      })
-    })
-
-    if (!response.ok) {
-      throw new Error(`Translation failed: ${response.status}`)
-    }
-
-    const result = await response.json()
-    console.log('Translation result:', result)
-    
-    return result.translatedText || text
-  } catch (error) {
-    console.error('Translation error:', error)
-    return text // Return original text if translation fails
+  // Don't translate if source and target are the same
+  if (sourceLanguage === targetLanguage) {
+    return text
   }
+
+  // Try multiple instances
+  for (let i = 0; i < LIBRETRANSLATE_INSTANCES.length; i++) {
+    const instanceUrl = LIBRETRANSLATE_INSTANCES[(currentInstanceIndex + i) % LIBRETRANSLATE_INSTANCES.length]
+    try {
+      const response = await fetch(`${instanceUrl}/translate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          q: text,
+          source: sourceLanguage,
+          target: targetLanguage,
+          format: 'text'
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`Translation failed: ${response.status}`)
+      }
+
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Invalid response format - expected JSON')
+      }
+
+      const result = await response.json()
+      console.log('Translation result:', result)
+      
+      // Update current instance to the working one
+      currentInstanceIndex = (currentInstanceIndex + i) % LIBRETRANSLATE_INSTANCES.length
+      
+      return result.translatedText || text
+    } catch (error) {
+      console.error(`Translation error with ${instanceUrl}:`, error)
+      continue
+    }
+  }
+  
+  console.error('All translation services failed')
+  return text // Return original text if all services fail
 }
 
 function getLanguageName(code: string): string {
