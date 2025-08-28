@@ -10,10 +10,12 @@ export const useBusinessesData = () => {
   useEffect(() => {
     const fetchBasicBusinesses = async () => {
       try {
-      const basicBusinesses = await getBusinessesBasic();
-      setBusinesses(basicBusinesses);
+        console.log('🏢 Starting to fetch businesses...');
+        const basicBusinesses = await getBusinessesBasic();
+        console.log(`🏢 Successfully loaded ${basicBusinesses.length} businesses`);
+        setBusinesses(basicBusinesses);
       } catch (error) {
-        console.error('Error fetching basic businesses:', error);
+        console.error('❌ Error fetching basic businesses:', error);
         setBusinesses([]);
       } finally {
         setLoading(false);

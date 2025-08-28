@@ -2,11 +2,18 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Business, BusinessRole } from '@/types/business';
 
 export async function getBusinessesBasic(): Promise<Business[]> {
+  console.log('🔄 Fetching businesses from Supabase...');
   const { data: businessesData, error } = await supabase
     .from('businesses')
-    .select('id, name, lat, lng');
+    .select('id, name, lat, lng')
+    .limit(5000); // Limit to 5000 businesses for performance
 
-  if (error) throw error;
+  if (error) {
+    console.error('❌ Supabase error:', error);
+    throw error;
+  }
+
+  console.log(`📊 Raw data from Supabase: ${businessesData?.length || 0} records`);
 
   const basicBusinesses: Business[] = (businessesData || []).map((business: any) => ({
     id: business.id,
@@ -17,6 +24,7 @@ export async function getBusinessesBasic(): Promise<Business[]> {
     roles: [],
   }));
 
+  console.log(`✅ Processed businesses: ${basicBusinesses.length}`);
   return basicBusinesses;
 }
 
