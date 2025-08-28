@@ -2,7 +2,9 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useViewportMapData } from '../hooks/useViewportMapData';
+import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
 import { useIsMobile } from '../hooks/use-mobile';
+import { DeckGLOverlay } from './DeckGLOverlay';
 import { 
   extractParkFeatures, 
   extractWaterFeatures, 
@@ -16,7 +18,6 @@ import {
   addWaterwaysLayer,
   addRoadsLayer,
   addRoadsLayerChunked,
-  addBusinessesLayer,
   ensureLayerOrder
 } from '../utils/mapLayers';
 
@@ -44,7 +45,7 @@ interface MapLibreMapProps {
 }
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
-  businesses,
+  businesses: propBusinesses, // Rename to avoid confusion with viewport businesses
   onBusinessClick,
   selectedBusiness,
   landmarks = []
@@ -54,9 +55,54 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
-  const { isProcessing, setIsProcessing, loadAllDataCenterOut, allDataLoaded } = useViewportMapData();
-  const lastLoadedBoundsRef = useRef<string | null>(null);
+  const { isProcessing, setIsProcessing, loadAllDataCenterOut } = useViewportMapData();
+  const { 
+    businesses, 
+    loading: businessesLoading, 
+    loadBusinessesInViewport, 
+    fetchFullBusinessDetails 
+  } = useViewportBusinesses();
   const processedRef = useRef(false);
+  const [deckGLViewState, setDeckGLViewState] = useState<any>(null);
+
+  // Enhanced business click handler with viewport integration
+  const handleBusinessClick = useCallback(async (business: any) => {
+    // Fetch full details if needed
+    if (!business.atmosphere?.length && !business.roles?.length) {
+      const fullBusiness = await fetchFullBusinessDetails(business.id);
+      if (fullBusiness && onBusinessClick) {
+        onBusinessClick(fullBusiness);
+      }
+    } else if (onBusinessClick) {
+      onBusinessClick(business);
+    }
+  }, [fetchFullBusinessDetails, onBusinessClick]);
+
+  // Load businesses in viewport when map moves
+  const handleViewportChange = useCallback(() => {
+    if (!map || !mapLoaded) return;
+
+    const bounds = map.getBounds();
+    const viewportBounds = {
+      north: bounds.getNorth(),
+      south: bounds.getSouth(),
+      east: bounds.getEast(),
+      west: bounds.getWest()
+    };
+
+    // Update deck.gl view state
+    const center = map.getCenter();
+    setDeckGLViewState({
+      longitude: center.lng,
+      latitude: center.lat,
+      zoom: map.getZoom(),
+      pitch: 0,
+      bearing: 0
+    });
+
+    // Load businesses for current viewport
+    loadBusinessesInViewport(viewportBounds, isMobile ? 500 : 1000);
+  }, [map, mapLoaded, loadBusinessesInViewport, isMobile]);
 
   const processMapFeatures = useCallback(async () => {
     // Prevent duplicate processing across re-mounts (StrictMode/dev or crashes)
@@ -192,28 +238,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return;
     }
 
-    // DEBUG: Check container dimensions and visibility
-    const container = mapRef.current;
-    const computedStyle = window.getComputedStyle(container);
-    const rect = container.getBoundingClientRect();
-    
-    console.log('Map container debug info:', {
-      width: rect.width,
-      height: rect.height,
-      display: computedStyle.display,
-      visibility: computedStyle.visibility,
-      opacity: computedStyle.opacity,
-      zIndex: computedStyle.zIndex,
-      position: computedStyle.position,
-      top: computedStyle.top,
-      left: computedStyle.left,
-      transform: computedStyle.transform
-    });
-
-    if (rect.width === 0 || rect.height === 0) {
-      console.error('Map container has zero dimensions!', { width: rect.width, height: rect.height });
-    }
-
     console.log('Initializing map with container:', mapRef.current);
     let mapInstance: maplibregl.Map | null = null;
     let cleanedUp = false;
@@ -294,17 +318,37 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.log('⏰ Calling processMapFeatures immediately');
       processMapFeatures();
     }
-  }, [mapLoaded, map, processMapFeatures]); // Only depend on map, mapLoaded, and the callback
+  }, [mapLoaded, map, processMapFeatures]);
 
-  // Remove viewport change loading since we load everything at once
-
-  // Handle business markers
+  // Setup viewport loading for businesses
   useEffect(() => {
-    if (!mapLoaded || !businesses || !map) return;
+    if (map && mapLoaded) {
+      const moveEndHandler = () => handleViewportChange();
+      map.on('moveend', moveEndHandler);
+      map.on('zoomend', moveEndHandler);
+      
+      // Load initial viewport
+      handleViewportChange();
+      
+      return () => {
+        map.off('moveend', moveEndHandler);
+        map.off('zoomend', moveEndHandler);
+      };
+    }
+  }, [map, mapLoaded, handleViewportChange]);
 
-    const cleanup = addBusinessesLayer(map, businesses, selectedBusiness, onBusinessClick);
-    return cleanup;
-  }, [mapLoaded, businesses, onBusinessClick, map, selectedBusiness]);
+  // Handle old business layer removal and deck.gl integration
+  useEffect(() => {
+    if (!mapLoaded || !map) return;
+
+    // Remove old businesses layer if it exists
+    if (map.getLayer('businesses-layer')) {
+      map.removeLayer('businesses-layer');
+    }
+    if (map.getSource('businesses')) {
+      map.removeSource('businesses');
+    }
+  }, [mapLoaded, map]);
 
   // Handle landmark markers
   useEffect(() => {
@@ -400,7 +444,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         zIndex: 1,
         backgroundColor: '#B3E5FC' // Light blue fallback while map loads
       }}
-    />
+    >
+      {/* Deck.GL Overlay for high-performance business rendering */}
+      {map && mapLoaded && businesses.length > 0 && (
+        <DeckGLOverlay
+          map={map}
+          businesses={businesses}
+          selectedBusinessId={selectedBusiness?.id}
+          onBusinessClick={handleBusinessClick}
+          enableClustering={businesses.length > 500}
+        />
+      )}
+    </div>
   );
 };
 

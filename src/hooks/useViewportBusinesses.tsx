@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Business } from '@/types/business';
 import { getBusinessesInViewport, getFullBusinessDetails as getFullBusinessDetailsService } from '@/services/businesses';
 
@@ -13,36 +13,48 @@ export const useViewportBusinesses = () => {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentBounds, setCurrentBounds] = useState<MapBounds | null>(null);
+  const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const loadBusinessesInViewport = useCallback(async (bounds: MapBounds, limit: number = 500) => {
-    // Avoid duplicate requests for same bounds
-    if (currentBounds && 
-        Math.abs(currentBounds.north - bounds.north) < 0.001 &&
-        Math.abs(currentBounds.south - bounds.south) < 0.001 &&
-        Math.abs(currentBounds.east - bounds.east) < 0.001 &&
-        Math.abs(currentBounds.west - bounds.west) < 0.001) {
-      return;
+  const loadBusinessesInViewport = useCallback(async (bounds: MapBounds, limit: number = 1000) => {
+    // Debounce viewport changes to avoid excessive API calls
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
     }
 
-    setLoading(true);
-    try {
-      console.log('🔄 Loading businesses for viewport:', bounds);
-      const viewportBusinesses = await getBusinessesInViewport(bounds, limit);
-      
-      // Merge with existing businesses to avoid duplicates
-      setBusinesses(prev => {
-        const existingIds = new Set(prev.map(b => b.id));
-        const newBusinesses = viewportBusinesses.filter(b => !existingIds.has(b.id));
-        return [...prev, ...newBusinesses];
-      });
-      
-      setCurrentBounds(bounds);
-      console.log(`✅ Loaded ${viewportBusinesses.length} businesses in viewport`);
-    } catch (error) {
-      console.error('❌ Error loading viewport businesses:', error);
-    } finally {
-      setLoading(false);
-    }
+    loadTimeoutRef.current = setTimeout(async () => {
+      // Expand bounds slightly to preload nearby businesses
+      const expandedBounds = {
+        north: bounds.north + (bounds.north - bounds.south) * 0.1,
+        south: bounds.south - (bounds.north - bounds.south) * 0.1,
+        east: bounds.east + (bounds.east - bounds.west) * 0.1,
+        west: bounds.west - (bounds.east - bounds.west) * 0.1
+      };
+
+      // Avoid duplicate requests for similar bounds
+      if (currentBounds && 
+          Math.abs(currentBounds.north - expandedBounds.north) < 0.005 &&
+          Math.abs(currentBounds.south - expandedBounds.south) < 0.005 &&
+          Math.abs(currentBounds.east - expandedBounds.east) < 0.005 &&
+          Math.abs(currentBounds.west - expandedBounds.west) < 0.005) {
+        return;
+      }
+
+      setLoading(true);
+      try {
+        console.log('🔄 Loading businesses for viewport:', expandedBounds);
+        const viewportBusinesses = await getBusinessesInViewport(expandedBounds, limit);
+        
+        // Replace businesses with viewport-specific ones
+        setBusinesses(viewportBusinesses);
+        setCurrentBounds(expandedBounds);
+        
+        console.log(`✅ Loaded ${viewportBusinesses.length} businesses in viewport`);
+      } catch (error) {
+        console.error('❌ Error loading viewport businesses:', error);
+      } finally {
+        setLoading(false);
+      }
+    }, 300); // 300ms debounce
   }, [currentBounds]);
 
   const fetchFullBusinessDetails = async (businessId: string) => {
@@ -67,6 +79,18 @@ export const useViewportBusinesses = () => {
   const clearBusinesses = useCallback(() => {
     setBusinesses([]);
     setCurrentBounds(null);
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+    }
+  }, []);
+
+  // Cleanup on unmount  
+  useEffect(() => {
+    return () => {
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+      }
+    };
   }, []);
 
   return { 
