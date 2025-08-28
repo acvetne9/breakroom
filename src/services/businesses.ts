@@ -2,11 +2,17 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Business, BusinessRole } from '@/types/business';
 
 export async function getBusinessesBasic(): Promise<Business[]> {
-  console.log('🔄 Fetching businesses from Supabase...');
+  console.log('🔄 Fetching businesses from center outward...');
+  
+  // NYC center coordinates (approximately Manhattan center)
+  const centerLat = 40.7589; // Times Square area
+  const centerLng = -73.9851;
+  
   const { data: businessesData, error } = await supabase
     .from('businesses')
     .select('id, name, lat, lng')
-    .limit(5000); // Limit to 5000 businesses for performance
+    .order('lat') // Simple ordering first to avoid complex PostGIS queries
+    .limit(5000);
 
   if (error) {
     console.error('❌ Supabase error:', error);
@@ -15,7 +21,21 @@ export async function getBusinessesBasic(): Promise<Business[]> {
 
   console.log(`📊 Raw data from Supabase: ${businessesData?.length || 0} records`);
 
-  const basicBusinesses: Business[] = (businessesData || []).map((business: any) => ({
+  if (!businessesData) return [];
+
+  // Calculate distance from center and sort by distance
+  const businessesWithDistance = businessesData.map((business: any) => {
+    const distance = Math.sqrt(
+      Math.pow(business.lat - centerLat, 2) + 
+      Math.pow(business.lng - centerLng, 2)
+    );
+    return { ...business, distance };
+  });
+
+  // Sort by distance from center (closest first)
+  businessesWithDistance.sort((a, b) => a.distance - b.distance);
+
+  const basicBusinesses: Business[] = businessesWithDistance.map((business: any) => ({
     id: business.id,
     name: business.name,
     position: { lat: business.lat, lng: business.lng },
@@ -24,7 +44,7 @@ export async function getBusinessesBasic(): Promise<Business[]> {
     roles: [],
   }));
 
-  console.log(`✅ Processed businesses: ${basicBusinesses.length}`);
+  console.log(`✅ Processed businesses from center out: ${basicBusinesses.length}`);
   return basicBusinesses;
 }
 
