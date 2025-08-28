@@ -81,13 +81,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // Load businesses in viewport when map moves
   const handleViewportChange = useCallback(() => {
     if (!map || !mapLoaded) {
-      console.log('⚠️ handleViewportChange: map not ready', { map: !!map, mapLoaded });
+      console.log('⚠️ handleViewportChange: map not ready', { 
+        map: !!map, 
+        mapLoaded,
+        isStyleLoaded: map?.isStyleLoaded?.()
+      });
       return;
     }
 
     try {
       const bounds = map.getBounds();
-      console.log('🗺️ Map bounds:', bounds);
+      console.log('🗺️ Map bounds:', {
+        north: bounds.getNorth(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        west: bounds.getWest(),
+        center: map.getCenter(),
+        zoom: map.getZoom()
+      });
       
       const viewportBounds = {
         north: bounds.getNorth(),
@@ -96,7 +107,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         west: bounds.getWest()
       };
 
-      console.log('📍 Loading businesses for viewport:', viewportBounds);
+      console.log('📍 Triggering business loading for viewport:', viewportBounds);
 
       // Update deck.gl view state
       const center = map.getCenter();
@@ -108,8 +119,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         bearing: 0
       });
 
-      // Load businesses for current viewport
-      loadBusinessesInViewport(viewportBounds, isMobile ? 500 : 1000);
+      // Load businesses for current viewport with enhanced logging
+      const businessLimit = isMobile ? 500 : 1000;
+      console.log(`🎯 Loading up to ${businessLimit} businesses for ${isMobile ? 'mobile' : 'desktop'}...`);
+      
+      loadBusinessesInViewport(viewportBounds, businessLimit);
     } catch (error) {
       console.error('❌ Error in handleViewportChange:', error);
     }
@@ -334,35 +348,64 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // Setup viewport loading for businesses
   useEffect(() => {
     if (map && mapLoaded) {
-      console.log('🔗 Setting up viewport loading listeners');
+      console.log('🔗 Setting up comprehensive business loading system');
       
       const moveEndHandler = () => {
-        console.log('🔄 Map move/zoom ended, loading businesses...');
+        console.log('🔄 Map move/zoom ended, triggering business load...');
         handleViewportChange();
       };
       
       const loadEndHandler = () => {
-        console.log('🗺️ Map fully loaded, loading initial businesses...');
+        console.log('🗺️ Map fully loaded and idle, loading businesses...');
         handleViewportChange();
       };
+
+      const clickHandler = () => {
+        console.log('🖱️ Map clicked, ensuring businesses are loaded...');
+        // Trigger business loading on any interaction
+        setTimeout(() => handleViewportChange(), 100);
+      };
       
+      // Multiple event listeners for comprehensive coverage
       map.on('moveend', moveEndHandler);
       map.on('zoomend', moveEndHandler);
-      map.on('idle', loadEndHandler); // Triggered when map is fully loaded and idle
+      map.on('idle', loadEndHandler);
+      map.on('click', clickHandler);
       
-      // Load initial viewport immediately if map is ready
-      if (map.isStyleLoaded()) {
-        console.log('⚡ Map already loaded, loading businesses immediately...');
-        setTimeout(() => handleViewportChange(), 100);
-      }
+      // Force initial load with multiple attempts
+      const forceLoad = () => {
+        if (map && map.isStyleLoaded()) {
+          console.log('⚡ Force loading businesses - map ready');
+          handleViewportChange();
+        } else {
+          console.log('⏳ Map not ready yet, retrying in 500ms...');
+          setTimeout(forceLoad, 500);
+        }
+      };
+
+      // Try loading immediately and with delays
+      forceLoad();
+      setTimeout(() => {
+        console.log('⏰ Delayed business loading attempt (1s)');
+        handleViewportChange();
+      }, 1000);
+      setTimeout(() => {
+        console.log('⏰ Final business loading attempt (3s)');
+        handleViewportChange();
+      }, 3000);
       
       return () => {
         map.off('moveend', moveEndHandler);
         map.off('zoomend', moveEndHandler);
         map.off('idle', loadEndHandler);
+        map.off('click', clickHandler);
       };
     } else {
-      console.log('⚠️ Map setup pending...', { map: !!map, mapLoaded });
+      console.log('⚠️ Business loading setup pending...', { 
+        hasMap: !!map, 
+        mapLoaded,
+        mapStyle: map?.isStyleLoaded?.() 
+      });
     }
   }, [map, mapLoaded, handleViewportChange]);
 
@@ -474,6 +517,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         backgroundColor: '#B3E5FC' // Light blue fallback while map loads
       }}
     >
+      {/* Business loading indicator */}
+      <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white text-xs p-2 rounded z-50 pointer-events-none">
+        <div>🏢 Businesses: {businesses.length}</div>
+        <div>⚡ Loading: {businessesLoading ? 'Yes' : 'No'}</div>
+        <div>🗺️ Map: {mapLoaded ? 'Ready' : 'Loading'}</div>
+        {businesses.length === 0 && (
+          <div className="text-yellow-300">⚠️ No businesses loaded</div>
+        )}
+      </div>
+      
       {/* Deck.GL Overlay for high-performance business rendering */}
       {map && mapLoaded && businesses.length > 0 && (
         <DeckGLOverlay
@@ -483,6 +536,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           onBusinessClick={handleBusinessClick}
           enableClustering={businesses.length > 500}
         />
+      )}
+      
+      {/* Fallback message when no businesses are visible */}
+      {map && mapLoaded && businesses.length === 0 && !businessesLoading && (
+        <div className="absolute bottom-4 left-4 bg-yellow-500 bg-opacity-90 text-black text-sm p-3 rounded max-w-xs">
+          <div className="font-semibold">No businesses in this area</div>
+          <div className="text-xs">Try moving the map or zooming out to see more businesses</div>
+        </div>
       )}
     </div>
   );
