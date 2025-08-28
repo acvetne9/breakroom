@@ -33,7 +33,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   };
   const checkForCompletion = () => {
     const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
-    const isValidRole = JOB_OPTIONS.includes(role.trim());
+    const isValidRole = JOB_OPTIONS.includes(role.trim()) || role.trim() === "Other";
     console.log('checkForCompletion called:', {
       salary,
       role,
