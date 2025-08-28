@@ -1,8 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Business, BusinessRole } from '@/types/business';
 
-export async function getBusinessesBasic(): Promise<Business[]> {
-  console.log('🔄 Fetching businesses from center outward...');
+export async function getBusinessesBasic(limit: number = 2000): Promise<Business[]> {
+  console.log(`🔄 Fetching ${limit} businesses from center outward...`);
   
   // NYC center coordinates (approximately Manhattan center)
   const centerLat = 40.7589; // Times Square area
@@ -11,7 +11,8 @@ export async function getBusinessesBasic(): Promise<Business[]> {
   const { data: businessesData, error } = await supabase
     .from('businesses')
     .select('id, name, lat, lng')
-    .order('lat'); // Load all businesses for yellow dots
+    .order('lat')
+    .limit(limit); // Limit for performance - can increase gradually
 
   if (error) {
     console.error('❌ Supabase error:', error);
@@ -45,6 +46,40 @@ export async function getBusinessesBasic(): Promise<Business[]> {
 
   console.log(`✅ Processed businesses from center out: ${basicBusinesses.length}`);
   return basicBusinesses;
+}
+
+// NEW: Viewport-based business loading for better performance
+export async function getBusinessesInViewport(
+  bounds: { north: number; south: number; east: number; west: number },
+  limit: number = 500
+): Promise<Business[]> {
+  console.log('🔄 Fetching businesses in viewport:', bounds);
+  
+  const { data: businessesData, error } = await supabase
+    .from('businesses')
+    .select('id, name, lat, lng')
+    .gte('lat', bounds.south)
+    .lte('lat', bounds.north)
+    .gte('lng', bounds.west)
+    .lte('lng', bounds.east)
+    .limit(limit);
+
+  if (error) {
+    console.error('❌ Viewport businesses error:', error);
+    throw error;
+  }
+
+  const businesses: Business[] = (businessesData || []).map((business: any) => ({
+    id: business.id,
+    name: business.name,
+    position: { lat: business.lat, lng: business.lng },
+    atmosphere: [],
+    salary: '0',
+    roles: [],
+  }));
+
+  console.log(`✅ Loaded ${businesses.length} businesses in viewport`);
+  return businesses;
 }
 
 export async function getFullBusinessDetails(businessId: string): Promise<Business | null> {
