@@ -16,10 +16,19 @@ export const useViewportBusinesses = () => {
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const loadBusinessesInViewport = useCallback(async (bounds: MapBounds, limit: number = 1000) => {
-    // Debounce viewport changes to avoid excessive API calls
+    console.log('🎯 loadBusinessesInViewport called with:', { bounds, limit, currentLoading: loading });
+
+    // Clear any existing timeout
     if (loadTimeoutRef.current) {
+      console.log('⏹️ Clearing existing timeout');
       clearTimeout(loadTimeoutRef.current);
     }
+
+    // Don't debounce the first load - load immediately if no businesses
+    const shouldLoadImmediately = businesses.length === 0;
+    const delay = shouldLoadImmediately ? 0 : 300;
+    
+    console.log(`⏱️ Setting load timeout with ${delay}ms delay (immediate: ${shouldLoadImmediately})`);
 
     loadTimeoutRef.current = setTimeout(async () => {
       try {
@@ -34,8 +43,8 @@ export const useViewportBusinesses = () => {
         console.log('📍 Original bounds:', bounds);
         console.log('📍 Expanded bounds:', expandedBounds);
 
-        // Avoid duplicate requests for similar bounds
-        if (currentBounds && 
+        // Skip duplicate check for first load
+        if (!shouldLoadImmediately && currentBounds && 
             Math.abs(currentBounds.north - expandedBounds.north) < 0.005 &&
             Math.abs(currentBounds.south - expandedBounds.south) < 0.005 &&
             Math.abs(currentBounds.east - expandedBounds.east) < 0.005 &&
@@ -56,13 +65,23 @@ export const useViewportBusinesses = () => {
         setCurrentBounds(expandedBounds);
         
         console.log(`✅ Updated state with ${viewportBusinesses.length} businesses`);
+        
+        // Force a re-render by logging the current state
+        setTimeout(() => {
+          console.log('🔍 Current state after update:', { 
+            businessCount: viewportBusinesses.length,
+            loading: false,
+            boundsSet: !!expandedBounds
+          });
+        }, 100);
+        
       } catch (error) {
         console.error('❌ Error loading viewport businesses:', error);
       } finally {
         setLoading(false);
       }
-    }, 300); // 300ms debounce
-  }, [currentBounds]);
+    }, delay);
+  }, [currentBounds, businesses.length, loading]);
 
   const fetchFullBusinessDetails = async (businessId: string) => {
     try {

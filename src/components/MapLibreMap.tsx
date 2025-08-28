@@ -345,11 +345,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded, map, processMapFeatures]);
 
-  // Setup viewport loading for businesses
+  // Setup viewport loading for businesses with aggressive triggering
   useEffect(() => {
+    console.log('🚀 Business loading system initializing...', { 
+      hasMap: !!map, 
+      mapLoaded,
+      businessCount: businesses.length 
+    });
+
     if (map && mapLoaded) {
       console.log('🔗 Setting up comprehensive business loading system');
       
+      // Immediate business loading function
+      const loadBusinessesNow = () => {
+        console.log('⚡ IMMEDIATE: Loading businesses now!');
+        handleViewportChange();
+      };
+
+      // Event handlers
       const moveEndHandler = () => {
         console.log('🔄 Map move/zoom ended, triggering business load...');
         handleViewportChange();
@@ -362,7 +375,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       const clickHandler = () => {
         console.log('🖱️ Map clicked, ensuring businesses are loaded...');
-        // Trigger business loading on any interaction
         setTimeout(() => handleViewportChange(), 100);
       };
       
@@ -371,34 +383,41 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       map.on('zoomend', moveEndHandler);
       map.on('idle', loadEndHandler);
       map.on('click', clickHandler);
+      map.on('load', loadEndHandler);
       
-      // Force initial load with multiple attempts
-      const forceLoad = () => {
-        if (map && map.isStyleLoaded()) {
-          console.log('⚡ Force loading businesses - map ready');
-          handleViewportChange();
-        } else {
-          console.log('⏳ Map not ready yet, retrying in 500ms...');
-          setTimeout(forceLoad, 500);
-        }
-      };
-
-      // Try loading immediately and with delays
-      forceLoad();
+      // AGGRESSIVE IMMEDIATE LOADING - try multiple approaches
+      console.log('🎯 Starting aggressive business loading...');
+      
+      // Try 1: Immediate
+      loadBusinessesNow();
+      
+      // Try 2: Next tick
+      setTimeout(loadBusinessesNow, 0);
+      
+      // Try 3: Short delay
       setTimeout(() => {
-        console.log('⏰ Delayed business loading attempt (1s)');
-        handleViewportChange();
+        console.log('⏰ 100ms delayed business loading attempt');
+        loadBusinessesNow();
+      }, 100);
+      
+      // Try 4: Medium delay
+      setTimeout(() => {
+        console.log('⏰ 500ms delayed business loading attempt');
+        loadBusinessesNow();
+      }, 500);
+      
+      // Try 5: Longer delay
+      setTimeout(() => {
+        console.log('⏰ 1s delayed business loading attempt');
+        loadBusinessesNow();
       }, 1000);
-      setTimeout(() => {
-        console.log('⏰ Final business loading attempt (3s)');
-        handleViewportChange();
-      }, 3000);
       
       return () => {
         map.off('moveend', moveEndHandler);
         map.off('zoomend', moveEndHandler);
         map.off('idle', loadEndHandler);
         map.off('click', clickHandler);
+        map.off('load', loadEndHandler);
       };
     } else {
       console.log('⚠️ Business loading setup pending...', { 
@@ -406,8 +425,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         mapLoaded,
         mapStyle: map?.isStyleLoaded?.() 
       });
+      
+      // Even if map isn't fully ready, try loading businesses
+      if (map) {
+        console.log('🔄 Map exists but not fully loaded, trying business load anyway...');
+        setTimeout(() => handleViewportChange(), 1000);
+      }
     }
-  }, [map, mapLoaded, handleViewportChange]);
+  }, [map, mapLoaded, handleViewportChange, businesses.length]);
 
   // Handle old business layer removal and deck.gl integration
   useEffect(() => {
