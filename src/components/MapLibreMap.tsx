@@ -98,30 +98,35 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     try {
       console.log('📍 Getting map bounds...');
       const bounds = map.getBounds();
-      console.log('🗺️ Map bounds retrieved:', {
+      const center = map.getCenter();
+      const zoom = map.getZoom();
+      
+      // Cache viewport calculations to avoid repeated work
+      const viewportData = {
         north: bounds.getNorth(),
         south: bounds.getSouth(),
         east: bounds.getEast(),
         west: bounds.getWest(),
-        center: map.getCenter(),
-        zoom: map.getZoom()
-      });
+        center,
+        zoom
+      };
+
+      console.log('🗺️ Map viewport data:', viewportData);
       
       const viewportBounds = {
-        north: bounds.getNorth(),
-        south: bounds.getSouth(),
-        east: bounds.getEast(),
-        west: bounds.getWest()
+        north: viewportData.north,
+        south: viewportData.south,
+        east: viewportData.east,
+        west: viewportData.west
       };
 
       console.log('📍 Triggering business loading for viewport:', viewportBounds);
 
-      // Update deck.gl view state
-      const center = map.getCenter();
+      // Update deck.gl view state efficiently
       setDeckGLViewState({
-        longitude: center.lng,
-        latitude: center.lat,
-        zoom: map.getZoom(),
+        longitude: viewportData.center.lng,
+        latitude: viewportData.center.lat,
+        zoom: viewportData.zoom,
         pitch: 0,
         bearing: 0
       });

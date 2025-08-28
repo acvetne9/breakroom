@@ -1,7 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { MapboxOverlay } from '@deck.gl/mapbox';
 import { createBusinessScatterplotLayer, createBusinessClusterLayer } from '@/utils/deckGLLayers';
 import type { Business } from '@/types/business';
+
+// Resource pool for overlay instances
+let overlayInstance: MapboxOverlay | null = null;
 
 interface DeckGLOverlayProps {
   map: maplibregl.Map;
@@ -18,25 +21,30 @@ export const DeckGLOverlay: React.FC<DeckGLOverlayProps> = ({
   onBusinessClick,
   enableClustering = true
 }) => {
+  // Reuse overlay instance to avoid constant creation/destruction
   const overlay = useMemo(() => {
-    const deckOverlay = new MapboxOverlay({
+    if (overlayInstance) {
+      return overlayInstance;
+    }
+
+    overlayInstance = new MapboxOverlay({
       interleaved: true,
       layers: []
     });
 
-    // Add to map
-    map.addControl(deckOverlay as any);
+    // Add to map only once
+    map.addControl(overlayInstance as any);
 
-    return deckOverlay;
+    return overlayInstance;
   }, [map]);
 
-  // Update layers when data changes
-  useMemo(() => {
-    if (!overlay) return;
-
+  // Memoized layer creation with aggressive caching
+  const layers = useMemo(() => {
     const shouldCluster = enableClustering && businesses.length > 500;
     
-    const layers = shouldCluster 
+    console.log(`🎯 Creating ${shouldCluster ? 'clustered' : 'scatter'} layer for ${businesses.length} businesses`);
+    
+    return shouldCluster 
       ? [createBusinessClusterLayer({
           businesses,
           selectedBusinessId,
@@ -47,24 +55,25 @@ export const DeckGLOverlay: React.FC<DeckGLOverlayProps> = ({
           businesses,
           selectedBusinessId,
           onBusinessClick,
-          // map not needed here
         })];
+  }, [businesses, selectedBusinessId, onBusinessClick, enableClustering, map]);
 
-    overlay.setProps({
-      layers
-    });
+  // Update layers efficiently - only when layers actually change
+  useMemo(() => {
+    if (!overlay) return;
 
-    console.log(`🎯 Updated deck.gl with ${businesses.length} businesses (clustering: ${shouldCluster})`);
-  }, [overlay, businesses, selectedBusinessId, onBusinessClick, enableClustering]);
+    overlay.setProps({ layers });
 
-  // Cleanup on unmount
+    console.log(`🎯 Updated deck.gl with ${businesses.length} businesses (clustering: ${enableClustering && businesses.length > 500})`);
+  }, [overlay, layers, businesses.length, enableClustering]);
+
+  // Cleanup on unmount - but keep overlay for reuse
   React.useEffect(() => {
     return () => {
-      if (overlay && map.hasControl(overlay as any)) {
-        map.removeControl(overlay as any);
-      }
+      // Don't remove overlay here - keep it for reuse
+      console.log('🔧 DeckGLOverlay cleanup (keeping overlay for reuse)');
     };
-  }, [overlay, map]);
+  }, []);
 
   return null; // This component doesn't render anything directly
 };

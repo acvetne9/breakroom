@@ -2,6 +2,11 @@ import { ScatterplotLayer } from '@deck.gl/layers';
 import { WebMercatorViewport } from '@deck.gl/core';
 import type { Business } from '@/types/business';
 
+// Resource pools for performance optimization
+const layerCache = new Map<string, ScatterplotLayer>();
+const clusterCache = new Map<string, any[]>();
+const CACHE_SIZE_LIMIT = 50;
+
 export interface DeckGLBusinessLayerProps {
   businesses: Business[];
   selectedBusinessId?: string; // Ignored for coloring per request
@@ -16,7 +21,19 @@ export const createBusinessScatterplotLayer = ({
   onBusinessClick,
   getTooltip
 }: DeckGLBusinessLayerProps) => {
-  return new ScatterplotLayer({
+  // Create cache key for layer reuse
+  const cacheKey = `scatterplot-${businesses.length}-${selectedBusinessId || 'none'}`;
+  
+  // Check if we can reuse existing layer
+  if (layerCache.has(cacheKey)) {
+    const cachedLayer = layerCache.get(cacheKey)!;
+    // Update data without recreating layer
+    cachedLayer.props.data = businesses;
+    return cachedLayer;
+  }
+
+  // Create new layer only when necessary
+  const layer = new ScatterplotLayer({
     id: 'businesses-scatterplot',
     data: businesses,
     pickable: true,
@@ -45,6 +62,15 @@ export const createBusinessScatterplotLayer = ({
       getFillColor: 200,
     }
   });
+
+  // Cache layer with size limit
+  if (layerCache.size >= CACHE_SIZE_LIMIT) {
+    const firstKey = layerCache.keys().next().value;
+    layerCache.delete(firstKey);
+  }
+  layerCache.set(cacheKey, layer);
+  
+  return layer;
 };
 
 // High-performance clustering layer for dense areas
@@ -54,10 +80,32 @@ export const createBusinessClusterLayer = ({
   onBusinessClick,
   map,
 }: DeckGLBusinessLayerProps) => {
-  // Simple clustering by grid
-  const clusteredData = clusterBusinesses(businesses, 0.001); // ~100m grid
+  // Aggressive cluster caching
+  const clusterKey = `cluster-${businesses.length}-${businesses[0]?.id || ''}-${businesses[businesses.length-1]?.id || ''}`;
+  
+  let clusteredData: any[];
+  if (clusterCache.has(clusterKey)) {
+    clusteredData = clusterCache.get(clusterKey)!;
+  } else {
+    clusteredData = clusterBusinesses(businesses, 0.001); // ~100m grid
+    
+    // Cache with size limit
+    if (clusterCache.size >= CACHE_SIZE_LIMIT) {
+      const firstKey = clusterCache.keys().next().value;
+      clusterCache.delete(firstKey);
+    }
+    clusterCache.set(clusterKey, clusteredData);
+  }
 
-  return new ScatterplotLayer({
+  // Layer caching for clusters
+  const layerCacheKey = `cluster-layer-${clusteredData.length}`;
+  if (layerCache.has(layerCacheKey)) {
+    const cachedLayer = layerCache.get(layerCacheKey)!;
+    cachedLayer.props.data = clusteredData;
+    return cachedLayer;
+  }
+
+  const layer = new ScatterplotLayer({
     id: 'businesses-clustered',
     data: clusteredData,
     pickable: true,
@@ -91,6 +139,15 @@ export const createBusinessClusterLayer = ({
       getFillColor: [businesses.length],
     }
   });
+
+  // Cache cluster layer
+  if (layerCache.size >= CACHE_SIZE_LIMIT) {
+    const firstKey = layerCache.keys().next().value;
+    layerCache.delete(firstKey);
+  }
+  layerCache.set(layerCacheKey, layer);
+  
+  return layer;
 };
 
 // Simple grid-based clustering
