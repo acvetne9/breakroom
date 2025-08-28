@@ -80,28 +80,39 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Load businesses in viewport when map moves
   const handleViewportChange = useCallback(() => {
-    if (!map || !mapLoaded) return;
+    if (!map || !mapLoaded) {
+      console.log('⚠️ handleViewportChange: map not ready', { map: !!map, mapLoaded });
+      return;
+    }
 
-    const bounds = map.getBounds();
-    const viewportBounds = {
-      north: bounds.getNorth(),
-      south: bounds.getSouth(),
-      east: bounds.getEast(),
-      west: bounds.getWest()
-    };
+    try {
+      const bounds = map.getBounds();
+      console.log('🗺️ Map bounds:', bounds);
+      
+      const viewportBounds = {
+        north: bounds.getNorth(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        west: bounds.getWest()
+      };
 
-    // Update deck.gl view state
-    const center = map.getCenter();
-    setDeckGLViewState({
-      longitude: center.lng,
-      latitude: center.lat,
-      zoom: map.getZoom(),
-      pitch: 0,
-      bearing: 0
-    });
+      console.log('📍 Loading businesses for viewport:', viewportBounds);
 
-    // Load businesses for current viewport
-    loadBusinessesInViewport(viewportBounds, isMobile ? 500 : 1000);
+      // Update deck.gl view state
+      const center = map.getCenter();
+      setDeckGLViewState({
+        longitude: center.lng,
+        latitude: center.lat,
+        zoom: map.getZoom(),
+        pitch: 0,
+        bearing: 0
+      });
+
+      // Load businesses for current viewport
+      loadBusinessesInViewport(viewportBounds, isMobile ? 500 : 1000);
+    } catch (error) {
+      console.error('❌ Error in handleViewportChange:', error);
+    }
   }, [map, mapLoaded, loadBusinessesInViewport, isMobile]);
 
   const processMapFeatures = useCallback(async () => {
@@ -323,12 +334,21 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // Setup viewport loading for businesses
   useEffect(() => {
     if (map && mapLoaded) {
-      const moveEndHandler = () => handleViewportChange();
+      console.log('🔗 Setting up viewport loading listeners');
+      
+      const moveEndHandler = () => {
+        console.log('🔄 Map move/zoom ended, loading businesses...');
+        handleViewportChange();
+      };
+      
       map.on('moveend', moveEndHandler);
       map.on('zoomend', moveEndHandler);
       
-      // Load initial viewport
-      handleViewportChange();
+      // Load initial viewport with delay to ensure map is fully ready
+      setTimeout(() => {
+        console.log('⏰ Loading initial viewport businesses...');
+        handleViewportChange();
+      }, 1000);
       
       return () => {
         map.off('moveend', moveEndHandler);
