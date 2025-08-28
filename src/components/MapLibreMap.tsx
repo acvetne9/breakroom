@@ -60,10 +60,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     businesses, 
     loading: businessesLoading, 
     loadBusinessesInViewport, 
-    fetchFullBusinessDetails 
+    fetchFullBusinessDetails,
+    clusterBusinesses 
   } = useViewportBusinesses();
   const processedRef = useRef(false);
   const [deckGLViewState, setDeckGLViewState] = useState<any>(null);
+  const [clusteredBusinesses, setClusteredBusinesses] = useState<any[]>([]);
+  const [currentZoom, setCurrentZoom] = useState(12);
 
   // Enhanced business click handler with viewport integration
   const handleBusinessClick = useCallback(async (business: any) => {
@@ -131,11 +134,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         bearing: 0
       });
 
-      // Load businesses for current viewport with enhanced logging
-      const businessLimit = isMobile ? 1500 : 5000;
+      // Load businesses with increased limits and clustering
+      const businessLimit = isMobile ? 3000 : 8000; // Increased limits
       console.log(`🎯 About to call loadBusinessesInViewport with ${businessLimit} limit for ${isMobile ? 'mobile' : 'desktop'}...`);
       
       loadBusinessesInViewport(viewportBounds, businessLimit);
+      
+      // Update zoom state
+      setCurrentZoom(viewportData.zoom);
+      
       console.log('✅ loadBusinessesInViewport called successfully');
       
     } catch (error) {
@@ -320,11 +327,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       setMapLoaded(true);
     });
 
-    // Log current zoom and center when map moves
+    // Log current zoom and center when map moves, trigger clustering
     mapInstance.on('moveend', () => {
       if (mapInstance) {
         const zoom = mapInstance.getZoom();
         const center = mapInstance.getCenter();
+        setCurrentZoom(zoom);
         console.log(`Current zoom: ${zoom.toFixed(2)} | Center: [${center.lng.toFixed(6)}, ${center.lat.toFixed(6)}]`);
       }
     });
@@ -586,7 +594,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           businesses={businesses}
           selectedBusinessId={selectedBusiness?.id}
           onBusinessClick={handleBusinessClick}
-          enableClustering={businesses.length > 500}
+          zoom={currentZoom}
         />
       )}
       

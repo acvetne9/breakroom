@@ -1,16 +1,13 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Business } from '@/types/business';
 import { getBusinessesInViewport, getFullBusinessDetails as getFullBusinessDetailsService } from '@/services/businesses';
+import { useTileCache } from './useTileCache';
+import { useMapWorker } from './useMapWorker';
 
-// Aggressive caching system
-const businessCache = new Map<string, Business[]>();
+// Preloading and request deduplication
+const inflightRequests = new Map<string, Promise<Business[]>>();
 const detailsCache = new Map<string, Business>();
-const boundsCache = new Map<string, string>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-const MAX_CACHE_SIZE = 100;
-
-// Cache cleanup
-const cacheTimestamps = new Map<string, number>();
+const MAX_DETAILS_CACHE = 200;
 
 interface MapBounds {
   north: number;
@@ -26,6 +23,11 @@ export const useViewportBusinesses = () => {
   const [loading, setLoading] = useState(false);
   const [currentBounds, setCurrentBounds] = useState<MapBounds | null>(null);
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const preloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Use tile-based caching and web worker
+  const { getCachedBusinesses, setCachedBusinesses } = useTileCache();
+  const { clusterBusinesses } = useMapWorker();
 
   console.log('🔧 useViewportBusinesses current state:', { 
     businessCount: businesses.length, 
@@ -33,114 +35,93 @@ export const useViewportBusinesses = () => {
     hasBounds: !!currentBounds 
   });
 
-  // Cleanup old cache entries
-  const cleanupCache = useCallback(() => {
-    const now = Date.now();
-    const expiredKeys: string[] = [];
-    
-    cacheTimestamps.forEach((timestamp, key) => {
-      if (now - timestamp > CACHE_TTL) {
-        expiredKeys.push(key);
-      }
-    });
-    
-    expiredKeys.forEach(key => {
-      businessCache.delete(key);
-      detailsCache.delete(key);
-      boundsCache.delete(key);
-      cacheTimestamps.delete(key);
-    });
-  }, []);
-
-  // Generate cache key for bounds
-  const getBoundsKey = useCallback((bounds: MapBounds, limit: number): string => {
-    const precision = 1000; // Round to avoid excessive cache entries
-    return `${Math.round(bounds.north * precision)}-${Math.round(bounds.south * precision)}-${Math.round(bounds.east * precision)}-${Math.round(bounds.west * precision)}-${limit}`;
-  }, []);
-
   const loadBusinessesInViewport = useCallback(async (bounds: MapBounds, limit: number = 1000) => {
     console.log('🎯 loadBusinessesInViewport called with:', { bounds, limit, currentLoading: loading });
 
-    // Cleanup old cache entries periodically
-    cleanupCache();
-    
-    const cacheKey = getBoundsKey(bounds, limit);
-    
-    // Check cache first (aggressive caching)
-    if (businessCache.has(cacheKey)) {
-      const cachedBusinesses = businessCache.get(cacheKey)!;
-      console.log(`🚀 Cache HIT! Returning ${cachedBusinesses.length} cached businesses`);
+    // Check tile cache first
+    const cachedBusinesses = getCachedBusinesses(bounds);
+    if (cachedBusinesses) {
+      console.log(`🚀 Tile cache HIT! Returning ${cachedBusinesses.length} cached businesses`);
       setBusinesses(cachedBusinesses);
       setCurrentBounds(bounds);
+      
+      // Preload adjacent areas in background
+      schedulePreload(bounds);
       return;
     }
 
-    // Pre-calculate expanded bounds (avoid recreation)
+    // Expand bounds for better caching
     const expandedBounds = {
-      north: bounds.north + (bounds.north - bounds.south) * 0.1,
-      south: bounds.south - (bounds.north - bounds.south) * 0.1,
-      east: bounds.east + (bounds.east - bounds.west) * 0.1,
-      west: bounds.west - (bounds.east - bounds.west) * 0.1
+      north: bounds.north + (bounds.north - bounds.south) * 0.15,
+      south: bounds.south - (bounds.north - bounds.south) * 0.15,
+      east: bounds.east + (bounds.east - bounds.west) * 0.15,
+      west: bounds.west - (bounds.east - bounds.west) * 0.15
     };
 
-    // Check expanded bounds cache too
-    const expandedCacheKey = getBoundsKey(expandedBounds, limit);
-    if (businessCache.has(expandedCacheKey)) {
-      const cachedBusinesses = businessCache.get(expandedCacheKey)!;
-      console.log(`🚀 Expanded cache HIT! Returning ${cachedBusinesses.length} cached businesses`);
-      setBusinesses(cachedBusinesses);
+    // Check expanded bounds in tile cache
+    const expandedCached = getCachedBusinesses(expandedBounds);
+    if (expandedCached) {
+      console.log(`🚀 Expanded tile cache HIT! Returning ${expandedCached.length} cached businesses`);
+      setBusinesses(expandedCached);
       setCurrentBounds(expandedBounds);
       return;
     }
 
-    // Clear any existing timeout
+    // Request deduplication
+    const requestKey = `${expandedBounds.north}-${expandedBounds.south}-${expandedBounds.east}-${expandedBounds.west}-${limit}`;
+    if (inflightRequests.has(requestKey)) {
+      console.log('🔄 Reusing in-flight request');
+      try {
+        const result = await inflightRequests.get(requestKey)!;
+        setBusinesses(result);
+        setCurrentBounds(expandedBounds);
+        return;
+      } catch (error) {
+        console.error('In-flight request failed:', error);
+      }
+    }
+
+    // Clear timeouts
     if (loadTimeoutRef.current) {
-      console.log('⏹️ Clearing existing timeout');
       clearTimeout(loadTimeoutRef.current);
     }
 
-    // Don't debounce the first load - load immediately if no businesses
+    // Immediate loading for empty state, debounced otherwise
     const shouldLoadImmediately = businesses.length === 0;
-    const delay = shouldLoadImmediately ? 0 : 300;
-    
-    console.log(`⏱️ Setting load timeout with ${delay}ms delay (immediate: ${shouldLoadImmediately})`);
+    const delay = shouldLoadImmediately ? 0 : 200; // Reduced debounce
 
     loadTimeoutRef.current = setTimeout(async () => {
+      // Skip duplicate requests
+      if (!shouldLoadImmediately && currentBounds && 
+          Math.abs(currentBounds.north - expandedBounds.north) < 0.003 &&
+          Math.abs(currentBounds.south - expandedBounds.south) < 0.003 &&
+          Math.abs(currentBounds.east - expandedBounds.east) < 0.003 &&
+          Math.abs(currentBounds.west - expandedBounds.west) < 0.003) {
+        console.log('🔄 Skipping duplicate request');
+        return;
+      }
+
+      setLoading(true);
+      
+      // Create and cache the request promise
+      const requestPromise = getBusinessesInViewport(expandedBounds, limit);
+      inflightRequests.set(requestKey, requestPromise);
+      
       try {
-        console.log('📍 Original bounds:', bounds);
-        console.log('📍 Expanded bounds:', expandedBounds);
-
-        // Skip duplicate check for first load
-        if (!shouldLoadImmediately && currentBounds && 
-            Math.abs(currentBounds.north - expandedBounds.north) < 0.005 &&
-            Math.abs(currentBounds.south - expandedBounds.south) < 0.005 &&
-            Math.abs(currentBounds.east - expandedBounds.east) < 0.005 &&
-            Math.abs(currentBounds.west - expandedBounds.west) < 0.005) {
-          console.log('🔄 Skipping duplicate request for similar bounds');
-          return;
-        }
-
-        setLoading(true);
         console.log('🔄 Loading businesses for viewport:', expandedBounds, 'limit:', limit);
         
-        const viewportBusinesses = await getBusinessesInViewport(expandedBounds, limit);
-        
+        const viewportBusinesses = await requestPromise;
         console.log(`📊 Received ${viewportBusinesses.length} businesses from service`);
         
-        // Aggressive caching with size limits
-        if (businessCache.size >= MAX_CACHE_SIZE) {
-          const oldestKey = businessCache.keys().next().value;
-          businessCache.delete(oldestKey);
-          cacheTimestamps.delete(oldestKey);
-        }
+        // Cache in tile system
+        setCachedBusinesses(expandedBounds, viewportBusinesses);
         
-        // Cache the results
-        businessCache.set(expandedCacheKey, viewportBusinesses);
-        cacheTimestamps.set(expandedCacheKey, Date.now());
-        
-        // Replace businesses with viewport-specific ones
+        // Update state
         setBusinesses(viewportBusinesses);
         setCurrentBounds(expandedBounds);
+        
+        // Schedule preloading
+        schedulePreload(expandedBounds);
         
         console.log(`✅ Updated state with ${viewportBusinesses.length} businesses`);
         
@@ -148,9 +129,69 @@ export const useViewportBusinesses = () => {
         console.error('❌ Error loading viewport businesses:', error);
       } finally {
         setLoading(false);
+        inflightRequests.delete(requestKey);
       }
     }, delay);
-  }, [currentBounds, businesses.length, loading, cleanupCache, getBoundsKey]);
+  }, [currentBounds, businesses.length, loading, getCachedBusinesses, setCachedBusinesses]);
+
+  // Preload adjacent areas for smooth panning
+  const schedulePreload = useCallback((bounds: MapBounds) => {
+    if (preloadTimeoutRef.current) {
+      clearTimeout(preloadTimeoutRef.current);
+    }
+    
+    preloadTimeoutRef.current = setTimeout(async () => {
+      const boundsSize = {
+        lat: bounds.north - bounds.south,
+        lng: bounds.east - bounds.west
+      };
+      
+      // Preload adjacent areas
+      const adjacentAreas = [
+        // North
+        { 
+          north: bounds.north + boundsSize.lat, 
+          south: bounds.north, 
+          east: bounds.east, 
+          west: bounds.west 
+        },
+        // South  
+        { 
+          north: bounds.south, 
+          south: bounds.south - boundsSize.lat, 
+          east: bounds.east, 
+          west: bounds.west 
+        },
+        // East
+        { 
+          north: bounds.north, 
+          south: bounds.south, 
+          east: bounds.east + boundsSize.lng, 
+          west: bounds.east 
+        },
+        // West
+        { 
+          north: bounds.north, 
+          south: bounds.south, 
+          east: bounds.west, 
+          west: bounds.west - boundsSize.lng 
+        }
+      ];
+      
+      // Preload areas that aren't cached
+      for (const area of adjacentAreas) {
+        if (!getCachedBusinesses(area)) {
+          try {
+            const businesses = await getBusinessesInViewport(area, 2000);
+            setCachedBusinesses(area, businesses);
+            console.log(`🔮 Preloaded ${businesses.length} businesses for adjacent area`);
+          } catch (error) {
+            console.warn('Preload failed for area:', area, error);
+          }
+        }
+      }
+    }, 1000); // Preload after 1 second of inactivity
+  }, [getCachedBusinesses, setCachedBusinesses]);
 
   const fetchFullBusinessDetails = async (businessId: string) => {
     // Check cache first
@@ -172,14 +213,14 @@ export const useViewportBusinesses = () => {
         return null;
       }
 
-      // Cache the full business details with size limit
-      if (detailsCache.size >= MAX_CACHE_SIZE) {
+      // Cache with size limit
+      if (detailsCache.size >= MAX_DETAILS_CACHE) {
         const oldestKey = detailsCache.keys().next().value;
         detailsCache.delete(oldestKey);
       }
       detailsCache.set(businessId, fullBusiness);
 
-      // Update the businesses array with full details
+      // Update businesses array
       setBusinesses(prev => prev.map(business => 
         business.id === businessId ? fullBusiness : business
       ));
@@ -197,7 +238,9 @@ export const useViewportBusinesses = () => {
     if (loadTimeoutRef.current) {
       clearTimeout(loadTimeoutRef.current);
     }
-    // Keep cache but clear current state
+    if (preloadTimeoutRef.current) {
+      clearTimeout(preloadTimeoutRef.current);
+    }
     console.log('🧹 Cleared business state but kept cache');
   }, []);
 
@@ -207,6 +250,9 @@ export const useViewportBusinesses = () => {
       if (loadTimeoutRef.current) {
         clearTimeout(loadTimeoutRef.current);
       }
+      if (preloadTimeoutRef.current) {
+        clearTimeout(preloadTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -215,6 +261,7 @@ export const useViewportBusinesses = () => {
     loading, 
     loadBusinessesInViewport, 
     fetchFullBusinessDetails,
-    clearBusinesses 
+    clearBusinesses,
+    clusterBusinesses // Expose clustering capability
   };
 };

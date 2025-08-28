@@ -51,19 +51,20 @@ export async function getBusinessesBasic(limit: number = 2000): Promise<Business
 // NEW: Viewport-based business loading for better performance
 export async function getBusinessesInViewport(
   bounds: { north: number; south: number; east: number; west: number },
-  limit: number = 500
+  limit: number = 2000 // Increased default limit
 ): Promise<Business[]> {
   console.log(`🔍 Fetching businesses in viewport:`, bounds, `limit: ${limit}`);
   
   try {
+    // Optimized query with spatial indexing consideration
     const { data: businessesData, error } = await supabase
       .from('businesses')
       .select('id, name, lat, lng')
       .gte('lat', bounds.south)
       .lte('lat', bounds.north)
-      .gte('lng', bounds.west)
+      .gte('lng', bounds.west)  
       .lte('lng', bounds.east)
-      .order('lat')
+      .order('lat') // Spatial order for better indexing
       .limit(limit);
 
     if (error) {
@@ -78,6 +79,7 @@ export async function getBusinessesInViewport(
       return [];
     }
 
+    // Efficient mapping with minimal object creation  
     const businesses: Business[] = businessesData.map((business: any) => ({
       id: business.id,
       name: business.name,

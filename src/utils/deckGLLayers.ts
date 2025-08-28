@@ -1,11 +1,8 @@
 import { ScatterplotLayer } from '@deck.gl/layers';
-import { WebMercatorViewport } from '@deck.gl/core';
 import type { Business } from '@/types/business';
 
-// Resource pools for performance optimization
-const layerCache = new Map<string, ScatterplotLayer>();
-const clusterCache = new Map<string, any[]>();
-const CACHE_SIZE_LIMIT = 50;
+// Optimized layer creation without caching instances (let deck.gl handle it)
+let layerCounter = 0;
 
 export interface DeckGLBusinessLayerProps {
   businesses: Business[];
@@ -21,137 +18,127 @@ export const createBusinessScatterplotLayer = ({
   onBusinessClick,
   getTooltip
 }: DeckGLBusinessLayerProps) => {
-  // Create cache key for layer reuse
-  const cacheKey = `scatterplot-${businesses.length}-${selectedBusinessId || 'none'}`;
+  // Use unique ID for efficient layer updates
+  const layerId = `businesses-scatter-${++layerCounter}`;
   
-  // Check if we can reuse existing layer
-  if (layerCache.has(cacheKey)) {
-    const cachedLayer = layerCache.get(cacheKey)!;
-    // Update data without recreating layer
-    cachedLayer.props.data = businesses;
-    return cachedLayer;
-  }
-
-  // Create new layer only when necessary
-  const layer = new ScatterplotLayer({
-    id: 'businesses-scatterplot',
+  // Let deck.gl handle layer diffing efficiently
+  return new ScatterplotLayer({
+    id: layerId,
     data: businesses,
-    pickable: true,
-    opacity: 0.8,
-    stroked: true,
-    filled: true,
-    radiusScale: 1,
-    radiusMinPixels: 8,
-    radiusMaxPixels: 32,
-    lineWidthMinPixels: 2,
-    getPosition: (d: Business) => [d.position.lng, d.position.lat],
-    getRadius: (_d: Business) => 8, // uniform radius
-    getFillColor: (_d: Business) => [250, 204, 21, 255], // uniform color (no discoloring)
-    getLineColor: [255, 255, 255, 255], // White stroke
-    onClick: onBusinessClick ? (info) => {
-      if (info.object) {
-        onBusinessClick(info.object as Business);
-      }
-    } : undefined,
-    updateTriggers: {
-      getRadius: [businesses.length],
-      getFillColor: [businesses.length],
-    },
-    transitions: {
-      getRadius: 200,
-      getFillColor: 200,
-    }
-  });
-
-  // Cache layer with size limit
-  if (layerCache.size >= CACHE_SIZE_LIMIT) {
-    const firstKey = layerCache.keys().next().value;
-    layerCache.delete(firstKey);
-  }
-  layerCache.set(cacheKey, layer);
-  
-  return layer;
-};
-
-// High-performance clustering layer for dense areas
-export const createBusinessClusterLayer = ({
-  businesses,
-  selectedBusinessId,
-  onBusinessClick,
-  map,
-}: DeckGLBusinessLayerProps) => {
-  // Aggressive cluster caching
-  const clusterKey = `cluster-${businesses.length}-${businesses[0]?.id || ''}-${businesses[businesses.length-1]?.id || ''}`;
-  
-  let clusteredData: any[];
-  if (clusterCache.has(clusterKey)) {
-    clusteredData = clusterCache.get(clusterKey)!;
-  } else {
-    clusteredData = clusterBusinesses(businesses, 0.001); // ~100m grid
-    
-    // Cache with size limit
-    if (clusterCache.size >= CACHE_SIZE_LIMIT) {
-      const firstKey = clusterCache.keys().next().value;
-      clusterCache.delete(firstKey);
-    }
-    clusterCache.set(clusterKey, clusteredData);
-  }
-
-  // Layer caching for clusters
-  const layerCacheKey = `cluster-layer-${clusteredData.length}`;
-  if (layerCache.has(layerCacheKey)) {
-    const cachedLayer = layerCache.get(layerCacheKey)!;
-    cachedLayer.props.data = clusteredData;
-    return cachedLayer;
-  }
-
-  const layer = new ScatterplotLayer({
-    id: 'businesses-clustered',
-    data: clusteredData,
     pickable: true,
     opacity: 0.9,
     stroked: true,
     filled: true,
     radiusScale: 1,
-    radiusMinPixels: 10,
-    radiusMaxPixels: 40,
+    radiusMinPixels: 6,
+    radiusMaxPixels: 24,
+    lineWidthMinPixels: 1.5,
+    getPosition: (d: Business) => [d.position.lng, d.position.lat],
+    getRadius: (_d: Business) => 6, // Smaller for better performance
+    getFillColor: [250, 204, 21, 255], // Uniform golden color
+    getLineColor: [255, 255, 255, 200], // Semi-transparent white stroke
+    onClick: onBusinessClick ? (info) => {
+      if (info.object) {
+        onBusinessClick(info.object as Business);
+      }
+    } : undefined,
+    // Efficient update triggers
+    updateTriggers: {
+      getPosition: [businesses],
+      getRadius: [businesses.length],
+      getFillColor: []
+    },
+    // Fast transitions
+    transitions: {
+      getPosition: {
+        duration: 300,
+        easing: (t: number) => t * t * (3 - 2 * t) // Smooth step
+      }
+    },
+    // Performance optimizations
+    dataComparator: (newData: any, oldData: any) => {
+      if (!Array.isArray(newData) || !Array.isArray(oldData)) return false;
+      if (newData.length !== oldData.length) return false;
+      return newData.every((business: any, i: number) => 
+        business.id === oldData[i]?.id &&
+        business.position?.lat === oldData[i]?.position?.lat &&
+        business.position?.lng === oldData[i]?.position?.lng
+      );
+    }
+  });
+};
+
+// Modern supercluster-based layer for web worker processed data
+export const createBusinessClusterLayer = (data: any[], onBusinessClick?: (business: Business) => void, map?: any) => {
+  const layerId = `businesses-cluster-${++layerCounter}`;
+  
+  return new ScatterplotLayer({
+    id: layerId,
+    data: data,
+    pickable: true,
+    opacity: 0.95,
+    stroked: true,
+    filled: true,
+    radiusScale: 1,
+    radiusMinPixels: 8,
+    radiusMaxPixels: 50,
     lineWidthMinPixels: 2,
-    getPosition: (d: any) => [d.lng, d.lat],
-    getRadius: (d: any) => Math.min(Math.max(Math.sqrt(d.count) * 6, 10), 40),
-    getFillColor: (_d: any) => [250, 204, 21, 255], // uniform color for clusters too
+    getPosition: (d: any) => {
+      if (d.type === 'cluster') {
+        return [d.position.lng, d.position.lat];
+      } else {
+        return [d.position.lng, d.position.lat];
+      }
+    },
+    getRadius: (d: any) => {
+      if (d.type === 'cluster') {
+        return Math.min(Math.max(Math.sqrt(d.count) * 4, 12), 50);
+      } else {
+        return 6;
+      }
+    },
+    getFillColor: (d: any) => {
+      if (d.type === 'cluster') {
+        // Cluster color with opacity based on count
+        const intensity = Math.min(d.count / 20, 1);
+        return [250, 204, 21, 200 + intensity * 55];
+      } else {
+        return [250, 204, 21, 255];
+      }
+    },
     getLineColor: [255, 255, 255, 255],
     onClick: (info) => {
       if (info.object) {
-        const cluster = info.object as any;
-        if (cluster.count === 1) {
-          onBusinessClick?.(cluster.businesses[0]);
-        } else {
-          console.log(`🔎 Cluster clicked with ${cluster.count} businesses. Zooming in...`);
+        const item = info.object as any;
+        if (item.type === 'cluster') {
+          console.log(`🔎 Cluster clicked with ${item.count} businesses. Zooming in...`);
           if (map && map.getZoom) {
-            const nextZoom = Math.min((map.getZoom?.() || 12) + 1.5, 18);
-            map.easeTo?.({ center: [cluster.lng, cluster.lat], zoom: nextZoom, duration: 500 });
+            const nextZoom = Math.min((map.getZoom?.() || 12) + 2, 18);
+            map.easeTo?.({ 
+              center: [item.position.lng, item.position.lat], 
+              zoom: nextZoom, 
+              duration: 600 
+            });
           }
+        } else {
+          onBusinessClick?.(item);
         }
       }
     },
     updateTriggers: {
-      getRadius: [businesses.length],
-      getFillColor: [businesses.length],
+      getPosition: [data],
+      getRadius: [data],
+      getFillColor: [data]
+    },
+    transitions: {
+      getPosition: { duration: 400 },
+      getRadius: { duration: 300 }
     }
   });
-
-  // Cache cluster layer
-  if (layerCache.size >= CACHE_SIZE_LIMIT) {
-    const firstKey = layerCache.keys().next().value;
-    layerCache.delete(firstKey);
-  }
-  layerCache.set(layerCacheKey, layer);
-  
-  return layer;
 };
 
-// Simple grid-based clustering
-function clusterBusinesses(businesses: Business[], gridSize: number = 0.001) {
+// Legacy fallback clustering (web worker is preferred)
+function fallbackClusterBusinesses(businesses: Business[], gridSize: number = 0.001) {
   const clusters = new Map<string, any>();
 
   businesses.forEach(business => {
@@ -172,7 +159,6 @@ function clusterBusinesses(businesses: Business[], gridSize: number = 0.001) {
     cluster.count++;
     cluster.businesses.push(business);
     
-    // Update centroid for better positioning
     if (cluster.count === 1) {
       cluster.lat = business.position.lat;
       cluster.lng = business.position.lng;
@@ -182,7 +168,13 @@ function clusterBusinesses(businesses: Business[], gridSize: number = 0.001) {
     }
   });
 
-  return Array.from(clusters.values());
+  return Array.from(clusters.values()).map(cluster => ({
+    type: 'cluster',
+    id: `fallback-cluster-${cluster.lat}-${cluster.lng}`,
+    position: { lat: cluster.lat, lng: cluster.lng },
+    count: cluster.count,
+    businesses: cluster.businesses
+  }));
 }
 
-export { clusterBusinesses };
+export { fallbackClusterBusinesses };

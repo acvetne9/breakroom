@@ -1,17 +1,20 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { MapboxOverlay } from '@deck.gl/mapbox';
 import { createBusinessScatterplotLayer, createBusinessClusterLayer } from '@/utils/deckGLLayers';
 import type { Business } from '@/types/business';
 
-// Resource pool for overlay instances
+// Singleton overlay for performance
 let overlayInstance: MapboxOverlay | null = null;
+let overlayUpdateTimeout: NodeJS.Timeout | null = null;
 
 interface DeckGLOverlayProps {
   map: maplibregl.Map;
-  businesses: Business[];
+  businesses: Business[] | any[]; // Can be clustered data from worker
   selectedBusinessId?: string;
   onBusinessClick?: (business: Business) => void;
   enableClustering?: boolean;
+  isClusteredData?: boolean; // Indicates if data is pre-clustered
+  zoom?: number; // Current zoom level
 }
 
 export const DeckGLOverlay: React.FC<DeckGLOverlayProps> = ({
@@ -19,61 +22,87 @@ export const DeckGLOverlay: React.FC<DeckGLOverlayProps> = ({
   businesses,
   selectedBusinessId,
   onBusinessClick,
-  enableClustering = true
+  enableClustering = true,
+  isClusteredData = false,
+  zoom = 12
 }) => {
-  // Reuse overlay instance to avoid constant creation/destruction
+  const [overlayReady, setOverlayReady] = useState(false);
+  
+  // Initialize overlay once
   const overlay = useMemo(() => {
     if (overlayInstance) {
+      setOverlayReady(true);
       return overlayInstance;
     }
 
-    overlayInstance = new MapboxOverlay({
+    const newOverlay = new MapboxOverlay({
       interleaved: true,
       layers: []
     });
 
-    // Add to map only once
-    map.addControl(overlayInstance as any);
+    // Add to map
+    map.addControl(newOverlay as any);
+    overlayInstance = newOverlay;
+    setOverlayReady(true);
 
-    return overlayInstance;
+    return newOverlay;
   }, [map]);
 
-  // Memoized layer creation with aggressive caching
+  // Optimized layer creation
   const layers = useMemo(() => {
-    const shouldCluster = enableClustering && businesses.length > 500;
+    if (!businesses.length) return [];
     
-    console.log(`🎯 Creating ${shouldCluster ? 'clustered' : 'scatter'} layer for ${businesses.length} businesses`);
+    // Use clustered data if available, otherwise decide based on count and zoom
+    if (isClusteredData) {
+      console.log(`🎯 Using pre-clustered data: ${businesses.length} items`);
+      return [createBusinessClusterLayer(businesses, onBusinessClick, map)];
+    }
     
-    return shouldCluster 
-      ? [createBusinessClusterLayer({
-          businesses,
-          selectedBusinessId,
-          onBusinessClick,
-          map,
-        })]
-      : [createBusinessScatterplotLayer({
-          businesses,
-          selectedBusinessId,
-          onBusinessClick,
-        })];
-  }, [businesses, selectedBusinessId, onBusinessClick, enableClustering, map]);
+    const shouldCluster = enableClustering && (businesses.length > 1000 || zoom < 13);
+    
+    console.log(`🎯 Creating ${shouldCluster ? 'clustered' : 'scatter'} layer for ${businesses.length} businesses at zoom ${zoom}`);
+    
+    if (shouldCluster) {
+      return [createBusinessClusterLayer(businesses, onBusinessClick, map)];
+    } else {
+      return [createBusinessScatterplotLayer({
+        businesses: businesses as Business[],
+        selectedBusinessId,
+        onBusinessClick,
+      })];
+    }
+  }, [businesses, selectedBusinessId, onBusinessClick, enableClustering, isClusteredData, zoom, map]);
 
-  // Update layers efficiently - only when layers actually change
-  useMemo(() => {
-    if (!overlay) return;
+  // Throttled layer updates for smooth panning
+  useEffect(() => {
+    if (!overlay || !overlayReady) return;
 
-    overlay.setProps({ layers });
+    // Clear existing timeout
+    if (overlayUpdateTimeout) {
+      clearTimeout(overlayUpdateTimeout);
+    }
 
-    console.log(`🎯 Updated deck.gl with ${businesses.length} businesses (clustering: ${enableClustering && businesses.length > 500})`);
-  }, [overlay, layers, businesses.length, enableClustering]);
+    overlayUpdateTimeout = setTimeout(() => {
+      overlay.setProps({ layers });
+      console.log(`🎯 Updated deck.gl with ${layers.length} layers (${businesses.length} businesses)`);
+    }, 16); // ~60fps updates
 
-  // Cleanup on unmount - but keep overlay for reuse
-  React.useEffect(() => {
     return () => {
-      // Don't remove overlay here - keep it for reuse
-      console.log('🔧 DeckGLOverlay cleanup (keeping overlay for reuse)');
+      if (overlayUpdateTimeout) {
+        clearTimeout(overlayUpdateTimeout);
+      }
+    };
+  }, [overlay, overlayReady, layers, businesses.length]);
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      console.log('🔧 DeckGLOverlay cleanup');
+      if (overlayUpdateTimeout) {
+        clearTimeout(overlayUpdateTimeout);
+      }
     };
   }, []);
 
-  return null; // This component doesn't render anything directly
+  return null;
 };
