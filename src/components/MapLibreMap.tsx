@@ -80,6 +80,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Load businesses in viewport when map moves
   const handleViewportChange = useCallback(() => {
+    console.log('🚨 handleViewportChange CALLED!', { 
+      hasMap: !!map, 
+      mapLoaded,
+      isStyleLoaded: map?.isStyleLoaded?.()
+    });
+
     if (!map || !mapLoaded) {
       console.log('⚠️ handleViewportChange: map not ready', { 
         map: !!map, 
@@ -90,8 +96,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
 
     try {
+      console.log('📍 Getting map bounds...');
       const bounds = map.getBounds();
-      console.log('🗺️ Map bounds:', {
+      console.log('🗺️ Map bounds retrieved:', {
         north: bounds.getNorth(),
         south: bounds.getSouth(),
         east: bounds.getEast(),
@@ -121,9 +128,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       // Load businesses for current viewport with enhanced logging
       const businessLimit = isMobile ? 500 : 1000;
-      console.log(`🎯 Loading up to ${businessLimit} businesses for ${isMobile ? 'mobile' : 'desktop'}...`);
+      console.log(`🎯 About to call loadBusinessesInViewport with ${businessLimit} limit for ${isMobile ? 'mobile' : 'desktop'}...`);
       
       loadBusinessesInViewport(viewportBounds, businessLimit);
+      console.log('✅ loadBusinessesInViewport called successfully');
+      
     } catch (error) {
       console.error('❌ Error in handleViewportChange:', error);
     }
@@ -347,14 +356,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Setup viewport loading for businesses with aggressive triggering
   useEffect(() => {
-    console.log('🚀 Business loading system initializing...', { 
+    console.log('🚀 Business loading useEffect triggered', { 
       hasMap: !!map, 
       mapLoaded,
-      businessCount: businesses.length 
+      businessCount: businesses.length,
+      effectDeps: { map: !!map, mapLoaded, businessesLength: businesses.length }
     });
 
     if (map && mapLoaded) {
-      console.log('🔗 Setting up comprehensive business loading system');
+      console.log('🔗 Setting up comprehensive business loading system - MAP AND LOADED ARE TRUE');
+      
+      // TEST: Try calling handleViewportChange immediately
+      console.log('🧪 TEST: Calling handleViewportChange immediately...');
+      try {
+        handleViewportChange();
+        console.log('🧪 TEST: handleViewportChange called successfully');
+      } catch (error) {
+        console.error('🧪 TEST: Error calling handleViewportChange:', error);
+      }
       
       // Immediate business loading function
       const loadBusinessesNow = () => {
@@ -429,7 +448,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       // Even if map isn't fully ready, try loading businesses
       if (map) {
         console.log('🔄 Map exists but not fully loaded, trying business load anyway...');
-        setTimeout(() => handleViewportChange(), 1000);
+        setTimeout(() => {
+          console.log('🔄 Delayed attempt - calling handleViewportChange...');
+          handleViewportChange();
+        }, 1000);
       }
     }
   }, [map, mapLoaded, handleViewportChange, businesses.length]);

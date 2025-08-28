@@ -10,10 +10,18 @@ interface MapBounds {
 }
 
 export const useViewportBusinesses = () => {
+  console.log('🔧 useViewportBusinesses hook initializing');
+  
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentBounds, setCurrentBounds] = useState<MapBounds | null>(null);
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  console.log('🔧 useViewportBusinesses current state:', { 
+    businessCount: businesses.length, 
+    loading, 
+    hasBounds: !!currentBounds 
+  });
 
   const loadBusinessesInViewport = useCallback(async (bounds: MapBounds, limit: number = 1000) => {
     console.log('🎯 loadBusinessesInViewport called with:', { bounds, limit, currentLoading: loading });
