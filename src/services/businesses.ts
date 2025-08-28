@@ -102,7 +102,7 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
   if (existingBusiness) {
     businessId = existingBusiness.id;
   } else {
-    // Create new business if it doesn't exist
+    // Create new business if it doesn't exist - NO AUTH REQUIRED
     // For now, we'll create a placeholder business with default coordinates
     const { data: newBusiness, error: createBusinessError } = await supabase
       .from('businesses')
@@ -135,7 +135,7 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
   }
 
   if (!existingRole) {
-    // Create new role if it doesn't exist
+    // Create new role if it doesn't exist - NO AUTH REQUIRED
     const { error: createRoleError } = await supabase
       .from('business_roles')
       .insert({

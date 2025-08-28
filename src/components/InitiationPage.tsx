@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 // framer-motion removed to prevent dynamic import parse issue
 import JobSearchDropdown from './JobSearchDropdown';
+import BusinessSearchDropdown from './BusinessSearchDropdown';
 import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 
@@ -78,13 +79,12 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     console.log('Setting role:', value, 'isPredefined:', isPredefinedOption);
     setRole(value);
   };
-  const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+  const handleLocationChange = (value: string, fullLocation?: string) => {
     setLocation(value);
-    setFullLocation(value); // Simple fallback - use same value
+    setFullLocation(fullLocation || value);
   };
-  const handleLocationBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    const value = e.target.value.trim();
+  const handleLocationBlur = () => {
+    const value = location.trim();
     if (!value) {
       setLocation('');
       setFullLocation('');
@@ -104,8 +104,6 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       return;
     }
     console.log('Location blur with value:', value);
-    setLocation(value);
-    setFullLocation(value);
 
     // Check for completion
     setTimeout(() => {
@@ -144,7 +142,16 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
             </div>
 
             <div>
-              <input type="text" value={location} onChange={handleLocationChange} onBlur={handleLocationBlur} placeholder="Where'd you work?..." className="app-input" />
+              <BusinessSearchDropdown 
+                value={location} 
+                onChange={handleLocationChange} 
+                onBlur={handleLocationBlur} 
+                placeholder="Where'd you work?..." 
+                className="app-input"
+                salary={salary}
+                role={role}
+                timePeriod={timePeriod}
+              />
             </div>
 
             <div className="text-center mt-8">
