@@ -341,19 +341,28 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         handleViewportChange();
       };
       
+      const loadEndHandler = () => {
+        console.log('🗺️ Map fully loaded, loading initial businesses...');
+        handleViewportChange();
+      };
+      
       map.on('moveend', moveEndHandler);
       map.on('zoomend', moveEndHandler);
+      map.on('idle', loadEndHandler); // Triggered when map is fully loaded and idle
       
-      // Load initial viewport with delay to ensure map is fully ready
-      setTimeout(() => {
-        console.log('⏰ Loading initial viewport businesses...');
-        handleViewportChange();
-      }, 1000);
+      // Load initial viewport immediately if map is ready
+      if (map.isStyleLoaded()) {
+        console.log('⚡ Map already loaded, loading businesses immediately...');
+        setTimeout(() => handleViewportChange(), 100);
+      }
       
       return () => {
         map.off('moveend', moveEndHandler);
         map.off('zoomend', moveEndHandler);
+        map.off('idle', loadEndHandler);
       };
+    } else {
+      console.log('⚠️ Map setup pending...', { map: !!map, mapLoaded });
     }
   }, [map, mapLoaded, handleViewportChange]);
 

@@ -22,33 +22,40 @@ export const useViewportBusinesses = () => {
     }
 
     loadTimeoutRef.current = setTimeout(async () => {
-      // Expand bounds slightly to preload nearby businesses
-      const expandedBounds = {
-        north: bounds.north + (bounds.north - bounds.south) * 0.1,
-        south: bounds.south - (bounds.north - bounds.south) * 0.1,
-        east: bounds.east + (bounds.east - bounds.west) * 0.1,
-        west: bounds.west - (bounds.east - bounds.west) * 0.1
-      };
-
-      // Avoid duplicate requests for similar bounds
-      if (currentBounds && 
-          Math.abs(currentBounds.north - expandedBounds.north) < 0.005 &&
-          Math.abs(currentBounds.south - expandedBounds.south) < 0.005 &&
-          Math.abs(currentBounds.east - expandedBounds.east) < 0.005 &&
-          Math.abs(currentBounds.west - expandedBounds.west) < 0.005) {
-        return;
-      }
-
-      setLoading(true);
       try {
-        console.log('🔄 Loading businesses for viewport:', expandedBounds);
+        // Expand bounds slightly to preload nearby businesses
+        const expandedBounds = {
+          north: bounds.north + (bounds.north - bounds.south) * 0.1,
+          south: bounds.south - (bounds.north - bounds.south) * 0.1,
+          east: bounds.east + (bounds.east - bounds.west) * 0.1,
+          west: bounds.west - (bounds.east - bounds.west) * 0.1
+        };
+
+        console.log('📍 Original bounds:', bounds);
+        console.log('📍 Expanded bounds:', expandedBounds);
+
+        // Avoid duplicate requests for similar bounds
+        if (currentBounds && 
+            Math.abs(currentBounds.north - expandedBounds.north) < 0.005 &&
+            Math.abs(currentBounds.south - expandedBounds.south) < 0.005 &&
+            Math.abs(currentBounds.east - expandedBounds.east) < 0.005 &&
+            Math.abs(currentBounds.west - expandedBounds.west) < 0.005) {
+          console.log('🔄 Skipping duplicate request for similar bounds');
+          return;
+        }
+
+        setLoading(true);
+        console.log('🔄 Loading businesses for viewport:', expandedBounds, 'limit:', limit);
+        
         const viewportBusinesses = await getBusinessesInViewport(expandedBounds, limit);
+        
+        console.log(`📊 Received ${viewportBusinesses.length} businesses from service`);
         
         // Replace businesses with viewport-specific ones
         setBusinesses(viewportBusinesses);
         setCurrentBounds(expandedBounds);
         
-        console.log(`✅ Loaded ${viewportBusinesses.length} businesses in viewport`);
+        console.log(`✅ Updated state with ${viewportBusinesses.length} businesses`);
       } catch (error) {
         console.error('❌ Error loading viewport businesses:', error);
       } finally {

@@ -53,33 +53,46 @@ export async function getBusinessesInViewport(
   bounds: { north: number; south: number; east: number; west: number },
   limit: number = 500
 ): Promise<Business[]> {
-  console.log('🔄 Fetching businesses in viewport:', bounds);
+  console.log(`🔍 Fetching businesses in viewport:`, bounds, `limit: ${limit}`);
   
-  const { data: businessesData, error } = await supabase
-    .from('businesses')
-    .select('id, name, lat, lng')
-    .gte('lat', bounds.south)
-    .lte('lat', bounds.north)
-    .gte('lng', bounds.west)
-    .lte('lng', bounds.east)
-    .limit(limit);
+  try {
+    const { data: businessesData, error } = await supabase
+      .from('businesses')
+      .select('id, name, lat, lng')
+      .gte('lat', bounds.south)
+      .lte('lat', bounds.north)
+      .gte('lng', bounds.west)
+      .lte('lng', bounds.east)
+      .order('lat')
+      .limit(limit);
 
-  if (error) {
-    console.error('❌ Viewport businesses error:', error);
-    throw error;
+    if (error) {
+      console.error('❌ Supabase viewport error:', error);
+      throw error;
+    }
+
+    console.log(`📊 Found ${businessesData?.length || 0} businesses in viewport`);
+
+    if (!businessesData || businessesData.length === 0) {
+      console.log('⚠️ No businesses found in viewport bounds:', bounds);
+      return [];
+    }
+
+    const businesses: Business[] = businessesData.map((business: any) => ({
+      id: business.id,
+      name: business.name,
+      position: { lat: business.lat, lng: business.lng },
+      atmosphere: [],
+      salary: '0',
+      roles: [],
+    }));
+
+    console.log(`✅ Returning ${businesses.length} businesses for rendering`);
+    return businesses;
+  } catch (error) {
+    console.error('❌ Error in getBusinessesInViewport:', error);
+    return [];
   }
-
-  const businesses: Business[] = (businessesData || []).map((business: any) => ({
-    id: business.id,
-    name: business.name,
-    position: { lat: business.lat, lng: business.lng },
-    atmosphere: [],
-    salary: '0',
-    roles: [],
-  }));
-
-  console.log(`✅ Loaded ${businesses.length} businesses in viewport`);
-  return businesses;
 }
 
 export async function getFullBusinessDetails(businessId: string): Promise<Business | null> {
