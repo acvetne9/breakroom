@@ -26,9 +26,10 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
     .from('businesses')
     .select('*')
     .eq('id', businessId)
-    .single();
+    .maybeSingle();
 
   if (businessError) throw businessError;
+  if (!businessData) return null;
 
   // Get current user
   const { data: { user } } = await supabase.auth.getUser();
@@ -92,10 +93,9 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
     .from('businesses')
     .select('id')
     .ilike('name', businessLocation)
-    .single();
+    .maybeSingle();
 
-  if (findError && findError.code !== 'PGRST116') {
-    // Error other than "not found"
+  if (findError) {
     throw findError;
   }
 
@@ -124,7 +124,7 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
           .from('businesses')
           .select('id')
           .eq('name', businessLocation)
-          .single();
+          .maybeSingle();
         
         if (retryBusiness) {
           businessId = retryBusiness.id;
@@ -146,9 +146,9 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
     .eq('business_id', businessId)
     .eq('role', role)
     .eq('salary', salary)
-    .single();
+    .maybeSingle();
 
-  if (roleCheckError && roleCheckError.code !== 'PGRST116') {
+  if (roleCheckError) {
     throw roleCheckError;
   }
 
