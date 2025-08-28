@@ -117,8 +117,26 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
       .select('id')
       .single();
 
-    if (createBusinessError) throw createBusinessError;
-    businessId = newBusiness.id;
+    if (createBusinessError) {
+      // If it's a duplicate key error, try to get the existing business again
+      if (createBusinessError.code === '23505') { // unique_violation
+        const { data: retryBusiness } = await supabase
+          .from('businesses')
+          .select('id')
+          .eq('name', businessLocation)
+          .single();
+        
+        if (retryBusiness) {
+          businessId = retryBusiness.id;
+        } else {
+          throw createBusinessError;
+        }
+      } else {
+        throw createBusinessError;
+      }
+    } else {
+      businessId = newBusiness.id;
+    }
   }
 
   // Check if this exact role already exists for this business
