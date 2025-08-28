@@ -3,6 +3,7 @@ import React, { memo } from 'react';
 import { Compass } from 'lucide-react';
 import VotingComponent from './VotingComponent';
 import { formatTimeAgo } from '../utils/timeAgo';
+import { TranslatedText } from './TranslatedText';
 interface Post {
   id: string;
   author: string;
@@ -90,7 +91,10 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
       <div className="app-card p-6 overflow-y-auto animate-fade-in" onClick={handleCardClick}>
         <div className="flex justify-between items-start mb-6">
           <div>
-            <h2 className="text-xl font-medium text-app-black">{business.name}</h2>
+            <TranslatedText 
+              text={business.name}
+              className="text-xl font-medium text-app-black"
+            />
             <div className="flex items-center mt-2">
               <span className="text-app-gray-medium">
                 {business.atmosphere.join(' • ')}
@@ -148,9 +152,10 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
               <>
                 {businessStories.slice(0, 5).map(story => (
                   <div key={story.id} className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded relative" onClick={(e) => handleStoryClick(story, e)}>
-                    <p className="text-app-gray-dark text-sm pb-4">
-                      {story.text.length > 100 ? `${story.text.substring(0, 100)}...` : story.text}
-                    </p>
+                    <TranslatedText 
+                      text={story.text.length > 100 ? `${story.text.substring(0, 100)}...` : story.text}
+                      className="text-app-gray-dark text-sm pb-4"
+                    />
                     <span className="absolute bottom-2 left-4 text-xs text-gray-400">{formatTimeAgo(story.createdAt)}</span>
                   </div>
                 ))}
