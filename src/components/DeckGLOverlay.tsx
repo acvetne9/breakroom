@@ -41,11 +41,13 @@ export const DeckGLOverlay: React.FC<DeckGLOverlayProps> = ({
           businesses,
           selectedBusinessId,
           onBusinessClick,
+          map,
         })]
       : [createBusinessScatterplotLayer({
           businesses,
           selectedBusinessId,
           onBusinessClick,
+          // map not needed here
         })];
 
     overlay.setProps({

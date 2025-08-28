@@ -127,7 +127,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
 
       // Load businesses for current viewport with enhanced logging
-      const businessLimit = isMobile ? 500 : 1000;
+      const businessLimit = isMobile ? 1500 : 5000;
       console.log(`🎯 About to call loadBusinessesInViewport with ${businessLimit} limit for ${isMobile ? 'mobile' : 'desktop'}...`);
       
       loadBusinessesInViewport(viewportBounds, businessLimit);

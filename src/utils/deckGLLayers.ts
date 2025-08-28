@@ -4,9 +4,10 @@ import type { Business } from '@/types/business';
 
 export interface DeckGLBusinessLayerProps {
   businesses: Business[];
-  selectedBusinessId?: string;
+  selectedBusinessId?: string; // Ignored for coloring per request
   onBusinessClick?: (business: Business) => void;
   getTooltip?: (info: any) => string;
+  map?: any; // optional MapLibre map for zooming on clusters
 }
 
 export const createBusinessScatterplotLayer = ({
@@ -27,11 +28,8 @@ export const createBusinessScatterplotLayer = ({
     radiusMaxPixels: 32,
     lineWidthMinPixels: 2,
     getPosition: (d: Business) => [d.position.lng, d.position.lat],
-    getRadius: (d: Business) => selectedBusinessId === d.id ? 12 : 8,
-    getFillColor: (d: Business) => 
-      selectedBusinessId === d.id 
-        ? [239, 68, 68, 255] // Red for selected
-        : [250, 204, 21, 255], // Yellow for unselected
+    getRadius: (_d: Business) => 8, // uniform radius
+    getFillColor: (_d: Business) => [250, 204, 21, 255], // uniform color (no discoloring)
     getLineColor: [255, 255, 255, 255], // White stroke
     onClick: onBusinessClick ? (info) => {
       if (info.object) {
@@ -39,12 +37,12 @@ export const createBusinessScatterplotLayer = ({
       }
     } : undefined,
     updateTriggers: {
-      getRadius: [selectedBusinessId],
-      getFillColor: [selectedBusinessId],
+      getRadius: [businesses.length],
+      getFillColor: [businesses.length],
     },
     transitions: {
-      getRadius: 300,
-      getFillColor: 300,
+      getRadius: 200,
+      getFillColor: 200,
     }
   });
 };
@@ -54,6 +52,7 @@ export const createBusinessClusterLayer = ({
   businesses,
   selectedBusinessId,
   onBusinessClick,
+  map,
 }: DeckGLBusinessLayerProps) => {
   // Simple clustering by grid
   const clusteredData = clusterBusinesses(businesses, 0.001); // ~100m grid
@@ -71,36 +70,25 @@ export const createBusinessClusterLayer = ({
     lineWidthMinPixels: 2,
     getPosition: (d: any) => [d.lng, d.lat],
     getRadius: (d: any) => Math.min(Math.max(Math.sqrt(d.count) * 6, 10), 40),
-    getFillColor: (d: any) => {
-      if (d.count === 1) {
-        return selectedBusinessId === d.businesses[0].id 
-          ? [239, 68, 68, 255] // Red for selected single business
-          : [250, 204, 21, 255]; // Yellow for single business
-      }
-      // Cluster colors based on density
-      const intensity = Math.min(d.count / 10, 1);
-      return [
-        255 - (intensity * 55),  // R: 255 -> 200
-        200 - (intensity * 50),  // G: 200 -> 150
-        50 + (intensity * 100),  // B: 50 -> 150
-        200 + (intensity * 55)   // A: 200 -> 255
-      ];
-    },
+    getFillColor: (_d: any) => [250, 204, 21, 255], // uniform color for clusters too
     getLineColor: [255, 255, 255, 255],
-    onClick: onBusinessClick ? (info) => {
+    onClick: (info) => {
       if (info.object) {
         const cluster = info.object as any;
         if (cluster.count === 1) {
-          onBusinessClick(cluster.businesses[0]);
+          onBusinessClick?.(cluster.businesses[0]);
         } else {
-          // Handle cluster click - could expand or show list
-          console.log(`Cluster clicked with ${cluster.count} businesses:`, cluster.businesses);
+          console.log(`🔎 Cluster clicked with ${cluster.count} businesses. Zooming in...`);
+          if (map && map.getZoom) {
+            const nextZoom = Math.min((map.getZoom?.() || 12) + 1.5, 18);
+            map.easeTo?.({ center: [cluster.lng, cluster.lat], zoom: nextZoom, duration: 500 });
+          }
         }
       }
-    } : undefined,
+    },
     updateTriggers: {
       getRadius: [businesses.length],
-      getFillColor: [selectedBusinessId, businesses.length],
+      getFillColor: [businesses.length],
     }
   });
 };
