@@ -14,6 +14,11 @@ interface BusinessSearchDropdownProps {
   salary?: string;
   role?: string;
   timePeriod?: string;
+  showAddForm?: boolean;
+  newBusinessAddress?: string;
+  onAddressChange?: (address: string) => void;
+  onCreateBusiness?: () => void;
+  isCreatingBusiness?: boolean;
 }
 
 const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
@@ -24,15 +29,25 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
   className = "",
   salary,
   role,
-  timePeriod
+  timePeriod,
+  showAddForm: externalShowAddForm = false,
+  newBusinessAddress: externalAddress = "",
+  onAddressChange,
+  onCreateBusiness: externalCreateBusiness,
+  isCreatingBusiness: externalIsCreating = false
 }) => {
   const { businesses, setBusinesses } = useBusinessesData();
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newBusinessAddress, setNewBusinessAddress] = useState('');
-  const [isCreatingBusiness, setIsCreatingBusiness] = useState(false);
+  const [internalShowAddForm, setInternalShowAddForm] = useState(false);
+  const [internalAddress, setInternalAddress] = useState('');
+  const [internalIsCreating, setInternalIsCreating] = useState(false);
   const { toast } = useToast();
+  
+  // Use external props if provided, otherwise use internal state
+  const showAddForm = externalShowAddForm || internalShowAddForm;
+  const newBusinessAddress = externalAddress || internalAddress;
+  const isCreatingBusiness = externalIsCreating || internalIsCreating;
   
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -41,7 +56,7 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowDropdown(false);
-        setShowAddForm(false);
+        setInternalShowAddForm(false);
       }
     };
 
@@ -55,7 +70,7 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
     if (inputValue.length === 0) {
       setSearchResults([]);
       setShowDropdown(false);
-      setShowAddForm(false);
+      setInternalShowAddForm(false);
       return;
     }
 
@@ -63,34 +78,35 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
       const { filteredBusinesses } = searchBusinesses(businesses, inputValue);
       setSearchResults(filteredBusinesses.slice(0, 5));
       setShowDropdown(true);
-      setShowAddForm(false);
+      setInternalShowAddForm(false);
     } else {
       setSearchResults([]);
       setShowDropdown(false);
-      setShowAddForm(false);
+      setInternalShowAddForm(false);
     }
   };
 
   const handleBusinessSelect = (business: any) => {
     onChange(business.name, business.formatted_address || business.vicinity || business.name);
     setShowDropdown(false);
-    setShowAddForm(false);
+    setInternalShowAddForm(false);
   };
 
   const handleInputBlur = () => {
     // Delay blur to allow dropdown clicks
     setTimeout(() => {
       if (value && !businesses.find(b => b.name.toLowerCase() === value.toLowerCase())) {
-        // Business doesn't exist, show add form
-        setShowAddForm(true);
+        // Business doesn't exist - don't auto-show form, let parent handle it
         setShowDropdown(false);
       } else {
         setShowDropdown(false);
-        setShowAddForm(false);
+        setInternalShowAddForm(false);
       }
       onBlur?.();
     }, 150);
   };
+
+  const businessNotFound = value && !businesses.find(b => b.name.toLowerCase() === value.toLowerCase()) && searchResults.length === 0;
 
   const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
     try {
@@ -113,6 +129,11 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
   };
 
   const handleCreateBusiness = async () => {
+    if (externalCreateBusiness) {
+      externalCreateBusiness();
+      return;
+    }
+
     if (!newBusinessAddress.trim()) {
       toast({
         title: "Address required",
@@ -140,7 +161,7 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
       return;
     }
 
-    setIsCreatingBusiness(true);
+    setInternalIsCreating(true);
 
     try {
       // Geocode the address
@@ -181,8 +202,8 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
         description: "New business has been added to the map",
       });
 
-      setShowAddForm(false);
-      setNewBusinessAddress('');
+      setInternalShowAddForm(false);
+      setInternalAddress('');
     } catch (error) {
       console.error('Error creating business:', error);
       toast({
@@ -191,7 +212,15 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
         variant: "destructive"
       });
     } finally {
-      setIsCreatingBusiness(false);
+      setInternalIsCreating(false);
+    }
+  };
+
+  const handleAddressChange = (address: string) => {
+    if (onAddressChange) {
+      onAddressChange(address);
+    } else {
+      setInternalAddress(address);
     }
   };
 
@@ -212,10 +241,12 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
         className={className}
       />
       
-      {/* Tiny text bottom left */}
-      <div className="absolute -bottom-5 left-0 text-xs text-muted-foreground">
-        Search existing businesses
-      </div>
+      {/* Tiny text bottom left - only show when business not found */}
+      {businessNotFound && (
+        <div className="absolute -bottom-5 left-0 text-xs text-muted-foreground">
+          Business not found - fill address below
+        </div>
+      )}
 
       {/* Search Results Dropdown */}
       {showDropdown && searchResults.length > 0 && (
@@ -245,37 +276,6 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
         </div>
       )}
 
-      {/* Add New Business Form */}
-      {showAddForm && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-50 p-3">
-          <div className="text-sm font-medium mb-2">Add "{value}" as a new business</div>
-          <input
-            type="text"
-            value={newBusinessAddress}
-            onChange={(e) => setNewBusinessAddress(e.target.value)}
-            placeholder="Enter business address..."
-            className="w-full px-3 py-2 border border-border rounded-md text-sm mb-2"
-          />
-          <div className="flex gap-2">
-            <button
-              onClick={handleCreateBusiness}
-              disabled={isCreatingBusiness}
-              className="px-3 py-1 bg-primary text-primary-foreground rounded text-sm disabled:opacity-50"
-            >
-              {isCreatingBusiness ? 'Adding...' : 'Add Business'}
-            </button>
-            <button
-              onClick={() => {
-                setShowAddForm(false);
-                setNewBusinessAddress('');
-              }}
-              className="px-3 py-1 border border-border rounded text-sm"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

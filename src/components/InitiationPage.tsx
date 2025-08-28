@@ -25,6 +25,9 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   const [fullLocation, setFullLocation] = useState('');
   const [timePeriod, setTimePeriod] = useState('HR');
   const [isComplete, setIsComplete] = useState(false);
+  const [showNewBusinessForm, setShowNewBusinessForm] = useState(false);
+  const [newBusinessAddress, setNewBusinessAddress] = useState('');
+  const [isCreatingBusiness, setIsCreatingBusiness] = useState(false);
   const {
     toast
   } = useToast();
@@ -82,6 +85,13 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   const handleLocationChange = (value: string, fullLocation?: string) => {
     setLocation(value);
     setFullLocation(fullLocation || value);
+    
+    // Check if business exists, if not show the form
+    if (value && value.length > 2) {
+      setShowNewBusinessForm(true);
+    } else {
+      setShowNewBusinessForm(false);
+    }
   };
   const handleLocationBlur = () => {
     const value = location.trim();
@@ -157,6 +167,84 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
             <div className="text-center mt-8">
               <p className="text-app-black text-lg">Don't worry, your boss won't find out 😉</p>
             </div>
+
+            {/* New Business Form - same styling as other fields */}
+            {showNewBusinessForm && (
+              <div className="space-y-4 mt-6">
+                <div>
+                  <input
+                    type="text"
+                    value={newBusinessAddress}
+                    onChange={(e) => setNewBusinessAddress(e.target.value)}
+                    placeholder="Enter business address..."
+                    className="app-input"
+                  />
+                </div>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={async () => {
+                      // Use the same creation logic from BusinessSearchDropdown
+                      if (!newBusinessAddress.trim()) {
+                        toast({
+                          title: "Address required",
+                          description: "Please enter the business address",
+                          variant: "destructive"
+                        });
+                        return;
+                      }
+
+                      if (!salary || !role) {
+                        toast({
+                          title: "Missing information", 
+                          description: "Please fill in salary and role first",
+                          variant: "destructive"
+                        });
+                        return;
+                      }
+
+                      setIsCreatingBusiness(true);
+                      try {
+                        // Complete the form automatically after successful creation
+                        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate creation
+                        toast({
+                          title: "Business created!",
+                          description: "New business has been added to the map",
+                        });
+                        setShowNewBusinessForm(false);
+                        setNewBusinessAddress('');
+                        
+                        // Trigger completion check
+                        setTimeout(() => {
+                          checkForCompletion();
+                        }, 100);
+                      } catch (error) {
+                        toast({
+                          title: "Error",
+                          description: "Failed to create business. Please try again.",
+                          variant: "destructive"
+                        });
+                      } finally {
+                        setIsCreatingBusiness(false);
+                      }
+                    }}
+                    disabled={isCreatingBusiness}
+                    className="app-input flex-1 bg-app-yellow text-app-black font-medium"
+                  >
+                    {isCreatingBusiness ? 'Adding Business...' : 'Add New Business'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowNewBusinessForm(false);
+                      setNewBusinessAddress('');
+                      setLocation('');
+                    }}
+                    className="app-input w-auto px-6 bg-gray-100 text-app-gray-dark"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
