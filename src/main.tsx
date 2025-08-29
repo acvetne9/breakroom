@@ -6,8 +6,7 @@ import './index.css'
 // Register service worker to normalize .pbf headers on the fly
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    const scope = '/data/tiles/';
-    navigator.serviceWorker.register('/tiles-sw.js', { scope })
+    navigator.serviceWorker.register('/data/tiles/tiles-sw.js')
       .then(reg => console.log('🧩 Service worker registered for tiles:', reg.scope))
       .catch(err => console.log('🧩 Service worker registration failed:', err));
   });
