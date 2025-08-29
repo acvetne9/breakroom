@@ -235,88 +235,124 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.error('🚨 Map error:', e.error);
     });
     
-    // Enhanced tile loading debug
+    // Enhanced tile loading debug with comprehensive diagnostics
     mapInstance.on('sourcedata', e => {
       if (e.sourceId === 'nyc-tiles') {
         console.log('🔄 NYC tiles event:', e.isSourceLoaded ? 'LOADED' : 'LOADING', e.dataType, e);
         
-        if ((((e as any).dataType === 'tile') || (((e as any).dataType === 'source') && mapInstance.isSourceLoaded('nyc-tiles')))) {
-          if (
-            layersAddedRef.current ||
-            mapInstance.getLayer('examplepoints-line') ||
-            mapInstance.getLayer('examplepoints-labels') ||
-            mapInstance.getLayer('roads-layer') ||
-            mapInstance.getLayer('parks-layer') ||
-            mapInstance.getLayer('water-layer')
-          ) {
-            console.log('ℹ️ Layers already present, skipping add.');
+        // Log tile-specific events for detailed debugging
+        if ((e as any).dataType === 'tile') {
+          const coord = (e as any).coord;
+          console.log(`📍 Tile loaded: ${coord ? `${coord.z}/${coord.x}/${coord.y}` : 'unknown'}`);
+          
+          // Immediately query this specific tile's features
+          setTimeout(() => {
+            try {
+              const allFeatures = mapInstance.querySourceFeatures('nyc-tiles');
+              const sourceLayers = Array.from(new Set(allFeatures.map((f: any) => f.sourceLayer)));
+              console.log(`🔍 After tile load - Features: ${allFeatures.length}, Source-layers: [${sourceLayers.join(', ')}]`);
+              
+              if (allFeatures.length > 0) {
+                console.log('📋 Sample feature:', JSON.stringify(allFeatures[0], null, 2));
+              }
+            } catch (err) {
+              console.warn('⚠️ Error querying features after tile load:', err);
+            }
+          }, 100);
+        }
+        
+        // Try adding layers on any significant event
+        if ((e as any).dataType === 'tile' || ((e as any).dataType === 'source' && mapInstance.isSourceLoaded('nyc-tiles'))) {
+          if (layersAddedRef.current) {
+            console.log('ℹ️ Layers already added, skipping.');
             return;
           }
-          console.log('✅ NYC tiles source fully loaded - adding layers');
+          
+          console.log('🎯 Attempting to add layers...');
           
           try {
-            // Inspect available source-layers for debugging
-            const features = mapInstance.querySourceFeatures('nyc-tiles');
-            const sourceLayers = Array.from(new Set(features.map((f: any) => f.sourceLayer)));
-            console.log('🔎 Available source-layers in tiles:', sourceLayers);
-            if (!sourceLayers.length) {
-              console.warn('⏳ No source-layers visible yet (tile not fully parsed). Waiting for next tile event…');
-              return;
-            }
-            const detectedLayer = sourceLayers.includes('examplepoints') ? 'examplepoints' : sourceLayers[0];
-            console.log('🧭 Using source-layer:', detectedLayer);
+            // Multiple query attempts with delays to catch async tile parsing
+            const queryAttempts = [0, 200, 500, 1000];
             
-            // Defensive cleanup in case of partial state
-            ['examplepoints-line', 'examplepoints-labels', 'water-layer', 'parks-layer', 'roads-layer', 'debug-all-features'].forEach(id => {
-              if (mapInstance.getLayer(id)) {
-                console.log('🗑️ Removing existing layer:', id);
-                mapInstance.removeLayer(id);
-              }
+            queryAttempts.forEach((delay, index) => {
+              setTimeout(() => {
+                try {
+                  const features = mapInstance.querySourceFeatures('nyc-tiles');
+                  const sourceLayers = Array.from(new Set(features.map((f: any) => f.sourceLayer)));
+                  
+                  console.log(`🔍 Query attempt ${index + 1} (${delay}ms delay): ${features.length} features, source-layers: [${sourceLayers.join(', ')}]`);
+                  
+                  if (sourceLayers.length > 0 && !layersAddedRef.current) {
+                    const detectedLayer = sourceLayers[0];
+                    console.log('🧭 Detected layer:', detectedLayer, 'from', sourceLayers);
+                    
+                    // Add a simple polygon layer first to test visibility
+                    try {
+                      mapInstance.addLayer({
+                        id: 'nyc-polygons',
+                        type: 'fill',
+                        source: 'nyc-tiles',
+                        'source-layer': detectedLayer,
+                        paint: {
+                          'fill-color': '#0B7285',
+                          'fill-opacity': 0.3
+                        },
+                        filter: ['==', ['geometry-type'], 'Polygon']
+                      });
+                      console.log('✅ Added polygon layer');
+                    } catch (polygonErr) {
+                      console.warn('⚠️ Polygon layer failed:', polygonErr);
+                    }
+                    
+                    // Add line layer
+                    try {
+                      mapInstance.addLayer({
+                        id: 'nyc-lines',
+                        type: 'line',
+                        source: 'nyc-tiles',
+                        'source-layer': detectedLayer,
+                        paint: {
+                          'line-color': '#FF6B35',
+                          'line-width': 2,
+                          'line-opacity': 0.8
+                        },
+                        filter: ['==', ['geometry-type'], 'LineString']
+                      });
+                      console.log('✅ Added line layer');
+                    } catch (lineErr) {
+                      console.warn('⚠️ Line layer failed:', lineErr);
+                    }
+                    
+                    // Add point layer
+                    try {
+                      mapInstance.addLayer({
+                        id: 'nyc-points',
+                        type: 'circle',
+                        source: 'nyc-tiles',
+                        'source-layer': detectedLayer,
+                        paint: {
+                          'circle-color': '#FF0000',
+                          'circle-radius': 4,
+                          'circle-opacity': 0.8
+                        },
+                        filter: ['==', ['geometry-type'], 'Point']
+                      });
+                      console.log('✅ Added point layer');
+                    } catch (pointErr) {
+                      console.warn('⚠️ Point layer failed:', pointErr);
+                    }
+                    
+                    layersAddedRef.current = true;
+                    console.log('🎉 NYC layers added successfully!');
+                  }
+                } catch (queryErr) {
+                  console.warn(`⚠️ Query attempt ${index + 1} failed:`, queryErr);
+                }
+              }, delay);
             });
-            
-            // Render detected vector layer as line
-            mapInstance.addLayer({
-              id: 'examplepoints-line',
-              type: 'line',
-              source: 'nyc-tiles',
-              'source-layer': detectedLayer,
-              paint: {
-                'line-color': '#0B7285',
-                'line-width': [
-                  'interpolate', ['linear'], ['zoom'],
-                  10, 0.5,
-                  14, 1.5,
-                  16, 3
-                ],
-                'line-opacity': 0.9
-              }
-            });
-            console.log('✅ Added line layer for', detectedLayer);
-            
-            // Optional labels from "name" attribute
-            mapInstance.addLayer({
-              id: 'examplepoints-labels',
-              type: 'symbol',
-              source: 'nyc-tiles',
-              'source-layer': detectedLayer,
-              layout: {
-                'text-field': ['coalesce', ['get', 'name'], ''],
-                'text-size': 11,
-                'symbol-placement': 'line'
-              },
-              paint: {
-                'text-color': '#0B7285',
-                'text-halo-color': '#FFFFFF',
-                'text-halo-width': 1
-              }
-            });
-            console.log('✅ Added labels for', detectedLayer);
-            
-            layersAddedRef.current = true;
-            console.log('🎉 All NYC tile layers added successfully!');
             
           } catch (error) {
-            console.error('🚨 Error adding tile layers:', error);
+            console.error('🚨 Error in layer addition process:', error);
           }
         }
       }
