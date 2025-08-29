@@ -159,7 +159,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       sources: {
         'nyc-tiles': {
           type: 'vector' as const,
-          tiles: [`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`],
+          tiles: ['/data/tiles/{z}/{x}/{y}.pbf'],
           minzoom: 10,
           maxzoom: 16
         }
