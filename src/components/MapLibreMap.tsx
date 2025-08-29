@@ -259,6 +259,54 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           console.log('🎯 Attempting to add layers...');
           
           try {
+            // NEW: Immediately try adding layers with known source-layer to trigger tile loading
+            if (!layersAddedRef.current) {
+              try {
+                mapInstance.addLayer({
+                  id: 'examplepoints-line',
+                  type: 'line',
+                  source: 'nyc-tiles',
+                  'source-layer': 'examplepoints',
+                  paint: {
+                    'line-color': '#0B7285',
+                    'line-width': [
+                      'interpolate', ['linear'], ['zoom'],
+                      10, 0.5,
+                      14, 1.5,
+                      16, 3
+                    ],
+                    'line-opacity': 0.9
+                  }
+                });
+                console.log('✅ Pre-added examplepoints line layer to initiate tile loads');
+              } catch (preLineErr) {
+                console.warn('⚠️ Pre-add line failed (may be fine if layer name differs):', preLineErr);
+              }
+              
+              try {
+                mapInstance.addLayer({
+                  id: 'examplepoints-labels',
+                  type: 'symbol',
+                  source: 'nyc-tiles',
+                  'source-layer': 'examplepoints',
+                  layout: {
+                    'text-field': ['coalesce', ['get', 'name'], ''],
+                    'text-size': 11,
+                    'symbol-placement': 'line'
+                  },
+                  paint: {
+                    'text-color': '#0B7285',
+                    'text-halo-color': '#FFFFFF',
+                    'text-halo-width': 1
+                  }
+                });
+                console.log('✅ Pre-added examplepoints labels');
+              } catch (preLabelErr) {
+                console.warn('⚠️ Pre-add labels failed (may be fine if layer name differs):', preLabelErr);
+              }
+              console.log('🧪 Pre-added layers using known layer name to trigger vector tile loading');
+            }
+            
             // Multiple query attempts with delays to catch async tile parsing
             const queryAttempts = [0, 200, 500, 1000];
             
