@@ -139,7 +139,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     (window as any).__MAP_FEATURES_PROCESSED__ = true; // prevent duplicate runs across mounts
     setIsProcessing(true);
     
-    console.log('🎉 Map processing completed - OpenStreetMap already initialized');
+    console.log('🎉 Custom NYC vector tiles loaded successfully');
     setIsProcessing(false);
   }, [map, mapLoaded, isMobile]); // Removed dependencies that could cause re-runs
 
@@ -157,19 +157,58 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const baseStyle = {
       version: 8 as const,
       sources: {
-        'osm': {
-          type: 'raster' as const,
-          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-          tileSize: 256,
-          attribution: '© OpenStreetMap contributors'
+        'nyc-tiles': {
+          type: 'vector' as const,
+          tiles: [`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`],
+          minzoom: 10,
+          maxzoom: 16
         }
       },
       glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
       layers: [
         {
-          id: 'osm',
-          type: 'raster' as const,
-          source: 'osm'
+          id: 'background',
+          type: 'background' as const,
+          paint: { 'background-color': '#B3E5FC' }
+        },
+        {
+          id: 'water',
+          type: 'fill' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'examplepoints',
+          filter: ['has', 'water'] as any,
+          paint: {
+            'fill-color': '#4FC3F7',
+            'fill-opacity': 0.8
+          }
+        },
+        {
+          id: 'parks',
+          type: 'fill' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'examplepoints',
+          filter: ['has', 'leisure'] as any,
+          paint: {
+            'fill-color': '#66BB6A',
+            'fill-opacity': 0.6
+          }
+        },
+        {
+          id: 'roads',
+          type: 'line' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'examplepoints',
+          filter: ['has', 'highway'] as any,
+          paint: {
+            'line-color': '#424242',
+            'line-width': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              10, 0.5,
+              16, 2
+            ] as any
+          }
         }
       ]
     };
