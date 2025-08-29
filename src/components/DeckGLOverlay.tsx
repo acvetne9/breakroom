@@ -58,7 +58,7 @@ export const DeckGLOverlay: React.FC<DeckGLOverlayProps> = ({
       return [createBusinessClusterLayer(businesses, onBusinessClick, map)];
     }
     
-    const shouldCluster = enableClustering && (businesses.length > 1000 || zoom < 13);
+    const shouldCluster = enableClustering && (businesses.length > 5000 || zoom < 11);
     
     console.log(`🎯 Creating ${shouldCluster ? 'clustered' : 'scatter'} layer for ${businesses.length} businesses at zoom ${zoom}`);
     
