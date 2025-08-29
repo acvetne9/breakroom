@@ -82,20 +82,18 @@ export const DeckGLOverlay: React.FC<DeckGLOverlayProps> = ({
       clearTimeout(overlayUpdateTimeout);
     }
 
-    // Smooth update with fade transitions
-    overlayUpdateTimeout = setTimeout(() => {
-      overlay.setProps({ 
-        layers
-      });
-      console.log(`🎯 Updated deck.gl with ${layers.length} layers (${businesses.length} businesses)`);
-    }, 50); // Reduced timeout for faster rendering
+    // Direct update without timeout to prevent loops
+    overlay.setProps({ 
+      layers
+    });
+    console.log(`🎯 Updated deck.gl with ${layers.length} layers`);
 
     return () => {
       if (overlayUpdateTimeout) {
         clearTimeout(overlayUpdateTimeout);
       }
     };
-  }, [overlay, overlayReady, layers, businesses.length]);
+  }, [overlay, overlayReady, layers]);
 
   // Cleanup
   useEffect(() => {
