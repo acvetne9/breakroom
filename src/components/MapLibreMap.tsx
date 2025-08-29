@@ -3,6 +3,7 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useViewportMapData } from '../hooks/useViewportMapData';
 import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
+import { useVectorTileData } from '../hooks/useVectorTileData';
 import { useIsMobile } from '../hooks/use-mobile';
 import { DeckGLOverlay } from './DeckGLOverlay';
 import { 
@@ -63,6 +64,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     fetchFullBusinessDetails,
     clusterBusinesses 
   } = useViewportBusinesses();
+  const { 
+    isProcessing: vectorTilesProcessing, 
+    addVectorTileSources, 
+    addVectorTileLayers 
+  } = useVectorTileData();
   const processedRef = useRef(false);
   const [deckGLViewState, setDeckGLViewState] = useState<any>(null);
   const [clusteredBusinesses, setClusteredBusinesses] = useState<any[]>([]);
@@ -166,108 +172,120 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return;
     }
     
-    console.log(`🗺️ Loading map data ${isMobile ? '(mobile-lite mode)' : '(full desktop mode)'}...`);
+    console.log(`🗺️ Loading vector tiles (much more memory efficient!)...`);
     processedRef.current = true; // prevent duplicate runs in this mount
     (window as any).__MAP_FEATURES_PROCESSED__ = true; // prevent duplicate runs across mounts
     setIsProcessing(true);
     
     try {
-      const { features, landData } = await loadAllDataCenterOut();
-      console.log('📦 Received data from loadAllDataCenterOut:', {
-        featuresCount: features?.length || 0,
-        landDataExists: !!landData,
-        landFeatureCount: landData?.features?.length || 0,
-        isMobile
-      });
-
-      // Add land layer first
-      if (landData) {
-        console.log(`🏞️ Adding land layer (${landData.features?.length} features)...`);
-        addLandLayer(map, landData);
-        console.log('✅ Land layer added');
+      // Add vector tile sources and layers instead of loading large GeoJSON files
+      console.log('📦 Adding vector tile sources...');
+      const sourcesAdded = await addVectorTileSources(map);
+      
+      if (sourcesAdded) {
+        console.log('🎨 Adding vector tile layers...');
+        addVectorTileLayers(map);
+        console.log('✅ Vector tiles setup completed - much more memory efficient!');
       } else {
-        console.log('⚠️ No land data available - this will cause visibility issues!');
-      }
+        console.log('⚠️ Falling back to GeoJSON loading...');
+        // Fallback to original GeoJSON loading if vector tiles fail
+        const { features, landData } = await loadAllDataCenterOut();
+        console.log('📦 Received data from loadAllDataCenterOut:', {
+          featuresCount: features?.length || 0,
+          landDataExists: !!landData,
+          landFeatureCount: landData?.features?.length || 0,
+          isMobile
+        });
 
-      if (features?.length) {
-        console.log(`📍 Processing ${features.length} main features...`);
-        // Create feature collection for processing
-        const mainData = {
-          type: 'FeatureCollection' as const,
-          features
-        };
-
-        if (isMobile) {
-          // Mobile mode: Load all features with chunked roads
-          console.log('📱 Mobile mode: Loading all features with chunked road loading');
-          const parkFeatures = extractParkFeatures(mainData);
-          const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
-          const waterFeatures = extractWaterFeatures(mainData, parkFeatureIds);
-          const roadFeatures = extractRoadFeatures(mainData);
-          const waterwayFeatures = extractWaterwayFeatures(mainData);
-
-          console.log(`🎯 Mobile extracted features:
-            - Parks: ${parkFeatures.length}
-            - Water: ${waterFeatures.length} 
-            - Roads: ${roadFeatures.length} (will load in chunks)
-            - Waterways: ${waterwayFeatures.length}`);
-
-          // Add non-road layers first
-          console.log('🎨 Adding non-road layers...');
-          addParksLayer(map, parkFeatures);
-          console.log(`✅ Parks layer added (${parkFeatures.length} features)`);
-          addWaterLayer(map, waterFeatures);
-          console.log(`✅ Water layer added (${waterFeatures.length} features)`);
-          addWaterwaysLayer(map, waterwayFeatures);
-          console.log(`✅ Waterways layer added (${waterwayFeatures.length} features)`);
-          
-          // Load roads in chunks to prevent memory crash
-          console.log('🛣️ Starting chunked road loading...');
-          await addRoadsLayerChunked(map, roadFeatures, true);
-          console.log(`✅ All roads loaded via chunking (${roadFeatures.length} features)`);
+        // Add land layer first
+        if (landData) {
+          console.log(`🏞️ Adding land layer (${landData.features?.length} features)...`);
+          addLandLayer(map, landData);
+          console.log('✅ Land layer added');
         } else {
-          // Desktop mode: Load all features
-          console.log('🖥️ Desktop mode: Loading all features');
-          const parkFeatures = extractParkFeatures(mainData);
-          const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
-          const waterFeatures = extractWaterFeatures(mainData, parkFeatureIds);
-          const roadFeatures = extractRoadFeatures(mainData);
-          const waterwayFeatures = extractWaterwayFeatures(mainData);
-
-          console.log(`🎯 Desktop extracted features:
-            - Parks: ${parkFeatures.length}
-            - Water: ${waterFeatures.length} 
-            - Roads: ${roadFeatures.length}
-            - Waterways: ${waterwayFeatures.length}`);
-
-          // Add all layers for desktop
-          console.log('🎨 Adding all desktop layers...');
-          addParksLayer(map, parkFeatures);
-          console.log(`✅ Parks layer added (${parkFeatures.length} features)`);
-          addWaterLayer(map, waterFeatures);
-          console.log(`✅ Water layer added (${waterFeatures.length} features)`);
-          addWaterwaysLayer(map, waterwayFeatures);
-          console.log(`✅ Waterways layer added (${waterwayFeatures.length} features)`);
-          addRoadsLayer(map, roadFeatures);
-          console.log(`✅ Roads layer added (${roadFeatures.length} features)`);
+          console.log('⚠️ No land data available - this will cause visibility issues!');
         }
 
-        // Ensure proper layer ordering
-        ensureLayerOrder(map);
-        console.log('✅ Layer ordering ensured');
-        
-        // Log current map layers
-        const mapLayers = map.getStyle().layers || [];
-        console.log('🗺️ Current map layers:', mapLayers.map(l => `${l.id} (${l.type})`));
-        
-        // Check if map is in correct bounds
-        const bounds = map.getBounds();
-        const center = map.getCenter();
-        console.log('🎯 Map bounds:', bounds.toArray());
-        console.log('🎯 Map center:', [center.lng, center.lat]);
-        console.log('🎯 Map zoom:', map.getZoom());
-      } else {
-        console.log('⚠️ No main features to process');
+        if (features?.length) {
+          console.log(`📍 Processing ${features.length} main features...`);
+          // Create feature collection for processing
+          const mainData = {
+            type: 'FeatureCollection' as const,
+            features
+          };
+
+          if (isMobile) {
+            // Mobile mode: Load all features with chunked roads
+            console.log('📱 Mobile mode: Loading all features with chunked road loading');
+            const parkFeatures = extractParkFeatures(mainData);
+            const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
+            const waterFeatures = extractWaterFeatures(mainData, parkFeatureIds);
+            const roadFeatures = extractRoadFeatures(mainData);
+            const waterwayFeatures = extractWaterwayFeatures(mainData);
+
+            console.log(`🎯 Mobile extracted features:
+              - Parks: ${parkFeatures.length}
+              - Water: ${waterFeatures.length} 
+              - Roads: ${roadFeatures.length} (will load in chunks)
+              - Waterways: ${waterwayFeatures.length}`);
+
+            // Add non-road layers first
+            console.log('🎨 Adding non-road layers...');
+            addParksLayer(map, parkFeatures);
+            console.log(`✅ Parks layer added (${parkFeatures.length} features)`);
+            addWaterLayer(map, waterFeatures);
+            console.log(`✅ Water layer added (${waterFeatures.length} features)`);
+            addWaterwaysLayer(map, waterwayFeatures);
+            console.log(`✅ Waterways layer added (${waterwayFeatures.length} features)`);
+            
+            // Load roads in chunks to prevent memory crash
+            console.log('🛣️ Starting chunked road loading...');
+            await addRoadsLayerChunked(map, roadFeatures, true);
+            console.log(`✅ All roads loaded via chunking (${roadFeatures.length} features)`);
+          } else {
+            // Desktop mode: Load all features
+            console.log('🖥️ Desktop mode: Loading all features');
+            const parkFeatures = extractParkFeatures(mainData);
+            const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
+            const waterFeatures = extractWaterFeatures(mainData, parkFeatureIds);
+            const roadFeatures = extractRoadFeatures(mainData);
+            const waterwayFeatures = extractWaterwayFeatures(mainData);
+
+            console.log(`🎯 Desktop extracted features:
+              - Parks: ${parkFeatures.length}
+              - Water: ${waterFeatures.length} 
+              - Roads: ${roadFeatures.length}
+              - Waterways: ${waterwayFeatures.length}`);
+
+            // Add all layers for desktop
+            console.log('🎨 Adding all desktop layers...');
+            addParksLayer(map, parkFeatures);
+            console.log(`✅ Parks layer added (${parkFeatures.length} features)`);
+            addWaterLayer(map, waterFeatures);
+            console.log(`✅ Water layer added (${waterFeatures.length} features)`);
+            addWaterwaysLayer(map, waterwayFeatures);
+            console.log(`✅ Waterways layer added (${waterwayFeatures.length} features)`);
+            addRoadsLayer(map, roadFeatures);
+            console.log(`✅ Roads layer added (${roadFeatures.length} features)`);
+          }
+
+          // Ensure proper layer ordering
+          ensureLayerOrder(map);
+          console.log('✅ Layer ordering ensured');
+          
+          // Log current map layers
+          const mapLayers = map.getStyle().layers || [];
+          console.log('🗺️ Current map layers:', mapLayers.map(l => `${l.id} (${l.type})`));
+          
+          // Check if map is in correct bounds
+          const bounds = map.getBounds();
+          const center = map.getCenter();
+          console.log('🎯 Map bounds:', bounds.toArray());
+          console.log('🎯 Map center:', [center.lng, center.lat]);
+          console.log('🎯 Map zoom:', map.getZoom());
+        } else {
+          console.log('⚠️ No main features to process');
+        }
       }
       
       console.log('🎉 Map processing completed successfully');
