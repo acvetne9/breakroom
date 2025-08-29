@@ -140,78 +140,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     setIsProcessing(true);
     
     try {
-      // Add vector tile source for pre-built tiles
-      if (!map.getSource('vector-tiles')) {
-        map.addSource('vector-tiles', {
-          type: 'vector',
-          tiles: [window.location.origin + '/data/tiles/{z}/{x}/{y}.pbf'],
-          minzoom: 10,
-          maxzoom: 16
+      // Use a simple OpenStreetMap style instead of custom vector tiles
+      if (!map.getStyle().sources['osm']) {
+        map.setStyle({
+          version: 8,
+          sources: {
+            'osm': {
+              type: 'raster',
+              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+              tileSize: 256,
+              attribution: '© OpenStreetMap contributors'
+            }
+          },
+          layers: [
+            {
+              id: 'osm',
+              type: 'raster',
+              source: 'osm'
+            }
+          ]
         });
-        console.log('✅ Vector tile source added');
-        
-        // Add actual map layers from vector tiles
-        const layers = [
-          {
-            id: 'water',
-            type: 'fill' as const,
-            source: 'vector-tiles',
-            'source-layer': 'water',
-            paint: {
-              'fill-color': '#4FC3F7',
-              'fill-opacity': 0.8
-            }
-          },
-          {
-            id: 'parks',
-            type: 'fill' as const,
-            source: 'vector-tiles',
-            'source-layer': 'parks',
-            paint: {
-              'fill-color': '#81C784',
-              'fill-opacity': 0.6
-            }
-          },
-          {
-            id: 'waterways',
-            type: 'line' as const,
-            source: 'vector-tiles',
-            'source-layer': 'waterways',
-            paint: {
-              'line-color': '#42A5F5',
-              'line-width': 2
-            }
-          },
-          {
-            id: 'roads',
-            type: 'line' as const,
-            source: 'vector-tiles',
-            'source-layer': 'roads',
-            paint: {
-              'line-color': '#666666',
-              'line-width': 1
-            }
-          }
-        ];
-        
-        // Add layers in order
-        layers.forEach(layer => {
-          if (!map.getLayer(layer.id)) {
-            map.addLayer(layer);
-            console.log(`✅ Added ${layer.id} layer`);
-          }
-        });
-      }
-
-      // Load GeoJSON data for land layer (keeping this simple)
-      console.log('🗺️ Loading land data...');
-      const { landData } = await loadAllDataCenterOut();
-      
-      // Add land layer first (always use GeoJSON for land for simplicity)
-      if (landData) {
-        console.log(`🏞️ Adding land layer (${landData.features?.length} features)...`);
-        addLandLayer(map, landData);
-        console.log('✅ Land layer added');
+        console.log('✅ OpenStreetMap style applied');
       }
       
       console.log('🎉 Map processing completed successfully');

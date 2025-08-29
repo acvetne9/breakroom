@@ -48,7 +48,7 @@ export const DeckGLOverlay: React.FC<DeckGLOverlayProps> = ({
     return newOverlay;
   }, [map]);
 
-  // Optimized layer creation
+  // Optimized layer creation - removed map dependency to prevent infinite loops
   const layers = useMemo(() => {
     if (!businesses.length) return [];
     
@@ -71,7 +71,7 @@ export const DeckGLOverlay: React.FC<DeckGLOverlayProps> = ({
         onBusinessClick,
       })];
     }
-  }, [businesses, selectedBusinessId, onBusinessClick, enableClustering, isClusteredData, zoom, map]);
+  }, [businesses, selectedBusinessId, onBusinessClick, enableClustering, isClusteredData, zoom]); // Removed map dependency
 
   // Smooth layer updates with improved transitions
   useEffect(() => {
@@ -88,7 +88,7 @@ export const DeckGLOverlay: React.FC<DeckGLOverlayProps> = ({
         layers
       });
       console.log(`🎯 Updated deck.gl with ${layers.length} layers (${businesses.length} businesses)`);
-    }, 100); // Slightly longer delay for smoother transitions
+    }, 50); // Reduced timeout for faster rendering
 
     return () => {
       if (overlayUpdateTimeout) {
