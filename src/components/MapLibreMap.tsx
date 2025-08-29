@@ -152,6 +152,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           maxzoom: 16,
           // Add scheme to handle potential encoding issues
           scheme: 'xyz' as const
+        },
+        // Fallback raster basemap so the map is visible even if vector layer detection is delayed
+        'osm-tiles': {
+          type: 'raster' as const,
+          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+          tileSize: 256,
+          attribution: '© OpenStreetMap contributors'
         }
       },
       glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
@@ -160,6 +167,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             id: 'background',
             type: 'background' as const,
             paint: { 'background-color': '#B3E5FC' }
+          },
+          {
+            id: 'osm-base',
+            type: 'raster' as const,
+            source: 'osm-tiles'
           }
           // Removed hardcoded layers - will add dynamically based on actual tile content
         ]
