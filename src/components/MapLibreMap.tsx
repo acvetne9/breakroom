@@ -66,6 +66,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   } = useViewportBusinesses();
   const processedRef = useRef(false);
   const [currentZoom, setCurrentZoom] = useState(12);
+  const layersAddedRef = useRef(false);
 
   // Enhanced business click handler with viewport integration
   const handleBusinessClick = useCallback(async (business: any) => {
@@ -138,12 +139,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     let mapInstance: maplibregl.Map | null = null;
     let cleanedUp = false;
 
+    const absoluteTilesUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+    console.log('🧭 Using tiles URL:', absoluteTilesUrl);
+
     const baseStyle = {
       version: 8 as const,
       sources: {
         'nyc-tiles': {
           type: 'vector' as const,
-          tiles: ['/data/tiles/{z}/{x}/{y}.pbf'],
+          tiles: [absoluteTilesUrl],
           minzoom: 10,
           maxzoom: 16
         }
@@ -199,61 +203,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           console.error('🚨 Tile access failed:', error);
         });
       
-      // Add proper layers for the NYC tiles based on your layer structure
-      setTimeout(() => {
-        try {
-          console.log('🔧 Adding NYC tile layers: water-lines, park-lines, roads');
-          
-          // Add water lines layer
-          mapInstance.addLayer({
-            id: 'water-layer',
-            type: 'line',
-            source: 'nyc-tiles',
-            'source-layer': 'water-lines',
-            paint: {
-              'line-color': '#4A90E2',
-              'line-width': 2,
-              'line-opacity': 0.8
-            }
-          });
-          
-          // Add park lines layer  
-          mapInstance.addLayer({
-            id: 'parks-layer',
-            type: 'line',
-            source: 'nyc-tiles',
-            'source-layer': 'park-lines',
-            paint: {
-              'line-color': '#7ED321',
-              'line-width': 1,
-              'line-opacity': 0.7
-            }
-          });
-          
-          // Add roads layer
-          mapInstance.addLayer({
-            id: 'roads-layer',
-            type: 'line',
-            source: 'nyc-tiles',
-            'source-layer': 'roads',
-            paint: {
-              'line-color': '#333333',
-              'line-width': [
-                'interpolate',
-                ['linear'],
-                ['zoom'],
-                10, 0.5,
-                16, 2
-              ],
-              'line-opacity': 0.8
-            }
-          });
-          
-          console.log('✅ Added all NYC tile layers successfully');
-        } catch (error) {
-          console.error('🚨 Error adding tile layers:', error);
-        }
-      }, 1000);
+      // Defer adding layers until the source reports as fully loaded via `sourcedata`
+      console.log('⏳ Waiting for nyc-tiles source to fully load before adding layers');
       
       setMapLoaded(true);
     });
@@ -276,18 +227,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         console.log('🔄 NYC tiles event:', e.isSourceLoaded ? 'LOADED' : 'LOADING', e.dataType, e);
         
         if (e.isSourceLoaded && e.dataType === 'source') {
-          console.log('✅ NYC tiles source fully loaded - adding layers immediately');
+          if (layersAddedRef.current || mapInstance.getLayer('roads-layer') || mapInstance.getLayer('parks-layer') || mapInstance.getLayer('water-layer')) {
+            console.log('ℹ️ Layers already present, skipping add.');
+            return;
+          }
+          console.log('✅ NYC tiles source fully loaded - adding layers');
           
           // Add layers immediately when source is loaded
           try {
-            console.log('🔧 Adding NYC tile layers: water-lines, park-lines, roads');
-            
-            // Remove any existing layers first
-            const layersToRemove = ['water-layer', 'parks-layer', 'roads-layer', 'debug-all-features'];
-            layersToRemove.forEach(layerId => {
-              if (mapInstance.getLayer(layerId)) {
-                console.log('🗑️ Removing existing layer:', layerId);
-                mapInstance.removeLayer(layerId);
+            // Defensive cleanup in case of partial state
+            ['water-layer', 'parks-layer', 'roads-layer', 'debug-all-features'].forEach(id => {
+              if (mapInstance.getLayer(id)) {
+                console.log('🗑️ Removing existing layer:', id);
+                mapInstance.removeLayer(id);
               }
             });
             
@@ -339,6 +291,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             });
             console.log('✅ Added roads layer');
             
+            layersAddedRef.current = true;
             console.log('🎉 All NYC tile layers added successfully!');
             
           } catch (error) {
@@ -357,6 +310,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           mapInstance.remove();
         } catch (error) {
           console.error('Error removing map:', error);
+        } finally {
+          layersAddedRef.current = false;
         }
       }
       setMap(null);
