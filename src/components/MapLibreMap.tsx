@@ -139,39 +139,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     (window as any).__MAP_FEATURES_PROCESSED__ = true; // prevent duplicate runs across mounts
     setIsProcessing(true);
     
-    try {
-      // Use a simple OpenStreetMap style instead of custom vector tiles
-      if (!map.getStyle().sources['osm']) {
-        map.setStyle({
-          version: 8,
-          sources: {
-            'osm': {
-              type: 'raster',
-              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-              tileSize: 256,
-              attribution: '© OpenStreetMap contributors'
-            }
-          },
-          layers: [
-            {
-              id: 'osm',
-              type: 'raster',
-              source: 'osm'
-            }
-          ]
-        });
-        console.log('✅ OpenStreetMap style applied');
-      }
-      
-      console.log('🎉 Map processing completed successfully');
-    } catch (error) {
-      console.error('❌ Error processing map features:', error);
-      // On error, reset flags so user can retry
-      processedRef.current = false;
-      (window as any).__MAP_FEATURES_PROCESSED__ = false;
-    } finally {
-      setIsProcessing(false);
-    }
+    console.log('🎉 Map processing completed - OpenStreetMap already initialized');
+    setIsProcessing(false);
   }, [map, mapLoaded, isMobile]); // Removed dependencies that could cause re-runs
 
   // Initialize map
@@ -187,13 +156,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     const baseStyle = {
       version: 8 as const,
-      sources: {},
+      sources: {
+        'osm': {
+          type: 'raster' as const,
+          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+          tileSize: 256,
+          attribution: '© OpenStreetMap contributors'
+        }
+      },
       glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
-      layers: [{
-        id: 'background',
-        type: 'background' as const,
-        paint: { 'background-color': '#B3E5FC' }
-      }]
+      layers: [
+        {
+          id: 'osm',
+          type: 'raster' as const,
+          source: 'osm'
+        }
+      ]
     };
 
     try {
