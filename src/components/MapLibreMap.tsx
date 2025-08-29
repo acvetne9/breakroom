@@ -235,8 +235,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
           console.log('✅ NYC tiles source fully loaded - adding layers');
           
-          // Add layers immediately when source is loaded
           try {
+            // Inspect available source-layers for debugging
+            const features = mapInstance.querySourceFeatures('nyc-tiles');
+            const sourceLayers = Array.from(new Set(features.map((f: any) => f.sourceLayer)));
+            console.log('🔎 Available source-layers in tiles:', sourceLayers);
+            
             // Defensive cleanup in case of partial state
             ['water-layer', 'parks-layer', 'roads-layer', 'debug-all-features'].forEach(id => {
               if (mapInstance.getLayer(id)) {
@@ -245,53 +249,43 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               }
             });
             
-            // Add water lines layer
+            // Render tiles from 'examplepoints' layer in nyc.mbtiles
             mapInstance.addLayer({
-              id: 'water-layer',
+              id: 'examplepoints-line',
               type: 'line',
               source: 'nyc-tiles',
-              'source-layer': 'water-lines',
+              'source-layer': 'examplepoints',
               paint: {
-                'line-color': '#4A90E2',
-                'line-width': 3,
-                'line-opacity': 1.0
-              }
-            });
-            console.log('✅ Added water-lines layer');
-            
-            // Add park lines layer  
-            mapInstance.addLayer({
-              id: 'parks-layer',
-              type: 'line',
-              source: 'nyc-tiles',
-              'source-layer': 'park-lines',
-              paint: {
-                'line-color': '#7ED321',
-                'line-width': 2,
-                'line-opacity': 1.0
-              }
-            });
-            console.log('✅ Added park-lines layer');
-            
-            // Add roads layer
-            mapInstance.addLayer({
-              id: 'roads-layer',
-              type: 'line',
-              source: 'nyc-tiles',
-              'source-layer': 'roads',
-              paint: {
-                'line-color': '#333333',
+                'line-color': '#0B7285',
                 'line-width': [
-                  'interpolate',
-                  ['linear'],
-                  ['zoom'],
-                  10, 1,
+                  'interpolate', ['linear'], ['zoom'],
+                  10, 0.5,
+                  14, 1.5,
                   16, 3
                 ],
-                'line-opacity': 1.0
+                'line-opacity': 0.9
               }
             });
-            console.log('✅ Added roads layer');
+            console.log('✅ Added examplepoints line layer');
+            
+            // Optional labels from "name" attribute
+            mapInstance.addLayer({
+              id: 'examplepoints-labels',
+              type: 'symbol',
+              source: 'nyc-tiles',
+              'source-layer': 'examplepoints',
+              layout: {
+                'text-field': ['coalesce', ['get', 'name'], ''],
+                'text-size': 11,
+                'symbol-placement': 'line'
+              },
+              paint: {
+                'text-color': '#0B7285',
+                'text-halo-color': '#FFFFFF',
+                'text-halo-width': 1
+              }
+            });
+            console.log('✅ Added examplepoints labels');
             
             layersAddedRef.current = true;
             console.log('🎉 All NYC tile layers added successfully!');
