@@ -149,54 +149,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         }
       },
       glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
-      layers: [
-        {
-          id: 'background',
-          type: 'background' as const,
-          paint: { 'background-color': '#B3E5FC' }
-        },
-        {
-          id: 'water-lines',
-          type: 'line' as const,
-          source: 'nyc-tiles',
-          'source-layer': 'examplepoints',
-          filter: ['has', 'water'] as any,
-          paint: {
-            'line-color': '#4FC3F7',
-            'line-width': 3,
-            'line-opacity': 0.8
+        layers: [
+          {
+            id: 'background',
+            type: 'background' as const,
+            paint: { 'background-color': '#B3E5FC' }
           }
-        },
-        {
-          id: 'park-lines', 
-          type: 'line' as const,
-          source: 'nyc-tiles',
-          'source-layer': 'examplepoints',
-          filter: ['has', 'leisure'] as any,
-          paint: {
-            'line-color': '#66BB6A',
-            'line-width': 2,
-            'line-opacity': 0.6
-          }
-        },
-        {
-          id: 'roads',
-          type: 'line' as const,
-          source: 'nyc-tiles',
-          'source-layer': 'examplepoints',
-          filter: ['has', 'highway'] as any,
-          paint: {
-            'line-color': '#424242',
-            'line-width': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              10, 0.5,
-              16, 2
-            ] as any
-          }
-        }
-      ]
+          // Removed hardcoded layers - will add dynamically based on actual tile content
+        ]
     };
 
     try {
@@ -221,45 +181,76 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     mapInstance.on('load', () => {
       if (cleanedUp) return;
-      console.log('🗺️ Map loaded - .pbf tiles ready');
+      console.log('🗺️ Map loaded - starting tile debugging');
       
-      // Debug tile structure
-      setTimeout(() => {
-        const features = mapInstance.queryRenderedFeatures();
-        console.log('🔍 All rendered features:', features.length);
-        
-        if (features.length === 0) {
-          console.log('🚨 No features rendered - debugging tile structure...');
-          
-          // Try to query source features directly
-          try {
-            const sourceFeatures = mapInstance.querySourceFeatures('nyc-tiles');
-            console.log('🔍 Source features from nyc-tiles:', sourceFeatures.length);
-            
-            if (sourceFeatures.length > 0) {
-              console.log('🔍 Sample source feature:', sourceFeatures[0]);
-              console.log('🔍 Source layers found:', [...new Set(sourceFeatures.map(f => (f as any).sourceLayer))]);
-              console.log('🔍 Feature properties sample:', sourceFeatures[0]?.properties);
-            }
-          } catch (e) {
-            console.error('🚨 Error querying source features:', e);
+      // Immediate tile access test
+      fetch('/data/tiles/12/1203/1536.pbf')
+        .then(response => {
+          console.log('🔍 Tile URL test:', response.status, response.ok ? '✅' : '❌');
+          if (!response.ok) {
+            console.error('🚨 Tiles are not accessible at /data/tiles/ - check if files exist');
           }
+          return response.arrayBuffer();
+        })
+        .then(buffer => {
+          console.log('🔍 Tile size:', buffer.byteLength, 'bytes');
+        })
+        .catch(error => {
+          console.error('🚨 Tile access failed:', error);
+        });
+      
+      // Add a catch-all layer to show ANY features in the tiles
+      setTimeout(() => {
+        try {
+          // First check what source layers exist
+          const sourceFeatures = mapInstance.querySourceFeatures('nyc-tiles');
+          console.log('🔍 Source features found:', sourceFeatures.length);
           
-          // Check if tiles are loading
-          const style = mapInstance.getStyle();
-          console.log('🔍 Map style sources:', Object.keys(style.sources));
-          console.log('🔍 Map style layers:', style.layers.map(l => l.id));
-          
-          // Force tile request by panning slightly
-          const center = mapInstance.getCenter();
-          mapInstance.easeTo({
-            center: [center.lng + 0.001, center.lat + 0.001],
-            duration: 100
-          });
-        } else {
-          console.log('✅ Features are rendering successfully:', features[0]);
+          if (sourceFeatures.length > 0) {
+            const sourceLayers = [...new Set(sourceFeatures.map(f => (f as any).sourceLayer))];
+            console.log('🔍 Actual source layers in your tiles:', sourceLayers);
+            
+            const sampleFeature = sourceFeatures[0];
+            console.log('🔍 Sample feature properties:', sampleFeature.properties);
+            console.log('🔍 Sample geometry type:', sampleFeature.geometry?.type);
+            
+            // Add a catch-all layer for the first source layer found
+            if (sourceLayers.length > 0) {
+              const firstSourceLayer = sourceLayers[0];
+              console.log('🔧 Adding catch-all layer for source:', firstSourceLayer);
+              
+              // Remove existing layers first
+              const existingLayers = ['water-lines', 'park-lines', 'roads'];
+              existingLayers.forEach(layerId => {
+                if (mapInstance.getLayer(layerId)) {
+                  mapInstance.removeLayer(layerId);
+                }
+              });
+              
+              // Add a simple circle layer that shows all features
+              mapInstance.addLayer({
+                id: 'debug-all-features',
+                type: 'circle',
+                source: 'nyc-tiles',
+                'source-layer': firstSourceLayer,
+                paint: {
+                  'circle-radius': 3,
+                  'circle-color': '#ff0000',
+                  'circle-opacity': 0.8,
+                  'circle-stroke-width': 1,
+                  'circle-stroke-color': '#ffffff'
+                }
+              });
+              
+              console.log('✅ Added debug layer - you should now see red dots for all features');
+            }
+          } else {
+            console.log('🚨 No features found in tiles - checking tile URL...');
+          }
+        } catch (error) {
+          console.error('🚨 Error in tile debugging:', error);
         }
-      }, 3000);
+      }, 1000);
       
       setMapLoaded(true);
     });
