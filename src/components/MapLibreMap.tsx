@@ -2,7 +2,9 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useViewportMapData } from '../hooks/useViewportMapData';
+import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
 import { useIsMobile } from '../hooks/use-mobile';
+import { DeckGLOverlay } from './DeckGLOverlay';
 import { 
   extractParkFeatures, 
   extractWaterFeatures, 
@@ -16,7 +18,6 @@ import {
   addWaterwaysLayer,
   addRoadsLayer,
   addRoadsLayerChunked,
-  addBusinessesLayer,
   ensureLayerOrder
 } from '../utils/mapLayers';
 
@@ -44,7 +45,7 @@ interface MapLibreMapProps {
 }
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
-  businesses,
+  businesses: propBusinesses, // Rename to avoid confusion with viewport businesses
   onBusinessClick,
   selectedBusiness,
   landmarks = []
@@ -54,9 +55,100 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
-  const { isProcessing, setIsProcessing, loadAllDataCenterOut, allDataLoaded } = useViewportMapData();
-  const lastLoadedBoundsRef = useRef<string | null>(null);
+  const { isProcessing, setIsProcessing, loadAllDataCenterOut } = useViewportMapData();
+  const { 
+    businesses, 
+    loading: businessesLoading, 
+    loadBusinessesInViewport, 
+    fetchFullBusinessDetails,
+    clusterBusinesses 
+  } = useViewportBusinesses();
   const processedRef = useRef(false);
+  const [deckGLViewState, setDeckGLViewState] = useState<any>(null);
+  const [clusteredBusinesses, setClusteredBusinesses] = useState<any[]>([]);
+  const [currentZoom, setCurrentZoom] = useState(12);
+
+  // Enhanced business click handler with viewport integration
+  const handleBusinessClick = useCallback(async (business: any) => {
+    // Fetch full details if needed
+    if (!business.atmosphere?.length && !business.roles?.length) {
+      const fullBusiness = await fetchFullBusinessDetails(business.id);
+      if (fullBusiness && onBusinessClick) {
+        onBusinessClick(fullBusiness);
+      }
+    } else if (onBusinessClick) {
+      onBusinessClick(business);
+    }
+  }, [fetchFullBusinessDetails, onBusinessClick]);
+
+  // Load businesses in viewport when map moves
+  const handleViewportChange = useCallback(() => {
+    console.log('🚨 handleViewportChange CALLED!', { 
+      hasMap: !!map, 
+      mapLoaded,
+      isStyleLoaded: map?.isStyleLoaded?.()
+    });
+
+    if (!map || !mapLoaded) {
+      console.log('⚠️ handleViewportChange: map not ready', { 
+        map: !!map, 
+        mapLoaded,
+        isStyleLoaded: map?.isStyleLoaded?.()
+      });
+      return;
+    }
+
+    try {
+      console.log('📍 Getting map bounds...');
+      const bounds = map.getBounds();
+      const center = map.getCenter();
+      const zoom = map.getZoom();
+      
+      // Cache viewport calculations to avoid repeated work
+      const viewportData = {
+        north: bounds.getNorth(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        west: bounds.getWest(),
+        center,
+        zoom
+      };
+
+      console.log('🗺️ Map viewport data:', viewportData);
+      
+      const viewportBounds = {
+        north: viewportData.north,
+        south: viewportData.south,
+        east: viewportData.east,
+        west: viewportData.west
+      };
+
+      console.log('📍 Triggering business loading for viewport:', viewportBounds);
+
+      // Update deck.gl view state efficiently
+      setDeckGLViewState({
+        longitude: viewportData.center.lng,
+        latitude: viewportData.center.lat,
+        zoom: viewportData.zoom,
+        pitch: 0,
+        bearing: 0
+      });
+
+      // Load businesses with increased limits and clustering
+      const businessLimit = isMobile ? 3000 : 8000; // Increased limits
+      console.log(`🎯 About to call loadBusinessesInViewport with ${businessLimit} limit for ${isMobile ? 'mobile' : 'desktop'}...`);
+      
+      loadBusinessesInViewport(viewportBounds, businessLimit);
+      
+      // Update zoom state
+      setCurrentZoom(viewportData.zoom);
+      
+      console.log('✅ loadBusinessesInViewport called successfully');
+      
+    } catch (error) {
+      console.error('❌ Error in handleViewportChange:', error);
+    }
+  }, [map, mapLoaded, loadBusinessesInViewport, isMobile]);
 
   const processMapFeatures = useCallback(async () => {
     // Prevent duplicate processing across re-mounts (StrictMode/dev or crashes)
@@ -192,28 +284,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return;
     }
 
-    // DEBUG: Check container dimensions and visibility
-    const container = mapRef.current;
-    const computedStyle = window.getComputedStyle(container);
-    const rect = container.getBoundingClientRect();
-    
-    console.log('Map container debug info:', {
-      width: rect.width,
-      height: rect.height,
-      display: computedStyle.display,
-      visibility: computedStyle.visibility,
-      opacity: computedStyle.opacity,
-      zIndex: computedStyle.zIndex,
-      position: computedStyle.position,
-      top: computedStyle.top,
-      left: computedStyle.left,
-      transform: computedStyle.transform
-    });
-
-    if (rect.width === 0 || rect.height === 0) {
-      console.error('Map container has zero dimensions!', { width: rect.width, height: rect.height });
-    }
-
     console.log('Initializing map with container:', mapRef.current);
     let mapInstance: maplibregl.Map | null = null;
     let cleanedUp = false;
@@ -257,11 +327,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       setMapLoaded(true);
     });
 
-    // Log current zoom and center when map moves
+    // Log current zoom and center when map moves, trigger clustering
     mapInstance.on('moveend', () => {
       if (mapInstance) {
         const zoom = mapInstance.getZoom();
         const center = mapInstance.getCenter();
+        setCurrentZoom(zoom);
         console.log(`Current zoom: ${zoom.toFixed(2)} | Center: [${center.lng.toFixed(6)}, ${center.lat.toFixed(6)}]`);
       }
     });
@@ -294,17 +365,122 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.log('⏰ Calling processMapFeatures immediately');
       processMapFeatures();
     }
-  }, [mapLoaded, map, processMapFeatures]); // Only depend on map, mapLoaded, and the callback
+  }, [mapLoaded, map, processMapFeatures]);
 
-  // Remove viewport change loading since we load everything at once
-
-  // Handle business markers
+  // Setup viewport loading for businesses with aggressive triggering
   useEffect(() => {
-    if (!mapLoaded || !businesses || !map) return;
+    console.log('🚀 Business loading useEffect triggered', { 
+      hasMap: !!map, 
+      mapLoaded,
+      businessCount: businesses.length,
+      effectDeps: { map: !!map, mapLoaded, businessesLength: businesses.length }
+    });
 
-    const cleanup = addBusinessesLayer(map, businesses, selectedBusiness, onBusinessClick);
-    return cleanup;
-  }, [mapLoaded, businesses, onBusinessClick, map, selectedBusiness]);
+    if (map && mapLoaded) {
+      console.log('🔗 Setting up comprehensive business loading system - MAP AND LOADED ARE TRUE');
+      
+      // TEST: Try calling handleViewportChange immediately
+      console.log('🧪 TEST: Calling handleViewportChange immediately...');
+      try {
+        handleViewportChange();
+        console.log('🧪 TEST: handleViewportChange called successfully');
+      } catch (error) {
+        console.error('🧪 TEST: Error calling handleViewportChange:', error);
+      }
+      
+      // Immediate business loading function
+      const loadBusinessesNow = () => {
+        console.log('⚡ IMMEDIATE: Loading businesses now!');
+        handleViewportChange();
+      };
+
+      // Event handlers
+      const moveEndHandler = () => {
+        console.log('🔄 Map move/zoom ended, triggering business load...');
+        handleViewportChange();
+      };
+      
+      const loadEndHandler = () => {
+        console.log('🗺️ Map fully loaded and idle, loading businesses...');
+        handleViewportChange();
+      };
+
+      const clickHandler = () => {
+        console.log('🖱️ Map clicked, ensuring businesses are loaded...');
+        setTimeout(() => handleViewportChange(), 100);
+      };
+      
+      // Multiple event listeners for comprehensive coverage
+      map.on('moveend', moveEndHandler);
+      map.on('zoomend', moveEndHandler);
+      map.on('idle', loadEndHandler);
+      map.on('click', clickHandler);
+      map.on('load', loadEndHandler);
+      
+      // AGGRESSIVE IMMEDIATE LOADING - try multiple approaches
+      console.log('🎯 Starting aggressive business loading...');
+      
+      // Try 1: Immediate
+      loadBusinessesNow();
+      
+      // Try 2: Next tick
+      setTimeout(loadBusinessesNow, 0);
+      
+      // Try 3: Short delay
+      setTimeout(() => {
+        console.log('⏰ 100ms delayed business loading attempt');
+        loadBusinessesNow();
+      }, 100);
+      
+      // Try 4: Medium delay
+      setTimeout(() => {
+        console.log('⏰ 500ms delayed business loading attempt');
+        loadBusinessesNow();
+      }, 500);
+      
+      // Try 5: Longer delay
+      setTimeout(() => {
+        console.log('⏰ 1s delayed business loading attempt');
+        loadBusinessesNow();
+      }, 1000);
+      
+      return () => {
+        map.off('moveend', moveEndHandler);
+        map.off('zoomend', moveEndHandler);
+        map.off('idle', loadEndHandler);
+        map.off('click', clickHandler);
+        map.off('load', loadEndHandler);
+      };
+    } else {
+      console.log('⚠️ Business loading setup pending...', { 
+        hasMap: !!map, 
+        mapLoaded,
+        mapStyle: map?.isStyleLoaded?.() 
+      });
+      
+      // Even if map isn't fully ready, try loading businesses
+      if (map) {
+        console.log('🔄 Map exists but not fully loaded, trying business load anyway...');
+        setTimeout(() => {
+          console.log('🔄 Delayed attempt - calling handleViewportChange...');
+          handleViewportChange();
+        }, 1000);
+      }
+    }
+  }, [map, mapLoaded, handleViewportChange, businesses.length]);
+
+  // Handle old business layer removal and deck.gl integration
+  useEffect(() => {
+    if (!mapLoaded || !map) return;
+
+    // Remove old businesses layer if it exists
+    if (map.getLayer('businesses-layer')) {
+      map.removeLayer('businesses-layer');
+    }
+    if (map.getSource('businesses')) {
+      map.removeSource('businesses');
+    }
+  }, [mapLoaded, map]);
 
   // Handle landmark markers
   useEffect(() => {
@@ -400,7 +576,36 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         zIndex: 1,
         backgroundColor: '#B3E5FC' // Light blue fallback while map loads
       }}
-    />
+    >
+      {/* Business loading indicator */}
+      <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white text-xs p-2 rounded z-50 pointer-events-none">
+        <div>🏢 Businesses: {businesses.length}</div>
+        <div>⚡ Loading: {businessesLoading ? 'Yes' : 'No'}</div>
+        <div>🗺️ Map: {mapLoaded ? 'Ready' : 'Loading'}</div>
+        {businesses.length === 0 && (
+          <div className="text-yellow-300">⚠️ No businesses loaded</div>
+        )}
+      </div>
+      
+      {/* Deck.GL Overlay for high-performance business rendering */}
+      {map && mapLoaded && businesses.length > 0 && (
+        <DeckGLOverlay
+          map={map}
+          businesses={businesses}
+          selectedBusinessId={selectedBusiness?.id}
+          onBusinessClick={handleBusinessClick}
+          zoom={currentZoom}
+        />
+      )}
+      
+      {/* Fallback message when no businesses are visible */}
+      {map && mapLoaded && businesses.length === 0 && !businessesLoading && (
+        <div className="absolute bottom-4 left-4 bg-yellow-500 bg-opacity-90 text-black text-sm p-3 rounded max-w-xs">
+          <div className="font-semibold">No businesses in this area</div>
+          <div className="text-xs">Try moving the map or zooming out to see more businesses</div>
+        </div>
+      )}
+    </div>
   );
 };
 

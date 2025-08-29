@@ -1,14 +1,41 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Business, BusinessRole } from '@/types/business';
 
-export async function getBusinessesBasic(): Promise<Business[]> {
+export async function getBusinessesBasic(limit: number = 2000): Promise<Business[]> {
+  console.log(`🔄 Fetching ${limit} businesses from center outward...`);
+  
+  // NYC center coordinates (approximately Manhattan center)
+  const centerLat = 40.7589; // Times Square area
+  const centerLng = -73.9851;
+  
   const { data: businessesData, error } = await supabase
     .from('businesses')
-    .select('id, name, lat, lng');
+    .select('id, name, lat, lng')
+    .order('lat')
+    .limit(limit); // Limit for performance - can increase gradually
 
-  if (error) throw error;
+  if (error) {
+    console.error('❌ Supabase error:', error);
+    throw error;
+  }
 
-  const basicBusinesses: Business[] = (businessesData || []).map((business: any) => ({
+  console.log(`📊 Raw data from Supabase: ${businessesData?.length || 0} records`);
+
+  if (!businessesData) return [];
+
+  // Calculate distance from center and sort by distance
+  const businessesWithDistance = businessesData.map((business: any) => {
+    const distance = Math.sqrt(
+      Math.pow(business.lat - centerLat, 2) + 
+      Math.pow(business.lng - centerLng, 2)
+    );
+    return { ...business, distance };
+  });
+
+  // Sort by distance from center (closest first)
+  businessesWithDistance.sort((a, b) => a.distance - b.distance);
+
+  const basicBusinesses: Business[] = businessesWithDistance.map((business: any) => ({
     id: business.id,
     name: business.name,
     position: { lat: business.lat, lng: business.lng },
@@ -17,7 +44,57 @@ export async function getBusinessesBasic(): Promise<Business[]> {
     roles: [],
   }));
 
+  console.log(`✅ Processed businesses from center out: ${basicBusinesses.length}`);
   return basicBusinesses;
+}
+
+// NEW: Viewport-based business loading for better performance
+export async function getBusinessesInViewport(
+  bounds: { north: number; south: number; east: number; west: number },
+  limit: number = 2000 // Increased default limit
+): Promise<Business[]> {
+  console.log(`🔍 Fetching businesses in viewport:`, bounds, `limit: ${limit}`);
+  
+  try {
+    // Optimized query with spatial indexing consideration
+    const { data: businessesData, error } = await supabase
+      .from('businesses')
+      .select('id, name, lat, lng')
+      .gte('lat', bounds.south)
+      .lte('lat', bounds.north)
+      .gte('lng', bounds.west)  
+      .lte('lng', bounds.east)
+      .order('lat') // Spatial order for better indexing
+      .limit(limit);
+
+    if (error) {
+      console.error('❌ Supabase viewport error:', error);
+      throw error;
+    }
+
+    console.log(`📊 Found ${businessesData?.length || 0} businesses in viewport`);
+
+    if (!businessesData || businessesData.length === 0) {
+      console.log('⚠️ No businesses found in viewport bounds:', bounds);
+      return [];
+    }
+
+    // Efficient mapping with minimal object creation  
+    const businesses: Business[] = businessesData.map((business: any) => ({
+      id: business.id,
+      name: business.name,
+      position: { lat: business.lat, lng: business.lng },
+      atmosphere: [],
+      salary: '0',
+      roles: [],
+    }));
+
+    console.log(`✅ Returning ${businesses.length} businesses for rendering`);
+    return businesses;
+  } catch (error) {
+    console.error('❌ Error in getBusinessesInViewport:', error);
+    return [];
+  }
 }
 
 export async function getFullBusinessDetails(businessId: string): Promise<Business | null> {
@@ -26,9 +103,10 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
     .from('businesses')
     .select('*')
     .eq('id', businessId)
-    .single();
+    .maybeSingle();
 
   if (businessError) throw businessError;
+  if (!businessData) return null;
 
   // Get current user
   const { data: { user } } = await supabase.auth.getUser();
@@ -92,17 +170,16 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
     .from('businesses')
     .select('id')
     .ilike('name', businessLocation)
-    .single();
+    .maybeSingle();
 
-  if (findError && findError.code !== 'PGRST116') {
-    // Error other than "not found"
+  if (findError) {
     throw findError;
   }
 
   if (existingBusiness) {
     businessId = existingBusiness.id;
   } else {
-    // Create new business if it doesn't exist
+    // Create new business if it doesn't exist - NO AUTH REQUIRED
     // For now, we'll create a placeholder business with default coordinates
     const { data: newBusiness, error: createBusinessError } = await supabase
       .from('businesses')
@@ -117,8 +194,26 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
       .select('id')
       .single();
 
-    if (createBusinessError) throw createBusinessError;
-    businessId = newBusiness.id;
+    if (createBusinessError) {
+      // If it's a duplicate key error, try to get the existing business again
+      if (createBusinessError.code === '23505') { // unique_violation
+        const { data: retryBusiness } = await supabase
+          .from('businesses')
+          .select('id')
+          .eq('name', businessLocation)
+          .maybeSingle();
+        
+        if (retryBusiness) {
+          businessId = retryBusiness.id;
+        } else {
+          throw createBusinessError;
+        }
+      } else {
+        throw createBusinessError;
+      }
+    } else {
+      businessId = newBusiness.id;
+    }
   }
 
   // Check if this exact role already exists for this business
@@ -128,14 +223,14 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
     .eq('business_id', businessId)
     .eq('role', role)
     .eq('salary', salary)
-    .single();
+    .maybeSingle();
 
-  if (roleCheckError && roleCheckError.code !== 'PGRST116') {
+  if (roleCheckError) {
     throw roleCheckError;
   }
 
   if (!existingRole) {
-    // Create new role if it doesn't exist
+    // Create new role if it doesn't exist - NO AUTH REQUIRED
     const { error: createRoleError } = await supabase
       .from('business_roles')
       .insert({
