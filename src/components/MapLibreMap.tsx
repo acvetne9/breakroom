@@ -270,29 +270,80 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.error('🚨 Map error:', e.error);
     });
     
-    // Debug tile loading
+    // Enhanced tile loading debug
     mapInstance.on('sourcedata', e => {
       if (e.sourceId === 'nyc-tiles') {
-        console.log('🔄 NYC tiles event:', e.isSourceLoaded ? 'LOADED' : 'LOADING', e.dataType);
+        console.log('🔄 NYC tiles event:', e.isSourceLoaded ? 'LOADED' : 'LOADING', e.dataType, e);
         
         if (e.isSourceLoaded && e.dataType === 'source') {
-          console.log('✅ NYC tiles source fully loaded');
+          console.log('✅ NYC tiles source fully loaded - adding layers immediately');
           
-          // Try to get tile data info
-          setTimeout(() => {
-            try {
-              const features = mapInstance.querySourceFeatures('nyc-tiles');
-              console.log('🔍 Features available in source:', features.length);
-              if (features.length > 0) {
-                const sourceLayers = [...new Set(features.map(f => (f as any).sourceLayer))];
-                console.log('🔍 Available source layers:', sourceLayers);
-                console.log('🔍 Sample feature properties:', features[0]?.properties);
-                console.log('🔍 Sample feature geometry type:', features[0]?.geometry?.type);
+          // Add layers immediately when source is loaded
+          try {
+            console.log('🔧 Adding NYC tile layers: water-lines, park-lines, roads');
+            
+            // Remove any existing layers first
+            const layersToRemove = ['water-layer', 'parks-layer', 'roads-layer', 'debug-all-features'];
+            layersToRemove.forEach(layerId => {
+              if (mapInstance.getLayer(layerId)) {
+                console.log('🗑️ Removing existing layer:', layerId);
+                mapInstance.removeLayer(layerId);
               }
-            } catch (e) {
-              console.log('🚨 Could not query source features:', e);
-            }
-          }, 1000);
+            });
+            
+            // Add water lines layer
+            mapInstance.addLayer({
+              id: 'water-layer',
+              type: 'line',
+              source: 'nyc-tiles',
+              'source-layer': 'water-lines',
+              paint: {
+                'line-color': '#4A90E2',
+                'line-width': 3,
+                'line-opacity': 1.0
+              }
+            });
+            console.log('✅ Added water-lines layer');
+            
+            // Add park lines layer  
+            mapInstance.addLayer({
+              id: 'parks-layer',
+              type: 'line',
+              source: 'nyc-tiles',
+              'source-layer': 'park-lines',
+              paint: {
+                'line-color': '#7ED321',
+                'line-width': 2,
+                'line-opacity': 1.0
+              }
+            });
+            console.log('✅ Added park-lines layer');
+            
+            // Add roads layer
+            mapInstance.addLayer({
+              id: 'roads-layer',
+              type: 'line',
+              source: 'nyc-tiles',
+              'source-layer': 'roads',
+              paint: {
+                'line-color': '#333333',
+                'line-width': [
+                  'interpolate',
+                  ['linear'],
+                  ['zoom'],
+                  10, 1,
+                  16, 3
+                ],
+                'line-opacity': 1.0
+              }
+            });
+            console.log('✅ Added roads layer');
+            
+            console.log('🎉 All NYC tile layers added successfully!');
+            
+          } catch (error) {
+            console.error('🚨 Error adding tile layers:', error);
+          }
         }
       }
     });
