@@ -149,7 +149,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: 'vector' as const,
           tiles: [absoluteTilesUrl],
           minzoom: 10,
-          maxzoom: 16
+          maxzoom: 16,
+          // Add scheme to handle potential encoding issues
+          scheme: 'xyz' as const
         }
       },
       glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
