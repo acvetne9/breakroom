@@ -149,6 +149,58 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           maxzoom: 16
         });
         console.log('✅ Vector tile source added');
+        
+        // Add actual map layers from vector tiles
+        const layers = [
+          {
+            id: 'water',
+            type: 'fill' as const,
+            source: 'vector-tiles',
+            'source-layer': 'water',
+            paint: {
+              'fill-color': '#4FC3F7',
+              'fill-opacity': 0.8
+            }
+          },
+          {
+            id: 'parks',
+            type: 'fill' as const,
+            source: 'vector-tiles',
+            'source-layer': 'parks',
+            paint: {
+              'fill-color': '#81C784',
+              'fill-opacity': 0.6
+            }
+          },
+          {
+            id: 'waterways',
+            type: 'line' as const,
+            source: 'vector-tiles',
+            'source-layer': 'waterways',
+            paint: {
+              'line-color': '#42A5F5',
+              'line-width': 2
+            }
+          },
+          {
+            id: 'roads',
+            type: 'line' as const,
+            source: 'vector-tiles',
+            'source-layer': 'roads',
+            paint: {
+              'line-color': '#666666',
+              'line-width': 1
+            }
+          }
+        ];
+        
+        // Add layers in order
+        layers.forEach(layer => {
+          if (!map.getLayer(layer.id)) {
+            map.addLayer(layer);
+            console.log(`✅ Added ${layer.id} layer`);
+          }
+        });
       }
 
       // Load GeoJSON data for land layer (keeping this simple)
