@@ -152,13 +152,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           maxzoom: 16,
           // Add scheme to handle potential encoding issues
           scheme: 'xyz' as const
-        },
-        // Fallback raster basemap so the map is visible even if vector layer detection is delayed
-        'osm-tiles': {
-          type: 'raster' as const,
-          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-          tileSize: 256,
-          attribution: '© OpenStreetMap contributors'
         }
       },
       glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
@@ -167,11 +160,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             id: 'background',
             type: 'background' as const,
             paint: { 'background-color': '#B3E5FC' }
-          },
-          {
-            id: 'osm-base',
-            type: 'raster' as const,
-            source: 'osm-tiles'
           }
           // Removed hardcoded layers - will add dynamically based on actual tile content
         ]
@@ -281,6 +269,80 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                   const sourceLayers = Array.from(new Set(features.map((f: any) => f.sourceLayer)));
                   
                   console.log(`🔍 Query attempt ${index + 1} (${delay}ms delay): ${features.length} features, source-layers: [${sourceLayers.join(', ')}]`);
+                  
+                  // If no source-layers detected yet, proactively probe the known layer name
+                  if (sourceLayers.length === 0 && !layersAddedRef.current) {
+                    try {
+                      const guess = mapInstance.querySourceFeatures('nyc-tiles', { sourceLayer: 'examplepoints' as any });
+                      console.log(`🧪 Probe 'examplepoints': ${guess.length} features`);
+                      if (guess.length > 0) {
+                        const detectedLayer = 'examplepoints';
+                        console.log('🧭 Using probed layer:', detectedLayer);
+                        
+                        // Add a simple polygon layer first to test visibility
+                        try {
+                          mapInstance.addLayer({
+                            id: 'nyc-polygons',
+                            type: 'fill',
+                            source: 'nyc-tiles',
+                            'source-layer': detectedLayer,
+                            paint: {
+                              'fill-color': '#0B7285',
+                              'fill-opacity': 0.3
+                            },
+                            filter: ['==', ['geometry-type'], 'Polygon']
+                          });
+                          console.log('✅ Added polygon layer (probed)');
+                        } catch (polygonErr) {
+                          console.warn('⚠️ Polygon layer (probed) failed:', polygonErr);
+                        }
+                        
+                        // Add line layer
+                        try {
+                          mapInstance.addLayer({
+                            id: 'nyc-lines',
+                            type: 'line',
+                            source: 'nyc-tiles',
+                            'source-layer': detectedLayer,
+                            paint: {
+                              'line-color': '#FF6B35',
+                              'line-width': 2,
+                              'line-opacity': 0.8
+                            },
+                            filter: ['==', ['geometry-type'], 'LineString']
+                          });
+                          console.log('✅ Added line layer (probed)');
+                        } catch (lineErr) {
+                          console.warn('⚠️ Line layer (probed) failed:', lineErr);
+                        }
+                        
+                        // Add point layer
+                        try {
+                          mapInstance.addLayer({
+                            id: 'nyc-points',
+                            type: 'circle',
+                            source: 'nyc-tiles',
+                            'source-layer': detectedLayer,
+                            paint: {
+                              'circle-color': '#FF0000',
+                              'circle-radius': 4,
+                              'circle-opacity': 0.8
+                            },
+                            filter: ['==', ['geometry-type'], 'Point']
+                          });
+                          console.log('✅ Added point layer (probed)');
+                        } catch (pointErr) {
+                          console.warn('⚠️ Point layer (probed) failed:', pointErr);
+                        }
+                        
+                        layersAddedRef.current = true;
+                        console.log('🎉 NYC layers added successfully! (probed)');
+                        return; // stop further attempts
+                      }
+                    } catch (probeErr) {
+                      console.warn('🧪 Probe failed:', probeErr);
+                    }
+                  }
                   
                   if (sourceLayers.length > 0 && !layersAddedRef.current) {
                     const detectedLayer = sourceLayers[0];
