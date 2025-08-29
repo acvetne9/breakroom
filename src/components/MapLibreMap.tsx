@@ -51,6 +51,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   selectedBusiness,
   landmarks = []
 }) => {
+  console.log('🔥 MapLibreMap function component executing');
   const isMobile = useIsMobile();
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
@@ -145,13 +146,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Initialize map
   useEffect(() => {
-    console.log('🔧 MapLibreMap useEffect triggered - initializing map');
+    console.log('🚀 MapLibreMap component mounted - starting initialization');
+    console.log('🚀 mapRef.current:', mapRef.current);
     if (!mapRef.current) {
-      console.error('❌ Map container not found');
+      console.error('❌ Map container not found - DOM element missing');
       return;
     }
 
-    console.log('✅ Map container found:', mapRef.current);
+    console.log('✅ Map container found, creating MapLibre instance...');
     let mapInstance: maplibregl.Map | null = null;
     let cleanedUp = false;
 
@@ -255,6 +257,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const sources = mapInstance.getStyle().sources;
       console.log('🗺️ Available sources:', Object.keys(sources || {}));
       
+      // Test if tiles are accessible by trying to query features
+      setTimeout(() => {
+        try {
+          const features = mapInstance.queryRenderedFeatures();
+          console.log('🗺️ Rendered features after 2s:', features.length);
+          if (features.length === 0) {
+            console.log('🚨 No features rendered - checking tile requests...');
+            // Force a tile request by checking viewport
+            const bounds = mapInstance.getBounds();
+            console.log('🗺️ Current viewport bounds:', bounds);
+          }
+        } catch (e) {
+          console.error('🚨 Error querying features:', e);
+        }
+      }, 2000);
+      
       setMapLoaded(true);
     });
 
@@ -289,12 +307,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     });
 
     mapInstance.on('render', () => {
-      if (mapInstance.loaded()) {
-        const renderedFeatures = mapInstance.queryRenderedFeatures();
-        if (renderedFeatures.length > 0) {
-          console.log('🗺️ Rendered features count:', renderedFeatures.length);
-          console.log('🗺️ Sample feature:', renderedFeatures[0]);
-        }
+      const renderedFeatures = mapInstance.queryRenderedFeatures();
+      if (renderedFeatures.length > 0) {
+        console.log('🗺️ Features rendered:', renderedFeatures.length, 'sample:', renderedFeatures[0]?.properties);
+      }
+    });
+
+    // Add specific error handling for tile loading
+    mapInstance.on('error', e => {
+      console.error('🚨 Map error:', e.error);
+      if (e.error?.message?.includes('tiles')) {
+        console.error('🚨 Tile loading error detected!');
       }
     });
 
@@ -446,6 +469,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded, landmarks, map]);
 
+  console.log('🚀 MapLibreMap render - businesses:', businesses.length);
   return (
     <div
       ref={mapRef}
