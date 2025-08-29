@@ -35,35 +35,40 @@ export const useViewportBusinesses = () => {
     hasBounds: !!currentBounds 
   });
 
-  const loadBusinessesInViewport = useCallback(async (bounds: MapBounds, limit: number = 5000, isMoving: boolean = false) => {
+  const loadBusinessesInViewport = useCallback(async (bounds: MapBounds, limit: number = 10000, isMoving: boolean = false) => {
     console.log('🎯 loadBusinessesInViewport called with:', { bounds, limit, isMoving, currentLoading: loading });
 
-    // DEBUGGING: Temporarily bypass cache to force fresh data load  
-    console.log('🔧 DEBUGGING: Bypassing cache to force fresh database query');
-    
     // Check tile cache first - always return cached data immediately for smooth experience
-    // const cachedBusinesses = getCachedBusinesses(bounds);
-    // if (cachedBusinesses) {
-    //   console.log(`🚀 Tile cache HIT! Returning ${cachedBusinesses.length} cached businesses`);
-    //   setBusinesses(cachedBusinesses);
-    //   setCurrentBounds(bounds);
-    //   
-    //   // Preload adjacent areas in background
-    //   schedulePreload(bounds);
-    //   return;
-    // }
+    const cachedBusinesses = getCachedBusinesses(bounds);
+    if (cachedBusinesses && cachedBusinesses.length > 500) { // Only use cache if substantial data
+      console.log(`🚀 Tile cache HIT! Returning ${cachedBusinesses.length} cached businesses`);
+      setBusinesses(cachedBusinesses);
+      setCurrentBounds(bounds);
+      
+      // Preload adjacent areas in background
+      schedulePreload(bounds);
+      return;
+    }
 
-    // Use exact bounds for debugging to see actual viewport data
-    const expandedBounds = bounds;
+    // Expand bounds significantly for initial loading to get more businesses
+    const isInitialLoad = businesses.length === 0;
+    const expansionFactor = isInitialLoad ? 0.5 : 0.2; // 50% expansion for initial load
     
-    // DEBUGGING: Skip expanded cache check
-    // const expandedCached = getCachedBusinesses(expandedBounds);
-    // if (expandedCached) {
-    //   console.log(`🚀 Expanded tile cache HIT! Returning ${expandedCached.length} cached businesses`);
-    //   setBusinesses(expandedCached);
-    //   setCurrentBounds(expandedBounds);
-    //   return;
-    // }
+    const expandedBounds = {
+      north: bounds.north + (bounds.north - bounds.south) * expansionFactor,
+      south: bounds.south - (bounds.north - bounds.south) * expansionFactor,
+      east: bounds.east + (bounds.east - bounds.west) * expansionFactor,
+      west: bounds.west - (bounds.east - bounds.west) * expansionFactor
+    };
+
+    // Check expanded bounds in tile cache
+    const expandedCached = getCachedBusinesses(expandedBounds);
+    if (expandedCached && expandedCached.length > 500) { // Only use cache if substantial
+      console.log(`🚀 Expanded tile cache HIT! Returning ${expandedCached.length} cached businesses`);
+      setBusinesses(expandedCached);
+      setCurrentBounds(expandedBounds);
+      return;
+    }
 
     // Request deduplication
     const requestKey = `${expandedBounds.north}-${expandedBounds.south}-${expandedBounds.east}-${expandedBounds.west}-${limit}`;
@@ -84,9 +89,9 @@ export const useViewportBusinesses = () => {
       clearTimeout(loadTimeoutRef.current);
     }
 
-    // Smart debouncing: longer delays during movement, immediate for empty state
+    // Smart debouncing: immediate for empty state, longer delays for better performance
     const shouldLoadImmediately = businesses.length === 0;
-    const delay = shouldLoadImmediately ? 0 : (isMoving ? 800 : 400); // Longer delays for smooth panning
+    const delay = shouldLoadImmediately ? 0 : (isMoving ? 600 : 200); // Reduced delays for faster loading
 
     loadTimeoutRef.current = setTimeout(async () => {
       // Skip if viewport hasn't changed significantly
