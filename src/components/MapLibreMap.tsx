@@ -154,7 +154,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           scheme: 'xyz' as const
         }
       },
-      glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
+      glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
         layers: [
           {
             id: 'background',
@@ -228,8 +228,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       if (e.sourceId === 'nyc-tiles') {
         console.log('🔄 NYC tiles event:', e.isSourceLoaded ? 'LOADED' : 'LOADING', e.dataType, e);
         
-        if (e.isSourceLoaded && e.dataType === 'source') {
-          if (layersAddedRef.current || mapInstance.getLayer('roads-layer') || mapInstance.getLayer('parks-layer') || mapInstance.getLayer('water-layer')) {
+        if ((((e as any).dataType === 'tile') || (((e as any).dataType === 'source') && mapInstance.isSourceLoaded('nyc-tiles')))) {
+          if (
+            layersAddedRef.current ||
+            mapInstance.getLayer('examplepoints-line') ||
+            mapInstance.getLayer('examplepoints-labels') ||
+            mapInstance.getLayer('roads-layer') ||
+            mapInstance.getLayer('parks-layer') ||
+            mapInstance.getLayer('water-layer')
+          ) {
             console.log('ℹ️ Layers already present, skipping add.');
             return;
           }
@@ -240,21 +247,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             const features = mapInstance.querySourceFeatures('nyc-tiles');
             const sourceLayers = Array.from(new Set(features.map((f: any) => f.sourceLayer)));
             console.log('🔎 Available source-layers in tiles:', sourceLayers);
+            if (!sourceLayers.length) {
+              console.warn('⏳ No source-layers visible yet (tile not fully parsed). Waiting for next tile event…');
+              return;
+            }
+            const detectedLayer = sourceLayers.includes('examplepoints') ? 'examplepoints' : sourceLayers[0];
+            console.log('🧭 Using source-layer:', detectedLayer);
             
             // Defensive cleanup in case of partial state
-            ['water-layer', 'parks-layer', 'roads-layer', 'debug-all-features'].forEach(id => {
+            ['examplepoints-line', 'examplepoints-labels', 'water-layer', 'parks-layer', 'roads-layer', 'debug-all-features'].forEach(id => {
               if (mapInstance.getLayer(id)) {
                 console.log('🗑️ Removing existing layer:', id);
                 mapInstance.removeLayer(id);
               }
             });
             
-            // Render tiles from 'examplepoints' layer in nyc.mbtiles
+            // Render detected vector layer as line
             mapInstance.addLayer({
               id: 'examplepoints-line',
               type: 'line',
               source: 'nyc-tiles',
-              'source-layer': 'examplepoints',
+              'source-layer': detectedLayer,
               paint: {
                 'line-color': '#0B7285',
                 'line-width': [
@@ -266,14 +279,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 'line-opacity': 0.9
               }
             });
-            console.log('✅ Added examplepoints line layer');
+            console.log('✅ Added line layer for', detectedLayer);
             
             // Optional labels from "name" attribute
             mapInstance.addLayer({
               id: 'examplepoints-labels',
               type: 'symbol',
               source: 'nyc-tiles',
-              'source-layer': 'examplepoints',
+              'source-layer': detectedLayer,
               layout: {
                 'text-field': ['coalesce', ['get', 'name'], ''],
                 'text-size': 11,
@@ -285,7 +298,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 'text-halo-width': 1
               }
             });
-            console.log('✅ Added examplepoints labels');
+            console.log('✅ Added labels for', detectedLayer);
             
             layersAddedRef.current = true;
             console.log('🎉 All NYC tile layers added successfully!');
