@@ -33,7 +33,14 @@ export const createBusinessScatterplotLayer = ({
     radiusMinPixels: 6,
     radiusMaxPixels: 24,
     lineWidthMinPixels: 1.5,
-    getPosition: (d: Business) => [d.position.lng, d.position.lat],
+    getPosition: (d: Business) => {
+      const pos = [d.position.lng, d.position.lat] as [number, number];
+      // Debug: Log first few positions to check coordinate format
+      if (Math.random() < 0.01) { // Log ~1% of positions to avoid spam
+        console.log(`🎯 DECK.GL POSITION:`, { id: d.id, name: d.name, position: pos });
+      }
+      return pos;
+    },
     getRadius: (_d: Business) => 6, // Smaller for better performance
     getFillColor: [250, 204, 21, 255], // Uniform golden color
     getLineColor: [255, 255, 255, 200], // Semi-transparent white stroke

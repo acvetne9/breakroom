@@ -89,6 +89,36 @@ export async function getBusinessesInViewport(
       roles: [],
     }));
 
+    // Debug: Log business positions to check coordinate system
+    if (businesses.length > 0) {
+      const sampleBusiness = businesses[0];
+      console.log(`🎯 SAMPLE BUSINESS POSITION:`, {
+        id: sampleBusiness.id,
+        name: sampleBusiness.name,
+        lat: sampleBusiness.position.lat,
+        lng: sampleBusiness.position.lng,
+        viewportBounds: bounds
+      });
+      
+      // Check if businesses are actually in viewport
+      const inViewport = businesses.filter(b => 
+        b.position.lat >= bounds.south && b.position.lat <= bounds.north &&
+        b.position.lng >= bounds.west && b.position.lng <= bounds.east
+      );
+      console.log(`🎯 VIEWPORT CHECK: ${inViewport.length}/${businesses.length} businesses actually in viewport`);
+      
+      // Log coordinate ranges
+      const latRange = {
+        min: Math.min(...businesses.map(b => b.position.lat)),
+        max: Math.max(...businesses.map(b => b.position.lat))
+      };
+      const lngRange = {
+        min: Math.min(...businesses.map(b => b.position.lng)),
+        max: Math.max(...businesses.map(b => b.position.lng))
+      };
+      console.log(`🎯 COORDINATE RANGES:`, { latRange, lngRange });
+    }
+    
     console.log(`✅ Returning ${businesses.length} businesses for rendering`);
     return businesses;
   } catch (error) {

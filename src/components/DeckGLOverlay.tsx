@@ -28,6 +28,18 @@ export const DeckGLOverlay: React.FC<DeckGLOverlayProps> = ({
 }) => {
   const [overlayReady, setOverlayReady] = useState(false);
   
+  // Debug: Log business data being passed to DeckGL
+  console.log(`🎯 DECKGL OVERLAY RECEIVED:`, {
+    businessCount: businesses.length,
+    isClusteredData,
+    zoom,
+    sampleBusiness: businesses[0] ? {
+      id: businesses[0].id,
+      name: businesses[0].name || 'Unknown',
+      position: businesses[0].position
+    } : null
+  });
+  
   // Initialize overlay once
   const overlay = useMemo(() => {
     if (overlayInstance) {
