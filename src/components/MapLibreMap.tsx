@@ -145,12 +145,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Initialize map
   useEffect(() => {
+    console.log('🔧 MapLibreMap useEffect triggered - initializing map');
     if (!mapRef.current) {
-      console.error('Map container not found');
+      console.error('❌ Map container not found');
       return;
     }
 
-    console.log('Initializing map with container:', mapRef.current);
+    console.log('✅ Map container found:', mapRef.current);
     let mapInstance: maplibregl.Map | null = null;
     let cleanedUp = false;
 
@@ -172,25 +173,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           paint: { 'background-color': '#B3E5FC' }
         },
         {
-          id: 'water',
-          type: 'fill' as const,
+          id: 'water-lines',
+          type: 'line' as const,
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           filter: ['has', 'water'] as any,
           paint: {
-            'fill-color': '#4FC3F7',
-            'fill-opacity': 0.8
+            'line-color': '#4FC3F7',
+            'line-width': 3,
+            'line-opacity': 0.8
           }
         },
         {
-          id: 'parks',
-          type: 'fill' as const,
+          id: 'park-lines', 
+          type: 'line' as const,
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           filter: ['has', 'leisure'] as any,
           paint: {
-            'fill-color': '#66BB6A',
-            'fill-opacity': 0.6
+            'line-color': '#66BB6A',
+            'line-width': 2,
+            'line-opacity': 0.6
           }
         },
         {
@@ -214,7 +217,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
 
     try {
-      console.log('Creating MapLibre instance...');
+      console.log('🔧 Creating MapLibre instance...');
       mapInstance = new maplibregl.Map({
         container: mapRef.current!,
         style: baseStyle,
@@ -225,13 +228,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         renderWorldCopies: false,
         attributionControl: false
       });
-      console.log('MapLibre instance created:', mapInstance);
+      console.log('✅ MapLibre instance created successfully:', mapInstance);
       
       // Set bounds immediately after creation
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
+      console.log('✅ Map bounds set');
       
     } catch (error) {
-      console.error('Error creating map instance:', error);
+      console.error('❌ Error creating map instance:', error);
       return;
     }
 
@@ -241,6 +245,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.log('🗺️ Vector tile source URL: /data/tiles/{z}/{x}/{y}.pbf');
       console.log('🗺️ Map center:', mapInstance.getCenter());
       console.log('🗺️ Map zoom:', mapInstance.getZoom());
+      console.log('🗺️ Map style loaded, checking layers...');
+      
+      // Check if layers exist
+      const layers = mapInstance.getStyle().layers;
+      console.log('🗺️ Available layers:', layers?.map(l => l.id));
+      
+      // Check sources
+      const sources = mapInstance.getStyle().sources;
+      console.log('🗺️ Available sources:', Object.keys(sources || {}));
+      
       setMapLoaded(true);
     });
 
@@ -258,14 +272,29 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     });
 
     mapInstance.on('sourcedata', e => {
-      if ((e as any).sourceId === 'nyc-tiles') {
-        console.log('🗺️ NYC tiles source event:', (e as any).isSourceLoaded ? 'LOADED' : 'LOADING');
+      const sourceEvent = e as any;
+      if (sourceEvent.sourceId === 'nyc-tiles') {
+        console.log('🗺️ NYC tiles source event:', sourceEvent.isSourceLoaded ? 'LOADED' : 'LOADING');
+        if (sourceEvent.isSourceLoaded) {
+          console.log('🗺️ NYC tiles fully loaded!');
+        }
       }
     });
 
     mapInstance.on('data', e => {
-      if ((e as any).sourceId === 'nyc-tiles') {
+      const dataEvent = e as any;
+      if (dataEvent.sourceId === 'nyc-tiles') {
         console.log('🗺️ NYC tiles data event:', e.type);
+      }
+    });
+
+    mapInstance.on('render', () => {
+      if (mapInstance.loaded()) {
+        const renderedFeatures = mapInstance.queryRenderedFeatures();
+        if (renderedFeatures.length > 0) {
+          console.log('🗺️ Rendered features count:', renderedFeatures.length);
+          console.log('🗺️ Sample feature:', renderedFeatures[0]);
+        }
       }
     });
 
