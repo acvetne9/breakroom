@@ -140,7 +140,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
 
       // Load businesses with increased limits and movement awareness
-      const businessLimit = isMobile ? 12000 : 25000; // Even higher limits for dense business visibility
+      const businessLimit = isMobile ? 12000 : 15000; // Even higher limits for dense business visibility
       console.log(`🎯 About to call loadBusinessesInViewport with ${businessLimit} limit for ${isMobile ? 'mobile' : 'desktop'}...`);
       
       loadBusinessesInViewport(viewportBounds, businessLimit, isMovingRef.current);
