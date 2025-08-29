@@ -16,6 +16,14 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+// Allow immediate activation when a new SW is installed
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    log('Skipping waiting on message...');
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   const isTile = url.pathname.startsWith('/data/tiles/') && url.pathname.endsWith('.pbf');
@@ -28,41 +36,21 @@ self.addEventListener('fetch', (event) => {
       const type = resp.headers.get('content-type') || '';
       log('Fetch tile:', url.pathname, '| encoding:', enc || 'none', '| type:', type || 'unknown');
 
-      // If server already sets proper gzip encoding, return as-is (browser will decompress)
-      if (enc.toLowerCase().includes('gzip')) {
-        log('Passing through (server provided gzip header).');
-        return resp;
-      }
-
-      // Read body to sniff gzip header
+      // Always read the body and normalize to raw (un-gzipped) protobuf bytes
       const buf = await resp.arrayBuffer();
-      const bytes = new Uint8Array(buf);
+      let bytes = new Uint8Array(buf);
 
       const isGzip = bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
       if (isGzip) {
-        log('Decompressing gzipped tile without Content-Encoding header:', url.pathname);
         try {
-          const decompressed = self.pako.ungzip(bytes); // Uint8Array
-          return new Response(decompressed, {
-            headers: {
-              'Content-Type': 'application/x-protobuf',
-              'Cache-Control': 'public, max-age=3600'
-            }
-          });
+          log('Decompressing gzipped tile:', url.pathname);
+          bytes = self.pako.ungzip(bytes); // Uint8Array
         } catch (e) {
-          log('Decompression failed:', e);
-          // Fall back to original bytes
-          return new Response(buf, {
-            headers: {
-              'Content-Type': 'application/x-protobuf'
-            }
-          });
+          log('Decompression failed, returning original bytes:', e);
         }
       }
 
-      // Not gzip; ensure correct content-type
-      log('Tile not gzip-encoded; normalizing headers.');
-      return new Response(buf, {
+      return new Response(bytes, {
         headers: {
           'Content-Type': 'application/x-protobuf',
           'Cache-Control': 'public, max-age=3600'
