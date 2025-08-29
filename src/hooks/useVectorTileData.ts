@@ -14,7 +14,7 @@ export const useVectorTileData = () => {
           type: 'vector',
           tiles: [
             // Serve tiles from your public directory
-            `${window.location.origin}/tiles/{z}/{x}/{y}.pbf`
+            `${window.location.origin}/tiles/businesses/{z}/{x}/{y}.pbf`
           ],
           minzoom: 10,
           maxzoom: 16
