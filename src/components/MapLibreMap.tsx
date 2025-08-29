@@ -134,12 +134,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return;
     }
     
-    console.log(`🗺️ Loading pre-built vector tiles...`);
+    console.log(`🗺️ Custom vector tiles from data/tiles/ ready`);
     processedRef.current = true; // prevent duplicate runs in this mount
     (window as any).__MAP_FEATURES_PROCESSED__ = true; // prevent duplicate runs across mounts
     setIsProcessing(true);
     
-    console.log('🎉 Custom NYC vector tiles loaded successfully');
+    console.log('🎉 Custom NYC vector tiles ready - NO OSM TILES');
     setIsProcessing(false);
   }, [map, mapLoaded, isMobile]); // Removed dependencies that could cause re-runs
 
