@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug NYC Tiles</title>
+    <script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        #info { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.8); color: white; padding: 10px; border-radius: 5px; max-width: 300px; z-index: 1000; }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3>NYC Tiles Debug</h3>
+        <div id="status">Loading...</div>
+        <div id="features"></div>
+        <div id="layers"></div>
+    </div>
+    <div id="map"></div>
+    
+    <script>
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: {
+                version: 8,
+                sources: {
+                    'nyc-tiles': {
+                        type: 'vector',
+                        tiles: [window.location.origin + '/data/tiles/{z}/{x}/{y}.pbf'],
+                        minzoom: 10,
+                        maxzoom: 16
+                    }
+                },
+                layers: [
+                    {
+                        id: 'background',
+                        type: 'background',
+                        paint: { 'background-color': '#B3E5FC' }
+                    }
+                ]
+            },
+            center: [-73.986104, 40.715245],
+            zoom: 12.77
+        });
+        
+        const statusEl = document.getElementById('status');
+        const featuresEl = document.getElementById('features');
+        const layersEl = document.getElementById('layers');
+        
+        map.on('load', () => {
+            statusEl.innerHTML = 'Map loaded ✅';
+            
+            // Test tile URL directly
+            fetch('/data/tiles/12/1203/1536.pbf')
+                .then(response => {
+                    console.log('Tile response:', response.status, response.headers.get('content-type'));
+                    statusEl.innerHTML += '<br>Tile accessible: ' + (response.ok ? '✅' : '❌');
+                    return response.arrayBuffer();
+                })
+                .then(buffer => {
+                    statusEl.innerHTML += '<br>Tile size: ' + buffer.byteLength + ' bytes';
+                })
+                .catch(error => {
+                    statusEl.innerHTML += '<br>Tile error: ❌ ' + error.message;
+                });
+                
+            // Check for features after a delay
+            setTimeout(() => {
+                try {
+                    const allFeatures = map.querySourceFeatures('nyc-tiles');
+                    console.log('All source features:', allFeatures);
+                    
+                    if (allFeatures.length > 0) {
+                        const sourceLayers = [...new Set(allFeatures.map(f => f.sourceLayer))];
+                        const sampleFeature = allFeatures[0];
+                        
+                        featuresEl.innerHTML = `
+                            <strong>Features found: ${allFeatures.length}</strong><br>
+                            Source layers: ${sourceLayers.join(', ')}<br>
+                            Sample properties: ${JSON.stringify(sampleFeature.properties, null, 2).substring(0, 200)}...
+                        `;
+                        
+                        // Add a simple layer to visualize the data
+                        if (sourceLayers.length > 0) {
+                            map.addLayer({
+                                id: 'debug-layer',
+                                type: 'circle',
+                                source: 'nyc-tiles',
+                                'source-layer': sourceLayers[0],
+                                paint: {
+                                    'circle-radius': 4,
+                                    'circle-color': '#ff0000',
+                                    'circle-opacity': 0.8
+                                }
+                            });
+                            
+                            layersEl.innerHTML = `Added debug layer for: ${sourceLayers[0]}`;
+                        }
+                    } else {
+                        featuresEl.innerHTML = 'No features found in tiles ❌';
+                    }
+                } catch (error) {
+                    featuresEl.innerHTML = 'Error querying features: ' + error.message;
+                }
+            }, 2000);
+        });
+        
+        map.on('error', (e) => {
+            console.error('Map error:', e);
+            statusEl.innerHTML += '<br>Map error: ❌ ' + e.error.message;
+        });
+    </script>
+</body>
+</html>

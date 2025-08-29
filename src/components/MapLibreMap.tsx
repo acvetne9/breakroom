@@ -222,6 +222,45 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     mapInstance.on('load', () => {
       if (cleanedUp) return;
       console.log('🗺️ Map loaded - .pbf tiles ready');
+      
+      // Debug tile structure
+      setTimeout(() => {
+        const features = mapInstance.queryRenderedFeatures();
+        console.log('🔍 All rendered features:', features.length);
+        
+        if (features.length === 0) {
+          console.log('🚨 No features rendered - debugging tile structure...');
+          
+          // Try to query source features directly
+          try {
+            const sourceFeatures = mapInstance.querySourceFeatures('nyc-tiles');
+            console.log('🔍 Source features from nyc-tiles:', sourceFeatures.length);
+            
+            if (sourceFeatures.length > 0) {
+              console.log('🔍 Sample source feature:', sourceFeatures[0]);
+              console.log('🔍 Source layers found:', [...new Set(sourceFeatures.map(f => (f as any).sourceLayer))]);
+              console.log('🔍 Feature properties sample:', sourceFeatures[0]?.properties);
+            }
+          } catch (e) {
+            console.error('🚨 Error querying source features:', e);
+          }
+          
+          // Check if tiles are loading
+          const style = mapInstance.getStyle();
+          console.log('🔍 Map style sources:', Object.keys(style.sources));
+          console.log('🔍 Map style layers:', style.layers.map(l => l.id));
+          
+          // Force tile request by panning slightly
+          const center = mapInstance.getCenter();
+          mapInstance.easeTo({
+            center: [center.lng + 0.001, center.lat + 0.001],
+            duration: 100
+          });
+        } else {
+          console.log('✅ Features are rendering successfully:', features[0]);
+        }
+      }, 3000);
+      
       setMapLoaded(true);
     });
 
@@ -235,6 +274,33 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     mapInstance.on('error', e => {
       console.error('🚨 Map error:', e.error);
+    });
+    
+    // Debug tile loading
+    mapInstance.on('sourcedata', e => {
+      if (e.sourceId === 'nyc-tiles') {
+        console.log('🔄 NYC tiles event:', e.isSourceLoaded ? 'LOADED' : 'LOADING', e.dataType);
+        
+        if (e.isSourceLoaded && e.dataType === 'source') {
+          console.log('✅ NYC tiles source fully loaded');
+          
+          // Try to get tile data info
+          setTimeout(() => {
+            try {
+              const features = mapInstance.querySourceFeatures('nyc-tiles');
+              console.log('🔍 Features available in source:', features.length);
+              if (features.length > 0) {
+                const sourceLayers = [...new Set(features.map(f => (f as any).sourceLayer))];
+                console.log('🔍 Available source layers:', sourceLayers);
+                console.log('🔍 Sample feature properties:', features[0]?.properties);
+                console.log('🔍 Sample feature geometry type:', features[0]?.geometry?.type);
+              }
+            } catch (e) {
+              console.log('🚨 Could not query source features:', e);
+            }
+          }, 1000);
+        }
+      }
     });
 
     setMap(mapInstance);
