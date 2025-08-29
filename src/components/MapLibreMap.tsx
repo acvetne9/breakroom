@@ -238,6 +238,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     mapInstance.on('load', () => {
       if (cleanedUp) return;
       console.log('🗺️ Map loaded and visible - blue background should be showing');
+      console.log('🗺️ Vector tile source URL: /data/tiles/{z}/{x}/{y}.pbf');
+      console.log('🗺️ Map center:', mapInstance.getCenter());
+      console.log('🗺️ Map zoom:', mapInstance.getZoom());
       setMapLoaded(true);
     });
 
@@ -251,7 +254,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     });
 
     mapInstance.on('error', e => {
-      console.error('Map error:', e.error);
+      console.error('🚨 Map error:', e.error);
+    });
+
+    mapInstance.on('sourcedata', e => {
+      if ((e as any).sourceId === 'nyc-tiles') {
+        console.log('🗺️ NYC tiles source event:', (e as any).isSourceLoaded ? 'LOADED' : 'LOADING');
+      }
+    });
+
+    mapInstance.on('data', e => {
+      if ((e as any).sourceId === 'nyc-tiles') {
+        console.log('🗺️ NYC tiles data event:', e.type);
+      }
     });
 
     setMap(mapInstance);
