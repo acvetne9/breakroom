@@ -86,69 +86,36 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const isMovingRef = useRef(false);
   const moveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load businesses in viewport when map moves with smooth debouncing
+  // Debounced viewport change handler - single, clean implementation
   const handleViewportChange = useCallback((isInitial: boolean = false) => {
-    console.log('🚨 handleViewportChange CALLED!', { 
-      hasMap: !!map, 
-      mapLoaded,
-      isInitial,
-      isMoving: isMovingRef.current
-    });
-
-    if (!map || !mapLoaded) {
-      console.log('⚠️ handleViewportChange: map not ready', { 
-        map: !!map, 
-        mapLoaded
-      });
-      return;
-    }
+    if (!map || !mapLoaded) return;
 
     try {
-      console.log('📍 Getting map bounds...');
       const bounds = map.getBounds();
       const center = map.getCenter();
       const zoom = map.getZoom();
       
-      // Cache viewport calculations to avoid repeated work
-      const viewportData = {
+      const viewportBounds = {
         north: bounds.getNorth(),
         south: bounds.getSouth(),
         east: bounds.getEast(),
-        west: bounds.getWest(),
-        center,
-        zoom
+        west: bounds.getWest()
       };
 
-      console.log('🗺️ Map viewport data:', viewportData);
-      
-      const viewportBounds = {
-        north: viewportData.north,
-        south: viewportData.south,
-        east: viewportData.east,
-        west: viewportData.west
-      };
-
-      console.log('📍 Triggering business loading for viewport:', viewportBounds);
-
-      // Update deck.gl view state efficiently
+      // Update deck.gl view state
       setDeckGLViewState({
-        longitude: viewportData.center.lng,
-        latitude: viewportData.center.lat,
-        zoom: viewportData.zoom,
+        longitude: center.lng,
+        latitude: center.lat,
+        zoom,
         pitch: 0,
         bearing: 0
       });
 
-      // Load businesses with increased limits and movement awareness
-      const businessLimit = isMobile ? 12000 : 15000; // Even higher limits for dense business visibility
-      console.log(`🎯 About to call loadBusinessesInViewport with ${businessLimit} limit for ${isMobile ? 'mobile' : 'desktop'}...`);
-      
+      // Load businesses with appropriate limits
+      const businessLimit = isMobile ? 12000 : 25000;
       loadBusinessesInViewport(viewportBounds, businessLimit, isMovingRef.current);
       
-      // Update zoom state
-      setCurrentZoom(viewportData.zoom);
-      
-      console.log('✅ loadBusinessesInViewport called successfully');
+      setCurrentZoom(zoom);
       
     } catch (error) {
       console.error('❌ Error in handleViewportChange:', error);
@@ -295,95 +262,34 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded, map, processMapFeatures]);
 
-  // Setup viewport loading for businesses with aggressive triggering
+  // Clean business loading setup - single effect with proper debouncing
   useEffect(() => {
-    console.log('🚀 Business loading useEffect triggered', { 
-      hasMap: !!map, 
-      mapLoaded,
-      businessCount: businesses.length,
-      effectDeps: { map: !!map, mapLoaded, businessesLength: businesses.length }
-    });
+    if (!map || !mapLoaded) return;
 
-    if (map && mapLoaded) {
-      console.log('🔗 Setting up comprehensive business loading system - MAP AND LOADED ARE TRUE');
+    let moveTimeout: NodeJS.Timeout | null = null;
+    
+    const moveEndHandler = () => {
+      // Clear existing timeout
+      if (moveTimeout) clearTimeout(moveTimeout);
       
-      // TEST: Try calling handleViewportChange immediately
-      console.log('🧪 TEST: Calling handleViewportChange immediately...');
-      try {
+      // Debounce viewport changes
+      moveTimeout = setTimeout(() => {
+        isMovingRef.current = false;
         handleViewportChange();
-        console.log('🧪 TEST: handleViewportChange called successfully');
-      } catch (error) {
-        console.error('🧪 TEST: Error calling handleViewportChange:', error);
-      }
-      
-      // Immediate business loading function
-      const loadBusinessesNow = () => {
-        console.log('⚡ IMMEDIATE: Loading businesses now!');
-        handleViewportChange();
-      };
-
-      // Event handlers with reduced frequency for smoother experience
-      const moveEndHandler = () => {
-        console.log('🔄 Map move/zoom ended, triggering smooth business load...');
-        
-        // Update zoom and movement state
-        const zoom = map.getZoom();
-        const center = map.getCenter();
-        setCurrentZoom(zoom);
-        console.log(`Current zoom: ${zoom.toFixed(2)} | Center: [${center.lng.toFixed(6)}, ${center.lat.toFixed(6)}]`);
-        
-        // Mark movement as ended after a delay to allow for smooth loading
-        moveTimeoutRef.current = setTimeout(() => {
-          isMovingRef.current = false;
-          console.log('🎯 Map movement ended - ready for smooth loading');
-        }, 200);
-        
-        // Load businesses for new viewport
-        handleViewportChange(false);
-      };
-      
-      const idleHandler = () => {
-        console.log('🗺️ Map idle, loading businesses...');
-        handleViewportChange(false);
-      };
-      
-      // Reduced event listeners for smoother experience
-      map.on('moveend', moveEndHandler);
-      map.on('idle', idleHandler);
-      
-      // Initial business loading with smooth approach
-      console.log('🎯 Starting initial business loading...');
-      
-      // Try initial load
-      setTimeout(() => {
-        console.log('⏰ Initial business loading attempt');
-        handleViewportChange(true);
       }, 300);
-      
-      return () => {
-        map.off('moveend', moveEndHandler);
-        map.off('idle', idleHandler);
-        if (moveTimeoutRef.current) {
-          clearTimeout(moveTimeoutRef.current);
-        }
-      };
-    } else {
-      console.log('⚠️ Business loading setup pending...', { 
-        hasMap: !!map, 
-        mapLoaded,
-        mapStyle: map?.isStyleLoaded?.() 
-      });
-      
-      // Even if map isn't fully ready, try loading businesses
-      if (map) {
-        console.log('🔄 Map exists but not fully loaded, trying business load anyway...');
-        setTimeout(() => {
-          console.log('🔄 Delayed attempt - calling handleViewportChange...');
-          handleViewportChange();
-        }, 1000);
-      }
-    }
-  }, [map, mapLoaded, handleViewportChange, businesses.length]);
+    };
+    
+    // Single event listener for smooth performance
+    map.on('moveend', moveEndHandler);
+    
+    // Initial load - only once when map is ready
+    handleViewportChange(true);
+    
+    return () => {
+      map.off('moveend', moveEndHandler);
+      if (moveTimeout) clearTimeout(moveTimeout);
+    };
+  }, [map, mapLoaded, handleViewportChange]);
 
   // Handle old business layer removal and deck.gl integration
   useEffect(() => {
