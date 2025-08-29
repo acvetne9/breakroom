@@ -4,8 +4,10 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { useViewportMapData } from '../hooks/useViewportMapData';
 import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
 import { useVectorTileData } from '../hooks/useVectorTileData';
+import { useTileChecker } from '../hooks/useTileChecker';
 import { useIsMobile } from '../hooks/use-mobile';
 import { DeckGLOverlay } from './DeckGLOverlay';
+import { TileSetupModal } from './TileSetupModal';
 import { 
   extractParkFeatures, 
   extractWaterFeatures, 
@@ -69,10 +71,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     addVectorTileSources, 
     addVectorTileLayers 
   } = useVectorTileData();
+  const { tileStatus, checkAllTiles } = useTileChecker();
   const processedRef = useRef(false);
   const [deckGLViewState, setDeckGLViewState] = useState<any>(null);
   const [clusteredBusinesses, setClusteredBusinesses] = useState<any[]>([]);
   const [currentZoom, setCurrentZoom] = useState(12);
+  const [showTileSetup, setShowTileSetup] = useState(false);
 
   // Enhanced business click handler with viewport integration
   const handleBusinessClick = useCallback(async (business: any) => {
@@ -178,11 +182,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     setIsProcessing(true);
     
     try {
+      // Check if vector tiles are available first
+      if (tileStatus.checked && !tileStatus.allTilesReady) {
+        console.log('⚠️ Vector tiles not ready, showing setup modal...');
+        setShowTileSetup(true);
+        // Still proceed with GeoJSON loading as fallback
+      }
+      
       // Add vector tile sources and layers instead of loading large GeoJSON files
       console.log('📦 Adding vector tile sources...');
       const sourcesAdded = await addVectorTileSources(map);
       
-      if (sourcesAdded) {
+      if (sourcesAdded && tileStatus.allTilesReady) {
         console.log('🎨 Adding vector tile layers...');
         addVectorTileLayers(map);
         console.log('✅ Vector tiles setup completed - much more memory efficient!');
@@ -614,6 +625,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           <div className="text-xs">Try moving the map or zooming out to see more businesses</div>
         </div>
       )}
+      
+      {/* Tile Setup Modal */}
+      <TileSetupModal
+        open={showTileSetup}
+        onClose={() => setShowTileSetup(false)}
+        missingBusinessTiles={!tileStatus.businessTilesExist}
+        missingLandTiles={!tileStatus.landTilesExist}
+      />
     </div>
   );
 };
