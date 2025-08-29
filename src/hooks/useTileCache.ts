@@ -161,6 +161,12 @@ export const useTileCache = () => {
       arr.findIndex(b => b.id === business.id) === index
     );
     
+    // If no businesses found, treat as cache miss to trigger fresh data fetch
+    if (uniqueBusinesses.length === 0) {
+      console.log(`🎯 Tile cache MISS! ${tiles.length} tiles found but 0 businesses - fetching fresh data`);
+      return null;
+    }
+    
     console.log(`🎯 Tile cache HIT! ${tiles.length} tiles, ${uniqueBusinesses.length} unique businesses`);
     return uniqueBusinesses;
   }, []);

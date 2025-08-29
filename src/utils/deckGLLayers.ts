@@ -48,11 +48,19 @@ export const createBusinessScatterplotLayer = ({
       getRadius: [businesses.length],
       getFillColor: []
     },
-    // Fast transitions
+    // Smooth transitions for business appearance/disappearance
     transitions: {
       getPosition: {
-        duration: 300,
+        duration: 400,
         easing: (t: number) => t * t * (3 - 2 * t) // Smooth step
+      },
+      getRadius: {
+        duration: 300,
+        easing: (t: number) => t * t * (3 - 2 * t)
+      },
+      getFillColor: {
+        duration: 250,
+        easing: (t: number) => t * t * (3 - 2 * t)
       }
     },
     // Performance optimizations
@@ -131,8 +139,18 @@ export const createBusinessClusterLayer = (data: any[], onBusinessClick?: (busin
       getFillColor: [data]
     },
     transitions: {
-      getPosition: { duration: 400 },
-      getRadius: { duration: 300 }
+      getPosition: { 
+        duration: 500,
+        easing: (t: number) => t * t * (3 - 2 * t)
+      },
+      getRadius: { 
+        duration: 400,
+        easing: (t: number) => t * t * (3 - 2 * t)
+      },
+      getFillColor: {
+        duration: 350,
+        easing: (t: number) => t * t * (3 - 2 * t)
+      }
     }
   });
 };
