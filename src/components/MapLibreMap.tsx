@@ -199,56 +199,59 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           console.error('🚨 Tile access failed:', error);
         });
       
-      // Add a catch-all layer to show ANY features in the tiles
+      // Add proper layers for the NYC tiles based on your layer structure
       setTimeout(() => {
         try {
-          // First check what source layers exist
-          const sourceFeatures = mapInstance.querySourceFeatures('nyc-tiles');
-          console.log('🔍 Source features found:', sourceFeatures.length);
+          console.log('🔧 Adding NYC tile layers: water-lines, park-lines, roads');
           
-          if (sourceFeatures.length > 0) {
-            const sourceLayers = [...new Set(sourceFeatures.map(f => (f as any).sourceLayer))];
-            console.log('🔍 Actual source layers in your tiles:', sourceLayers);
-            
-            const sampleFeature = sourceFeatures[0];
-            console.log('🔍 Sample feature properties:', sampleFeature.properties);
-            console.log('🔍 Sample geometry type:', sampleFeature.geometry?.type);
-            
-            // Add a catch-all layer for the first source layer found
-            if (sourceLayers.length > 0) {
-              const firstSourceLayer = sourceLayers[0];
-              console.log('🔧 Adding catch-all layer for source:', firstSourceLayer);
-              
-              // Remove existing layers first
-              const existingLayers = ['water-lines', 'park-lines', 'roads'];
-              existingLayers.forEach(layerId => {
-                if (mapInstance.getLayer(layerId)) {
-                  mapInstance.removeLayer(layerId);
-                }
-              });
-              
-              // Add a simple circle layer that shows all features
-              mapInstance.addLayer({
-                id: 'debug-all-features',
-                type: 'circle',
-                source: 'nyc-tiles',
-                'source-layer': firstSourceLayer,
-                paint: {
-                  'circle-radius': 3,
-                  'circle-color': '#ff0000',
-                  'circle-opacity': 0.8,
-                  'circle-stroke-width': 1,
-                  'circle-stroke-color': '#ffffff'
-                }
-              });
-              
-              console.log('✅ Added debug layer - you should now see red dots for all features');
+          // Add water lines layer
+          mapInstance.addLayer({
+            id: 'water-layer',
+            type: 'line',
+            source: 'nyc-tiles',
+            'source-layer': 'water-lines',
+            paint: {
+              'line-color': '#4A90E2',
+              'line-width': 2,
+              'line-opacity': 0.8
             }
-          } else {
-            console.log('🚨 No features found in tiles - checking tile URL...');
-          }
+          });
+          
+          // Add park lines layer  
+          mapInstance.addLayer({
+            id: 'parks-layer',
+            type: 'line',
+            source: 'nyc-tiles',
+            'source-layer': 'park-lines',
+            paint: {
+              'line-color': '#7ED321',
+              'line-width': 1,
+              'line-opacity': 0.7
+            }
+          });
+          
+          // Add roads layer
+          mapInstance.addLayer({
+            id: 'roads-layer',
+            type: 'line',
+            source: 'nyc-tiles',
+            'source-layer': 'roads',
+            paint: {
+              'line-color': '#333333',
+              'line-width': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                10, 0.5,
+                16, 2
+              ],
+              'line-opacity': 0.8
+            }
+          });
+          
+          console.log('✅ Added all NYC tile layers successfully');
         } catch (error) {
-          console.error('🚨 Error in tile debugging:', error);
+          console.error('🚨 Error adding tile layers:', error);
         }
       }, 1000);
       
