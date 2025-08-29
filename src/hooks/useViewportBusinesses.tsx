@@ -35,37 +35,35 @@ export const useViewportBusinesses = () => {
     hasBounds: !!currentBounds 
   });
 
-  const loadBusinessesInViewport = useCallback(async (bounds: MapBounds, limit: number = 1000, isMoving: boolean = false) => {
+  const loadBusinessesInViewport = useCallback(async (bounds: MapBounds, limit: number = 5000, isMoving: boolean = false) => {
     console.log('🎯 loadBusinessesInViewport called with:', { bounds, limit, isMoving, currentLoading: loading });
 
+    // DEBUGGING: Temporarily bypass cache to force fresh data load  
+    console.log('🔧 DEBUGGING: Bypassing cache to force fresh database query');
+    
     // Check tile cache first - always return cached data immediately for smooth experience
-    const cachedBusinesses = getCachedBusinesses(bounds);
-    if (cachedBusinesses) {
-      console.log(`🚀 Tile cache HIT! Returning ${cachedBusinesses.length} cached businesses`);
-      setBusinesses(cachedBusinesses);
-      setCurrentBounds(bounds);
-      
-      // Preload adjacent areas in background
-      schedulePreload(bounds);
-      return;
-    }
+    // const cachedBusinesses = getCachedBusinesses(bounds);
+    // if (cachedBusinesses) {
+    //   console.log(`🚀 Tile cache HIT! Returning ${cachedBusinesses.length} cached businesses`);
+    //   setBusinesses(cachedBusinesses);
+    //   setCurrentBounds(bounds);
+    //   
+    //   // Preload adjacent areas in background
+    //   schedulePreload(bounds);
+    //   return;
+    // }
 
-    // Expand bounds for better caching
-    const expandedBounds = {
-      north: bounds.north + (bounds.north - bounds.south) * 0.2,
-      south: bounds.south - (bounds.north - bounds.south) * 0.2,
-      east: bounds.east + (bounds.east - bounds.west) * 0.2,
-      west: bounds.west - (bounds.east - bounds.west) * 0.2
-    };
-
-    // Check expanded bounds in tile cache
-    const expandedCached = getCachedBusinesses(expandedBounds);
-    if (expandedCached) {
-      console.log(`🚀 Expanded tile cache HIT! Returning ${expandedCached.length} cached businesses`);
-      setBusinesses(expandedCached);
-      setCurrentBounds(expandedBounds);
-      return;
-    }
+    // Use exact bounds for debugging to see actual viewport data
+    const expandedBounds = bounds;
+    
+    // DEBUGGING: Skip expanded cache check
+    // const expandedCached = getCachedBusinesses(expandedBounds);
+    // if (expandedCached) {
+    //   console.log(`🚀 Expanded tile cache HIT! Returning ${expandedCached.length} cached businesses`);
+    //   setBusinesses(expandedCached);
+    //   setCurrentBounds(expandedBounds);
+    //   return;
+    // }
 
     // Request deduplication
     const requestKey = `${expandedBounds.north}-${expandedBounds.south}-${expandedBounds.east}-${expandedBounds.west}-${limit}`;
