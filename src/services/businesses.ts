@@ -48,84 +48,79 @@ export async function getBusinessesBasic(limit: number = 2000): Promise<Business
   return basicBusinesses;
 }
 
-// NEW: Viewport-based business loading for better performance
-export async function getBusinessesInViewport(
+export const getBusinessesInViewport = async (
   bounds: { north: number; south: number; east: number; west: number },
-  limit: number = 2000 // Increased default limit
-): Promise<Business[]> {
-  console.log(`🔍 Fetching businesses in viewport:`, bounds, `limit: ${limit}`);
-  
+  limit: number = 2000
+): Promise<Business[]> => {
   try {
-    // Optimized query with spatial indexing consideration
-    const { data: businessesData, error } = await supabase
+    console.log(`🎯 Starting optimized spatial query for bounds:`, bounds);
+    
+    // Try the new spatial function first (PostGIS optimized)
+    const { data: spatialData, error: spatialError } = await supabase
+      .rpc('businesses_in_bbox', {
+        west: bounds.west,
+        south: bounds.south,
+        east: bounds.east,
+        north: bounds.north,
+        query_limit: limit
+      });
+
+    if (!spatialError && spatialData) {
+      console.log(`🚀 Spatial query successful: ${spatialData.length} businesses found`);
+      
+      const businesses: Business[] = spatialData.map((business) => ({
+        id: business.id,
+        name: business.name,
+        position: { lat: business.lat, lng: business.lng },
+        atmosphere: business.atmosphere || [],
+        salary: business.salary,
+        businessType: business.business_type,
+        place_id: business.place_id,
+        website: business.website,
+        url: business.url,
+        roles: [],
+      }));
+      
+      return businesses;
+    }
+
+    // Fallback to the old method if spatial query fails
+    console.log(`⚠️ Spatial query failed, falling back to coordinate filtering:`, spatialError);
+    
+    const { data, error } = await supabase
       .from('businesses')
-      .select('id, name, lat, lng')
+      .select('*')
       .gte('lat', bounds.south)
       .lte('lat', bounds.north)
-      .gte('lng', bounds.west)  
+      .gte('lng', bounds.west)
       .lte('lng', bounds.east)
-      .order('lat') // Spatial order for better indexing
       .limit(limit);
 
     if (error) {
-      console.error('❌ Supabase viewport error:', error);
+      console.error('❌ Error fetching businesses in viewport:', error);
       throw error;
     }
 
-    console.log(`📊 Found ${businessesData?.length || 0} businesses in viewport`);
-
-    if (!businessesData || businessesData.length === 0) {
-      console.log('⚠️ No businesses found in viewport bounds:', bounds);
-      return [];
-    }
-
-    // Efficient mapping with minimal object creation  
-    const businesses: Business[] = businessesData.map((business: any) => ({
+    const businesses: Business[] = (data || []).map((business) => ({
       id: business.id,
       name: business.name,
       position: { lat: business.lat, lng: business.lng },
-      atmosphere: [],
-      salary: '0',
+      atmosphere: business.atmosphere || [],
+      salary: business.salary,
+      businessType: business.business_type,
+      place_id: business.place_id,
+      website: business.website,
+      url: business.url,
       roles: [],
     }));
 
-    // Debug: Log business positions to check coordinate system
-    if (businesses.length > 0) {
-      const sampleBusiness = businesses[0];
-      console.log(`🎯 SAMPLE BUSINESS POSITION:`, {
-        id: sampleBusiness.id,
-        name: sampleBusiness.name,
-        lat: sampleBusiness.position.lat,
-        lng: sampleBusiness.position.lng,
-        viewportBounds: bounds
-      });
-      
-      // Check if businesses are actually in viewport
-      const inViewport = businesses.filter(b => 
-        b.position.lat >= bounds.south && b.position.lat <= bounds.north &&
-        b.position.lng >= bounds.west && b.position.lng <= bounds.east
-      );
-      console.log(`🎯 VIEWPORT CHECK: ${inViewport.length}/${businesses.length} businesses actually in viewport`);
-      
-      // Log coordinate ranges
-      const latRange = {
-        min: Math.min(...businesses.map(b => b.position.lat)),
-        max: Math.max(...businesses.map(b => b.position.lat))
-      };
-      const lngRange = {
-        min: Math.min(...businesses.map(b => b.position.lng)),
-        max: Math.max(...businesses.map(b => b.position.lng))
-      };
-      console.log(`🎯 COORDINATE RANGES:`, { latRange, lngRange });
-    }
-    
-    console.log(`✅ Returning ${businesses.length} businesses for rendering`);
+    console.log(`✅ Fallback query returned ${businesses.length} businesses`);
     return businesses;
   } catch (error) {
     console.error('❌ Error in getBusinessesInViewport:', error);
     return [];
   }
-}
+};
 
 export async function getFullBusinessDetails(businessId: string): Promise<Business | null> {
   // Fetch base business
