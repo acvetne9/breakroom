@@ -51,7 +51,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   selectedBusiness,
   landmarks = []
 }) => {
-  console.log('🔥 MapLibreMap function component executing');
   const isMobile = useIsMobile();
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
@@ -66,8 +65,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     clusterBusinesses 
   } = useViewportBusinesses();
   const processedRef = useRef(false);
-  const [deckGLViewState, setDeckGLViewState] = useState<any>(null);
-  const [clusteredBusinesses, setClusteredBusinesses] = useState<any[]>([]);
   const [currentZoom, setCurrentZoom] = useState(12);
 
   // Enhanced business click handler with viewport integration
@@ -87,7 +84,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const isMovingRef = useRef(false);
   const moveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Debounced viewport change handler - single, clean implementation
+  // Stable viewport change handler to prevent infinite re-renders
   const handleViewportChange = useCallback((isInitial: boolean = false) => {
     if (!map || !mapLoaded) return;
 
@@ -103,15 +100,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         west: bounds.getWest()
       };
 
-      // Update deck.gl view state
-      setDeckGLViewState({
-        longitude: center.lng,
-        latitude: center.lat,
-        zoom,
-        pitch: 0,
-        bearing: 0
-      });
-
       // Load businesses with appropriate limits
       const businessLimit = isMobile ? 12000 : 25000;
       loadBusinessesInViewport(viewportBounds, businessLimit, isMovingRef.current);
@@ -121,39 +109,32 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     } catch (error) {
       console.error('❌ Error in handleViewportChange:', error);
     }
-  }, [map, mapLoaded, loadBusinessesInViewport, isMobile]);
+  }, [map, mapLoaded, isMobile]); // Removed loadBusinessesInViewport to prevent re-renders
 
   const processMapFeatures = useCallback(async () => {
     // Prevent duplicate processing across re-mounts (StrictMode/dev or crashes)
     const alreadyGlobalProcessed = (window as any).__MAP_FEATURES_PROCESSED__ === true;
-    if (processedRef.current || alreadyGlobalProcessed || isProcessing) {
-      console.log('🚫 Map features already processed or processing. Skipping.');
+    if (processedRef.current || alreadyGlobalProcessed) {
       return;
     }
     if (!map || !mapLoaded) {
-      console.log(`🚫 Skipping map processing - map: ${!!map}, mapLoaded: ${mapLoaded}`);
       return;
     }
     
-    console.log(`🗺️ Custom vector tiles from data/tiles/ ready`);
     processedRef.current = true; // prevent duplicate runs in this mount
     (window as any).__MAP_FEATURES_PROCESSED__ = true; // prevent duplicate runs across mounts
     setIsProcessing(true);
     
-    console.log('🎉 Custom NYC vector tiles ready - NO OSM TILES');
+    console.log('🎉 NYC .pbf vector tiles ready');
     setIsProcessing(false);
-  }, [map, mapLoaded, isMobile]); // Removed dependencies that could cause re-runs
+  }, []); // No dependencies to prevent infinite re-renders
 
   // Initialize map
   useEffect(() => {
-    console.log('🚀 MapLibreMap component mounted - starting initialization');
-    console.log('🚀 mapRef.current:', mapRef.current);
     if (!mapRef.current) {
-      console.error('❌ Map container not found - DOM element missing');
       return;
     }
 
-    console.log('✅ Map container found, creating MapLibre instance...');
     let mapInstance: maplibregl.Map | null = null;
     let cleanedUp = false;
 
@@ -219,7 +200,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
 
     try {
-      console.log('🔧 Creating MapLibre instance...');
       mapInstance = new maplibregl.Map({
         container: mapRef.current!,
         style: baseStyle,
@@ -230,11 +210,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         renderWorldCopies: false,
         attributionControl: false
       });
-      console.log('✅ MapLibre instance created successfully:', mapInstance);
       
       // Set bounds immediately after creation
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
-      console.log('✅ Map bounds set');
       
     } catch (error) {
       console.error('❌ Error creating map instance:', error);
@@ -243,36 +221,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     mapInstance.on('load', () => {
       if (cleanedUp) return;
-      console.log('🗺️ Map loaded and visible - blue background should be showing');
-      console.log('🗺️ Vector tile source URL: /data/tiles/{z}/{x}/{y}.pbf');
-      console.log('🗺️ Map center:', mapInstance.getCenter());
-      console.log('🗺️ Map zoom:', mapInstance.getZoom());
-      console.log('🗺️ Map style loaded, checking layers...');
-      
-      // Check if layers exist
-      const layers = mapInstance.getStyle().layers;
-      console.log('🗺️ Available layers:', layers?.map(l => l.id));
-      
-      // Check sources
-      const sources = mapInstance.getStyle().sources;
-      console.log('🗺️ Available sources:', Object.keys(sources || {}));
-      
-      // Test if tiles are accessible by trying to query features
-      setTimeout(() => {
-        try {
-          const features = mapInstance.queryRenderedFeatures();
-          console.log('🗺️ Rendered features after 2s:', features.length);
-          if (features.length === 0) {
-            console.log('🚨 No features rendered - checking tile requests...');
-            // Force a tile request by checking viewport
-            const bounds = mapInstance.getBounds();
-            console.log('🗺️ Current viewport bounds:', bounds);
-          }
-        } catch (e) {
-          console.error('🚨 Error querying features:', e);
-        }
-      }, 2000);
-      
+      console.log('🗺️ Map loaded - .pbf tiles ready');
       setMapLoaded(true);
     });
 
@@ -282,43 +231,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       if (moveTimeoutRef.current) {
         clearTimeout(moveTimeoutRef.current);
       }
-      console.log('🎯 Map movement started');
     });
 
     mapInstance.on('error', e => {
       console.error('🚨 Map error:', e.error);
-    });
-
-    mapInstance.on('sourcedata', e => {
-      const sourceEvent = e as any;
-      if (sourceEvent.sourceId === 'nyc-tiles') {
-        console.log('🗺️ NYC tiles source event:', sourceEvent.isSourceLoaded ? 'LOADED' : 'LOADING');
-        if (sourceEvent.isSourceLoaded) {
-          console.log('🗺️ NYC tiles fully loaded!');
-        }
-      }
-    });
-
-    mapInstance.on('data', e => {
-      const dataEvent = e as any;
-      if (dataEvent.sourceId === 'nyc-tiles') {
-        console.log('🗺️ NYC tiles data event:', e.type);
-      }
-    });
-
-    mapInstance.on('render', () => {
-      const renderedFeatures = mapInstance.queryRenderedFeatures();
-      if (renderedFeatures.length > 0) {
-        console.log('🗺️ Features rendered:', renderedFeatures.length, 'sample:', renderedFeatures[0]?.properties);
-      }
-    });
-
-    // Add specific error handling for tile loading
-    mapInstance.on('error', e => {
-      console.error('🚨 Map error:', e.error);
-      if (e.error?.message?.includes('tiles')) {
-        console.error('🚨 Tile loading error detected!');
-      }
     });
 
     setMap(mapInstance);
@@ -339,10 +255,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Load map data after initialization (only once)
   useEffect(() => {
-    console.log(`🎯 Map data loading effect triggered - mapLoaded: ${mapLoaded}, map: ${!!map}, isProcessing: ${isProcessing}, processed: ${processedRef.current}`);
-    
-    if (mapLoaded && map && !isProcessing && !processedRef.current) {
-      console.log('⏰ Calling processMapFeatures immediately');
+    if (mapLoaded && map && !processedRef.current) {
       processMapFeatures();
     }
   }, [mapLoaded, map, processMapFeatures]);
@@ -469,7 +382,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded, landmarks, map]);
 
-  console.log('🚀 MapLibreMap render - businesses:', businesses.length);
+  
   return (
     <div
       ref={mapRef}
