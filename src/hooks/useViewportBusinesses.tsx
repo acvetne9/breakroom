@@ -35,10 +35,10 @@ export const useViewportBusinesses = () => {
     hasBounds: !!currentBounds 
   });
 
-  const loadBusinessesInViewport = useCallback(async (bounds: MapBounds, limit: number = 1000) => {
-    console.log('🎯 loadBusinessesInViewport called with:', { bounds, limit, currentLoading: loading });
+  const loadBusinessesInViewport = useCallback(async (bounds: MapBounds, limit: number = 1000, isMoving: boolean = false) => {
+    console.log('🎯 loadBusinessesInViewport called with:', { bounds, limit, isMoving, currentLoading: loading });
 
-    // Check tile cache first
+    // Check tile cache first - always return cached data immediately for smooth experience
     const cachedBusinesses = getCachedBusinesses(bounds);
     if (cachedBusinesses) {
       console.log(`🚀 Tile cache HIT! Returning ${cachedBusinesses.length} cached businesses`);
@@ -52,10 +52,10 @@ export const useViewportBusinesses = () => {
 
     // Expand bounds for better caching
     const expandedBounds = {
-      north: bounds.north + (bounds.north - bounds.south) * 0.15,
-      south: bounds.south - (bounds.north - bounds.south) * 0.15,
-      east: bounds.east + (bounds.east - bounds.west) * 0.15,
-      west: bounds.west - (bounds.east - bounds.west) * 0.15
+      north: bounds.north + (bounds.north - bounds.south) * 0.2,
+      south: bounds.south - (bounds.north - bounds.south) * 0.2,
+      east: bounds.east + (bounds.east - bounds.west) * 0.2,
+      west: bounds.west - (bounds.east - bounds.west) * 0.2
     };
 
     // Check expanded bounds in tile cache
@@ -81,23 +81,23 @@ export const useViewportBusinesses = () => {
       }
     }
 
-    // Clear timeouts
+    // Clear previous timeout
     if (loadTimeoutRef.current) {
       clearTimeout(loadTimeoutRef.current);
     }
 
-    // Immediate loading for empty state, debounced otherwise
+    // Smart debouncing: longer delays during movement, immediate for empty state
     const shouldLoadImmediately = businesses.length === 0;
-    const delay = shouldLoadImmediately ? 0 : 200; // Reduced debounce
+    const delay = shouldLoadImmediately ? 0 : (isMoving ? 800 : 400); // Longer delays for smooth panning
 
     loadTimeoutRef.current = setTimeout(async () => {
-      // Skip duplicate requests
+      // Skip if viewport hasn't changed significantly
       if (!shouldLoadImmediately && currentBounds && 
-          Math.abs(currentBounds.north - expandedBounds.north) < 0.003 &&
-          Math.abs(currentBounds.south - expandedBounds.south) < 0.003 &&
-          Math.abs(currentBounds.east - expandedBounds.east) < 0.003 &&
-          Math.abs(currentBounds.west - expandedBounds.west) < 0.003) {
-        console.log('🔄 Skipping duplicate request');
+          Math.abs(currentBounds.north - expandedBounds.north) < 0.002 &&
+          Math.abs(currentBounds.south - expandedBounds.south) < 0.002 &&
+          Math.abs(currentBounds.east - expandedBounds.east) < 0.002 &&
+          Math.abs(currentBounds.west - expandedBounds.west) < 0.002) {
+        console.log('🔄 Skipping similar viewport request');
         return;
       }
 
@@ -116,14 +116,30 @@ export const useViewportBusinesses = () => {
         // Cache in tile system
         setCachedBusinesses(expandedBounds, viewportBusinesses);
         
-        // Update state
-        setBusinesses(viewportBusinesses);
+        // Smooth update - merge with existing businesses for seamless transitions
+        setBusinesses(prev => {
+          const existingIds = new Set(prev.map(b => b.id));
+          const newBusinesses = viewportBusinesses.filter(b => !existingIds.has(b.id));
+          const combinedBusinesses = [...prev, ...newBusinesses];
+          
+          // Keep only businesses within expanded bounds for performance
+          const filteredBusinesses = combinedBusinesses.filter(business => 
+            business.position.lat >= expandedBounds.south && 
+            business.position.lat <= expandedBounds.north &&
+            business.position.lng >= expandedBounds.west && 
+            business.position.lng <= expandedBounds.east
+          );
+          
+          console.log(`🔄 Smooth merge: ${prev.length} existing + ${newBusinesses.length} new = ${filteredBusinesses.length} total`);
+          return filteredBusinesses;
+        });
+        
         setCurrentBounds(expandedBounds);
         
         // Schedule preloading
         schedulePreload(expandedBounds);
         
-        console.log(`✅ Updated state with ${viewportBusinesses.length} businesses`);
+        console.log(`✅ Updated state with smooth transitions`);
         
       } catch (error) {
         console.error('❌ Error loading viewport businesses:', error);

@@ -73,7 +73,7 @@ export const DeckGLOverlay: React.FC<DeckGLOverlayProps> = ({
     }
   }, [businesses, selectedBusinessId, onBusinessClick, enableClustering, isClusteredData, zoom, map]);
 
-  // Throttled layer updates for smooth panning
+  // Smooth layer updates with improved transitions
   useEffect(() => {
     if (!overlay || !overlayReady) return;
 
@@ -82,10 +82,13 @@ export const DeckGLOverlay: React.FC<DeckGLOverlayProps> = ({
       clearTimeout(overlayUpdateTimeout);
     }
 
+    // Smooth update with fade transitions
     overlayUpdateTimeout = setTimeout(() => {
-      overlay.setProps({ layers });
+      overlay.setProps({ 
+        layers
+      });
       console.log(`🎯 Updated deck.gl with ${layers.length} layers (${businesses.length} businesses)`);
-    }, 16); // ~60fps updates
+    }, 100); // Slightly longer delay for smoother transitions
 
     return () => {
       if (overlayUpdateTimeout) {

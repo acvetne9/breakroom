@@ -81,19 +81,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [fetchFullBusinessDetails, onBusinessClick]);
 
-  // Load businesses in viewport when map moves
-  const handleViewportChange = useCallback(() => {
+  // Movement state tracking for better debouncing
+  const isMovingRef = useRef(false);
+  const moveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load businesses in viewport when map moves with smooth debouncing
+  const handleViewportChange = useCallback((isInitial: boolean = false) => {
     console.log('🚨 handleViewportChange CALLED!', { 
       hasMap: !!map, 
       mapLoaded,
-      isStyleLoaded: map?.isStyleLoaded?.()
+      isInitial,
+      isMoving: isMovingRef.current
     });
 
     if (!map || !mapLoaded) {
       console.log('⚠️ handleViewportChange: map not ready', { 
         map: !!map, 
-        mapLoaded,
-        isStyleLoaded: map?.isStyleLoaded?.()
+        mapLoaded
       });
       return;
     }
@@ -134,11 +138,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         bearing: 0
       });
 
-      // Load businesses with increased limits and clustering
-      const businessLimit = isMobile ? 3000 : 8000; // Increased limits
+      // Load businesses with increased limits and movement awareness
+      const businessLimit = isMobile ? 3000 : 8000;
       console.log(`🎯 About to call loadBusinessesInViewport with ${businessLimit} limit for ${isMobile ? 'mobile' : 'desktop'}...`);
       
-      loadBusinessesInViewport(viewportBounds, businessLimit);
+      loadBusinessesInViewport(viewportBounds, businessLimit, isMovingRef.current);
       
       // Update zoom state
       setCurrentZoom(viewportData.zoom);
@@ -327,13 +331,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       setMapLoaded(true);
     });
 
-    // Log current zoom and center when map moves, trigger clustering
+    // Movement tracking with smooth business loading
+    mapInstance.on('movestart', () => {
+      isMovingRef.current = true;
+      if (moveTimeoutRef.current) {
+        clearTimeout(moveTimeoutRef.current);
+      }
+      console.log('🎯 Map movement started');
+    });
+
     mapInstance.on('moveend', () => {
       if (mapInstance) {
         const zoom = mapInstance.getZoom();
         const center = mapInstance.getCenter();
         setCurrentZoom(zoom);
         console.log(`Current zoom: ${zoom.toFixed(2)} | Center: [${center.lng.toFixed(6)}, ${center.lat.toFixed(6)}]`);
+        
+        // Mark movement as ended after a delay to allow for smooth loading
+        moveTimeoutRef.current = setTimeout(() => {
+          isMovingRef.current = false;
+          console.log('🎯 Map movement ended - ready for smooth loading');
+        }, 200);
       }
     });
 
@@ -394,62 +412,36 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         handleViewportChange();
       };
 
-      // Event handlers
+      // Event handlers with reduced frequency for smoother experience
       const moveEndHandler = () => {
-        console.log('🔄 Map move/zoom ended, triggering business load...');
-        handleViewportChange();
+        console.log('🔄 Map move/zoom ended, triggering smooth business load...');
+        handleViewportChange(false);
       };
       
-      const loadEndHandler = () => {
-        console.log('🗺️ Map fully loaded and idle, loading businesses...');
-        handleViewportChange();
-      };
-
-      const clickHandler = () => {
-        console.log('🖱️ Map clicked, ensuring businesses are loaded...');
-        setTimeout(() => handleViewportChange(), 100);
+      const idleHandler = () => {
+        console.log('🗺️ Map idle, loading businesses...');
+        handleViewportChange(false);
       };
       
-      // Multiple event listeners for comprehensive coverage
+      // Reduced event listeners for smoother experience
       map.on('moveend', moveEndHandler);
-      map.on('zoomend', moveEndHandler);
-      map.on('idle', loadEndHandler);
-      map.on('click', clickHandler);
-      map.on('load', loadEndHandler);
+      map.on('idle', idleHandler);
       
-      // AGGRESSIVE IMMEDIATE LOADING - try multiple approaches
-      console.log('🎯 Starting aggressive business loading...');
+      // Initial business loading with smooth approach
+      console.log('🎯 Starting initial business loading...');
       
-      // Try 1: Immediate
-      loadBusinessesNow();
-      
-      // Try 2: Next tick
-      setTimeout(loadBusinessesNow, 0);
-      
-      // Try 3: Short delay
+      // Try initial load
       setTimeout(() => {
-        console.log('⏰ 100ms delayed business loading attempt');
-        loadBusinessesNow();
-      }, 100);
-      
-      // Try 4: Medium delay
-      setTimeout(() => {
-        console.log('⏰ 500ms delayed business loading attempt');
-        loadBusinessesNow();
-      }, 500);
-      
-      // Try 5: Longer delay
-      setTimeout(() => {
-        console.log('⏰ 1s delayed business loading attempt');
-        loadBusinessesNow();
-      }, 1000);
+        console.log('⏰ Initial business loading attempt');
+        handleViewportChange(true);
+      }, 300);
       
       return () => {
         map.off('moveend', moveEndHandler);
-        map.off('zoomend', moveEndHandler);
-        map.off('idle', loadEndHandler);
-        map.off('click', clickHandler);
-        map.off('load', loadEndHandler);
+        map.off('idle', idleHandler);
+        if (moveTimeoutRef.current) {
+          clearTimeout(moveTimeoutRef.current);
+        }
       };
     } else {
       console.log('⚠️ Business loading setup pending...', { 
