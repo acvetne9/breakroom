@@ -331,28 +331,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       setMapLoaded(true);
     });
 
-    // Movement tracking with smooth business loading
+    // Movement tracking only - business loading will be handled separately
     mapInstance.on('movestart', () => {
       isMovingRef.current = true;
       if (moveTimeoutRef.current) {
         clearTimeout(moveTimeoutRef.current);
       }
       console.log('🎯 Map movement started');
-    });
-
-    mapInstance.on('moveend', () => {
-      if (mapInstance) {
-        const zoom = mapInstance.getZoom();
-        const center = mapInstance.getCenter();
-        setCurrentZoom(zoom);
-        console.log(`Current zoom: ${zoom.toFixed(2)} | Center: [${center.lng.toFixed(6)}, ${center.lat.toFixed(6)}]`);
-        
-        // Mark movement as ended after a delay to allow for smooth loading
-        moveTimeoutRef.current = setTimeout(() => {
-          isMovingRef.current = false;
-          console.log('🎯 Map movement ended - ready for smooth loading');
-        }, 200);
-      }
     });
 
     mapInstance.on('error', e => {
@@ -415,6 +400,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       // Event handlers with reduced frequency for smoother experience
       const moveEndHandler = () => {
         console.log('🔄 Map move/zoom ended, triggering smooth business load...');
+        
+        // Update zoom and movement state
+        const zoom = map.getZoom();
+        const center = map.getCenter();
+        setCurrentZoom(zoom);
+        console.log(`Current zoom: ${zoom.toFixed(2)} | Center: [${center.lng.toFixed(6)}, ${center.lat.toFixed(6)}]`);
+        
+        // Mark movement as ended after a delay to allow for smooth loading
+        moveTimeoutRef.current = setTimeout(() => {
+          isMovingRef.current = false;
+          console.log('🎯 Map movement ended - ready for smooth loading');
+        }, 200);
+        
+        // Load businesses for new viewport
         handleViewportChange(false);
       };
       
