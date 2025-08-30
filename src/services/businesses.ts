@@ -11,7 +11,8 @@ export async function getBusinessesBasic(): Promise<Business[]> {
   const { data: businessesData, error } = await supabase
     .from('businesses')
     .select('id, name, lat, lng')
-    .order('lat'); // Load all businesses for yellow dots
+    .order('lat') // Simple ordering first to avoid complex PostGIS queries
+    .limit(5000);
 
   if (error) {
     console.error('❌ Supabase error:', error);
