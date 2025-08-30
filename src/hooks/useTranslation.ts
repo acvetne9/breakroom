@@ -63,18 +63,15 @@ export function useTranslation() {
         isTranslated: data.sourceLanguage !== userLanguage
       }
 
-      // Cache the result only if missing
-      setTranslationCache(prev => {
-        if (prev[cacheKey]) return prev
-        return {
-          ...prev,
-          [cacheKey]: {
-            translatedText: result.translatedText,
-            sourceLanguage: result.sourceLanguage,
-            targetLanguage: result.targetLanguage
-          }
+      // Cache the result
+      setTranslationCache(prev => ({
+        ...prev,
+        [cacheKey]: {
+          translatedText: result.translatedText,
+          sourceLanguage: result.sourceLanguage,
+          targetLanguage: result.targetLanguage
         }
-      })
+      }))
 
       return result
     } catch (error) {

@@ -42,7 +42,7 @@ export function TranslatedText({ text, className = '', showIndicator = true }: T
     }
 
     loadTranslation()
-  }, [text])
+  }, [text, translateText])
 
   if (isLoading) {
     return <Skeleton className={`h-4 w-full ${className}`} />

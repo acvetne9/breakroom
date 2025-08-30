@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Minus, Smartphone } from 'lucide-react';
 import JobSearchDropdown from './JobSearchDropdown';
-import BusinessSearchDropdown from './BusinessSearchDropdown';
+import LocationSearchInput from './LocationSearchInput';
 import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 import { useDevice } from '@/contexts/DeviceContext';
@@ -362,15 +362,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             </div>
 
             <div className="flex items-center space-x-3">
-              <BusinessSearchDropdown
+              {/* FIXED: Replace regular input with LocationSearchInput */}
+              <LocationSearchInput
                 value={currentJob.location}
                 onChange={handleCurrentJobLocationChange}
                 onBlur={handleCurrentJobLocationBlur}
                 className="app-input flex-1"
-                placeholder="Search businesses..."
-                salary={currentJob.salary}
-                role={currentJob.role}
-                timePeriod={currentTimePeriod}
+                placeholder="Search NYC locations..."
               />
               <div className="w-6"></div>
             </div>
@@ -431,15 +429,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 </div>
 
                 <div className="flex items-center space-x-3">
-                  <BusinessSearchDropdown
+                  <LocationSearchInput
                     value={job.location}
                     onChange={value => updatePastJob(job.id, 'location', value)}
                     onBlur={() => handlePastJobBlur(job.id, 'location', job.location)}
                     className="app-input flex-1"
-                    placeholder="Search businesses..."
-                    salary={job.salary}
-                    role={job.role}
-                    timePeriod={pastJobTimePeriods[job.id]}
+                    placeholder="Search NYC locations..."
                   />
                   <button 
                     onClick={() => removePastJob(job.id)} 
