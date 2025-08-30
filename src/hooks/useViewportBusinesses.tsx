@@ -104,10 +104,15 @@ export const useViewportBusinesses = () => {
         // Cache in tile system
         setCachedBusinesses(expandedBounds, viewportBusinesses);
         
-        // Accumulate businesses (Google Maps style) - don't replace existing ones
+        // Stable accumulation - maintain existing business positions
         setBusinesses(prev => {
-          const existingIds = new Set(prev.map(b => b.id));
-          const newBusinesses = viewportBusinesses.filter(b => !existingIds.has(b.id));
+          // Create a map of existing businesses by ID for fast lookup
+          const existingMap = new Map(prev.map(b => [b.id, b]));
+          
+          // Only add truly new businesses
+          const newBusinesses = viewportBusinesses.filter(b => !existingMap.has(b.id));
+          
+          // Return stable array - existing businesses keep their positions
           return [...prev, ...newBusinesses];
         });
         setCurrentBounds(expandedBounds);

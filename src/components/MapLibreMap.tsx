@@ -52,6 +52,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Enhanced business click handler with viewport integration
   const handleBusinessClick = useCallback(async (business: any) => {
+    console.log('🎯 MapLibreMap handleBusinessClick called:', business.name);
+    
+    // Zoom to business first
+    if (map) {
+      map.easeTo({
+        center: [business.position.lng, business.position.lat],
+        zoom: Math.max(map.getZoom(), 16),
+        duration: 800
+      });
+    }
+    
     // Fetch full details if needed
     if (!business.atmosphere?.length && !business.roles?.length) {
       const fullBusiness = await fetchFullBusinessDetails(business.id);
@@ -61,7 +72,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     } else if (onBusinessClick) {
       onBusinessClick(business);
     }
-  }, [fetchFullBusinessDetails, onBusinessClick]);
+  }, [fetchFullBusinessDetails, onBusinessClick, map]);
 
   // Movement state tracking for better debouncing
   const isMovingRef = useRef(false);

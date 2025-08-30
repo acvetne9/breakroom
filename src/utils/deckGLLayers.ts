@@ -38,6 +38,7 @@ export const createBusinessScatterplotLayer = ({
     getLineColor: [255, 255, 255, 200], // Semi-transparent white stroke
     onClick: onBusinessClick ? (info) => {
       if (info.object) {
+        console.log('🎯 Business clicked:', info.object.name);
         onBusinessClick(info.object as Business);
       }
     } : undefined,
@@ -128,6 +129,7 @@ export const createBusinessClusterLayer = (data: any[], onBusinessClick?: (busin
             });
           }
         } else {
+          console.log('🎯 Individual business clicked from cluster:', item.name);
           onBusinessClick?.(item);
         }
       }
