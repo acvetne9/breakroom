@@ -70,108 +70,145 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return;
     }
     
-    console.log(`🗺️ Loading map data ${isMobile ? '(mobile-lite mode)' : '(full desktop mode)'}...`);
+    console.log(`🗺️ Loading map data with vector tiles...`);
     processedRef.current = true; // prevent duplicate runs in this mount
     (window as any).__MAP_FEATURES_PROCESSED__ = true; // prevent duplicate runs across mounts
     setIsProcessing(true);
     
     try {
-      const { features, landData } = await loadAllDataCenterOut();
-      console.log('📦 Received data from loadAllDataCenterOut:', {
-        featuresCount: features?.length || 0,
-        landDataExists: !!landData,
-        landFeatureCount: landData?.features?.length || 0,
-        isMobile
-      });
-
-      // Add land layer first
-      if (landData) {
-        console.log(`🏞️ Adding land layer (${landData.features?.length} features)...`);
-        addLandLayer(map, landData);
-        console.log('✅ Land layer added');
-      } else {
+      // Load land layer first (still using GeoJSON for land)
+      try {
+        const landResponse = await fetch('/data/nyc_land.geojson');
+        const landData = await landResponse.json();
+        if (landData) {
+          console.log(`🏞️ Adding land layer...`);
+          addLandLayer(map, landData);
+          console.log('✅ Land layer added');
+        }
+      } catch (error) {
         console.log('⚠️ No land data available - this will cause visibility issues!');
       }
 
-      if (features?.length) {
-        console.log(`📍 Processing ${features.length} main features...`);
-        // Create feature collection for processing
-        const mainData = {
-          type: 'FeatureCollection' as const,
-          features
-        };
+      // Add vector tile source
+      const tilesUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+      console.log('🧭 Using tiles URL:', tilesUrl);
+      
+      if (!map.getSource('nyc-tiles')) {
+        map.addSource('nyc-tiles', {
+          type: 'vector',
+          tiles: [tilesUrl],
+          minzoom: 8,
+          maxzoom: 16
+        });
+        console.log('✅ Added vector tile source');
+      }
 
-        if (isMobile) {
-          // Mobile mode: Load all features with chunked roads
-          console.log('📱 Mobile mode: Loading all features with chunked road loading');
-          const parkFeatures = extractParkFeatures(mainData);
-          const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
-          const waterFeatures = extractWaterFeatures(mainData, parkFeatureIds);
-          const roadFeatures = extractRoadFeatures(mainData);
-          const waterwayFeatures = extractWaterwayFeatures(mainData);
-
-          console.log(`🎯 Mobile extracted features:
-            - Parks: ${parkFeatures.length}
-            - Water: ${waterFeatures.length} 
-            - Roads: ${roadFeatures.length} (will load in chunks)
-            - Waterways: ${waterwayFeatures.length}`);
-
-          // Add non-road layers first
-          console.log('🎨 Adding non-road layers...');
-          addParksLayer(map, parkFeatures);
-          console.log(`✅ Parks layer added (${parkFeatures.length} features)`);
-          addWaterLayer(map, waterFeatures);
-          console.log(`✅ Water layer added (${waterFeatures.length} features)`);
-          addWaterwaysLayer(map, waterwayFeatures);
-          console.log(`✅ Waterways layer added (${waterwayFeatures.length} features)`);
+      // Wait for source to load and probe for layer names
+      const maxAttempts = 10;
+      let attempt = 0;
+      let sourceLayerName = null;
+      
+      while (attempt < maxAttempts && !sourceLayerName) {
+        attempt++;
+        const delay = Math.min(200 * attempt, 1000);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        const features = map.querySourceFeatures('nyc-tiles');
+        console.log(`🔍 Query attempt ${attempt} (${delay}ms delay): ${features.length} features`);
+        
+        if (features.length > 0) {
+          const uniqueLayers = new Set(features.map(f => (f as any).sourceLayer).filter(Boolean));
+          console.log('🎯 Found source layers:', Array.from(uniqueLayers));
           
-          // Load roads in chunks to prevent memory crash
-          console.log('🛣️ Starting chunked road loading...');
-          await addRoadsLayerChunked(map, roadFeatures, true);
-          console.log(`✅ All roads loaded via chunking (${roadFeatures.length} features)`);
-        } else {
-          // Desktop mode: Load all features
-          console.log('🖥️ Desktop mode: Loading all features');
-          const parkFeatures = extractParkFeatures(mainData);
-          const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
-          const waterFeatures = extractWaterFeatures(mainData, parkFeatureIds);
-          const roadFeatures = extractRoadFeatures(mainData);
-          const waterwayFeatures = extractWaterwayFeatures(mainData);
+          // Try to find a suitable layer name
+          const layerCandidates = ['examplepoints', 'default', 'features'];
+          for (const candidate of layerCandidates) {
+            if (uniqueLayers.has(candidate)) {
+              sourceLayerName = candidate;
+              break;
+            }
+          }
+          
+          // If no known candidate, use the first available layer
+          if (!sourceLayerName && uniqueLayers.size > 0) {
+            sourceLayerName = Array.from(uniqueLayers)[0];
+          }
+          
+          if (sourceLayerName) {
+            console.log(`🧭 Using source layer: ${sourceLayerName}`);
+            break;
+          }
+        }
+      }
 
-          console.log(`🎯 Desktop extracted features:
-            - Parks: ${parkFeatures.length}
-            - Water: ${waterFeatures.length} 
-            - Roads: ${roadFeatures.length}
-            - Waterways: ${waterwayFeatures.length}`);
+      if (sourceLayerName) {
+        // Add vector tile layers with proper styling
+        console.log('🎨 Adding vector tile layers...');
+        
+        // Add parks layer
+        if (!map.getLayer('parks-vector')) {
+          map.addLayer({
+            id: 'parks-vector',
+            type: 'fill',
+            source: 'nyc-tiles',
+            'source-layer': sourceLayerName,
+            filter: ['in', ['get', 'leisure'], ['literal', ['park', 'garden', 'playground', 'recreation_ground']]],
+            paint: {
+              'fill-color': '#87C17A', // Same green as GeoJSON version
+              'fill-opacity': 1.0
+            }
+          });
+          console.log('✅ Added parks vector layer');
+        }
 
-          // Add all layers for desktop
-          console.log('🎨 Adding all desktop layers...');
-          addParksLayer(map, parkFeatures);
-          console.log(`✅ Parks layer added (${parkFeatures.length} features)`);
-          addWaterLayer(map, waterFeatures);
-          console.log(`✅ Water layer added (${waterFeatures.length} features)`);
-          addWaterwaysLayer(map, waterwayFeatures);
-          console.log(`✅ Waterways layer added (${waterwayFeatures.length} features)`);
-          addRoadsLayer(map, roadFeatures);
-          console.log(`✅ Roads layer added (${roadFeatures.length} features)`);
+        // Add water layer
+        if (!map.getLayer('water-vector')) {
+          map.addLayer({
+            id: 'water-vector',
+            type: 'fill',
+            source: 'nyc-tiles',
+            'source-layer': sourceLayerName,
+            filter: ['in', ['get', 'natural'], ['literal', ['water', 'bay', 'lake']]],
+            paint: {
+              'fill-color': '#6CA4E1', // Same blue as GeoJSON version
+              'fill-opacity': 1.0
+            }
+          });
+          console.log('✅ Added water vector layer');
+        }
+
+        // Add roads layer
+        if (!map.getLayer('roads-vector')) {
+          map.addLayer({
+            id: 'roads-vector',
+            type: 'line',
+            source: 'nyc-tiles',
+            'source-layer': sourceLayerName,
+            filter: ['has', 'highway'],
+            paint: {
+              'line-color': '#666666', // Same gray as GeoJSON version
+              'line-width': 2
+            }
+          });
+          console.log('✅ Added roads vector layer');
         }
 
         // Ensure proper layer ordering
-        ensureLayerOrder(map);
-        console.log('✅ Layer ordering ensured');
+        const layers = ['parks-vector', 'water-vector', 'roads-vector'];
+        layers.forEach(layerId => {
+          if (map.getLayer(layerId)) {
+            map.moveLayer(layerId);
+          }
+        });
+        
+        console.log('✅ Vector tile layers added and ordered');
         
         // Log current map layers
         const mapLayers = map.getStyle().layers || [];
         console.log('🗺️ Current map layers:', mapLayers.map(l => `${l.id} (${l.type})`));
         
-        // Check if map is in correct bounds
-        const bounds = map.getBounds();
-        const center = map.getCenter();
-        console.log('🎯 Map bounds:', bounds.toArray());
-        console.log('🎯 Map center:', [center.lng, center.lat]);
-        console.log('🎯 Map zoom:', map.getZoom());
       } else {
-        console.log('⚠️ No main features to process');
+        console.log('⚠️ Could not determine source layer name from vector tiles');
       }
       
       console.log('🎉 Map processing completed successfully');
@@ -183,7 +220,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     } finally {
       setIsProcessing(false);
     }
-  }, [map, mapLoaded, isMobile]); // Removed dependencies that could cause re-runs
+  }, [map, mapLoaded, isMobile]);
 
   // Initialize map
   useEffect(() => {
