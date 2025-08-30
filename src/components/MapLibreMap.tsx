@@ -2,10 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useViewportMapData } from '../hooks/useViewportMapData';
-import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
-
 import { useIsMobile } from '../hooks/use-mobile';
-import { DeckGLOverlay } from './DeckGLOverlay';
 import { 
   extractParkFeatures, 
   extractWaterFeatures, 
@@ -19,6 +16,7 @@ import {
   addWaterwaysLayer,
   addRoadsLayer,
   addRoadsLayerChunked,
+  addBusinessesLayer,
   ensureLayerOrder
 } from '../utils/mapLayers';
 
@@ -46,7 +44,7 @@ interface MapLibreMapProps {
 }
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
-  businesses: propBusinesses, // Rename to avoid confusion with viewport businesses
+  businesses,
   onBusinessClick,
   selectedBusiness,
   landmarks = []
@@ -56,116 +54,183 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
-  const { isProcessing, setIsProcessing, loadAllDataCenterOut } = useViewportMapData();
-  const { 
-    businesses, 
-    loading: businessesLoading, 
-    loadBusinessesInViewport, 
-    fetchFullBusinessDetails,
-    clusterBusinesses 
-  } = useViewportBusinesses();
+  const { isProcessing, setIsProcessing, loadAllDataCenterOut, allDataLoaded } = useViewportMapData();
+  const lastLoadedBoundsRef = useRef<string | null>(null);
   const processedRef = useRef(false);
-  const [currentZoom, setCurrentZoom] = useState(12);
-  const layersAddedRef = useRef(false);
-
-  // Enhanced business click handler with viewport integration
-  const handleBusinessClick = useCallback(async (business: any) => {
-    // Fetch full details if needed
-    if (!business.atmosphere?.length && !business.roles?.length) {
-      const fullBusiness = await fetchFullBusinessDetails(business.id);
-      if (fullBusiness && onBusinessClick) {
-        onBusinessClick(fullBusiness);
-      }
-    } else if (onBusinessClick) {
-      onBusinessClick(business);
-    }
-  }, [fetchFullBusinessDetails, onBusinessClick]);
-
-  // Movement state tracking for better debouncing
-  const isMovingRef = useRef(false);
-  const moveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Stable viewport change handler to prevent infinite re-renders
-  const handleViewportChange = useCallback((isInitial: boolean = false) => {
-    if (!map || !mapLoaded) return;
-
-    try {
-      const bounds = map.getBounds();
-      const center = map.getCenter();
-      const zoom = map.getZoom();
-      
-      const viewportBounds = {
-        north: bounds.getNorth(),
-        south: bounds.getSouth(),
-        east: bounds.getEast(),
-        west: bounds.getWest()
-      };
-
-      // Load businesses with appropriate limits
-      const businessLimit = isMobile ? 12000 : 25000;
-      loadBusinessesInViewport(viewportBounds, businessLimit, isMovingRef.current);
-      
-      setCurrentZoom(zoom);
-      
-    } catch (error) {
-      console.error('❌ Error in handleViewportChange:', error);
-    }
-  }, [map, mapLoaded, isMobile]); // Removed loadBusinessesInViewport to prevent re-renders
 
   const processMapFeatures = useCallback(async () => {
     // Prevent duplicate processing across re-mounts (StrictMode/dev or crashes)
     const alreadyGlobalProcessed = (window as any).__MAP_FEATURES_PROCESSED__ === true;
-    if (processedRef.current || alreadyGlobalProcessed) {
+    if (processedRef.current || alreadyGlobalProcessed || isProcessing) {
+      console.log('🚫 Map features already processed or processing. Skipping.');
       return;
     }
     if (!map || !mapLoaded) {
+      console.log(`🚫 Skipping map processing - map: ${!!map}, mapLoaded: ${mapLoaded}`);
       return;
     }
     
+    console.log(`🗺️ Loading map data ${isMobile ? '(mobile-lite mode)' : '(full desktop mode)'}...`);
     processedRef.current = true; // prevent duplicate runs in this mount
     (window as any).__MAP_FEATURES_PROCESSED__ = true; // prevent duplicate runs across mounts
     setIsProcessing(true);
     
-    console.log('🎉 NYC .pbf vector tiles ready');
-    setIsProcessing(false);
-  }, []); // No dependencies to prevent infinite re-renders
+    try {
+      const { features, landData } = await loadAllDataCenterOut();
+      console.log('📦 Received data from loadAllDataCenterOut:', {
+        featuresCount: features?.length || 0,
+        landDataExists: !!landData,
+        landFeatureCount: landData?.features?.length || 0,
+        isMobile
+      });
+
+      // Add land layer first
+      if (landData) {
+        console.log(`🏞️ Adding land layer (${landData.features?.length} features)...`);
+        addLandLayer(map, landData);
+        console.log('✅ Land layer added');
+      } else {
+        console.log('⚠️ No land data available - this will cause visibility issues!');
+      }
+
+      if (features?.length) {
+        console.log(`📍 Processing ${features.length} main features...`);
+        // Create feature collection for processing
+        const mainData = {
+          type: 'FeatureCollection' as const,
+          features
+        };
+
+        if (isMobile) {
+          // Mobile mode: Load all features with chunked roads
+          console.log('📱 Mobile mode: Loading all features with chunked road loading');
+          const parkFeatures = extractParkFeatures(mainData);
+          const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
+          const waterFeatures = extractWaterFeatures(mainData, parkFeatureIds);
+          const roadFeatures = extractRoadFeatures(mainData);
+          const waterwayFeatures = extractWaterwayFeatures(mainData);
+
+          console.log(`🎯 Mobile extracted features:
+            - Parks: ${parkFeatures.length}
+            - Water: ${waterFeatures.length} 
+            - Roads: ${roadFeatures.length} (will load in chunks)
+            - Waterways: ${waterwayFeatures.length}`);
+
+          // Add non-road layers first
+          console.log('🎨 Adding non-road layers...');
+          addParksLayer(map, parkFeatures);
+          console.log(`✅ Parks layer added (${parkFeatures.length} features)`);
+          addWaterLayer(map, waterFeatures);
+          console.log(`✅ Water layer added (${waterFeatures.length} features)`);
+          addWaterwaysLayer(map, waterwayFeatures);
+          console.log(`✅ Waterways layer added (${waterwayFeatures.length} features)`);
+          
+          // Load roads in chunks to prevent memory crash
+          console.log('🛣️ Starting chunked road loading...');
+          await addRoadsLayerChunked(map, roadFeatures, true);
+          console.log(`✅ All roads loaded via chunking (${roadFeatures.length} features)`);
+        } else {
+          // Desktop mode: Load all features
+          console.log('🖥️ Desktop mode: Loading all features');
+          const parkFeatures = extractParkFeatures(mainData);
+          const parkFeatureIds = new Set(parkFeatures.map(f => f.properties?.id || f.id).filter(Boolean));
+          const waterFeatures = extractWaterFeatures(mainData, parkFeatureIds);
+          const roadFeatures = extractRoadFeatures(mainData);
+          const waterwayFeatures = extractWaterwayFeatures(mainData);
+
+          console.log(`🎯 Desktop extracted features:
+            - Parks: ${parkFeatures.length}
+            - Water: ${waterFeatures.length} 
+            - Roads: ${roadFeatures.length}
+            - Waterways: ${waterwayFeatures.length}`);
+
+          // Add all layers for desktop
+          console.log('🎨 Adding all desktop layers...');
+          addParksLayer(map, parkFeatures);
+          console.log(`✅ Parks layer added (${parkFeatures.length} features)`);
+          addWaterLayer(map, waterFeatures);
+          console.log(`✅ Water layer added (${waterFeatures.length} features)`);
+          addWaterwaysLayer(map, waterwayFeatures);
+          console.log(`✅ Waterways layer added (${waterwayFeatures.length} features)`);
+          addRoadsLayer(map, roadFeatures);
+          console.log(`✅ Roads layer added (${roadFeatures.length} features)`);
+        }
+
+        // Ensure proper layer ordering
+        ensureLayerOrder(map);
+        console.log('✅ Layer ordering ensured');
+        
+        // Log current map layers
+        const mapLayers = map.getStyle().layers || [];
+        console.log('🗺️ Current map layers:', mapLayers.map(l => `${l.id} (${l.type})`));
+        
+        // Check if map is in correct bounds
+        const bounds = map.getBounds();
+        const center = map.getCenter();
+        console.log('🎯 Map bounds:', bounds.toArray());
+        console.log('🎯 Map center:', [center.lng, center.lat]);
+        console.log('🎯 Map zoom:', map.getZoom());
+      } else {
+        console.log('⚠️ No main features to process');
+      }
+      
+      console.log('🎉 Map processing completed successfully');
+    } catch (error) {
+      console.error('❌ Error processing map features:', error);
+      // On error, reset flags so user can retry
+      processedRef.current = false;
+      (window as any).__MAP_FEATURES_PROCESSED__ = false;
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [map, mapLoaded, isMobile]); // Removed dependencies that could cause re-runs
 
   // Initialize map
   useEffect(() => {
     if (!mapRef.current) {
+      console.error('Map container not found');
       return;
     }
 
+    // DEBUG: Check container dimensions and visibility
+    const container = mapRef.current;
+    const computedStyle = window.getComputedStyle(container);
+    const rect = container.getBoundingClientRect();
+    
+    console.log('Map container debug info:', {
+      width: rect.width,
+      height: rect.height,
+      display: computedStyle.display,
+      visibility: computedStyle.visibility,
+      opacity: computedStyle.opacity,
+      zIndex: computedStyle.zIndex,
+      position: computedStyle.position,
+      top: computedStyle.top,
+      left: computedStyle.left,
+      transform: computedStyle.transform
+    });
+
+    if (rect.width === 0 || rect.height === 0) {
+      console.error('Map container has zero dimensions!', { width: rect.width, height: rect.height });
+    }
+
+    console.log('Initializing map with container:', mapRef.current);
     let mapInstance: maplibregl.Map | null = null;
     let cleanedUp = false;
 
-    const absoluteTilesUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-    console.log('🧭 Using tiles URL:', absoluteTilesUrl);
-
     const baseStyle = {
       version: 8 as const,
-      sources: {
-        'nyc-tiles': {
-          type: 'vector' as const,
-          tiles: [absoluteTilesUrl],
-          minzoom: 10,
-          maxzoom: 16,
-          // Add scheme to handle potential encoding issues
-          scheme: 'xyz' as const
-        }
-      },
-      glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-        layers: [
-          {
-            id: 'background',
-            type: 'background' as const,
-            paint: { 'background-color': '#B3E5FC' }
-          }
-          // Removed hardcoded layers - will add dynamically based on actual tile content
-        ]
+      sources: {},
+      glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
+      layers: [{
+        id: 'background',
+        type: 'background' as const,
+        paint: { 'background-color': '#B3E5FC' }
+      }]
     };
 
     try {
+      console.log('Creating MapLibre instance...');
       mapInstance = new maplibregl.Map({
         container: mapRef.current!,
         style: baseStyle,
@@ -176,296 +241,33 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         renderWorldCopies: false,
         attributionControl: false
       });
+      console.log('MapLibre instance created:', mapInstance);
       
       // Set bounds immediately after creation
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
       
     } catch (error) {
-      console.error('❌ Error creating map instance:', error);
+      console.error('Error creating map instance:', error);
       return;
     }
 
     mapInstance.on('load', () => {
       if (cleanedUp) return;
-      console.log('🗺️ Map loaded - starting tile debugging');
-      
-      // Immediate tile access test
-      fetch('/data/tiles/12/1203/1536.pbf')
-        .then(response => {
-          console.log('🔍 Tile URL test:', response.status, response.ok ? '✅' : '❌');
-          if (!response.ok) {
-            console.error('🚨 Tiles are not accessible at /data/tiles/ - check if files exist');
-          }
-          return response.arrayBuffer();
-        })
-        .then(buffer => {
-          console.log('🔍 Tile size:', buffer.byteLength, 'bytes');
-        })
-        .catch(error => {
-          console.error('🚨 Tile access failed:', error);
-        });
-      
-      // Defer adding layers until the source reports as fully loaded via `sourcedata`
-      console.log('⏳ Waiting for nyc-tiles source to fully load before adding layers');
-      
+      console.log('🗺️ Map loaded and visible - blue background should be showing');
       setMapLoaded(true);
     });
 
-    // Movement tracking only - business loading will be handled separately
-    mapInstance.on('movestart', () => {
-      isMovingRef.current = true;
-      if (moveTimeoutRef.current) {
-        clearTimeout(moveTimeoutRef.current);
+    // Log current zoom and center when map moves
+    mapInstance.on('moveend', () => {
+      if (mapInstance) {
+        const zoom = mapInstance.getZoom();
+        const center = mapInstance.getCenter();
+        console.log(`Current zoom: ${zoom.toFixed(2)} | Center: [${center.lng.toFixed(6)}, ${center.lat.toFixed(6)}]`);
       }
     });
 
     mapInstance.on('error', e => {
-      console.error('🚨 Map error:', e.error);
-    });
-    
-    // Enhanced tile loading debug with comprehensive diagnostics
-    mapInstance.on('sourcedata', e => {
-      if (e.sourceId === 'nyc-tiles') {
-        console.log('🔄 NYC tiles event:', e.isSourceLoaded ? 'LOADED' : 'LOADING', e.dataType, e);
-        
-        // Log tile-specific events for detailed debugging
-        if ((e as any).dataType === 'tile') {
-          const coord = (e as any).coord;
-          console.log(`📍 Tile loaded: ${coord ? `${coord.z}/${coord.x}/${coord.y}` : 'unknown'}`);
-          
-          // Immediately query this specific tile's features
-          setTimeout(() => {
-            try {
-              const allFeatures = mapInstance.querySourceFeatures('nyc-tiles');
-              const sourceLayers = Array.from(new Set(allFeatures.map((f: any) => f.sourceLayer)));
-              console.log(`🔍 After tile load - Features: ${allFeatures.length}, Source-layers: [${sourceLayers.join(', ')}]`);
-              
-              if (allFeatures.length > 0) {
-                console.log('📋 Sample feature:', JSON.stringify(allFeatures[0], null, 2));
-              }
-            } catch (err) {
-              console.warn('⚠️ Error querying features after tile load:', err);
-            }
-          }, 100);
-        }
-        
-        // Try adding layers on any significant event
-        if ((e as any).dataType === 'tile' || ((e as any).dataType === 'source' && mapInstance.isSourceLoaded('nyc-tiles'))) {
-          if (layersAddedRef.current) {
-            console.log('ℹ️ Layers already added, skipping.');
-            return;
-          }
-          
-          console.log('🎯 Attempting to add layers...');
-          
-          try {
-            // NEW: Immediately try adding layers with known source-layer to trigger tile loading
-            if (!layersAddedRef.current) {
-              try {
-                mapInstance.addLayer({
-                  id: 'examplepoints-line',
-                  type: 'line',
-                  source: 'nyc-tiles',
-                  'source-layer': 'examplepoints',
-                  paint: {
-                    'line-color': '#0B7285',
-                    'line-width': [
-                      'interpolate', ['linear'], ['zoom'],
-                      10, 0.5,
-                      14, 1.5,
-                      16, 3
-                    ],
-                    'line-opacity': 0.9
-                  }
-                });
-                console.log('✅ Pre-added examplepoints line layer to initiate tile loads');
-              } catch (preLineErr) {
-                console.warn('⚠️ Pre-add line failed (may be fine if layer name differs):', preLineErr);
-              }
-              
-              try {
-                mapInstance.addLayer({
-                  id: 'examplepoints-labels',
-                  type: 'symbol',
-                  source: 'nyc-tiles',
-                  'source-layer': 'examplepoints',
-                  layout: {
-                    'text-field': ['coalesce', ['get', 'name'], ''],
-                    'text-size': 11,
-                    'symbol-placement': 'line'
-                  },
-                  paint: {
-                    'text-color': '#0B7285',
-                    'text-halo-color': '#FFFFFF',
-                    'text-halo-width': 1
-                  }
-                });
-                console.log('✅ Pre-added examplepoints labels');
-              } catch (preLabelErr) {
-                console.warn('⚠️ Pre-add labels failed (may be fine if layer name differs):', preLabelErr);
-              }
-              console.log('🧪 Pre-added layers using known layer name to trigger vector tile loading');
-            }
-            
-            // Multiple query attempts with delays to catch async tile parsing
-            const queryAttempts = [0, 200, 500, 1000];
-            
-            queryAttempts.forEach((delay, index) => {
-              setTimeout(() => {
-                try {
-                  const features = mapInstance.querySourceFeatures('nyc-tiles');
-                  const sourceLayers = Array.from(new Set(features.map((f: any) => f.sourceLayer)));
-                  
-                  console.log(`🔍 Query attempt ${index + 1} (${delay}ms delay): ${features.length} features, source-layers: [${sourceLayers.join(', ')}]`);
-                  
-                  // If no source-layers detected yet, proactively probe the known layer name
-                  if (sourceLayers.length === 0 && !layersAddedRef.current) {
-                    try {
-                      const guess = mapInstance.querySourceFeatures('nyc-tiles', { sourceLayer: 'examplepoints' as any });
-                      console.log(`🧪 Probe 'examplepoints': ${guess.length} features`);
-                      if (guess.length > 0) {
-                        const detectedLayer = 'examplepoints';
-                        console.log('🧭 Using probed layer:', detectedLayer);
-                        
-                        // Add a simple polygon layer first to test visibility
-                        try {
-                          mapInstance.addLayer({
-                            id: 'nyc-polygons',
-                            type: 'fill',
-                            source: 'nyc-tiles',
-                            'source-layer': detectedLayer,
-                            paint: {
-                              'fill-color': '#0B7285',
-                              'fill-opacity': 0.3
-                            },
-                            filter: ['==', ['geometry-type'], 'Polygon']
-                          });
-                          console.log('✅ Added polygon layer (probed)');
-                        } catch (polygonErr) {
-                          console.warn('⚠️ Polygon layer (probed) failed:', polygonErr);
-                        }
-                        
-                        // Add line layer
-                        try {
-                          mapInstance.addLayer({
-                            id: 'nyc-lines',
-                            type: 'line',
-                            source: 'nyc-tiles',
-                            'source-layer': detectedLayer,
-                            paint: {
-                              'line-color': '#FF6B35',
-                              'line-width': 2,
-                              'line-opacity': 0.8
-                            },
-                            filter: ['==', ['geometry-type'], 'LineString']
-                          });
-                          console.log('✅ Added line layer (probed)');
-                        } catch (lineErr) {
-                          console.warn('⚠️ Line layer (probed) failed:', lineErr);
-                        }
-                        
-                        // Add point layer
-                        try {
-                          mapInstance.addLayer({
-                            id: 'nyc-points',
-                            type: 'circle',
-                            source: 'nyc-tiles',
-                            'source-layer': detectedLayer,
-                            paint: {
-                              'circle-color': '#FF0000',
-                              'circle-radius': 4,
-                              'circle-opacity': 0.8
-                            },
-                            filter: ['==', ['geometry-type'], 'Point']
-                          });
-                          console.log('✅ Added point layer (probed)');
-                        } catch (pointErr) {
-                          console.warn('⚠️ Point layer (probed) failed:', pointErr);
-                        }
-                        
-                        layersAddedRef.current = true;
-                        console.log('🎉 NYC layers added successfully! (probed)');
-                        return; // stop further attempts
-                      }
-                    } catch (probeErr) {
-                      console.warn('🧪 Probe failed:', probeErr);
-                    }
-                  }
-                  
-                  if (sourceLayers.length > 0 && !layersAddedRef.current) {
-                    const detectedLayer = sourceLayers[0];
-                    console.log('🧭 Detected layer:', detectedLayer, 'from', sourceLayers);
-                    
-                    // Add a simple polygon layer first to test visibility
-                    try {
-                      mapInstance.addLayer({
-                        id: 'nyc-polygons',
-                        type: 'fill',
-                        source: 'nyc-tiles',
-                        'source-layer': detectedLayer,
-                        paint: {
-                          'fill-color': '#0B7285',
-                          'fill-opacity': 0.3
-                        },
-                        filter: ['==', ['geometry-type'], 'Polygon']
-                      });
-                      console.log('✅ Added polygon layer');
-                    } catch (polygonErr) {
-                      console.warn('⚠️ Polygon layer failed:', polygonErr);
-                    }
-                    
-                    // Add line layer
-                    try {
-                      mapInstance.addLayer({
-                        id: 'nyc-lines',
-                        type: 'line',
-                        source: 'nyc-tiles',
-                        'source-layer': detectedLayer,
-                        paint: {
-                          'line-color': '#FF6B35',
-                          'line-width': 2,
-                          'line-opacity': 0.8
-                        },
-                        filter: ['==', ['geometry-type'], 'LineString']
-                      });
-                      console.log('✅ Added line layer');
-                    } catch (lineErr) {
-                      console.warn('⚠️ Line layer failed:', lineErr);
-                    }
-                    
-                    // Add point layer
-                    try {
-                      mapInstance.addLayer({
-                        id: 'nyc-points',
-                        type: 'circle',
-                        source: 'nyc-tiles',
-                        'source-layer': detectedLayer,
-                        paint: {
-                          'circle-color': '#FF0000',
-                          'circle-radius': 4,
-                          'circle-opacity': 0.8
-                        },
-                        filter: ['==', ['geometry-type'], 'Point']
-                      });
-                      console.log('✅ Added point layer');
-                    } catch (pointErr) {
-                      console.warn('⚠️ Point layer failed:', pointErr);
-                    }
-                    
-                    layersAddedRef.current = true;
-                    console.log('🎉 NYC layers added successfully!');
-                  }
-                } catch (queryErr) {
-                  console.warn(`⚠️ Query attempt ${index + 1} failed:`, queryErr);
-                }
-              }, delay);
-            });
-            
-          } catch (error) {
-            console.error('🚨 Error in layer addition process:', error);
-          }
-        }
-      }
+      console.error('Map error:', e.error);
     });
 
     setMap(mapInstance);
@@ -477,8 +279,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           mapInstance.remove();
         } catch (error) {
           console.error('Error removing map:', error);
-        } finally {
-          layersAddedRef.current = false;
         }
       }
       setMap(null);
@@ -488,52 +288,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Load map data after initialization (only once)
   useEffect(() => {
-    if (mapLoaded && map && !processedRef.current) {
+    console.log(`🎯 Map data loading effect triggered - mapLoaded: ${mapLoaded}, map: ${!!map}, isProcessing: ${isProcessing}, processed: ${processedRef.current}`);
+    
+    if (mapLoaded && map && !isProcessing && !processedRef.current) {
+      console.log('⏰ Calling processMapFeatures immediately');
       processMapFeatures();
     }
-  }, [mapLoaded, map, processMapFeatures]);
+  }, [mapLoaded, map, processMapFeatures]); // Only depend on map, mapLoaded, and the callback
 
-  // Clean business loading setup - single effect with proper debouncing
+  // Remove viewport change loading since we load everything at once
+
+  // Handle business markers
   useEffect(() => {
-    if (!map || !mapLoaded) return;
+    if (!mapLoaded || !businesses || !map) return;
 
-    let moveTimeout: NodeJS.Timeout | null = null;
-    
-    const moveEndHandler = () => {
-      // Clear existing timeout
-      if (moveTimeout) clearTimeout(moveTimeout);
-      
-      // Debounce viewport changes
-      moveTimeout = setTimeout(() => {
-        isMovingRef.current = false;
-        handleViewportChange();
-      }, 300);
-    };
-    
-    // Single event listener for smooth performance
-    map.on('moveend', moveEndHandler);
-    
-    // Initial load - only once when map is ready
-    handleViewportChange(true);
-    
-    return () => {
-      map.off('moveend', moveEndHandler);
-      if (moveTimeout) clearTimeout(moveTimeout);
-    };
-  }, [map, mapLoaded, handleViewportChange]);
-
-  // Handle old business layer removal and deck.gl integration
-  useEffect(() => {
-    if (!mapLoaded || !map) return;
-
-    // Remove old businesses layer if it exists
-    if (map.getLayer('businesses-layer')) {
-      map.removeLayer('businesses-layer');
-    }
-    if (map.getSource('businesses')) {
-      map.removeSource('businesses');
-    }
-  }, [mapLoaded, map]);
+    const cleanup = addBusinessesLayer(map, businesses, selectedBusiness, onBusinessClick);
+    return cleanup;
+  }, [mapLoaded, businesses, onBusinessClick, map, selectedBusiness]);
 
   // Handle landmark markers
   useEffect(() => {
@@ -615,7 +386,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded, landmarks, map]);
 
-  
   return (
     <div
       ref={mapRef}
@@ -630,36 +400,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         zIndex: 1,
         backgroundColor: '#B3E5FC' // Light blue fallback while map loads
       }}
-    >
-      {/* Business loading indicator */}
-      <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white text-xs p-2 rounded z-50 pointer-events-none">
-        <div>🏢 Businesses: {businesses.length}</div>
-        <div>⚡ Loading: {businessesLoading ? 'Yes' : 'No'}</div>
-        <div>🗺️ Vector Tiles: Ready</div>
-        {businesses.length === 0 && (
-          <div className="text-yellow-300">⚠️ No businesses loaded</div>
-        )}
-      </div>
-      
-      {/* Deck.GL Overlay for high-performance business rendering */}
-      {map && mapLoaded && businesses.length > 0 && (
-        <DeckGLOverlay
-          map={map}
-          businesses={businesses}
-          selectedBusinessId={selectedBusiness?.id}
-          onBusinessClick={handleBusinessClick}
-          zoom={currentZoom}
-        />
-      )}
-      
-      {/* Fallback message when no businesses are visible */}
-      {map && mapLoaded && businesses.length === 0 && !businessesLoading && (
-        <div className="absolute bottom-4 left-4 bg-yellow-500 bg-opacity-90 text-black text-sm p-3 rounded max-w-xs">
-          <div className="font-semibold">No businesses in this area</div>
-          <div className="text-xs">Try moving the map or zooming out to see more businesses</div>
-        </div>
-      )}
-    </div>
+    />
   );
 };
 

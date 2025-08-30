@@ -11,8 +11,7 @@ export const useBusinessesData = () => {
     const fetchBasicBusinesses = async () => {
       try {
         console.log('🏢 Starting to fetch businesses...');
-        // Start with fewer businesses for better performance
-        const basicBusinesses = await getBusinessesBasic(3000); // Reduced from unlimited
+        const basicBusinesses = await getBusinessesBasic();
         console.log(`🏢 Successfully loaded ${basicBusinesses.length} businesses`);
         setBusinesses(basicBusinesses);
       } catch (error) {
