@@ -65,10 +65,8 @@ export type Database = {
           lat: number
           lng: number
           name: string
-          place_id: string | null
           salary: string | null
           updated_at: string
-          url: string | null
           website: string | null
         }
         Insert: {
@@ -80,10 +78,8 @@ export type Database = {
           lat: number
           lng: number
           name: string
-          place_id?: string | null
           salary?: string | null
           updated_at?: string
-          url?: string | null
           website?: string | null
         }
         Update: {
@@ -95,10 +91,8 @@ export type Database = {
           lat?: number
           lng?: number
           name?: string
-          place_id?: string | null
           salary?: string | null
           updated_at?: string
-          url?: string | null
           website?: string | null
         }
         Relationships: []
