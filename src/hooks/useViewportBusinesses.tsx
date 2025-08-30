@@ -17,8 +17,6 @@ interface MapBounds {
 }
 
 export const useViewportBusinesses = () => {
-  console.log('🔧 useViewportBusinesses hook initializing');
-  
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentBounds, setCurrentBounds] = useState<MapBounds | null>(null);
@@ -29,30 +27,22 @@ export const useViewportBusinesses = () => {
   const { getCachedBusinesses, setCachedBusinesses } = useTileCache();
   const { clusterBusinesses } = useMapWorker();
 
-  console.log('🔧 useViewportBusinesses current state:', { 
-    businessCount: businesses.length, 
-    loading, 
-    hasBounds: !!currentBounds 
-  });
-
   const loadBusinessesInViewport = useCallback(async (bounds: MapBounds, limit: number = 10000, isMoving: boolean = false) => {
-    console.log('🎯 loadBusinessesInViewport called with:', { bounds, limit, isMoving, currentLoading: loading });
+    // Prevent duplicate requests if already loading
+    if (loading) return;
 
-    // Check tile cache first - always return cached data immediately for smooth experience
+    // Check tile cache first
     const cachedBusinesses = getCachedBusinesses(bounds);
-    if (cachedBusinesses && cachedBusinesses.length > 500) { // Only use cache if substantial data
-      console.log(`🚀 Tile cache HIT! Returning ${cachedBusinesses.length} cached businesses`);
+    if (cachedBusinesses && cachedBusinesses.length > 200) {
       setBusinesses(cachedBusinesses);
       setCurrentBounds(bounds);
-      
-      // Preload adjacent areas in background
       schedulePreload(bounds);
       return;
     }
 
-    // Expand bounds significantly for initial loading to get more businesses
+    // Expand bounds for better coverage
     const isInitialLoad = businesses.length === 0;
-    const expansionFactor = isInitialLoad ? 0.5 : 0.2; // 50% expansion for initial load
+    const expansionFactor = isInitialLoad ? 0.3 : 0.15;
     
     const expandedBounds = {
       north: bounds.north + (bounds.north - bounds.south) * expansionFactor,
@@ -61,10 +51,9 @@ export const useViewportBusinesses = () => {
       west: bounds.west - (bounds.east - bounds.west) * expansionFactor
     };
 
-    // Check expanded bounds in tile cache
+    // Check expanded cache
     const expandedCached = getCachedBusinesses(expandedBounds);
-    if (expandedCached && expandedCached.length > 500) { // Only use cache if substantial
-      console.log(`🚀 Expanded tile cache HIT! Returning ${expandedCached.length} cached businesses`);
+    if (expandedCached && expandedCached.length > 200) {
       setBusinesses(expandedCached);
       setCurrentBounds(expandedBounds);
       return;
@@ -89,18 +78,17 @@ export const useViewportBusinesses = () => {
       clearTimeout(loadTimeoutRef.current);
     }
 
-    // Smart debouncing: immediate for empty state, longer delays for better performance
+    // Optimized debouncing
     const shouldLoadImmediately = businesses.length === 0;
-    const delay = shouldLoadImmediately ? 0 : (isMoving ? 600 : 200); // Reduced delays for faster loading
+    const delay = shouldLoadImmediately ? 0 : (isMoving ? 400 : 150);
 
     loadTimeoutRef.current = setTimeout(async () => {
-      // Skip if viewport hasn't changed significantly
+      // Skip similar viewport requests
       if (!shouldLoadImmediately && currentBounds && 
-          Math.abs(currentBounds.north - expandedBounds.north) < 0.002 &&
-          Math.abs(currentBounds.south - expandedBounds.south) < 0.002 &&
-          Math.abs(currentBounds.east - expandedBounds.east) < 0.002 &&
-          Math.abs(currentBounds.west - expandedBounds.west) < 0.002) {
-        console.log('🔄 Skipping similar viewport request');
+          Math.abs(currentBounds.north - expandedBounds.north) < 0.001 &&
+          Math.abs(currentBounds.south - expandedBounds.south) < 0.001 &&
+          Math.abs(currentBounds.east - expandedBounds.east) < 0.001 &&
+          Math.abs(currentBounds.west - expandedBounds.west) < 0.001) {
         return;
       }
 
@@ -111,38 +99,17 @@ export const useViewportBusinesses = () => {
       inflightRequests.set(requestKey, requestPromise);
       
       try {
-        console.log('🔄 Loading businesses for viewport:', expandedBounds, 'limit:', limit);
-        
         const viewportBusinesses = await requestPromise;
-        console.log(`📊 Received ${viewportBusinesses.length} businesses from service`);
         
         // Cache in tile system
         setCachedBusinesses(expandedBounds, viewportBusinesses);
         
-        // Smooth update - merge with existing businesses for seamless transitions
-        setBusinesses(prev => {
-          const existingIds = new Set(prev.map(b => b.id));
-          const newBusinesses = viewportBusinesses.filter(b => !existingIds.has(b.id));
-          const combinedBusinesses = [...prev, ...newBusinesses];
-          
-          // Keep only businesses within expanded bounds for performance
-          const filteredBusinesses = combinedBusinesses.filter(business => 
-            business.position.lat >= expandedBounds.south && 
-            business.position.lat <= expandedBounds.north &&
-            business.position.lng >= expandedBounds.west && 
-            business.position.lng <= expandedBounds.east
-          );
-          
-          console.log(`🔄 Smooth merge: ${prev.length} existing + ${newBusinesses.length} new = ${filteredBusinesses.length} total`);
-          return filteredBusinesses;
-        });
-        
+        // Update businesses efficiently
+        setBusinesses(viewportBusinesses);
         setCurrentBounds(expandedBounds);
         
         // Schedule preloading
         schedulePreload(expandedBounds);
-        
-        console.log(`✅ Updated state with smooth transitions`);
         
       } catch (error) {
         console.error('❌ Error loading viewport businesses:', error);

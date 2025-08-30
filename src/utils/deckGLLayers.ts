@@ -1,8 +1,7 @@
 import { ScatterplotLayer } from '@deck.gl/layers';
 import type { Business } from '@/types/business';
 
-// Optimized layer creation without caching instances (let deck.gl handle it)
-let layerCounter = 0;
+// Use stable layer IDs to prevent infinite re-renders
 
 export interface DeckGLBusinessLayerProps {
   businesses: Business[];
@@ -18,8 +17,8 @@ export const createBusinessScatterplotLayer = ({
   onBusinessClick,
   getTooltip
 }: DeckGLBusinessLayerProps) => {
-  // Use unique ID for efficient layer updates
-  const layerId = `businesses-scatter-${++layerCounter}`;
+  // Use stable ID to prevent layer recreation
+  const layerId = 'businesses-scatter';
   
   // Let deck.gl handle layer diffing efficiently
   return new ScatterplotLayer({
@@ -78,7 +77,7 @@ export const createBusinessScatterplotLayer = ({
 
 // Modern supercluster-based layer for web worker processed data
 export const createBusinessClusterLayer = (data: any[], onBusinessClick?: (business: Business) => void, map?: any) => {
-  const layerId = `businesses-cluster-${++layerCounter}`;
+  const layerId = 'businesses-cluster';
   
   return new ScatterplotLayer({
     id: layerId,

@@ -48,7 +48,7 @@ export const DeckGLOverlay: React.FC<DeckGLOverlayProps> = ({
     return newOverlay;
   }, [map]);
 
-  // Optimized layer creation
+  // Optimized layer creation - removed map dependency to prevent infinite loops
   const layers = useMemo(() => {
     if (!businesses.length) return [];
     
@@ -58,7 +58,7 @@ export const DeckGLOverlay: React.FC<DeckGLOverlayProps> = ({
       return [createBusinessClusterLayer(businesses, onBusinessClick, map)];
     }
     
-    const shouldCluster = enableClustering && (businesses.length > 1000 || zoom < 13);
+    const shouldCluster = enableClustering && (businesses.length > 5000 || zoom < 11);
     
     console.log(`🎯 Creating ${shouldCluster ? 'clustered' : 'scatter'} layer for ${businesses.length} businesses at zoom ${zoom}`);
     
@@ -71,7 +71,7 @@ export const DeckGLOverlay: React.FC<DeckGLOverlayProps> = ({
         onBusinessClick,
       })];
     }
-  }, [businesses, selectedBusinessId, onBusinessClick, enableClustering, isClusteredData, zoom, map]);
+  }, [businesses, selectedBusinessId, onBusinessClick, enableClustering, isClusteredData, zoom]); // Removed map dependency
 
   // Smooth layer updates with improved transitions
   useEffect(() => {
@@ -82,20 +82,18 @@ export const DeckGLOverlay: React.FC<DeckGLOverlayProps> = ({
       clearTimeout(overlayUpdateTimeout);
     }
 
-    // Smooth update with fade transitions
-    overlayUpdateTimeout = setTimeout(() => {
-      overlay.setProps({ 
-        layers
-      });
-      console.log(`🎯 Updated deck.gl with ${layers.length} layers (${businesses.length} businesses)`);
-    }, 100); // Slightly longer delay for smoother transitions
+    // Direct update without timeout to prevent loops
+    overlay.setProps({ 
+      layers
+    });
+    console.log(`🎯 Updated deck.gl with ${layers.length} layers`);
 
     return () => {
       if (overlayUpdateTimeout) {
         clearTimeout(overlayUpdateTimeout);
       }
     };
-  }, [overlay, overlayReady, layers, businesses.length]);
+  }, [overlay, overlayReady, layers]);
 
   // Cleanup
   useEffect(() => {
