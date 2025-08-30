@@ -205,14 +205,14 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
     businessId = existingBusiness.id;
   } else {
     // Create new business if it doesn't exist - NO AUTH REQUIRED
-    // For now, we'll create a placeholder business with default coordinates
+    // Use safe Manhattan coordinates away from water
     const { data: newBusiness, error: createBusinessError } = await supabase
       .from('businesses')
       .insert({
         name: businessLocation,
         business_type: 'Unknown',
-        lat: 40.7128, // Default NYC coordinates
-        lng: -74.0060,
+        lat: 40.7589, // Times Square area - safe land coordinates
+        lng: -73.9851,
         atmosphere: [],
         salary: salary
       })

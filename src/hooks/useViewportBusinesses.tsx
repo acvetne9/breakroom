@@ -104,8 +104,12 @@ export const useViewportBusinesses = () => {
         // Cache in tile system
         setCachedBusinesses(expandedBounds, viewportBusinesses);
         
-        // Update businesses efficiently
-        setBusinesses(viewportBusinesses);
+        // Accumulate businesses (Google Maps style) - don't replace existing ones
+        setBusinesses(prev => {
+          const existingIds = new Set(prev.map(b => b.id));
+          const newBusinesses = viewportBusinesses.filter(b => !existingIds.has(b.id));
+          return [...prev, ...newBusinesses];
+        });
         setCurrentBounds(expandedBounds);
         
         // Schedule preloading
