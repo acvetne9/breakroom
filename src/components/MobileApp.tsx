@@ -382,7 +382,6 @@ const MobileApp: React.FC = () => {
       {/* Map is always the background */}
       <Suspense fallback={<Skeleton className="w-full h-full" />}>
         <HomePage 
-          businesses={businesses} 
           currentSlide={currentSlide}
           currentView={currentView}
           selectedBusiness={selectedBusiness}

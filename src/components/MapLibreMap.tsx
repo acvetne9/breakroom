@@ -23,30 +23,12 @@ import {
 } from '../utils/mapLayers';
 
 interface MapLibreMapProps {
-  businesses: {
-    id: string;
-    name: string;
-    position: { lat: number; lng: number };
-    atmosphere: string[];
-    salary?: string;
-    stories?: { id: string; text: string; author: string }[];
-    businessType?: string;
-    roles?: {
-      role: string;
-      salary: string;
-      upvotes?: number;
-      downvotes?: number;
-      userVote?: 'up' | 'down';
-    }[];
-    place_id?: string;
-  }[];
   onBusinessClick?: (business: any) => void;
   selectedBusiness?: any;
   landmarks?: { lat: number; lng: number; emoji: string }[];
 }
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
-  businesses: propBusinesses, // Rename to avoid confusion with viewport businesses
   onBusinessClick,
   selectedBusiness,
   landmarks = []

@@ -20,25 +20,6 @@ interface Post {
 }
 
 interface HomePageProps {
-  businesses: Array<{
-    id: string;
-    name: string;
-    position: { lat: number; lng: number };
-    atmosphere: string[];
-    salary?: string;
-    stories?: Array<{ id: string; text: string; author: string }>;
-    businessType?: string;
-    roles?: Array<{ 
-      role: string; 
-      salary: string; 
-      upvotes?: number; 
-      downvotes?: number; 
-      userVote?: 'up' | 'down' | null; 
-    }>;
-    place_id?: string;
-    website?: string;
-    url?: string;
-  }>;
   currentSlide?: number;
   currentView?: 'initiation' | 'main';
   selectedBusiness?: any;
@@ -47,11 +28,10 @@ interface HomePageProps {
   onBusinessStoriesClick?: (businessId: string) => void;
   onPostClick?: (post: Post) => void;
   onRoleVote?: (businessId: string, roleIndex: number, voteType: 'up' | 'down') => void;
-  onLocationSave?: (location: string, fullLocation: string) => void; // New prop for saving location
+  onLocationSave?: (location: string, fullLocation: string) => void;
 }
 
 const HomePage: React.FC<HomePageProps> = ({ 
-  businesses, 
   currentSlide = 1,
   currentView = 'main',
   selectedBusiness: propSelectedBusiness,
@@ -68,7 +48,6 @@ const HomePage: React.FC<HomePageProps> = ({
   // Use prop-controlled selectedBusiness if available, otherwise use local state
   const selectedBusiness = propSelectedBusiness;
   const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [filteredBusinesses, setFilteredBusinesses] = useState(businesses);
   const [isSearchActive, setIsSearchActive] = useState(false);
   const landmarks = [
     {lat: 40.690331, lng: -74.045414, emoji: "🗽"},
@@ -98,29 +77,21 @@ const HomePage: React.FC<HomePageProps> = ({
 ]
   const { toast } = useToast();
 
-  // Update filtered businesses when businesses prop changes
-  useEffect(() => {
-    if (!isSearchActive) {
-      setFilteredBusinesses(businesses);
-    }
-    console.log('HomePage: businesses prop:', businesses.length, businesses);
-    console.log('HomePage: filteredBusinesses:', filteredBusinesses.length, filteredBusinesses);
-  }, [businesses, isSearchActive, filteredBusinesses]);
 
   const handleSearchInput = (value: string) => {
     setSearchValue(value);
     
     if (value.length === 0) {
-      // Restore all businesses when search is cleared
+      // Clear search results when search is cleared
       setSearchResults([]);
-      setFilteredBusinesses(businesses);
       setIsSearchActive(false);
       return;
     }
     
+    // For now, disable search since we're using viewport-based loading
+    // TODO: Implement search with viewport businesses or server-side search
     if (value.length > 2) {
-      const { filteredBusinesses: filtered } = searchBusinesses(businesses, value);
-      setSearchResults(filtered.slice(0, 5)); // Show top 5 results in dropdown
+      setSearchResults([]); // Temporarily disabled
     } else {
       setSearchResults([]);
     }
@@ -140,21 +111,12 @@ const HomePage: React.FC<HomePageProps> = ({
       return;
     }
     
-    const { filteredBusinesses: filtered, exactMatch } = searchBusinesses(businesses, searchValue);
-    
-    if (exactMatch) {
-      // Navigate directly to the exact match
-      onBusinessSelect?.(exactMatch);
-      setShowBusinessDetails(false);
-      setSearchResults([]);
-      setFilteredBusinesses([exactMatch]);
-      setIsSearchActive(true);
-    } else {
-      // Show filtered results
-      setFilteredBusinesses(filtered);
-      setSearchResults([]);
-      setIsSearchActive(true);
-    }
+    // Search functionality temporarily disabled for viewport-based loading
+    // TODO: Implement server-side search or integrate with viewport businesses
+    toast({
+      title: "Search coming soon",
+      description: "Search functionality will be available with the new map system",
+    });
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -197,7 +159,6 @@ const HomePage: React.FC<HomePageProps> = ({
     <div className="relative w-full h-full">
       {/* MapLibre with OpenStreetMap base layer */}
       <MapLibreMap
-        businesses={businesses}
         onBusinessClick={handleBusinessClick}
         selectedBusiness={selectedBusiness}
         landmarks={landmarks}
