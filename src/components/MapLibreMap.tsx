@@ -1,24 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useViewportMapData } from '../hooks/useViewportMapData';
 import { useIsMobile } from '../hooks/use-mobile';
-import { 
-  extractParkFeatures, 
-  extractWaterFeatures, 
-  extractRoadFeatures, 
-  extractWaterwayFeatures 
-} from '../utils/featureProcessing';
-import {
-  addLandLayer,
-  addParksLayer,
-  addWaterLayer,
-  addWaterwaysLayer,
-  addRoadsLayer,
-  addRoadsLayerChunked,
-  addBusinessesLayer,
-  ensureLayerOrder
-} from '../utils/mapLayers';
+import { addBusinessesLayer } from '../utils/mapLayers';
 
 interface MapLibreMapProps {
   businesses: {
@@ -54,8 +38,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
-  const { isProcessing, setIsProcessing, loadAllDataCenterOut, allDataLoaded } = useViewportMapData();
-  const lastLoadedBoundsRef = useRef<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const processedRef = useRef(false);
 
   const processMapFeatures = useCallback(async () => {
@@ -70,28 +53,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return;
     }
     
-    console.log(`🗺️ Loading map data with vector tiles...`);
+    console.log(`🧭 Loading vector tiles exclusively...`);
     processedRef.current = true; // prevent duplicate runs in this mount
     (window as any).__MAP_FEATURES_PROCESSED__ = true; // prevent duplicate runs across mounts
     setIsProcessing(true);
     
     try {
-      // Load land layer first (still using GeoJSON for land)
-      try {
-        const landResponse = await fetch('/data/nyc_land.geojson');
-        const landData = await landResponse.json();
-        if (landData) {
-          console.log(`🏞️ Adding land layer...`);
-          addLandLayer(map, landData);
-          console.log('✅ Land layer added');
-        }
-      } catch (error) {
-        console.log('⚠️ No land data available - this will cause visibility issues!');
-      }
-
-      // Add vector tile source
+      // Add vector tile source for all data including land
       const tilesUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-      console.log('🧭 Using tiles URL:', tilesUrl);
+      console.log('🧭 Using vector tiles URL:', tilesUrl);
       
       if (!map.getSource('nyc-tiles')) {
         map.addSource('nyc-tiles', {
@@ -103,81 +73,120 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         console.log('✅ Added vector tile source');
       }
 
+      // Test if tiles are available
+      try {
+        const testTileUrl = tilesUrl.replace('{z}', '12').replace('{x}', '1205').replace('{y}', '1539');
+        const response = await fetch(testTileUrl);
+        console.log(`🔍 Tile test: ${response.status} ${response.ok ? '✅' : '❌'}`);
+        if (!response.ok) {
+          console.log('⚠️ Vector tiles not found. Please generate tiles first.');
+          console.log('📖 See public/data/tiles/README.md for instructions');
+        }
+      } catch (error) {
+        console.log('⚠️ Could not test vector tiles:', error);
+      }
+
       // Wait for source to load and probe for layer names
-      const maxAttempts = 10;
+      const maxAttempts = 5;
       let attempt = 0;
       let sourceLayerName = null;
       
       while (attempt < maxAttempts && !sourceLayerName) {
         attempt++;
-        const delay = Math.min(200 * attempt, 1000);
+        const delay = Math.min(500 * attempt, 2000);
         await new Promise(resolve => setTimeout(resolve, delay));
         
-        const features = map.querySourceFeatures('nyc-tiles');
-        console.log(`🔍 Query attempt ${attempt} (${delay}ms delay): ${features.length} features`);
-        
-        if (features.length > 0) {
-          const uniqueLayers = new Set(features.map(f => (f as any).sourceLayer).filter(Boolean));
-          console.log('🎯 Found source layers:', Array.from(uniqueLayers));
+        try {
+          const features = map.querySourceFeatures('nyc-tiles');
+          console.log(`🔍 Tile query attempt ${attempt}: ${features.length} features found`);
           
-          // Try to find a suitable layer name
-          const layerCandidates = ['examplepoints', 'default', 'features'];
-          for (const candidate of layerCandidates) {
-            if (uniqueLayers.has(candidate)) {
-              sourceLayerName = candidate;
+          if (features.length > 0) {
+            const uniqueLayers = new Set(features.map(f => (f as any).sourceLayer).filter(Boolean));
+            console.log('🎯 Available source layers:', Array.from(uniqueLayers));
+            
+            // Try common layer names
+            const layerCandidates = ['features', 'examplepoints', 'default', 'data'];
+            for (const candidate of layerCandidates) {
+              if (uniqueLayers.has(candidate)) {
+                sourceLayerName = candidate;
+                break;
+              }
+            }
+            
+            // If no match, use the first available layer
+            if (!sourceLayerName && uniqueLayers.size > 0) {
+              sourceLayerName = Array.from(uniqueLayers)[0];
+            }
+            
+            if (sourceLayerName) {
+              console.log(`🧭 Using source layer: "${sourceLayerName}"`);
               break;
             }
           }
-          
-          // If no known candidate, use the first available layer
-          if (!sourceLayerName && uniqueLayers.size > 0) {
-            sourceLayerName = Array.from(uniqueLayers)[0];
-          }
-          
-          if (sourceLayerName) {
-            console.log(`🧭 Using source layer: ${sourceLayerName}`);
-            break;
-          }
+        } catch (error) {
+          console.log(`🔍 Query attempt ${attempt} failed:`, error);
         }
       }
 
       if (sourceLayerName) {
-        // Add vector tile layers with proper styling
-        console.log('🎨 Adding vector tile layers...');
+        console.log('🎨 Adding styled vector tile layers...');
         
-        // Add parks layer
+        // Land/background fill (beige)
+        if (!map.getLayer('land-vector')) {
+          map.addLayer({
+            id: 'land-vector',
+            type: 'fill',
+            source: 'nyc-tiles',
+            'source-layer': sourceLayerName,
+            filter: ['==', ['geometry-type'], 'Polygon'],
+            paint: {
+              'fill-color': '#F5F5DC', // Wheat/beige land color
+              'fill-opacity': 0.8
+            }
+          });
+          console.log('✅ Added land vector layer');
+        }
+
+        // Parks (green)
         if (!map.getLayer('parks-vector')) {
           map.addLayer({
             id: 'parks-vector',
             type: 'fill',
             source: 'nyc-tiles',
             'source-layer': sourceLayerName,
-            filter: ['in', ['get', 'leisure'], ['literal', ['park', 'garden', 'playground', 'recreation_ground']]],
+            filter: ['any',
+              ['in', ['get', 'leisure'], ['literal', ['park', 'garden', 'playground', 'recreation_ground']]],
+              ['==', ['get', 'landuse'], 'recreation_ground']
+            ],
             paint: {
-              'fill-color': '#87C17A', // Same green as GeoJSON version
+              'fill-color': '#87C17A', // Green parks
               'fill-opacity': 1.0
             }
           });
           console.log('✅ Added parks vector layer');
         }
 
-        // Add water layer
+        // Water bodies (blue)
         if (!map.getLayer('water-vector')) {
           map.addLayer({
             id: 'water-vector',
             type: 'fill',
             source: 'nyc-tiles',
             'source-layer': sourceLayerName,
-            filter: ['in', ['get', 'natural'], ['literal', ['water', 'bay', 'lake']]],
+            filter: ['any',
+              ['in', ['get', 'natural'], ['literal', ['water', 'bay', 'lake', 'river']]],
+              ['==', ['get', 'waterway'], 'river'],
+              ['==', ['get', 'landuse'], 'reservoir']
+            ],
             paint: {
-              'fill-color': '#6CA4E1', // Same blue as GeoJSON version
+              'fill-color': '#6CA4E1', // Blue water
               'fill-opacity': 1.0
             }
           });
           console.log('✅ Added water vector layer');
         }
 
-        // Add roads layer
+        // Roads (gray lines)
         if (!map.getLayer('roads-vector')) {
           map.addLayer({
             id: 'roads-vector',
@@ -186,41 +195,79 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'source-layer': sourceLayerName,
             filter: ['has', 'highway'],
             paint: {
-              'line-color': '#666666', // Same gray as GeoJSON version
-              'line-width': 2
+              'line-color': '#666666', // Gray roads
+              'line-width': [
+                'case',
+                ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk', 'primary']]],
+                3,
+                ['in', ['get', 'highway'], ['literal', ['secondary', 'tertiary']]],
+                2,
+                1
+              ]
             }
           });
           console.log('✅ Added roads vector layer');
         }
 
-        // Ensure proper layer ordering
-        const layers = ['parks-vector', 'water-vector', 'roads-vector'];
-        layers.forEach(layerId => {
+        // Ensure proper layer ordering (bottom to top)
+        const orderedLayers = ['land-vector', 'water-vector', 'parks-vector', 'roads-vector'];
+        orderedLayers.forEach((layerId, index) => {
           if (map.getLayer(layerId)) {
-            map.moveLayer(layerId);
+            if (index === 0) {
+              map.moveLayer(layerId);
+            } else {
+              map.moveLayer(layerId, orderedLayers[index - 1]);
+            }
           }
         });
         
-        console.log('✅ Vector tile layers added and ordered');
+        console.log('✅ Vector tile layers styled and ordered');
         
         // Log current map layers
         const mapLayers = map.getStyle().layers || [];
-        console.log('🗺️ Current map layers:', mapLayers.map(l => `${l.id} (${l.type})`));
+        console.log('🗺️ Final map layers:', mapLayers.map(l => `${l.id} (${l.type})`));
         
       } else {
-        console.log('⚠️ Could not determine source layer name from vector tiles');
+        console.log('❌ No vector tile data found!');
+        console.log('📖 Please generate vector tiles and place them in public/data/tiles/');
+        console.log('📖 See public/data/tiles/README.md for instructions');
+        
+        // Show message to user
+        const messageDiv = document.createElement('div');
+        messageDiv.style.cssText = `
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          background: rgba(255, 255, 255, 0.95);
+          padding: 20px;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          text-align: center;
+          font-family: sans-serif;
+          z-index: 1000;
+        `;
+        messageDiv.innerHTML = `
+          <h3 style="margin: 0 0 10px 0; color: #e74c3c;">Vector Tiles Not Found</h3>
+          <p style="margin: 0 0 10px 0;">Please generate vector tiles and place them in:</p>
+          <code style="background: #f8f9fa; padding: 4px 8px; border-radius: 4px;">public/data/tiles/{z}/{x}/{y}.pbf</code>
+          <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">
+            See <strong>public/data/tiles/README.md</strong> for instructions
+          </p>
+        `;
+        map.getContainer().appendChild(messageDiv);
       }
       
-      console.log('🎉 Map processing completed successfully');
+      console.log('🎉 Vector tile setup completed');
     } catch (error) {
-      console.error('❌ Error processing map features:', error);
+      console.error('❌ Error setting up vector tiles:', error);
       // On error, reset flags so user can retry
       processedRef.current = false;
       (window as any).__MAP_FEATURES_PROCESSED__ = false;
     } finally {
       setIsProcessing(false);
     }
-  }, [map, mapLoaded, isMobile]);
+  }, [map, mapLoaded]);
 
   // Initialize map
   useEffect(() => {

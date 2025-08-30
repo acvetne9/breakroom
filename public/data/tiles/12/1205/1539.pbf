@@ -1,0 +1,9 @@
+# Vector Tile Placeholder
+# This is a placeholder file. You need to generate actual .pbf vector tiles from your GeoJSON data.
+# 
+# To generate vector tiles:
+# 1. Install tippecanoe: brew install tippecanoe (macOS) or apt-get install tippecanoe (Ubuntu)
+# 2. Run: tippecanoe -o tiles.mbtiles -z12 --drop-densest-as-needed --extend-zooms-if-still-dropping your_data.geojson
+# 3. Extract tiles: mb-util tiles.mbtiles tiles/
+# 
+# The tiles should be in the format: {z}/{x}/{y}.pbf
