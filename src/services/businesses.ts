@@ -1,14 +1,41 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Business, BusinessRole } from '@/types/business';
 
-export async function getBusinessesBasic(): Promise<Business[]> {
+export async function getBusinessesBasic(limit: number = 2000): Promise<Business[]> {
+  console.log(`🔄 Fetching ${limit} businesses from center outward...`);
+  
+  // NYC center coordinates (approximately Manhattan center)
+  const centerLat = 40.7589; // Times Square area
+  const centerLng = -73.9851;
+  
   const { data: businessesData, error } = await supabase
     .from('businesses')
-    .select('id, name, lat, lng');
+    .select('id, name, lat, lng')
+    .order('lat')
+    .limit(limit); // Limit for performance - can increase gradually
 
-  if (error) throw error;
+  if (error) {
+    console.error('❌ Supabase error:', error);
+    throw error;
+  }
 
-  const basicBusinesses: Business[] = (businessesData || []).map((business: any) => ({
+  console.log(`📊 Raw data from Supabase: ${businessesData?.length || 0} records`);
+
+  if (!businessesData) return [];
+
+  // Calculate distance from center and sort by distance
+  const businessesWithDistance = businessesData.map((business: any) => {
+    const distance = Math.sqrt(
+      Math.pow(business.lat - centerLat, 2) + 
+      Math.pow(business.lng - centerLng, 2)
+    );
+    return { ...business, distance };
+  });
+
+  // Sort by distance from center (closest first)
+  businessesWithDistance.sort((a, b) => a.distance - b.distance);
+
+  const basicBusinesses: Business[] = businessesWithDistance.map((business: any) => ({
     id: business.id,
     name: business.name,
     position: { lat: business.lat, lng: business.lng },
@@ -17,8 +44,83 @@ export async function getBusinessesBasic(): Promise<Business[]> {
     roles: [],
   }));
 
+  console.log(`✅ Processed businesses from center out: ${basicBusinesses.length}`);
   return basicBusinesses;
 }
+
+export const getBusinessesInViewport = async (
+  bounds: { north: number; south: number; east: number; west: number },
+  limit: number = 2000
+): Promise<Business[]> => {
+  try {
+    console.log(`🎯 Starting optimized spatial query for bounds:`, bounds);
+    
+    // Try the new spatial function first (PostGIS optimized)
+    const { data: spatialData, error: spatialError } = await supabase
+      .rpc('businesses_in_bbox', {
+        west: bounds.west,
+        south: bounds.south,
+        east: bounds.east,
+        north: bounds.north,
+        query_limit: limit
+      });
+
+    if (!spatialError && spatialData) {
+      console.log(`🚀 Spatial query successful: ${spatialData.length} businesses found`);
+      
+      const businesses: Business[] = spatialData.map((business) => ({
+        id: business.id,
+        name: business.name,
+        position: { lat: business.lat, lng: business.lng },
+        atmosphere: business.atmosphere || [],
+        salary: business.salary,
+        businessType: business.business_type,
+        place_id: business.place_id,
+        website: business.website,
+        url: business.url,
+        roles: [],
+      }));
+      
+      return businesses;
+    }
+
+    // Fallback to the old method if spatial query fails
+    console.log(`⚠️ Spatial query failed, falling back to coordinate filtering:`, spatialError);
+    
+    const { data, error } = await supabase
+      .from('businesses')
+      .select('*')
+      .gte('lat', bounds.south)
+      .lte('lat', bounds.north)
+      .gte('lng', bounds.west)
+      .lte('lng', bounds.east)
+      .limit(limit);
+
+    if (error) {
+      console.error('❌ Error fetching businesses in viewport:', error);
+      throw error;
+    }
+
+    const businesses: Business[] = (data || []).map((business) => ({
+      id: business.id,
+      name: business.name,
+      position: { lat: business.lat, lng: business.lng },
+      atmosphere: business.atmosphere || [],
+      salary: business.salary,
+      businessType: business.business_type,
+      place_id: business.place_id,
+      website: business.website,
+      url: business.url,
+      roles: [],
+    }));
+
+    console.log(`✅ Fallback query returned ${businesses.length} businesses`);
+    return businesses;
+  } catch (error) {
+    console.error('❌ Error in getBusinessesInViewport:', error);
+    return [];
+  }
+};
 
 export async function getFullBusinessDetails(businessId: string): Promise<Business | null> {
   // Fetch base business
@@ -26,9 +128,10 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
     .from('businesses')
     .select('*')
     .eq('id', businessId)
-    .single();
+    .maybeSingle();
 
   if (businessError) throw businessError;
+  if (!businessData) return null;
 
   // Get current user
   const { data: { user } } = await supabase.auth.getUser();
@@ -92,17 +195,16 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
     .from('businesses')
     .select('id')
     .ilike('name', businessLocation)
-    .single();
+    .maybeSingle();
 
-  if (findError && findError.code !== 'PGRST116') {
-    // Error other than "not found"
+  if (findError) {
     throw findError;
   }
 
   if (existingBusiness) {
     businessId = existingBusiness.id;
   } else {
-    // Create new business if it doesn't exist
+    // Create new business if it doesn't exist - NO AUTH REQUIRED
     // For now, we'll create a placeholder business with default coordinates
     const { data: newBusiness, error: createBusinessError } = await supabase
       .from('businesses')
@@ -117,8 +219,26 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
       .select('id')
       .single();
 
-    if (createBusinessError) throw createBusinessError;
-    businessId = newBusiness.id;
+    if (createBusinessError) {
+      // If it's a duplicate key error, try to get the existing business again
+      if (createBusinessError.code === '23505') { // unique_violation
+        const { data: retryBusiness } = await supabase
+          .from('businesses')
+          .select('id')
+          .eq('name', businessLocation)
+          .maybeSingle();
+        
+        if (retryBusiness) {
+          businessId = retryBusiness.id;
+        } else {
+          throw createBusinessError;
+        }
+      } else {
+        throw createBusinessError;
+      }
+    } else {
+      businessId = newBusiness.id;
+    }
   }
 
   // Check if this exact role already exists for this business
@@ -128,14 +248,14 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
     .eq('business_id', businessId)
     .eq('role', role)
     .eq('salary', salary)
-    .single();
+    .maybeSingle();
 
-  if (roleCheckError && roleCheckError.code !== 'PGRST116') {
+  if (roleCheckError) {
     throw roleCheckError;
   }
 
   if (!existingRole) {
-    // Create new role if it doesn't exist
+    // Create new role if it doesn't exist - NO AUTH REQUIRED
     const { error: createRoleError } = await supabase
       .from('business_roles')
       .insert({
