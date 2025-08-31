@@ -137,7 +137,8 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
               <div className="flex items-center space-x-3">
                 <input
                   type="text"
-                  inputMode="numeric"
+                  inputMode="decimal"
+                  pattern="[0-9]*[.,]?[0-9]*"
                   value={salary}
                   onChange={handleSalaryChange}
                   onBlur={checkForCompletion}
