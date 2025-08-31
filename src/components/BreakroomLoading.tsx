@@ -5,8 +5,24 @@ interface BreakroomLoadingProps {
 }
 
 const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
-  // Remove automatic timer - now controlled by parent component
-  
+  const [isVisible, setIsVisible] = useState(true);
+
+  useEffect(() => {
+    // Auto-hide after animation completes (3 seconds)
+    const timer = setTimeout(() => {
+      setIsVisible(false);
+      if (onComplete) {
+        setTimeout(onComplete, 500); // Wait for fade out
+      }
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [onComplete]);
+
+  if (!isVisible) {
+    return null;
+  }
+
   const styles = {
     container: {
       position: 'fixed' as const,

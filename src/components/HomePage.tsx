@@ -46,30 +46,9 @@ const HomePage: React.FC<HomePageProps> = ({
   const [searchValue, setSearchValue] = useState('');
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
   const [showLoading, setShowLoading] = useState(true);
-  const [mapLoaded, setMapLoaded] = useState(false);
-  const [businessesLoaded, setBusinessesLoaded] = useState(false);
-
-  // Check if everything is loaded and hide loading screen
-  useEffect(() => {
-    if (mapLoaded && businessesLoaded) {
-      // Add small delay to ensure smooth transition
-      const timer = setTimeout(() => {
-        setShowLoading(false);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [mapLoaded, businessesLoaded]);
 
   const handleLoadingComplete = () => {
-    // This is now handled by the useEffect above
-  };
-
-  const handleMapLoaded = () => {
-    setMapLoaded(true);
-  };
-
-  const handleBusinessesLoaded = () => {
-    setBusinessesLoaded(true);
+    setShowLoading(false);
   };
   
   // Use prop-controlled selectedBusiness if available, otherwise use local state
@@ -184,19 +163,16 @@ const HomePage: React.FC<HomePageProps> = ({
 
   return (
     <div>
-      {showLoading && (
+      {showLoading ? (
         <BreakroomLoading onComplete={handleLoadingComplete} />
-      )}
-      
-      <div className={`relative w-full h-full ${showLoading ? 'opacity-0 pointer-events-none' : 'opacity-100'} transition-opacity duration-500`}>
-        {/* MapLibre with OpenStreetMap base layer */}
-        <MapLibreMap
-          onBusinessClick={handleBusinessClick}
-          selectedBusiness={selectedBusiness}
-          landmarks={landmarks}
-          onMapLoaded={handleMapLoaded}
-          onBusinessesLoaded={handleBusinessesLoaded}
-        />
+      ) : (
+        <div className="relative w-full h-full">
+          {/* MapLibre with OpenStreetMap base layer */}
+          <MapLibreMap
+            onBusinessClick={handleBusinessClick}
+            selectedBusiness={selectedBusiness}
+            landmarks={landmarks}
+          />
         
         
         {/* Search results dropdown */}
@@ -274,7 +250,8 @@ const HomePage: React.FC<HomePageProps> = ({
             </div>
           </div>
         )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
