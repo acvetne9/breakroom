@@ -171,7 +171,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
           }
           100% {
             opacity: 1;
-            transform: translateX(-100%) translateX(-8px);
+            transform: translateX(-100%) translateX(-4px);
           }
         }
         
@@ -186,7 +186,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
           }
           100% {
             opacity: 1;
-            transform: translateX(0%) translateX(8px);
+            transform: translateX(0%) translateX(4px);
           }
         }
         
