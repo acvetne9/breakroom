@@ -27,7 +27,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
     container: {
       position: 'fixed' as const,
       inset: '0',
-      zIndex: 200,
+      zIndex: 20000,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
