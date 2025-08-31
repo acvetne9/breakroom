@@ -165,6 +165,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
 
     try {
+      console.log('🗺️ Creating MapLibre instance...');
       mapInstance = new maplibregl.Map({
         container: mapRef.current!,
         style: baseStyle,
@@ -175,6 +176,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         renderWorldCopies: false,
         attributionControl: false
       });
+      
+      console.log('🗺️ MapLibre instance created successfully');
       
       // Set bounds immediately after creation
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
@@ -805,7 +808,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         width: '100%',
         height: '100%',
         zIndex: 1,
-        backgroundColor: '#B3E5FC' // Light blue fallback while map loads
+        backgroundColor: '#F5F5DC' // Fallback background color
       }}
     >
       {/* Business loading indicator */}
