@@ -31,14 +31,16 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
 
   /** Format salary as $123.00 */
   const formatSalary = (input: string) => {
-    //const cleanValue = input.replace(/[^0-9.]/g, '');
+    const cleanValue = input.replace(/[^0-9.]/g, '');
     const number = parseFloat(cleanValue);
     if (isNaN(number)) return '';
     return `$${number.toFixed(2)}`;
   };
 
-  const handleSalaryChange = (value: string) => {
-    setSalary(formatSalary(value));
+  const handleSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // only allow digits
+    const raw = e.target.value.replace(/[^0-9]/g, "");
+    setAmount(raw);
   };
 
   const checkForCompletion = () => {
@@ -125,7 +127,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                   value={salary}
                   onChange={(e) => handleSalaryChange(e.target.value)}
                   onBlur={checkForCompletion}
-                  placeholder="$16.00"
+                  placeholder="$0.00"
                   className="app-input text-center text-lg flex-1 !py-0 h-12"
                 />
                 <select
