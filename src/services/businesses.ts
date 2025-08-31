@@ -75,9 +75,7 @@ export const getBusinessesInViewport = async (
         atmosphere: business.atmosphere || [],
         salary: business.salary,
         businessType: business.business_type,
-        place_id: business.place_id,
         website: business.website,
-        url: business.url,
         roles: [],
       }));
       
@@ -108,9 +106,7 @@ export const getBusinessesInViewport = async (
       atmosphere: business.atmosphere || [],
       salary: business.salary,
       businessType: business.business_type,
-      place_id: business.place_id,
       website: business.website,
-      url: business.url,
       roles: [],
     }));
 
@@ -179,9 +175,7 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
     atmosphere: businessData.atmosphere || [],
     salary: businessData.salary,
     roles: businessRoles,
-    place_id: businessData.place_id,
     website: businessData.website,
-    url: businessData.url,
   };
 
   return fullBusiness;

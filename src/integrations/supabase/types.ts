@@ -568,10 +568,8 @@ export type Database = {
           lat: number
           lng: number
           name: string
-          place_id: string
           salary: string
           updated_at: string
-          url: string
           website: string
         }[]
       }
