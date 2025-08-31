@@ -374,24 +374,56 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                           console.warn('⚠️ Water layer (probed) failed:', waterErr);
                         }
                         
-                        // Add roads layer
-                        try {
-                          mapInstance.addLayer({
-                            id: 'nyc-roads',
-                            type: 'line',
-                            source: 'nyc-tiles',
-                            'source-layer': detectedLayer,
-                            paint: {
-                              'line-color': '#666666', // Dark gray for roads
-                              'line-width': 2,
-                              'line-opacity': 1.0
-                            },
-                            filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
-                          });
-                          console.log('✅ Added roads layer (probed)');
-                        } catch (roadsErr) {
-                          console.warn('⚠️ Roads layer (probed) failed:', roadsErr);
-                        }
+                         // Add roads layer
+                         try {
+                           mapInstance.addLayer({
+                             id: 'nyc-roads',
+                             type: 'line',
+                             source: 'nyc-tiles',
+                             'source-layer': detectedLayer,
+                             paint: {
+                               'line-color': '#666666', // Dark gray for roads
+                               'line-width': 2,
+                               'line-opacity': 1.0
+                             },
+                             filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
+                           });
+                           console.log('✅ Added roads layer (probed)');
+                         } catch (roadsErr) {
+                           console.warn('⚠️ Roads layer (probed) failed:', roadsErr);
+                         }
+                         
+                         // Add street name labels over roads but behind businesses (probed)
+                         try {
+                           mapInstance.addLayer({
+                             id: 'nyc-street-labels',
+                             type: 'symbol',
+                             source: 'nyc-tiles',
+                             'source-layer': detectedLayer,
+                             layout: {
+                               'text-field': ['coalesce', ['get', 'name'], ''],
+                               'text-size': [
+                                 'interpolate', ['linear'], ['zoom'],
+                                 12, 10,
+                                 16, 14,
+                                 18, 16
+                               ],
+                               'text-font': ['Open Sans Regular'],
+                               'symbol-placement': 'line',
+                               'text-rotation-alignment': 'map',
+                               'text-pitch-alignment': 'viewport'
+                             },
+                             paint: {
+                               'text-color': '#333333',
+                               'text-halo-color': '#FFFFFF',
+                               'text-halo-width': 1.5
+                             },
+                             filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway'], ['has', 'name']]
+                           });
+                           console.log('✅ Added street labels layer (probed)');
+                         } catch (streetLabelsErr) {
+                           console.warn('⚠️ Street labels layer (probed) failed:', streetLabelsErr);
+                         }
                         
                         // Add waterways layer
                         try {
@@ -500,24 +532,56 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                       console.warn('⚠️ Water layer failed:', waterErr);
                     }
                     
-                    // Add roads layer
-                    try {
-                      mapInstance.addLayer({
-                        id: 'nyc-roads',
-                        type: 'line',
-                        source: 'nyc-tiles',
-                        'source-layer': detectedLayer,
-                        paint: {
-                          'line-color': '#666666', // Dark gray for roads
-                          'line-width': 2,
-                          'line-opacity': 1.0
-                        },
-                        filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
-                      });
-                      console.log('✅ Added roads layer');
-                    } catch (roadsErr) {
-                      console.warn('⚠️ Roads layer failed:', roadsErr);
-                    }
+                     // Add roads layer
+                     try {
+                       mapInstance.addLayer({
+                         id: 'nyc-roads',
+                         type: 'line',
+                         source: 'nyc-tiles',
+                         'source-layer': detectedLayer,
+                         paint: {
+                           'line-color': '#666666', // Dark gray for roads
+                           'line-width': 2,
+                           'line-opacity': 1.0
+                         },
+                         filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
+                       });
+                       console.log('✅ Added roads layer');
+                     } catch (roadsErr) {
+                       console.warn('⚠️ Roads layer failed:', roadsErr);
+                     }
+                     
+                     // Add street name labels over roads but behind businesses
+                     try {
+                       mapInstance.addLayer({
+                         id: 'nyc-street-labels',
+                         type: 'symbol',
+                         source: 'nyc-tiles',
+                         'source-layer': detectedLayer,
+                         layout: {
+                           'text-field': ['coalesce', ['get', 'name'], ''],
+                           'text-size': [
+                             'interpolate', ['linear'], ['zoom'],
+                             12, 10,
+                             16, 14,
+                             18, 16
+                           ],
+                           'text-font': ['Open Sans Regular'],
+                           'symbol-placement': 'line',
+                           'text-rotation-alignment': 'map',
+                           'text-pitch-alignment': 'viewport'
+                         },
+                         paint: {
+                           'text-color': '#333333',
+                           'text-halo-color': '#FFFFFF',
+                           'text-halo-width': 1.5
+                         },
+                         filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway'], ['has', 'name']]
+                       });
+                       console.log('✅ Added street labels layer');
+                     } catch (streetLabelsErr) {
+                       console.warn('⚠️ Street labels layer failed:', streetLabelsErr);
+                     }
                     
                     // Add waterways layer
                     try {
