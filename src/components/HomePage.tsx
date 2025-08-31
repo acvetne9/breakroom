@@ -3,7 +3,6 @@ import MapLibreMap from './MapLibreMap';
 import BusinessPreview from './BusinessPreview';
 import BusinessDetails from './BusinessDetails';
 import BreakroomLoading from './BreakroomLoading';
-
 import { searchBusinesses } from '../utils/searchUtils';
 import { isProfane } from '../utils/profanityFilter';
 import { Search } from 'lucide-react';
@@ -251,7 +250,7 @@ const HomePage: React.FC<HomePageProps> = ({
           </div>
         )}
         </div>
-      )}
+      
     </div>
   );
 };
