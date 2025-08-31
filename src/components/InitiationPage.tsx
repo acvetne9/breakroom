@@ -38,9 +38,23 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   };
 
   const handleSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Allow digits, decimal point, and dollar sign
-    const raw = e.target.value.replace(/[^0-9.$]/g, "");
-    setSalary(raw);
+    // Remove non-numeric characters except decimal point
+    let raw = e.target.value.replace(/[^0-9.]/g, "");
+    
+    // Ensure only one decimal point
+    const parts = raw.split('.');
+    if (parts.length > 2) {
+      raw = parts[0] + '.' + parts.slice(1).join('');
+    }
+    
+    // Limit to 2 decimal places
+    if (parts[1] && parts[1].length > 2) {
+      raw = parts[0] + '.' + parts[1].substring(0, 2);
+    }
+    
+    // Format with $ prefix for display
+    const formatted = raw ? `$${raw}` : '';
+    setSalary(formatted);
   };
 
   const checkForCompletion = () => {
