@@ -8,7 +8,7 @@ let overlayInstance: MapboxOverlay | null = null;
 let overlayUpdateTimeout: NodeJS.Timeout | null = null;
 
 interface DeckGLOverlayProps {
-  map: maplibregl.Map | null;
+  map: maplibregl.Map;
   businesses: Business[] | any[]; // Can be clustered data from worker
   selectedBusinessId?: string;
   onBusinessClick?: (business: Business) => void;
@@ -28,34 +28,22 @@ export const DeckGLOverlay: React.FC<DeckGLOverlayProps> = ({
 }) => {
   const [overlayReady, setOverlayReady] = useState(false);
   
-  // Initialize overlay once - but only when map is available
+  // Initialize overlay once
   const overlay = useMemo(() => {
-    if (!map) {
-      console.log('🔄 Map not ready yet, skipping overlay initialization');
-      return null;
-    }
-    
     if (overlayInstance) {
       setOverlayReady(true);
       return overlayInstance;
     }
 
-    console.log('🎯 Initializing DeckGL overlay');
     const newOverlay = new MapboxOverlay({
       interleaved: true,
       layers: []
     });
 
-    // Add to map safely
-    try {
-      map.addControl(newOverlay as any);
-      overlayInstance = newOverlay;
-      setOverlayReady(true);
-      console.log('✅ DeckGL overlay added to map');
-    } catch (error) {
-      console.error('❌ Error adding overlay to map:', error);
-      return null;
-    }
+    // Add to map
+    map.addControl(newOverlay as any);
+    overlayInstance = newOverlay;
+    setOverlayReady(true);
 
     return newOverlay;
   }, [map]);
@@ -87,7 +75,7 @@ export const DeckGLOverlay: React.FC<DeckGLOverlayProps> = ({
 
   // Smooth layer updates with improved transitions
   useEffect(() => {
-    if (!overlay || !overlayReady || !map) return;
+    if (!overlay || !overlayReady) return;
 
     // Clear existing timeout
     if (overlayUpdateTimeout) {
@@ -105,7 +93,7 @@ export const DeckGLOverlay: React.FC<DeckGLOverlayProps> = ({
         clearTimeout(overlayUpdateTimeout);
       }
     };
-  }, [overlay, overlayReady, layers, map]);
+  }, [overlay, overlayReady, layers]);
 
   // Cleanup
   useEffect(() => {

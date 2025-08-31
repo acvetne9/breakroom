@@ -6,6 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
@@ -563,11 +564,15 @@ export type Database = {
         Returns: {
           atmosphere: string[]
           business_type: string
+          created_at: string
           id: string
           lat: number
           lng: number
           name: string
+          place_id: string
           salary: string
+          updated_at: string
+          url: string
           website: string
         }[]
       }
