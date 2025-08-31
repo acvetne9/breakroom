@@ -27,7 +27,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
     container: {
       position: 'fixed' as const,
       inset: '0',
-      zIndex: 100,
+      zIndex: 50,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -54,7 +54,8 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       justifyContent: 'center',
       alignItems: 'center',
       marginBottom: '20px',
-      transform: 'scale(1.5)'
+      transform: 'scale(1.5)',
+      marginRight: '-12px' // Offset to center the mug body instead of mug+handle
     },
     coffeeMug: {
       position: 'relative' as const,
@@ -186,7 +187,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
           }
           100% {
             opacity: 1;
-            transform: translateX(0%) translateX(4px);
+            transform: translateX(0%) translateX(0px);
           }
         }
         
