@@ -18,7 +18,10 @@ interface InitiationPageProps {
 }
 
 const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
-  const [salary, setSalary] = useState('');
+  // salaryRaw is the actual numeric string the user types (e.g. "123" or "12.5")
+  const [salaryRaw, setSalaryRaw] = useState('');
+  const displaySalary = salaryRaw ? `$${salaryRaw}` : '';
+
   const [role, setRole] = useState('');
   const [location, setLocation] = useState('');
   const [fullLocation, setFullLocation] = useState('');
@@ -29,36 +32,47 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   const [isCreatingBusiness, setIsCreatingBusiness] = useState(false);
   const { toast } = useToast();
 
-  /** Format salary as $123.00 */
-  const formatSalary = (input: string) => {
-    const cleanValue = input.replace(/[^0-9.]/g, '');
-    const number = parseFloat(cleanValue);
-    if (isNaN(number)) return '';
-    return `$${number.toFixed(2)}`;
-  };
-
+  /** Handle typing in the salary input.
+   *  Keeps only digits and a single optional decimal point.
+   *  Does NOT auto-append .00 on every keystroke.
+   */
   const handleSalaryChange = (value: string) => {
-    setSalary(formatSalary(value));
+    // value may include a leading $, remove non-numeric except dot
+    let cleaned = value.replace(/[^0-9.]/g, '');
+
+    // allow only one dot
+    const parts = cleaned.split('.');
+    if (parts.length > 1) {
+      const integer = parts.shift() || '';
+      cleaned = integer + '.' + parts.join('');
+    }
+
+    // if user types just "." treat as "0." (optional)
+    if (cleaned === '.') {
+      cleaned = '0.';
+    }
+
+    setSalaryRaw(cleaned);
   };
 
   const checkForCompletion = () => {
-    const allFilled =
-      salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
-    const isValidRole =
-      JOB_OPTIONS.includes(role.trim()) || role.trim() === 'Other';
+    const allFilled = salaryRaw.trim() !== '' && role.trim() !== '' && location.trim() !== '';
+    const isValidRole = JOB_OPTIONS.includes(role.trim()) || role.trim() === 'Other';
+    console.log('checkForCompletion called:', { salaryRaw, role, location, allFilled, isValidRole });
 
     if (allFilled && isValidRole && !isComplete) {
       setIsComplete(true);
 
-      // Delay to allow for UI animations if needed
+      // Delay slightly for UI animations if needed
       setTimeout(() => {
         const dataToPass = {
-          salary,
+          salary: displaySalary, // pass formatted string like "$123" (no forced cents)
           role,
           location,
           fullLocation: fullLocation || location,
           timePeriod,
         };
+        console.log('InitiationPage completing with data:', dataToPass);
         onComplete(dataToPass);
       }, 300);
     }
@@ -66,11 +80,12 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
 
   const handleRoleChange = (value: string) => {
     const isPredefinedOption = JOB_OPTIONS.includes(value);
+
     if (!isPredefinedOption && value && isProfane(value)) {
       toast({
         title: 'Invalid role',
         description: 'Inappropriate content detected in job role',
-        variant: 'destructive',
+        variant: 'destructive'
       });
       return;
     }
@@ -90,17 +105,22 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
       setFullLocation('');
       return;
     }
+
     if (value && isProfane(value)) {
       toast({
         title: 'Invalid location',
         description: 'Inappropriate content detected in location',
-        variant: 'destructive',
+        variant: 'destructive'
       });
       setLocation('');
       setFullLocation('');
       return;
     }
-    setTimeout(() => checkForCompletion(), 10);
+
+    // Small timeout to allow any selection handlers to finish
+    setTimeout(() => {
+      checkForCompletion();
+    }, 10);
   };
 
   return (
@@ -109,30 +129,23 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
         <div className="space-y-6">
           <div className="text-center">
             <h1 className="text-app-black mb-6 font-normal text-lg">
-              Make A Difference! ❤️
-              <br />
-              Share A Past Or Current Job
+              Make A Difference! ❤️<br/>Share A Past Or Current Job
             </h1>
           </div>
 
           <div className="space-y-6">
-            {/* Salary + Time Period */}
             <div>
               <div className="flex items-center space-x-3">
                 <input
                   type="text"
                   inputMode="numeric"
-                  value={salary}
+                  value={displaySalary}
                   onChange={(e) => handleSalaryChange(e.target.value)}
                   onBlur={checkForCompletion}
-                  placeholder="$0.00"
+                  placeholder="$0"
                   className="app-input text-center text-lg flex-1 !py-0 h-12"
                 />
-                <select
-                  value={timePeriod}
-                  onChange={(e) => setTimePeriod(e.target.value)}
-                  className="app-input text-lg w-auto !py-0 h-12"
-                >
+                <select value={timePeriod} onChange={e => setTimePeriod(e.target.value)} className="app-input text-lg w-auto !py-0 h-12">
                   <option value="HR">HR</option>
                   <option value="MO">MO</option>
                   <option value="YR">YR</option>
@@ -141,49 +154,35 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
             </div>
 
             <div className="text-center">
-              <p className="text-app-black mb-4 text-lg font-normal">
-                3 Easy Questions. Kept Anonymous 🤐
-              </p>
+              <p className="text-app-black mb-4 text-lg font-normal">3 Easy Questions. Kept Anonomous 🤐</p>
             </div>
 
-            {/* Role */}
             <div>
-              <JobSearchDropdown
-                value={role}
-                onChange={handleRoleChange}
-                onBlur={checkForCompletion}
-                placeholder="Search or select a job role..."
-                className="app-input"
-              />
+              <JobSearchDropdown value={role} onChange={handleRoleChange} onBlur={checkForCompletion} placeholder="Search or select a job role..." className="app-input" />
             </div>
 
             <div className="text-center">
-              <p className="text-app-black mb-4 text-lg">
-                Find Work That Works For You 👷‍♀️
-              </p>
+              <p className="text-app-black mb-4 text-lg">Find Work That Works For You 👷‍♀️</p>
             </div>
 
-            {/* Location */}
             <div>
-              <BusinessSearchDropdown
-                value={location}
-                onChange={handleLocationChange}
-                onBlur={handleLocationBlur}
-                placeholder="Where'd you work?..."
+              <BusinessSearchDropdown 
+                value={location} 
+                onChange={handleLocationChange} 
+                onBlur={handleLocationBlur} 
+                placeholder="Where'd you work?..." 
                 className="app-input"
-                salary={salary}
+                salary={displaySalary}   {/* keep passing the $-prefixed string */}
                 role={role}
                 timePeriod={timePeriod}
               />
             </div>
 
             <div className="text-center mt-8">
-              <p className="text-app-black text-lg">
-                Don't worry, your boss won't find out 😉
-              </p>
+              <p className="text-app-black text-lg">Don't worry, your boss won't find out 😉</p>
             </div>
 
-            {/* New Business Form */}
+            {/* New Business Form - same styling as other fields */}
             {showNewBusinessForm && (
               <div className="space-y-4 mt-6">
                 <div>
@@ -200,38 +199,41 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                     onClick={async () => {
                       if (!newBusinessAddress.trim()) {
                         toast({
-                          title: 'Address required',
-                          description: 'Please enter the business address',
-                          variant: 'destructive',
+                          title: "Address required",
+                          description: "Please enter the business address",
+                          variant: "destructive"
                         });
                         return;
                       }
-                      if (!salary || !role) {
+
+                      if (!salaryRaw || !role) {
                         toast({
-                          title: 'Missing information',
-                          description: 'Please fill in salary and role first',
-                          variant: 'destructive',
+                          title: "Missing information", 
+                          description: "Please fill in salary and role first",
+                          variant: "destructive"
                         });
                         return;
                       }
+
                       setIsCreatingBusiness(true);
                       try {
-                        await new Promise((resolve) =>
-                          setTimeout(resolve, 500)
-                        ); // Simulate creation
+                        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate creation
                         toast({
-                          title: 'Business created!',
-                          description: 'New business has been added to the map',
+                          title: "Business created!",
+                          description: "New business has been added to the map",
                         });
                         setShowNewBusinessForm(false);
                         setNewBusinessAddress('');
-                        setTimeout(() => checkForCompletion(), 100);
-                      } catch {
+                        
+                        // Trigger completion check
+                        setTimeout(() => {
+                          checkForCompletion();
+                        }, 100);
+                      } catch (error) {
                         toast({
-                          title: 'Error',
-                          description:
-                            'Failed to create business. Please try again.',
-                          variant: 'destructive',
+                          title: "Error",
+                          description: "Failed to create business. Please try again.",
+                          variant: "destructive"
                         });
                       } finally {
                         setIsCreatingBusiness(false);
@@ -240,9 +242,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                     disabled={isCreatingBusiness}
                     className="app-input flex-1 bg-app-yellow text-app-black font-medium"
                   >
-                    {isCreatingBusiness
-                      ? 'Adding Business...'
-                      : 'Add New Business'}
+                    {isCreatingBusiness ? 'Adding Business...' : 'Add New Business'}
                   </button>
                   <button
                     onClick={() => {
