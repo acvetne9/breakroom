@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import MapLibreMap from './MapLibreMap';
 import BusinessPreview from './BusinessPreview';
 import BusinessDetails from './BusinessDetails';
+import BreakroomLoading from './LoadingScreen';
 
 import { searchBusinesses } from '../utils/searchUtils';
 import { isProfane } from '../utils/profanityFilter';
