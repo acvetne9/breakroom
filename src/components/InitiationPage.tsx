@@ -40,7 +40,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   const handleSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // only allow digits
     const raw = e.target.value.replace(/[^0-9]/g, "");
-    setAmount(raw);
+    setSalary(formatSalary(raw));
   };
 
   const checkForCompletion = () => {
@@ -125,7 +125,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                   type="text"
                   inputMode="numeric"
                   value={salary}
-                  onChange={(e) => handleSalaryChange(e.target.value)}
+                  onChange={handleSalaryChange}
                   onBlur={checkForCompletion}
                   placeholder="$0.00"
                   className="app-input text-center text-lg flex-1 !py-0 h-12"
