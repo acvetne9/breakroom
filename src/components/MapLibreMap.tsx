@@ -421,8 +421,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                             'source-layer': detectedLayer,
                             paint: {
                               'circle-color': '#FACC15', // Yellow for businesses
-                              'circle-radius': 6,
-                              'circle-opacity': 0.9,
+                              'circle-radius': 8,
+                              'circle-opacity': 1.0,
                               'circle-stroke-width': 2,
                               'circle-stroke-color': '#FFFFFF'
                             },
