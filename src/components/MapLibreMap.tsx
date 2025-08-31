@@ -422,12 +422,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         </div>
       )}
       
-      <DeckGLOverlay
-        map={map}
-        businesses={businesses}
-        selectedBusinessId={selectedBusiness?.id}
-        onBusinessClick={handleBusinessClick}
-      />
+      {map && (
+        <DeckGLOverlay
+          map={map}
+          businesses={businesses}
+          selectedBusinessId={selectedBusiness?.id}
+          onBusinessClick={handleBusinessClick}
+        />
+      )}
     </div>
   );
 };
