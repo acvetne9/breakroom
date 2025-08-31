@@ -163,6 +163,15 @@ const HomePage: React.FC<HomePageProps> = ({
 
   return (
     <div className="relative w-full h-full">
+
+      <div>
+        {showLoading && (
+          <BreakroomLoading onComplete={handleLoadingComplete} />
+        )}
+        {/* Rest of your app */}
+      </div>
+
+      
       {/* MapLibre with OpenStreetMap base layer */}
       <MapLibreMap
         onBusinessClick={handleBusinessClick}
