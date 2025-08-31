@@ -44,6 +44,12 @@ const HomePage: React.FC<HomePageProps> = ({
 }) => {
   const [searchValue, setSearchValue] = useState('');
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
+  const [showLoading, setShowLoading] = useState(true);
+
+  const handleLoadingComplete = () => {
+    setShowLoading(false);
+    // Your app initialization logic here
+  };
   
   // Use prop-controlled selectedBusiness if available, otherwise use local state
   const selectedBusiness = propSelectedBusiness;
