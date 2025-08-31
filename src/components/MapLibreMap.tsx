@@ -141,7 +141,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     console.log('🧭 Using tiles URL:', absoluteTilesUrl);
     console.log('📱 Is Capacitor environment:', isCapacitor);
 
-    // Simplified style with no fonts to prevent crashes
+    // Simplified style with proper font handling
     const baseStyle = {
       version: 8 as const,
       sources: {
@@ -153,6 +153,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           scheme: 'xyz' as const
         }
       },
+      // Use a working font service
+      glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
       layers: [
         {
           id: 'background',
@@ -203,28 +205,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.error('🚨 Map error:', e.error);
     });
     
-    // Simple sourcedata handler without font-dependent layers
+    // Enhanced sourcedata handler to restore all map features
     mapInstance.on('sourcedata', e => {
       if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
-        console.log('🎯 Source fully loaded, attempting to add basic layers...');
+        console.log('🎯 Source fully loaded, attempting to add comprehensive layers...');
         
         try {
-          // Only add simple layers without text/labels to avoid font issues
-          if (!mapInstance.getLayer('roads')) {
-            mapInstance.addLayer({
-              id: 'roads',
-              type: 'line',
-              source: 'nyc-tiles',
-              'source-layer': 'examplepoints',
-              filter: ['has', 'name'],
-              paint: {
-                'line-color': '#666',
-                'line-width': 2,
-                'line-opacity': 0.8
-              }
-            });
-          }
-          
+          // Water features
           if (!mapInstance.getLayer('water')) {
             mapInstance.addLayer({
               id: 'water',
@@ -237,10 +224,85 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 'fill-opacity': 0.6
               }
             });
+            console.log('✅ Added water layer');
+          }
+
+          // River lines
+          if (!mapInstance.getLayer('rivers')) {
+            mapInstance.addLayer({
+              id: 'rivers',
+              type: 'line',
+              source: 'nyc-tiles',
+              'source-layer': 'examplepoints',
+              filter: ['==', 'water', 'river'],
+              paint: {
+                'line-color': '#4A90E2',
+                'line-width': 3,
+                'line-opacity': 0.8
+              }
+            });
+            console.log('✅ Added rivers layer');
+          }
+
+          // Roads
+          if (!mapInstance.getLayer('roads')) {
+            mapInstance.addLayer({
+              id: 'roads',
+              type: 'line',
+              source: 'nyc-tiles',
+              'source-layer': 'examplepoints',
+              filter: ['has', 'name'],
+              paint: {
+                'line-color': '#666',
+                'line-width': [
+                  'interpolate', ['linear'], ['zoom'],
+                  10, 0.5,
+                  14, 2,
+                  16, 4
+                ],
+                'line-opacity': 0.8
+              }
+            });
+            console.log('✅ Added roads layer');
+          }
+
+          // Street name labels - now with proper font handling
+          if (!mapInstance.getLayer('street-labels')) {
+            mapInstance.addLayer({
+              id: 'street-labels',
+              type: 'symbol',
+              source: 'nyc-tiles',
+              'source-layer': 'examplepoints',
+              filter: ['has', 'name'],
+              layout: {
+                'text-field': ['get', 'name'],
+                'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+                'text-size': [
+                  'interpolate', ['linear'], ['zoom'],
+                  10, 8,
+                  14, 12,
+                  16, 16
+                ],
+                'symbol-placement': 'line',
+                'text-rotation-alignment': 'map',
+                'text-pitch-alignment': 'viewport'
+              },
+              paint: {
+                'text-color': '#333',
+                'text-halo-color': '#FFFFFF',
+                'text-halo-width': 2,
+                'text-opacity': [
+                  'interpolate', ['linear'], ['zoom'],
+                  10, 0,
+                  12, 1
+                ]
+              }
+            });
+            console.log('✅ Added street labels layer');
           }
           
-          console.log('✅ Basic layers added successfully');
           layersAddedRef.current = true;
+          console.log('✅ All map features added successfully');
           
         } catch (error) {
           console.warn('⚠️ Error adding layers:', error);
