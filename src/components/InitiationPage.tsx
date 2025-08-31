@@ -38,9 +38,9 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   };
 
   const handleSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // only allow digits
-    const raw = e.target.value.replace(/[^0-9]/g, "");
-    setSalary(formatSalary(raw));
+    // Allow digits, decimal point, and dollar sign
+    const raw = e.target.value.replace(/[^0-9.$]/g, "");
+    setSalary(raw);
   };
 
   const checkForCompletion = () => {
