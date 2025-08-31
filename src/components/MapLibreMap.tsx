@@ -132,8 +132,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     let mapInstance: maplibregl.Map | null = null;
     let cleanedUp = false;
 
-    const absoluteTilesUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+    // Handle tile URLs for different environments
+    const isCapacitor = window.location.protocol === 'capacitor:';
+    const absoluteTilesUrl = isCapacitor 
+      ? `https://id-preview--8b6dea56-dc8e-4244-a645-44c92d10150b.lovable.app/data/tiles/{z}/{x}/{y}.pbf`
+      : `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+    
     console.log('🧭 Using tiles URL:', absoluteTilesUrl);
+    console.log('📱 Is Capacitor environment:', isCapacitor);
 
     const baseStyle = {
       version: 8 as const,
