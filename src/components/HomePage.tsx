@@ -46,10 +46,30 @@ const HomePage: React.FC<HomePageProps> = ({
   const [searchValue, setSearchValue] = useState('');
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
   const [showLoading, setShowLoading] = useState(true);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [businessesLoaded, setBusinessesLoaded] = useState(false);
+
+  // Check if everything is loaded and hide loading screen
+  useEffect(() => {
+    if (mapLoaded && businessesLoaded) {
+      // Add small delay to ensure smooth transition
+      const timer = setTimeout(() => {
+        setShowLoading(false);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [mapLoaded, businessesLoaded]);
 
   const handleLoadingComplete = () => {
-    setShowLoading(false);
-    // Your app initialization logic here
+    // This is now handled by the useEffect above
+  };
+
+  const handleMapLoaded = () => {
+    setMapLoaded(true);
+  };
+
+  const handleBusinessesLoaded = () => {
+    setBusinessesLoaded(true);
   };
   
   // Use prop-controlled selectedBusiness if available, otherwise use local state
@@ -164,97 +184,97 @@ const HomePage: React.FC<HomePageProps> = ({
 
   return (
     <div>
-
-      {showLoading ? (
+      {showLoading && (
         <BreakroomLoading onComplete={handleLoadingComplete} />
-      ) : (
-        <div className="relative w-full h-full">
-          {/* MapLibre with OpenStreetMap base layer */}
-          <MapLibreMap
-            onBusinessClick={handleBusinessClick}
-            selectedBusiness={selectedBusiness}
-            landmarks={landmarks}
-          />
-          
-          
-          {/* Search results dropdown */}
-          {searchResults.length > 0 && (
-            <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-10">
-              <div className="app-popup p-4 pb-8 max-h-60 overflow-y-auto rounded-t-lg rounded-b-none border-b-0">
-                {searchResults.map(business => (
-                  <div 
-                    key={business.id}
-                    className="flex flex-col py-2 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
-                    onClick={() => handleBusinessClick(business)}
-                  >
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">{business.name}</span>
-                      <span className="text-sm text-app-gray-medium">{business.salary}</span>
-                    </div>
-                    <div className="flex gap-2 mt-1">
-                      <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                        {business.businessType}
-                      </span>
-                      {business.roles?.slice(0, 2).map((role: any, index: number) => (
-                        <span key={index} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                          {role.role}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-    
-          {/* Business Preview Popup */}
-          {selectedBusiness && !showBusinessDetails && (
-            <BusinessPreview 
-              business={selectedBusiness}
-              posts={posts}
-              onClose={handleClosePreview}
-              onShowDetails={handleShowBusinessDetails}
-              onStoriesClick={handleBusinessStoriesClick}
-            />
-          )}
-    
-          {/* Business Details Card */}
-          {selectedBusiness && showBusinessDetails && (
-            <BusinessDetails 
-              business={selectedBusiness}
-              posts={posts}
-              onClose={handleClosePreview}
-              onBackToPreview={handleBackToPreview}
-              onStoriesClick={() => onBusinessStoriesClick?.(selectedBusiness.id)}
-              onPostClick={onPostClick}
-              onRoleVote={onRoleVote}
-            />
-          )}
-    
-          {/* Search input bar at bottom - only show on home slide and not during initiation */}
-          {currentSlide === 1 && currentView === 'main' && (
-            <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
-              <div className="relative">
-                <input
-                  type="text"
-                  value={searchValue}
-                  onChange={(e) => handleSearchInput(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Search businesses, roles, salary..."
-                  className="search-bar pr-12"
-                />
-                <button
-                  onClick={performSearch}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-app-gray-medium hover:text-app-gray-dark transition-colors"
-                >
-                  <span>🔍</span>
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
       )}
+      
+      <div className={`relative w-full h-full ${showLoading ? 'opacity-0 pointer-events-none' : 'opacity-100'} transition-opacity duration-500`}>
+        {/* MapLibre with OpenStreetMap base layer */}
+        <MapLibreMap
+          onBusinessClick={handleBusinessClick}
+          selectedBusiness={selectedBusiness}
+          landmarks={landmarks}
+          onMapLoaded={handleMapLoaded}
+          onBusinessesLoaded={handleBusinessesLoaded}
+        />
+        
+        
+        {/* Search results dropdown */}
+        {searchResults.length > 0 && (
+          <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-10">
+            <div className="app-popup p-4 pb-8 max-h-60 overflow-y-auto rounded-t-lg rounded-b-none border-b-0">
+              {searchResults.map(business => (
+                <div 
+                  key={business.id}
+                  className="flex flex-col py-2 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                  onClick={() => handleBusinessClick(business)}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">{business.name}</span>
+                    <span className="text-sm text-app-gray-medium">{business.salary}</span>
+                  </div>
+                  <div className="flex gap-2 mt-1">
+                    <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                      {business.businessType}
+                    </span>
+                    {business.roles?.slice(0, 2).map((role: any, index: number) => (
+                      <span key={index} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                        {role.role}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+  
+        {/* Business Preview Popup */}
+        {selectedBusiness && !showBusinessDetails && (
+          <BusinessPreview 
+            business={selectedBusiness}
+            posts={posts}
+            onClose={handleClosePreview}
+            onShowDetails={handleShowBusinessDetails}
+            onStoriesClick={handleBusinessStoriesClick}
+          />
+        )}
+  
+        {/* Business Details Card */}
+        {selectedBusiness && showBusinessDetails && (
+          <BusinessDetails 
+            business={selectedBusiness}
+            posts={posts}
+            onClose={handleClosePreview}
+            onBackToPreview={handleBackToPreview}
+            onStoriesClick={() => onBusinessStoriesClick?.(selectedBusiness.id)}
+            onPostClick={onPostClick}
+            onRoleVote={onRoleVote}
+          />
+        )}
 
+        {/* Search input bar at bottom - only show on home slide and not during initiation */}
+        {currentSlide === 1 && currentView === 'main' && (
+          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
+            <div className="relative">
+              <input
+                type="text"
+                value={searchValue}
+                onChange={(e) => handleSearchInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Search businesses, roles, salary..."
+                className="search-bar pr-12"
+              />
+              <button
+                onClick={performSearch}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-app-gray-medium hover:text-app-gray-dark transition-colors"
+              >
+                <span>🔍</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
