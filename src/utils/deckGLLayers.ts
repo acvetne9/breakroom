@@ -25,11 +25,11 @@ export const createBusinessScatterplotLayer = ({
     id: layerId,
     data: businesses,
     pickable: true,
-    opacity: 0.9,
+    opacity: 1.0,
     stroked: true,
     filled: true,
     radiusScale: 1,
-    radiusMinPixels: 6,
+    radiusMinPixels: 8,
     radiusMaxPixels: 24,
     lineWidthMinPixels: 1.5,
     getPosition: (d: Business) => [d.position.lng, d.position.lat],
@@ -38,6 +38,7 @@ export const createBusinessScatterplotLayer = ({
     getLineColor: [255, 255, 255, 200], // Semi-transparent white stroke
     onClick: onBusinessClick ? (info) => {
       if (info.object) {
+        console.log('🎯 Business clicked:', info.object.name);
         onBusinessClick(info.object as Business);
       }
     } : undefined,
@@ -83,7 +84,7 @@ export const createBusinessClusterLayer = (data: any[], onBusinessClick?: (busin
     id: layerId,
     data: data,
     pickable: true,
-    opacity: 0.95,
+    opacity: 1.0,
     stroked: true,
     filled: true,
     radiusScale: 1,
@@ -128,6 +129,7 @@ export const createBusinessClusterLayer = (data: any[], onBusinessClick?: (busin
             });
           }
         } else {
+          console.log('🎯 Individual business clicked from cluster:', item.name);
           onBusinessClick?.(item);
         }
       }

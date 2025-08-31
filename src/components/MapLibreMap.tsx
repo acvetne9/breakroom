@@ -23,30 +23,12 @@ import {
 } from '../utils/mapLayers';
 
 interface MapLibreMapProps {
-  businesses: {
-    id: string;
-    name: string;
-    position: { lat: number; lng: number };
-    atmosphere: string[];
-    salary?: string;
-    stories?: { id: string; text: string; author: string }[];
-    businessType?: string;
-    roles?: {
-      role: string;
-      salary: string;
-      upvotes?: number;
-      downvotes?: number;
-      userVote?: 'up' | 'down';
-    }[];
-    place_id?: string;
-  }[];
   onBusinessClick?: (business: any) => void;
   selectedBusiness?: any;
   landmarks?: { lat: number; lng: number; emoji: string }[];
 }
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
-  businesses: propBusinesses, // Rename to avoid confusion with viewport businesses
   onBusinessClick,
   selectedBusiness,
   landmarks = []
@@ -70,6 +52,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Enhanced business click handler with viewport integration
   const handleBusinessClick = useCallback(async (business: any) => {
+    console.log('🎯 MapLibreMap handleBusinessClick called:', business.name);
+    
+    // Zoom to business first
+    if (map) {
+      map.easeTo({
+        center: [business.position.lng, business.position.lat],
+        zoom: Math.max(map.getZoom(), 16),
+        duration: 800
+      });
+    }
+    
     // Fetch full details if needed
     if (!business.atmosphere?.length && !business.roles?.length) {
       const fullBusiness = await fetchFullBusinessDetails(business.id);
@@ -79,7 +72,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     } else if (onBusinessClick) {
       onBusinessClick(business);
     }
-  }, [fetchFullBusinessDetails, onBusinessClick]);
+  }, [fetchFullBusinessDetails, onBusinessClick, map]);
 
   // Movement state tracking for better debouncing
   const isMovingRef = useRef(false);
@@ -159,7 +152,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           {
             id: 'background',
             type: 'background' as const,
-            paint: { 'background-color': '#B3E5FC' }
+            paint: { 'background-color': '#F5F5DC' } // Wheat color for land background
           }
           // Removed hardcoded layers - will add dynamically based on actual tile content
         ]
@@ -327,60 +320,117 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                         const detectedLayer = 'examplepoints';
                         console.log('🧭 Using probed layer:', detectedLayer);
                         
-                        // Add a simple polygon layer first to test visibility
+                        // Add land/park polygon layers with proper colors
                         try {
                           mapInstance.addLayer({
-                            id: 'nyc-polygons',
+                            id: 'nyc-land',
                             type: 'fill',
                             source: 'nyc-tiles',
                             'source-layer': detectedLayer,
                             paint: {
-                              'fill-color': '#0B7285',
-                              'fill-opacity': 0.3
+                              'fill-color': '#F5F5DC', // Wheat color for land
+                              'fill-opacity': 1.0
                             },
                             filter: ['==', ['geometry-type'], 'Polygon']
                           });
-                          console.log('✅ Added polygon layer (probed)');
-                        } catch (polygonErr) {
-                          console.warn('⚠️ Polygon layer (probed) failed:', polygonErr);
+                          console.log('✅ Added land layer (probed)');
+                        } catch (landErr) {
+                          console.warn('⚠️ Land layer (probed) failed:', landErr);
                         }
                         
-                        // Add line layer
+                        // Add parks layer
                         try {
                           mapInstance.addLayer({
-                            id: 'nyc-lines',
+                            id: 'nyc-parks',
+                            type: 'fill',
+                            source: 'nyc-tiles',
+                            'source-layer': detectedLayer,
+                            paint: {
+                              'fill-color': '#87C17A', // Green for parks
+                              'fill-opacity': 1.0
+                            },
+                            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'leisure']]
+                          });
+                          console.log('✅ Added parks layer (probed)');
+                        } catch (parksErr) {
+                          console.warn('⚠️ Parks layer (probed) failed:', parksErr);
+                        }
+                        
+                        // Add water layer
+                        try {
+                          mapInstance.addLayer({
+                            id: 'nyc-water',
+                            type: 'fill',
+                            source: 'nyc-tiles',
+                            'source-layer': detectedLayer,
+                            paint: {
+                              'fill-color': '#6CA4E1', // Blue for water
+                              'fill-opacity': 1.0
+                            },
+                            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']]
+                          });
+                          console.log('✅ Added water layer (probed)');
+                        } catch (waterErr) {
+                          console.warn('⚠️ Water layer (probed) failed:', waterErr);
+                        }
+                        
+                        // Add roads layer
+                        try {
+                          mapInstance.addLayer({
+                            id: 'nyc-roads',
                             type: 'line',
                             source: 'nyc-tiles',
                             'source-layer': detectedLayer,
                             paint: {
-                              'line-color': '#FF6B35',
+                              'line-color': '#666666', // Dark gray for roads
                               'line-width': 2,
-                              'line-opacity': 0.8
+                              'line-opacity': 1.0
                             },
-                            filter: ['==', ['geometry-type'], 'LineString']
+                            filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
                           });
-                          console.log('✅ Added line layer (probed)');
-                        } catch (lineErr) {
-                          console.warn('⚠️ Line layer (probed) failed:', lineErr);
+                          console.log('✅ Added roads layer (probed)');
+                        } catch (roadsErr) {
+                          console.warn('⚠️ Roads layer (probed) failed:', roadsErr);
                         }
                         
-                        // Add point layer
+                        // Add waterways layer
                         try {
                           mapInstance.addLayer({
-                            id: 'nyc-points',
+                            id: 'nyc-waterways',
+                            type: 'line',
+                            source: 'nyc-tiles',
+                            'source-layer': detectedLayer,
+                            paint: {
+                              'line-color': '#999999', // Light gray for waterways
+                              'line-width': 1,
+                              'line-opacity': 0.6
+                            },
+                            filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'waterway']]
+                          });
+                          console.log('✅ Added waterways layer (probed)');
+                        } catch (waterwaysErr) {
+                          console.warn('⚠️ Waterways layer (probed) failed:', waterwaysErr);
+                        }
+                        
+                        // Add businesses points layer
+                        try {
+                          mapInstance.addLayer({
+                            id: 'nyc-businesses',
                             type: 'circle',
                             source: 'nyc-tiles',
                             'source-layer': detectedLayer,
                             paint: {
-                              'circle-color': '#FF0000',
-                              'circle-radius': 4,
-                              'circle-opacity': 0.8
+                              'circle-color': '#FACC15', // Yellow for businesses
+                              'circle-radius': 8,
+                              'circle-opacity': 1.0,
+                              'circle-stroke-width': 2,
+                              'circle-stroke-color': '#FFFFFF'
                             },
                             filter: ['==', ['geometry-type'], 'Point']
                           });
-                          console.log('✅ Added point layer (probed)');
-                        } catch (pointErr) {
-                          console.warn('⚠️ Point layer (probed) failed:', pointErr);
+                          console.log('✅ Added businesses layer (probed)');
+                        } catch (businessesErr) {
+                          console.warn('⚠️ Businesses layer (probed) failed:', businessesErr);
                         }
                         
                         layersAddedRef.current = true;
@@ -396,60 +446,117 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                     const detectedLayer = sourceLayers[0];
                     console.log('🧭 Detected layer:', detectedLayer, 'from', sourceLayers);
                     
-                    // Add a simple polygon layer first to test visibility
+                    // Add land/park polygon layers with proper colors
                     try {
                       mapInstance.addLayer({
-                        id: 'nyc-polygons',
+                        id: 'nyc-land',
                         type: 'fill',
                         source: 'nyc-tiles',
                         'source-layer': detectedLayer,
                         paint: {
-                          'fill-color': '#0B7285',
-                          'fill-opacity': 0.3
+                          'fill-color': '#F5F5DC', // Wheat color for land
+                          'fill-opacity': 1.0
                         },
                         filter: ['==', ['geometry-type'], 'Polygon']
                       });
-                      console.log('✅ Added polygon layer');
-                    } catch (polygonErr) {
-                      console.warn('⚠️ Polygon layer failed:', polygonErr);
+                      console.log('✅ Added land layer');
+                    } catch (landErr) {
+                      console.warn('⚠️ Land layer failed:', landErr);
                     }
                     
-                    // Add line layer
+                    // Add parks layer
                     try {
                       mapInstance.addLayer({
-                        id: 'nyc-lines',
+                        id: 'nyc-parks',
+                        type: 'fill',
+                        source: 'nyc-tiles',
+                        'source-layer': detectedLayer,
+                        paint: {
+                          'fill-color': '#87C17A', // Green for parks
+                          'fill-opacity': 1.0
+                        },
+                        filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'leisure']]
+                      });
+                      console.log('✅ Added parks layer');
+                    } catch (parksErr) {
+                      console.warn('⚠️ Parks layer failed:', parksErr);
+                    }
+                    
+                    // Add water layer
+                    try {
+                      mapInstance.addLayer({
+                        id: 'nyc-water',
+                        type: 'fill',
+                        source: 'nyc-tiles',
+                        'source-layer': detectedLayer,
+                        paint: {
+                          'fill-color': '#6CA4E1', // Blue for water
+                          'fill-opacity': 1.0
+                        },
+                        filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']]
+                      });
+                      console.log('✅ Added water layer');
+                    } catch (waterErr) {
+                      console.warn('⚠️ Water layer failed:', waterErr);
+                    }
+                    
+                    // Add roads layer
+                    try {
+                      mapInstance.addLayer({
+                        id: 'nyc-roads',
                         type: 'line',
                         source: 'nyc-tiles',
                         'source-layer': detectedLayer,
                         paint: {
-                          'line-color': '#FF6B35',
+                          'line-color': '#666666', // Dark gray for roads
                           'line-width': 2,
-                          'line-opacity': 0.8
+                          'line-opacity': 1.0
                         },
-                        filter: ['==', ['geometry-type'], 'LineString']
+                        filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
                       });
-                      console.log('✅ Added line layer');
-                    } catch (lineErr) {
-                      console.warn('⚠️ Line layer failed:', lineErr);
+                      console.log('✅ Added roads layer');
+                    } catch (roadsErr) {
+                      console.warn('⚠️ Roads layer failed:', roadsErr);
                     }
                     
-                    // Add point layer
+                    // Add waterways layer
                     try {
                       mapInstance.addLayer({
-                        id: 'nyc-points',
+                        id: 'nyc-waterways',
+                        type: 'line',
+                        source: 'nyc-tiles',
+                        'source-layer': detectedLayer,
+                        paint: {
+                          'line-color': '#999999', // Light gray for waterways
+                          'line-width': 1,
+                          'line-opacity': 0.6
+                        },
+                        filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'waterway']]
+                      });
+                      console.log('✅ Added waterways layer');
+                    } catch (waterwaysErr) {
+                      console.warn('⚠️ Waterways layer failed:', waterwaysErr);
+                    }
+                    
+                    // Add businesses points layer
+                    try {
+                      mapInstance.addLayer({
+                        id: 'nyc-businesses',
                         type: 'circle',
                         source: 'nyc-tiles',
                         'source-layer': detectedLayer,
                         paint: {
-                          'circle-color': '#FF0000',
-                          'circle-radius': 4,
-                          'circle-opacity': 0.8
+                          'circle-color': '#FACC15', // Yellow for businesses
+                          'circle-radius': 8,
+                          'circle-opacity': 1.0,
+                          'circle-stroke-width': 2,
+                          'circle-stroke-color': '#FFFFFF'
                         },
                         filter: ['==', ['geometry-type'], 'Point']
                       });
-                      console.log('✅ Added point layer');
-                    } catch (pointErr) {
-                      console.warn('⚠️ Point layer failed:', pointErr);
+                      console.log('✅ Added businesses layer');
+                    } catch (businessesErr) {
+                      console.warn('⚠️ Businesses layer failed:', businessesErr);
                     }
                     
                     layersAddedRef.current = true;

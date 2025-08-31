@@ -14,7 +14,5 @@ export interface Business {
   salary?: string;
   roles?: BusinessRole[];
   businessType?: string;
-  place_id?: string;
   website?: string;
-  url?: string;
 }

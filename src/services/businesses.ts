@@ -75,9 +75,7 @@ export const getBusinessesInViewport = async (
         atmosphere: business.atmosphere || [],
         salary: business.salary,
         businessType: business.business_type,
-        place_id: business.place_id,
         website: business.website,
-        url: business.url,
         roles: [],
       }));
       
@@ -108,9 +106,7 @@ export const getBusinessesInViewport = async (
       atmosphere: business.atmosphere || [],
       salary: business.salary,
       businessType: business.business_type,
-      place_id: business.place_id,
       website: business.website,
-      url: business.url,
       roles: [],
     }));
 
@@ -179,9 +175,7 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
     atmosphere: businessData.atmosphere || [],
     salary: businessData.salary,
     roles: businessRoles,
-    place_id: businessData.place_id,
     website: businessData.website,
-    url: businessData.url,
   };
 
   return fullBusiness;
@@ -204,41 +198,9 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
   if (existingBusiness) {
     businessId = existingBusiness.id;
   } else {
-    // Create new business if it doesn't exist - NO AUTH REQUIRED
-    // For now, we'll create a placeholder business with default coordinates
-    const { data: newBusiness, error: createBusinessError } = await supabase
-      .from('businesses')
-      .insert({
-        name: businessLocation,
-        business_type: 'Unknown',
-        lat: 40.7128, // Default NYC coordinates
-        lng: -74.0060,
-        atmosphere: [],
-        salary: salary
-      })
-      .select('id')
-      .single();
+    // Don't create businesses without proper coordinates
+    throw new Error(`Business "${businessLocation}" not found. Businesses must be created with proper coordinates first.`);
 
-    if (createBusinessError) {
-      // If it's a duplicate key error, try to get the existing business again
-      if (createBusinessError.code === '23505') { // unique_violation
-        const { data: retryBusiness } = await supabase
-          .from('businesses')
-          .select('id')
-          .eq('name', businessLocation)
-          .maybeSingle();
-        
-        if (retryBusiness) {
-          businessId = retryBusiness.id;
-        } else {
-          throw createBusinessError;
-        }
-      } else {
-        throw createBusinessError;
-      }
-    } else {
-      businessId = newBusiness.id;
-    }
   }
 
   // Check if this exact role already exists for this business

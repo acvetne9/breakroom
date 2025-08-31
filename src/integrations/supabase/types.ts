@@ -6,6 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
@@ -65,10 +66,8 @@ export type Database = {
           lat: number
           lng: number
           name: string
-          place_id: string | null
           salary: string | null
           updated_at: string
-          url: string | null
           website: string | null
         }
         Insert: {
@@ -80,10 +79,8 @@ export type Database = {
           lat: number
           lng: number
           name: string
-          place_id?: string | null
           salary?: string | null
           updated_at?: string
-          url?: string | null
           website?: string | null
         }
         Update: {
@@ -95,10 +92,8 @@ export type Database = {
           lat?: number
           lng?: number
           name?: string
-          place_id?: string | null
           salary?: string | null
           updated_at?: string
-          url?: string | null
           website?: string | null
         }
         Relationships: []

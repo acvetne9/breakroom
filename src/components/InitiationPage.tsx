@@ -16,9 +16,8 @@ interface InitiationPageProps {
     timePeriod: string;
   }) => void;
 }
-const InitiationPage: React.FC<InitiationPageProps> = ({
-  onComplete
-}) => {
+
+const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   const [salary, setSalary] = useState('');
   const [role, setRole] = useState('');
   const [location, setLocation] = useState('');
@@ -28,71 +27,78 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   const [showNewBusinessForm, setShowNewBusinessForm] = useState(false);
   const [newBusinessAddress, setNewBusinessAddress] = useState('');
   const [isCreatingBusiness, setIsCreatingBusiness] = useState(false);
-  const {
-    toast
-  } = useToast();
-  const handleSalaryChange = (value: string) => {
-    const cleanValue = value.replace(/[^0-9.]/g, '');
-    setSalary(cleanValue ? `$${cleanValue}` : '');
+  const { toast } = useToast();
+
+  /** Format salary as $123.00 */
+  const formatSalary = (input: string) => {
+    const cleanValue = input.replace(/[^0-9.]/g, '');
+    const number = parseFloat(cleanValue);
+    if (isNaN(number)) return '';
+    return `$${number.toFixed(2)}`;
   };
+
+  const handleSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Remove non-numeric characters except decimal point
+    let raw = e.target.value.replace(/[^0-9.]/g, "");
+    
+    // Ensure only one decimal point
+    const parts = raw.split('.');
+    if (parts.length > 2) {
+      raw = parts[0] + '.' + parts.slice(1).join('');
+    }
+    
+    // Limit to 2 decimal places
+    if (parts[1] && parts[1].length > 2) {
+      raw = parts[0] + '.' + parts[1].substring(0, 2);
+    }
+    
+    // Format with $ prefix for display
+    const formatted = raw ? `$${raw}` : '';
+    setSalary(formatted);
+  };
+
   const checkForCompletion = () => {
-    const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
-    const isValidRole = JOB_OPTIONS.includes(role.trim()) || role.trim() === "Other";
-    console.log('checkForCompletion called:', {
-      salary,
-      role,
-      location,
-      allFilled,
-      isValidRole
-    });
+    const allFilled =
+      salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
+    const isValidRole =
+      JOB_OPTIONS.includes(role.trim()) || role.trim() === 'Other';
+
     if (allFilled && isValidRole && !isComplete) {
-      console.log('Setting isComplete to true');
       setIsComplete(true);
 
-      // Complete after animation
+      // Delay to allow for UI animations if needed
       setTimeout(() => {
         const dataToPass = {
           salary,
           role,
           location,
           fullLocation: fullLocation || location,
-          timePeriod
+          timePeriod,
         };
-        console.log('InitiationPage completing with data:', dataToPass);
         onComplete(dataToPass);
-      }, 500);
+      }, 300);
     }
   };
+
   const handleRoleChange = (value: string) => {
-    console.log('handleRoleChange called with:', value);
-
-    // Check if this is a predefined job option (safe to use)
     const isPredefinedOption = JOB_OPTIONS.includes(value);
-
-    // Only validate for profanity if it's NOT a predefined option
     if (!isPredefinedOption && value && isProfane(value)) {
-      console.log('Profanity detected in manual role input:', value);
       toast({
-        title: "Invalid role",
-        description: "Inappropriate content detected in job role",
-        variant: "destructive"
+        title: 'Invalid role',
+        description: 'Inappropriate content detected in job role',
+        variant: 'destructive',
       });
-      return; // Don't set the value if it's profane
+      return;
     }
-    console.log('Setting role:', value, 'isPredefined:', isPredefinedOption);
     setRole(value);
   };
+
   const handleLocationChange = (value: string, fullLocation?: string) => {
     setLocation(value);
     setFullLocation(fullLocation || value);
-    
-    // Check if business exists, if not show the form
-    if (value && value.length > 2) {
-      setShowNewBusinessForm(true);
-    } else {
-      setShowNewBusinessForm(false);
-    }
+    setShowNewBusinessForm(value && value.length > 2);
   };
+
   const handleLocationBlur = () => {
     const value = location.trim();
     if (!value) {
@@ -100,38 +106,49 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       setFullLocation('');
       return;
     }
-
-    // Only validate for profanity on blur for manual input
     if (value && isProfane(value)) {
       toast({
-        title: "Invalid location",
-        description: "Inappropriate content detected in location",
-        variant: "destructive"
+        title: 'Invalid location',
+        description: 'Inappropriate content detected in location',
+        variant: 'destructive',
       });
-      // Clear the invalid input
       setLocation('');
       setFullLocation('');
       return;
     }
-    console.log('Location blur with value:', value);
-
-    // Check for completion
-    setTimeout(() => {
-      checkForCompletion();
-    }, 10);
+    setTimeout(() => checkForCompletion(), 10);
   };
-  return <div className="absolute inset-0 z-50 flex items-center justify-center">
+
+  return (
+    <div className="absolute inset-0 z-50 flex items-center justify-center">
       <div className="app-card flex flex-col justify-center px-8 py-12">
         <div className="space-y-6">
           <div className="text-center">
-            <h1 className="text-app-black mb-6 font-normal text-lg">Make A Difference! ❤️<br/>Share A Past Or Current Job</h1>
+            <h1 className="text-app-black mb-6 font-normal text-lg">
+              Make A Difference! ❤️
+              <br />
+              Share A Past Or Current Job
+            </h1>
           </div>
 
           <div className="space-y-6">
+            {/* Salary + Time Period */}
             <div>
               <div className="flex items-center space-x-3">
-                <input type="text" inputMode="numeric" value={salary} onChange={e => handleSalaryChange(e.target.value)} onBlur={checkForCompletion} placeholder="$14" className="app-input text-center text-lg flex-1 !py-0 h-12" />
-                <select value={timePeriod} onChange={e => setTimePeriod(e.target.value)} className="app-input text-lg w-auto !py-0 h-12">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={salary}
+                  onChange={handleSalaryChange}
+                  onBlur={checkForCompletion}
+                  placeholder="$0.00"
+                  className="app-input text-center text-lg flex-1 !py-0 h-12"
+                />
+                <select
+                  value={timePeriod}
+                  onChange={(e) => setTimePeriod(e.target.value)}
+                  className="app-input text-lg w-auto !py-0 h-12"
+                >
                   <option value="HR">HR</option>
                   <option value="MO">MO</option>
                   <option value="YR">YR</option>
@@ -140,23 +157,35 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
             </div>
 
             <div className="text-center">
-              <p className="text-app-black mb-4 text-lg font-normal">3 Easy Questions. Kept Anonomous 🤐</p>
+              <p className="text-app-black mb-4 text-lg font-normal">
+                3 Easy Questions. Kept Anonymous 🤐
+              </p>
             </div>
 
+            {/* Role */}
             <div>
-              <JobSearchDropdown value={role} onChange={handleRoleChange} onBlur={checkForCompletion} placeholder="Search or select a job role..." className="app-input" />
+              <JobSearchDropdown
+                value={role}
+                onChange={handleRoleChange}
+                onBlur={checkForCompletion}
+                placeholder="Search or select a job role..."
+                className="app-input"
+              />
             </div>
 
             <div className="text-center">
-              <p className="text-app-black mb-4 text-lg">Find Work That Works For You 👷‍♀️</p>
+              <p className="text-app-black mb-4 text-lg">
+                Find Work That Works For You 👷‍♀️
+              </p>
             </div>
 
+            {/* Location */}
             <div>
-              <BusinessSearchDropdown 
-                value={location} 
-                onChange={handleLocationChange} 
-                onBlur={handleLocationBlur} 
-                placeholder="Where'd you work?..." 
+              <BusinessSearchDropdown
+                value={location}
+                onChange={handleLocationChange}
+                onBlur={handleLocationBlur}
+                placeholder="Where'd you work?..."
                 className="app-input"
                 salary={salary}
                 role={role}
@@ -165,10 +194,12 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
             </div>
 
             <div className="text-center mt-8">
-              <p className="text-app-black text-lg">Don't worry, your boss won't find out 😉</p>
+              <p className="text-app-black text-lg">
+                Don't worry, your boss won't find out 😉
+              </p>
             </div>
 
-            {/* New Business Form - same styling as other fields */}
+            {/* New Business Form */}
             {showNewBusinessForm && (
               <div className="space-y-4 mt-6">
                 <div>
@@ -183,45 +214,40 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
                 <div className="flex items-center space-x-3">
                   <button
                     onClick={async () => {
-                      // Use the same creation logic from BusinessSearchDropdown
                       if (!newBusinessAddress.trim()) {
                         toast({
-                          title: "Address required",
-                          description: "Please enter the business address",
-                          variant: "destructive"
+                          title: 'Address required',
+                          description: 'Please enter the business address',
+                          variant: 'destructive',
                         });
                         return;
                       }
-
                       if (!salary || !role) {
                         toast({
-                          title: "Missing information", 
-                          description: "Please fill in salary and role first",
-                          variant: "destructive"
+                          title: 'Missing information',
+                          description: 'Please fill in salary and role first',
+                          variant: 'destructive',
                         });
                         return;
                       }
-
                       setIsCreatingBusiness(true);
                       try {
-                        // Complete the form automatically after successful creation
-                        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate creation
+                        await new Promise((resolve) =>
+                          setTimeout(resolve, 500)
+                        ); // Simulate creation
                         toast({
-                          title: "Business created!",
-                          description: "New business has been added to the map",
+                          title: 'Business created!',
+                          description: 'New business has been added to the map',
                         });
                         setShowNewBusinessForm(false);
                         setNewBusinessAddress('');
-                        
-                        // Trigger completion check
-                        setTimeout(() => {
-                          checkForCompletion();
-                        }, 100);
-                      } catch (error) {
+                        setTimeout(() => checkForCompletion(), 100);
+                      } catch {
                         toast({
-                          title: "Error",
-                          description: "Failed to create business. Please try again.",
-                          variant: "destructive"
+                          title: 'Error',
+                          description:
+                            'Failed to create business. Please try again.',
+                          variant: 'destructive',
                         });
                       } finally {
                         setIsCreatingBusiness(false);
@@ -230,7 +256,9 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
                     disabled={isCreatingBusiness}
                     className="app-input flex-1 bg-app-yellow text-app-black font-medium"
                   >
-                    {isCreatingBusiness ? 'Adding Business...' : 'Add New Business'}
+                    {isCreatingBusiness
+                      ? 'Adding Business...'
+                      : 'Add New Business'}
                   </button>
                   <button
                     onClick={() => {
@@ -248,6 +276,8 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
           </div>
         </div>
       </div>
-    </div>;
+    </div>
+  );
 };
+
 export default InitiationPage;
