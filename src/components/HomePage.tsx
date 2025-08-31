@@ -163,7 +163,7 @@ const HomePage: React.FC<HomePageProps> = ({
   };
 
   return (
-    <div className="relative w-full h-full">
+    <div>
 
       {!showLoading ? (
         <BreakroomLoading onComplete={handleLoadingComplete} />
