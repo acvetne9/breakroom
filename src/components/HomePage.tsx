@@ -168,7 +168,7 @@ const HomePage: React.FC<HomePageProps> = ({
       {!showLoading ? (
         <BreakroomLoading onComplete={handleLoadingComplete} />
       ) : (
-        <>
+        <div className="relative w-full h-full">
           {/* MapLibre with OpenStreetMap base layer */}
           <MapLibreMap
             onBusinessClick={handleBusinessClick}
@@ -252,7 +252,7 @@ const HomePage: React.FC<HomePageProps> = ({
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
 
     </div>
