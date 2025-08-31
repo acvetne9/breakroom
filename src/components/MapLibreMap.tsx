@@ -153,7 +153,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           scheme: 'xyz' as const
         }
       },
-      glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+      glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
         layers: [
           {
             id: 'background',
