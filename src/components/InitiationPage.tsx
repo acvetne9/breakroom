@@ -19,7 +19,7 @@ interface InitiationPageProps {
 const InitiationPage: React.FC<InitiationPageProps> = ({
   onComplete
 }) => {
-  const [salary, setSalary] = useState<number | ''>('');
+  const [salary, setSalary] = useState('');
   const [role, setRole] = useState('');
   const [location, setLocation] = useState('');
   const [fullLocation, setFullLocation] = useState('');
@@ -32,9 +32,8 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     toast
   } = useToast();
   const handleSalaryChange = (value: string) => {
-    // keep only digits
-    const numeric = value.replace(/\D/g, '');
-    setSalary(numeric ? parseInt(numeric, 10) : '');
+    const cleanValue = value.replace(/[^0-9.]/g, '');
+    setSalary(cleanValue ? `$${cleanValue}` : '');
   };
   const checkForCompletion = () => {
     const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
@@ -131,15 +130,18 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
           <div className="space-y-6">
             <div>
               <div className="flex items-center space-x-3">
+                <div className="relative flex items-center flex-1">
+                <span className="absolute left-3 text-gray-500">$</span>
                 <input
                   type="text"
                   inputMode="numeric"
                   value={salary === '' ? '' : salary.toString()}
                   onChange={(e) => handleSalaryChange(e.target.value)}
                   onBlur={checkForCompletion}
-                  placeholder="$14"
-                  className="app-input text-center text-lg flex-1 !py-0 h-12"
+                  placeholder="14"
+                  className="app-input text-center text-lg flex-1 !py-0 h-12 pl-6"
                 />
+              </div>
                 <select value={timePeriod} onChange={e => setTimePeriod(e.target.value)} className="app-input text-lg w-auto !py-0 h-12">
                   <option value="HR">HR</option>
                   <option value="MO">MO</option>
