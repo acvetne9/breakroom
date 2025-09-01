@@ -337,7 +337,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 onChange={e => handleCurrentTimePeriodChange(e.target.value)} 
                 className="px-4 py-3 bg-white text-sm"
                 style={{
-                  border: '1px solid hsl(var(--app-gray-light))',
+                  border: '2px solid hsl(var(--app-gray-light))',
                   borderRadius: '0.5rem',
                   height: '48px',
                   fontSize: '16px'
@@ -408,7 +408,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     onChange={e => updatePastJobTimePeriod(job.id, e.target.value)}
                     className="px-4 py-3 bg-white text-sm"
                     style={{
-                      border: '1px solid hsl(var(--app-gray-light))',
+                      border: '2px solid hsl(var(--app-gray-light))',
                       borderRadius: '0.5rem',
                       height: '48px',
                       fontSize: '16px'
