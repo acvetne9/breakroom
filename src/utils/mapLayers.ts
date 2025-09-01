@@ -95,8 +95,6 @@ export const addRoadsLayer = (map: maplibregl.Map, roadFeatures: any[]) => {
     (map.getSource('roads') as maplibregl.GeoJSONSource).setData(roadsCollection as any);
   } else {
     map.addSource('roads', { type: 'geojson', data: roadsCollection });
-    
-    // Add road lines
     map.addLayer({
       id: 'roads-layer',
       type: 'line',
@@ -106,37 +104,8 @@ export const addRoadsLayer = (map: maplibregl.Map, roadFeatures: any[]) => {
         'line-width': 2
       }
     });
-
-    // Add road labels
-    map.addLayer({
-      id: 'roads-labels',
-      type: 'symbol',
-      source: 'roads',
-      layout: {
-        'text-field': ['get', 'name'], // Assumes road name is in the 'name' property
-        'text-font': ['Open Sans Regular'], // Use available system font
-        'text-size': 12,
-        'symbol-placement': 'line', // Place text along the line
-        'text-rotation-alignment': 'map',
-        'text-pitch-alignment': 'viewport',
-        'text-anchor': 'center',
-        'text-offset': [0, 0],
-        'text-max-angle': 30, // Maximum angle for curved text
-        'text-padding': 1,
-        'text-keep-upright': true, // Keep text readable
-        'text-allow-overlap': false,
-        'text-ignore-placement': false
-      },
-      paint: {
-        'text-color': '#333333',
-        'text-halo-color': '#FFFFFF',
-        'text-halo-width': 1.5,
-        'text-halo-blur': 0.5
-      },
-      filter: ['!=', ['get', 'name'], ''] // Only show roads with names
-    });
   }
-  console.log(`Added ${roadFeatures.length} road features with labels`);
+  console.log(`Added ${roadFeatures.length} road features`);
 };
 
 export const addRoadsLayerChunked = async (map: maplibregl.Map, roadFeatures: any[], isMobile: boolean = false) => {
@@ -147,11 +116,8 @@ export const addRoadsLayerChunked = async (map: maplibregl.Map, roadFeatures: an
   
   console.log(`🛣️ Loading ${roadFeatures.length} roads in center-out chunks of ${chunkSize} (mobile: ${isMobile})`);
   
-  // Remove existing roads layers if they exist
+  // Remove existing roads layer if it exists
   if (map.getSource('roads')) {
-    if (map.getLayer('roads-labels')) {
-      map.removeLayer('roads-labels');
-    }
     if (map.getLayer('roads-layer')) {
       map.removeLayer('roads-layer');
     }
@@ -164,7 +130,6 @@ export const addRoadsLayerChunked = async (map: maplibregl.Map, roadFeatures: an
     data: { type: 'FeatureCollection', features: [] }
   });
   
-  // Add road lines layer
   map.addLayer({
     id: 'roads-layer',
     type: 'line',
@@ -173,35 +138,6 @@ export const addRoadsLayerChunked = async (map: maplibregl.Map, roadFeatures: an
       'line-color': '#666666',
       'line-width': 2
     }
-  });
-
-  // Add road labels layer
-  map.addLayer({
-    id: 'roads-labels',
-    type: 'symbol',
-    source: 'roads',
-    layout: {
-      'text-field': ['get', 'name'], // Assumes road name is in the 'name' property
-      'text-font': ['Open Sans Regular'], // Use available system font
-      'text-size': 12,
-      'symbol-placement': 'line', // Place text along the line
-      'text-rotation-alignment': 'map',
-      'text-pitch-alignment': 'viewport',
-      'text-anchor': 'center',
-      'text-offset': [0, 0],
-      'text-max-angle': 30, // Maximum angle for curved text
-      'text-padding': 1,
-      'text-keep-upright': true, // Keep text readable
-      'text-allow-overlap': false,
-      'text-ignore-placement': false
-    },
-    paint: {
-      'text-color': '#333333',
-      'text-halo-color': '#FFFFFF',
-      'text-halo-width': 1.5,
-      'text-halo-blur': 0.5
-    },
-    filter: ['!=', ['get', 'name'], ''] // Only show roads with names
   });
   
   // Get map center to sort roads by distance from center
@@ -259,12 +195,9 @@ export const addRoadsLayerChunked = async (map: maplibregl.Map, roadFeatures: an
 };
 
 export const ensureLayerOrder = (map: maplibregl.Map) => {
-  // Ensure proper layer ordering: roads over water/parks, labels over roads, businesses on top
+  // Ensure proper layer ordering: roads over water/parks, businesses over roads
   if (map.getLayer('roads-layer')) {
     map.moveLayer('roads-layer');
-  }
-  if (map.getLayer('roads-labels')) {
-    map.moveLayer('roads-labels');
   }
   if (map.getLayer('businesses-layer')) {
     map.moveLayer('businesses-layer');
