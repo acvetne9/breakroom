@@ -3,7 +3,6 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useViewportMapData } from '../hooks/useViewportMapData';
 import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
-
 import { useIsMobile } from '../hooks/use-mobile';
 import { DeckGLOverlay } from './DeckGLOverlay';
 import { 
@@ -26,12 +25,16 @@ interface MapLibreMapProps {
   onBusinessClick?: (business: any) => void;
   selectedBusiness?: any;
   landmarks?: { lat: number; lng: number; emoji: string }[];
+  onMapLoaded?: () => void;
+  onBusinessesLoaded?: () => void;
 }
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
   onBusinessClick,
   selectedBusiness,
-  landmarks = []
+  landmarks = [],
+  onMapLoaded,
+  onBusinessesLoaded
 }) => {
   const isMobile = useIsMobile();
   const mapRef = useRef<HTMLDivElement>(null);
@@ -202,6 +205,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.log('⏳ Waiting for nyc-tiles source to fully load before adding layers');
       
       setMapLoaded(true);
+      
+      // Notify parent that map is loaded
+      if (onMapLoaded) {
+        onMapLoaded();
+      }
     });
 
     // Movement tracking only - business loading will be handled separately
@@ -642,7 +650,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded, map]);
 
-  // Handle landmark markers
+  // Notify parent when businesses are loaded
+  useEffect(() => {
+    if (!businessesLoading && businesses.length > 0 && onBusinessesLoaded) {
+      onBusinessesLoaded();
+    }
+  }, [businessesLoading, businesses.length, onBusinessesLoaded]);
   useEffect(() => {
     if (!mapLoaded || !landmarks || !map) return;
 
