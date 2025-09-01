@@ -131,16 +131,16 @@ const HomePage: React.FC<HomePageProps> = ({
         <BreakroomLoading onComplete={handleLoadingComplete} />
       )}
         <div>
-          {/* White bar at top - only show after search submit */}
-          {currentSlide === 1 && currentView === 'main' && submittedSearch && (
+          {/* White bar at top - only show after search */}
+          {currentSlide === 1 && currentView === 'main' && searchValue && (
             <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none">
               <UnifiedBusinessSearch
-                value={submittedSearch}
-                onChange={() => {}}          // disable editing
+                value={searchValue}
+                onChange={() => {}}          // no-op so it can't change
                 onBusinessSelect={() => {}}  // no-op
                 placeholder=""
                 variant="search-bar"
-                showIcon={true}
+                showIcon={false}             // hide search icon if you want
                 onLocationSave={() => {}}
               />
             </div>
