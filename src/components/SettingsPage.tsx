@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Minus, Smartphone } from 'lucide-react';
 import JobSearchDropdown from './JobSearchDropdown';
 import BusinessSearchDropdown from './BusinessSearchDropdown';
+import UnifiedBusinessSearch from './UnifiedBusinessSearch';
 import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 import { useDevice } from '@/contexts/DeviceContext';
@@ -316,6 +317,16 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       <div className="app-card p-6 overflow-y-auto">
         <h1 className="text-xl font-medium text-app-black mb-8">Your Page! 😊</h1>
         
+        {/* Quick Search Button */}
+        <div className="mb-6">
+          <UnifiedBusinessSearch
+            value="barista $20/hr"
+            onChange={() => {}}
+            placeholder="Search barista jobs at $20/hr..."
+            className="app-input text-sm"
+            variant="dropdown"
+          />
+        </div>
         
         {/* Current Job Section */}
         <div className="mb-8">
