@@ -319,13 +319,15 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         
         {/* Quick Search Button */}
         <div className="mb-6">
-          <UnifiedBusinessSearch
-            value="barista $20/hr"
-            onChange={() => {}}
-            placeholder="Search barista jobs at $20/hr..."
-            className="app-input text-sm"
-            variant="dropdown"
-          />
+          <button 
+            onClick={() => {
+              // Search for barista jobs at $20/hr
+              console.log('Searching for barista jobs at $20/hr');
+            }}
+            className="px-4 py-2 bg-app-yellow text-app-black text-sm rounded hover:bg-app-yellow/90 transition-colors"
+          >
+            Find Barista Jobs $20/hr
+          </button>
         </div>
         
         {/* Current Job Section */}
