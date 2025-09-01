@@ -55,7 +55,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       alignItems: 'center',
       marginBottom: '20px',
       transform: 'scale(1.5)',
-      marginRight: '-12px' // Offset to center the mug body instead of mug+handle
+      marginLeft: '12px' // Offset to center the mug body instead of mug+handle
     },
     coffeeMug: {
       position: 'relative' as const,
