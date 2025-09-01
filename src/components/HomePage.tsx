@@ -133,8 +133,16 @@ const HomePage: React.FC<HomePageProps> = ({
         <div>
           {/* White bar at top - only show after search */}
           {currentSlide === 1 && currentView === 'main' && searchValue && (
-            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-20">
-              <div className="bg-white rounded-lg shadow-md w-[600px] h-[48px]" />
+            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none">
+              <UnifiedBusinessSearch
+                value={searchValue}
+                onChange={() => {}}          // no-op so it can't change
+                onBusinessSelect={() => {}}  // no-op
+                placeholder=""
+                variant="search-bar"
+                showIcon={false}             // hide search icon if you want
+                onLocationSave={() => {}}
+              />
             </div>
           )}
           
