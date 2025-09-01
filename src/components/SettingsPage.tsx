@@ -445,7 +445,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                       timePeriod={currentTimePeriod}
                     />
                   </div>
-                  <div className="w-6"></div>
                   <button 
                     onClick={() => removePastJob(job.id)} 
                     className="w-6 h-6 bg-app-yellow rounded-full flex items-center justify-center"
