@@ -1,14 +1,12 @@
 import { ScatterplotLayer } from '@deck.gl/layers';
 import type { Business } from '@/types/business';
 
-// Use stable layer IDs to prevent infinite re-renders
-
 export interface DeckGLBusinessLayerProps {
   businesses: Business[];
-  selectedBusinessId?: string; // Ignored for coloring per request
+  selectedBusinessId?: string;
   onBusinessClick?: (business: Business) => void;
   getTooltip?: (info: any) => string;
-  map?: any; // optional MapLibre map for zooming on clusters
+  map?: any;
 }
 
 export const createBusinessScatterplotLayer = ({
@@ -20,7 +18,6 @@ export const createBusinessScatterplotLayer = ({
   // Use stable ID to prevent layer recreation
   const layerId = 'businesses-scatter';
   
-  // Let deck.gl handle layer diffing efficiently
   return new ScatterplotLayer({
     id: layerId,
     data: businesses,
@@ -33,50 +30,26 @@ export const createBusinessScatterplotLayer = ({
     radiusMaxPixels: 24,
     lineWidthMinPixels: 1.5,
     getPosition: (d: Business) => [d.position.lng, d.position.lat],
-    getRadius: (_d: Business) => 6, // Smaller for better performance
-    getFillColor: [250, 204, 21, 255], // Uniform golden color
-    getLineColor: [255, 255, 255, 200], // Semi-transparent white stroke
+    getRadius: (_d: Business) => 6,
+    getFillColor: [250, 204, 21, 255],
+    getLineColor: [255, 255, 255, 200],
     onClick: onBusinessClick ? (info) => {
       if (info.object) {
         console.log('🎯 Business clicked:', info.object.name);
         onBusinessClick(info.object as Business);
       }
     } : undefined,
-    // Efficient update triggers
+    // Update triggers - dots will appear/disappear instantly when data changes
     updateTriggers: {
       getPosition: [businesses],
       getRadius: [businesses.length],
       getFillColor: []
-    },
-    // Smooth transitions for business appearance/disappearance
-    transitions: {
-      getPosition: {
-        duration: 400,
-        easing: (t: number) => t * t * (3 - 2 * t) // Smooth step
-      },
-      getRadius: {
-        duration: 300,
-        easing: (t: number) => t * t * (3 - 2 * t)
-      },
-      getFillColor: {
-        duration: 250,
-        easing: (t: number) => t * t * (3 - 2 * t)
-      }
-    },
-    // Performance optimizations
-    dataComparator: (newData: any, oldData: any) => {
-      if (!Array.isArray(newData) || !Array.isArray(oldData)) return false;
-      if (newData.length !== oldData.length) return false;
-      return newData.every((business: any, i: number) => 
-        business.id === oldData[i]?.id &&
-        business.position?.lat === oldData[i]?.position?.lat &&
-        business.position?.lng === oldData[i]?.position?.lng
-      );
     }
+    // REMOVED: transitions - no more flying animations
+    // REMOVED: dataComparator - dots are destroyed/recreated with data changes
   });
 };
 
-// Modern supercluster-based layer for web worker processed data
 export const createBusinessClusterLayer = (data: any[], onBusinessClick?: (business: Business) => void, map?: any) => {
   const layerId = 'businesses-cluster';
   
@@ -107,7 +80,6 @@ export const createBusinessClusterLayer = (data: any[], onBusinessClick?: (busin
     },
     getFillColor: (d: any) => {
       if (d.type === 'cluster') {
-        // Cluster color with opacity based on count
         const intensity = Math.min(d.count / 20, 1);
         return [250, 204, 21, 200 + intensity * 55];
       } else {
@@ -138,21 +110,8 @@ export const createBusinessClusterLayer = (data: any[], onBusinessClick?: (busin
       getPosition: [data],
       getRadius: [data],
       getFillColor: [data]
-    },
-    transitions: {
-      getPosition: { 
-        duration: 500,
-        easing: (t: number) => t * t * (3 - 2 * t)
-      },
-      getRadius: { 
-        duration: 400,
-        easing: (t: number) => t * t * (3 - 2 * t)
-      },
-      getFillColor: {
-        duration: 350,
-        easing: (t: number) => t * t * (3 - 2 * t)
-      }
     }
+    // REMOVED: transitions - clusters won't animate between positions
   });
 };
 
