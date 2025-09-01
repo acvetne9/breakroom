@@ -314,7 +314,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   return (
     <div className="relative w-full h-full flex items-center justify-center">
       <div className="app-card p-6 overflow-y-auto">
-        <h1 className="text-xl font-medium text-app-black mb-8">Your Info.</h1>
+        <h1 className="text-xl font-medium text-app-black mb-8">Your Page! 😊</h1>
         
         
         {/* Current Job Section */}
