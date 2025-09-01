@@ -362,16 +362,18 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             </div>
 
             <div className="flex items-center space-x-3">
-              <BusinessSearchDropdown
-                value={currentJob.location}
-                onChange={handleCurrentJobLocationChange}
-                onBlur={handleCurrentJobLocationBlur}
-                className="app-input flex-1"
-                placeholder="Search businesses..."
-                salary={currentJob.salary}
-                role={currentJob.role}
-                timePeriod={currentTimePeriod}
-              />
+              <div className="flex-1">
+                <BusinessSearchDropdown
+                  value={currentJob.location}
+                  onChange={handleCurrentJobLocationChange}
+                  onBlur={handleCurrentJobLocationBlur}
+                  className="app-input w-full"
+                  placeholder="Search businesses..."
+                  salary={currentJob.salary}
+                  role={currentJob.role}
+                  timePeriod={currentTimePeriod}
+                />
+              </div>
               <div className="w-6"></div>
             </div>
           </div>
