@@ -130,14 +130,14 @@ const HomePage: React.FC<HomePageProps> = ({
       {showLoading && (
         <BreakroomLoading onComplete={handleLoadingComplete} />
       )}
-        {/* White bar at top */}
-        {currentSlide === 1 && currentView === 'main' && (
-          <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-20">
-            <div className="bg-white rounded-lg shadow-md w-[600px] h-[48px]" />
-          </div>
-        )}
-        
         <div>
+          {/* White bar at top - only show after search */}
+          {currentSlide === 1 && currentView === 'main' && searchValue && (
+            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-20">
+              <div className="bg-white rounded-lg shadow-md w-[600px] h-[48px]" />
+            </div>
+          )}
+          
           {/* MapLibre with OpenStreetMap base layer */}
           <MapLibreMap
             onBusinessClick={handleBusinessClick}
