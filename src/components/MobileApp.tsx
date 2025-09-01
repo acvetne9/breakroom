@@ -2,8 +2,6 @@ import React, { useState, useRef, useEffect, Suspense } from 'react';
 import { motion, PanInfo } from 'framer-motion';
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Toaster } from './ui/sonner';
-import { isProfane } from '../utils/profanityFilter';
 
 const InitiationPage = React.lazy(() => import('./InitiationPage'));
 const HomePage = React.lazy(() => import('./HomePage'));
@@ -11,7 +9,30 @@ const SettingsPage = React.lazy(() => import('./SettingsPage'));
 const ExplorePage = React.lazy(() => import('./ExplorePage'));
 
 import { useBusinessesData } from '../hooks/useBusinessesData';
-import { UserData, Post } from '../types/app';
+
+interface UserData {
+  salary: string;
+  role: string;
+  location: string;
+  fullLocation?: string;
+  timePeriod: string;
+}
+
+interface Post {
+  id: string;
+  author: string;
+  text: string;
+  businessId?: string;
+  businessName?: string;
+  images?: string[];
+  isStory?: boolean;
+  isJobUpdate?: boolean;
+  linkedLocation?: string;
+  upvotes: number;
+  downvotes: number;
+  userVote?: 'up' | 'down' | null;
+  createdAt: Date;
+}
 
 const MobileApp: React.FC = () => {
   const isMobile = useIsMobile();
