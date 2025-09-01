@@ -317,18 +317,38 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       <div className="app-card p-6 overflow-y-auto">
         <h1 className="text-xl font-medium text-app-black mb-8">Your Page! 😊</h1>
         
-        {/* Quick Search Button */}
-        <div className="mb-6">
-          <button 
+        {/* Quick Search Buttons */}
+        <div className="mb-6 flex space-x-3">
+          {/* Coffee emoji button */}
+          <button
             onClick={() => {
-              // Search for barista jobs at $20/hr
-              console.log('Searching for barista jobs at $20/hr');
+              console.log("Searching for barista jobs at $20/hr");
+            }}
+            className="text-2xl"
+          >
+            ☕
+          </button>
+        
+          {/* Example: Add more quick search buttons here */}
+          <button
+            onClick={() => {
+              console.log("Searching for tech jobs");
             }}
             className="px-4 py-2 bg-app-yellow text-app-black text-sm rounded hover:bg-app-yellow/90 transition-colors"
           >
-            Find Barista Jobs $20/hr
+            💻 Tech
+          </button>
+        
+          <button
+            onClick={() => {
+              console.log("Searching for designer jobs");
+            }}
+            className="px-4 py-2 bg-app-yellow text-app-black text-sm rounded hover:bg-app-yellow/90 transition-colors"
+          >
+            🎨 Designer
           </button>
         </div>
+
         
         {/* Current Job Section */}
         <div className="mb-8">
