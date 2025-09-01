@@ -4,6 +4,7 @@ import BusinessPreview from './BusinessPreview';
 import BusinessDetails from './BusinessDetails';
 import BreakroomLoading from './BreakroomLoading';
 import UnifiedBusinessSearch from './UnifiedBusinessSearch';
+import { EnhancedBusiness } from '@/services/enhancedBusinessSearch';
 
 import { useToast } from '@/hooks/use-toast';
 
@@ -79,8 +80,19 @@ const HomePage: React.FC<HomePageProps> = ({
 ]
   const { toast } = useToast();
 
-  const handleSearchChange = (value: string, business?: any) => {
+  const handleSearchChange = (value: string, business?: EnhancedBusiness) => {
     setSearchValue(value);
+  };
+
+  const handleSearchBusinessSelect = (business: EnhancedBusiness) => {
+    // Convert EnhancedBusiness to the format expected by the map
+    const mapBusiness = {
+      ...business,
+      businessType: business.businessType || business.business_type,
+      formatted_address: business.formatted_address || business.vicinity || business.name
+    };
+    handleBusinessClick(mapBusiness);
+    setSearchValue(''); // Clear search after selection
   };
 
   const handleBusinessClick = (business: any) => {
@@ -95,10 +107,6 @@ const HomePage: React.FC<HomePageProps> = ({
     }
   };
 
-  const handleSearchBusinessSelect = (business: any) => {
-    handleBusinessClick(business);
-    setSearchValue(''); // Clear search after selection
-  };
 
   const handleShowBusinessDetails = () => {
     setShowBusinessDetails(true);
@@ -162,7 +170,7 @@ const HomePage: React.FC<HomePageProps> = ({
               value={searchValue}
               onChange={handleSearchChange}
               onBusinessSelect={handleSearchBusinessSelect}
-              placeholder="Search businesses, roles, salary..."
+              placeholder="Search places, roles, pay (e.g. 'Starbucks barista $15', 'manager $20+')..."
               variant="search-bar"
               showIcon={true}
               onLocationSave={onLocationSave}

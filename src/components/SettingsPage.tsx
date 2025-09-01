@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import UnifiedBusinessSearch from './UnifiedBusinessSearch';
+import { EnhancedBusiness } from '@/services/enhancedBusinessSearch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -46,11 +47,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
 
-  const handleLocationChange = (value: string, business?: any) => {
+  const handleLocationChange = (value: string, business?: EnhancedBusiness) => {
     setLocation(value);
   };
 
-  const handleLocationSelect = (business: any) => {
+  const handleLocationSelect = (business: EnhancedBusiness) => {
     setLocation(business.name);
   };
 
