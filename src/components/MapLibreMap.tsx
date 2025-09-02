@@ -354,16 +354,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                          // Add parks layer
                          try {
                            mapInstance.addLayer({
-                             id: 'nyc-parks',
-                             type: 'fill',
-                             source: 'nyc-tiles',
-                             'source-layer': detectedLayer,
-                             paint: {
-                               'fill-color': '#87C17A', // Green for parks
-                               'fill-opacity': 1.0
-                             },
-                             filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'leisure']]
-                           });
+                            id: 'nyc-green-spaces',
+                            type: 'fill',
+                            source: 'nyc-tiles',
+                            'source-layer': detectedLayer,
+                            paint: {
+                              'fill-color': '#87C17A', // Green for both
+                              'fill-opacity': 1.0
+                            },
+                            filter: [
+                              'all',
+                              ['==', ['geometry-type'], 'Polygon'],
+                              ['any',
+                                ['==', ['get', 'leisure'], 'park'],
+                                ['==', ['get', 'landuse'], 'cemetery']
+                              ]
+                            ]
+                          });
                            console.log('✅ Added parks layer (probed)');
                          } catch (parksErr) {
                            console.warn('⚠️ Parks layer (probed) failed:', parksErr);
