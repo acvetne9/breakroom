@@ -49,7 +49,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     loading: businessesLoading, 
     loadBusinessesInViewport, 
     fetchFullBusinessDetails,
-    clusterBusinesses 
+    clusterBusinesses,
+    isSearching
   } = useViewportBusinesses(searchFilters);
   const processedRef = useRef(false);
   const [currentZoom, setCurrentZoom] = useState(12);
@@ -110,19 +111,44 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [map, mapLoaded, isMobile]); // Removed loadBusinessesInViewport to prevent re-renders
 
-  // Reload businesses whenever search filters change
+  // Reload businesses whenever search filters change - expand area significantly for comprehensive search
   useEffect(() => {
     if (!map || !mapLoaded) return;
     console.log('🗺️ Map reloading businesses due to filter change:', searchFilters);
     try {
-      const bounds = map.getBounds();
-      const viewportBounds = {
-        north: bounds.getNorth(),
-        south: bounds.getSouth(),
-        east: bounds.getEast(),
-        west: bounds.getWest()
-      };
-      const businessLimit = isMobile ? 12000 : 25000;
+      const mapBounds = map.getBounds();
+      const center = map.getCenter();
+      const zoom = map.getZoom();
+      
+      let viewportBounds;
+      let businessLimit;
+      
+      if (searchFilters) {
+        // Expand search area significantly to query all possible matching businesses
+        const expansionFactor = zoom > 13 ? 3.0 : zoom > 11 ? 4.0 : 5.0;
+        const latRange = mapBounds.getNorth() - mapBounds.getSouth();
+        const lngRange = mapBounds.getEast() - mapBounds.getWest();
+        
+        viewportBounds = {
+          north: center.lat + (latRange * expansionFactor) / 2,
+          south: center.lat - (latRange * expansionFactor) / 2,
+          east: center.lng + (lngRange * expansionFactor) / 2,
+          west: center.lng - (lngRange * expansionFactor) / 2
+        };
+        businessLimit = 10000; // Higher limit for comprehensive search
+        
+        console.log(`🔍 Expanded search area by ${expansionFactor}x for filtering`);
+      } else {
+        // Normal viewport bounds for no filters
+        viewportBounds = {
+          north: mapBounds.getNorth(),
+          south: mapBounds.getSouth(),
+          east: mapBounds.getEast(),
+          west: mapBounds.getWest()
+        };
+        businessLimit = isMobile ? 12000 : 25000;
+      }
+      
       loadBusinessesInViewport(viewportBounds, businessLimit, false);
     } catch (e) {
       console.warn('⚠️ Failed to reload businesses on filter change:', e);

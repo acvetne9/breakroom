@@ -21,6 +21,8 @@ export const useViewportBusinesses = (searchFilters?: any) => {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentBounds, setCurrentBounds] = useState<MapBounds | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [lastSearchFilters, setLastSearchFilters] = useState<any>(null);
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const preloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -92,19 +94,45 @@ export const useViewportBusinesses = (searchFilters?: any) => {
     // Prevent duplicate requests if already loading
     if (loading) return;
 
-    // Progressive search with filters - bypass cache entirely
+    // Check if this is a new search (different filters)
+    const isNewSearch = JSON.stringify(searchFilters) !== JSON.stringify(lastSearchFilters);
+    
+    // Progressive search with filters - hide all businesses initially, then reveal as found
     if (searchFilters) {
+      // Clear businesses and start fresh search if filters changed
+      if (isNewSearch) {
+        console.log('🧹 New search detected - clearing all businesses');
+        setBusinesses([]);
+        setIsSearching(true);
+        setLastSearchFilters(searchFilters);
+      }
+      
+      // If still the same search, keep existing results
+      if (!isNewSearch && !isSearching) {
+        console.log('🔄 Same search filters - keeping existing results');
+        return;
+      }
+      
       setLoading(true);
       try {
+        const allFoundBusinesses: Business[] = [];
+        
         await progressiveSearch.searchBusinesses(
           bounds,
           searchFilters,
           (progressBusinesses, isComplete) => {
-            console.log(`🔄 Progressive search: ${progressBusinesses.length} businesses${isComplete ? ' (complete)' : ''}`);
-            setBusinesses(progressBusinesses);
+            // Accumulate all found businesses
+            allFoundBusinesses.length = 0;
+            allFoundBusinesses.push(...progressBusinesses);
+            
+            console.log(`🔍 Progressive search: ${progressBusinesses.length} businesses found${isComplete ? ' (search complete)' : ''}`);
+            setBusinesses([...allFoundBusinesses]);
+            
             if (isComplete) {
               setLoading(false);
+              setIsSearching(false);
               setCurrentBounds(bounds);
+              console.log(`✅ Search completed with ${allFoundBusinesses.length} total businesses`);
             }
           },
           limit
@@ -112,8 +140,15 @@ export const useViewportBusinesses = (searchFilters?: any) => {
       } catch (error) {
         console.error('❌ Progressive search error:', error);
         setLoading(false);
+        setIsSearching(false);
       }
       return;
+    }
+    
+    // No search filters - clear search state and load normally
+    if (isNewSearch) {
+      setLastSearchFilters(null);
+      setIsSearching(false);
     }
 
     // Check tile cache first (only if no search filters are active)
@@ -224,7 +259,7 @@ export const useViewportBusinesses = (searchFilters?: any) => {
         inflightRequests.delete(requestKey);
       }
     }, delay);
-  }, [loading, getCachedBusinesses, setCachedBusinesses, searchFilters, schedulePreload, progressiveSearch]);
+  }, [loading, getCachedBusinesses, setCachedBusinesses, searchFilters, lastSearchFilters, isSearching, schedulePreload, progressiveSearch]);
 
   // Cleanup progressive search on filter changes
   useEffect(() => {
@@ -305,6 +340,7 @@ export const useViewportBusinesses = (searchFilters?: any) => {
     loadBusinessesInViewport, 
     fetchFullBusinessDetails,
     clearBusinesses,
-    clusterBusinesses // Expose clustering capability
+    clusterBusinesses, // Expose clustering capability
+    isSearching // Expose search state
   };
 };
