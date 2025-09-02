@@ -345,11 +345,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         
           <button
             onClick={() => {
-              onSearchTrigger?.('barista');
+              onSearchTrigger?.('government');
             }}
             className="text-2xl hover:scale-110 transition-transform"
           >
-            🎨 Designer
+            👨‍⚖️
           </button>
         </div>
 
