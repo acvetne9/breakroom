@@ -13,9 +13,12 @@ export interface SearchFilters {
 }
 
 export function parseSearchFilters(searchQuery: string): SearchFilters | null {
+  console.log('🔍 [parseSearchFilters] Input query:', searchQuery);
+  
   if (!searchQuery.trim()) return null;
 
   const { salaryQuery, textTerms } = parseSearchTerms(searchQuery);
+  console.log('🔍 [parseSearchFilters] Parsed terms - salaryQuery:', salaryQuery, 'textTerms:', textTerms);
   
   // Common role keywords - expanded list but more inclusive approach
   const commonRoles = [
@@ -43,6 +46,9 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
     commonBusinessTypes.includes(term.toLowerCase())
   );
 
+  console.log('🔍 [parseSearchFilters] Role filter found:', roleFilter);
+  console.log('🔍 [parseSearchFilters] Business type filter found:', businessTypeFilter);
+
   const filters: SearchFilters = {
     textTerms: textTerms || []
   };
@@ -58,8 +64,11 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
     filters.businessTypeFilter = businessTypeFilter;
   }
 
+  console.log('🔍 [parseSearchFilters] Final filters:', filters);
+
   // Return null if no meaningful filters (only empty textTerms)
   if ((!textTerms || textTerms.length === 0) && !salaryQuery && !roleFilter && !businessTypeFilter) {
+    console.log('🔍 [parseSearchFilters] No meaningful filters found, returning null');
     return null;
   }
 

@@ -98,7 +98,15 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   };
 
   const handleBusinessClick = (business: EnhancedBusiness) => {
-    onChange(business.name, business);
+    console.log('🏢 [handleBusinessClick] Business clicked:', business.name);
+    console.log('🏢 [handleBusinessClick] Current search value:', value);
+    console.log('🏢 [handleBusinessClick] Should perform search instead of just saving business');
+    
+    // Instead of just saving the business, we should execute the search with the current search term
+    // and then optionally save the location
+    performSearch();
+    
+    // Still call the business select callback for any other handling needed
     onBusinessSelect?.(business);
     setShowDropdown(false);
     setSearchResults([]);
@@ -111,6 +119,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   };
 
   const performSearch = () => {
+    console.log('🔍 [performSearch] Called with value:', value);
+    
     if (!value.trim()) {
       // Clear search - commit empty query to clear filters
       if (committedQueryRef.current !== '') {
@@ -124,6 +134,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     
     // Check for profanity in search terms
     if (isProfane(value)) {
+      console.log('🚫 Search blocked - profanity detected:', value);
       toast({
         title: "Search blocked",
         description: "Inappropriate search terms detected",
@@ -135,10 +146,14 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     
     // Commit the query and apply filters immediately (require 4+ characters for meaningful search)
     const trimmedValue = value.trim();
+    console.log('🔍 [performSearch] Trimmed value:', trimmedValue, 'length:', trimmedValue.length);
+    console.log('🔍 [performSearch] Current committed query:', committedQueryRef.current);
+    
     if (trimmedValue.length >= 4 && committedQueryRef.current !== trimmedValue) {
       console.log('🔍 Committing search query:', trimmedValue);
       committedQueryRef.current = trimmedValue;
       const filters = parseSearchFilters(trimmedValue);
+      console.log('🔍 [performSearch] Parsed filters:', filters);
       
       // Only proceed if filters have meaningful content
       if (filters && (
@@ -152,7 +167,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         lastFiltersRef.current = filtersKey;
         onChange(value, undefined, filters);
       } else {
-        console.log('⚠️ No valid filters found, clearing search');
+        console.log('⚠️ No valid filters found for query:', trimmedValue);
+        console.log('⚠️ Filters object:', filters);
         if (lastFiltersRef.current !== null) {
           lastFiltersRef.current = null;
           committedQueryRef.current = '';
@@ -165,6 +181,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       lastFiltersRef.current = null;
       committedQueryRef.current = '';
       onChange(value, undefined, null);
+    } else {
+      console.log('🔍 [performSearch] No action taken - length:', trimmedValue.length, 'committed:', committedQueryRef.current);
     }
     setShowDropdown(false);
   };
