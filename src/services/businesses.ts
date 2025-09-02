@@ -153,8 +153,8 @@ export const getBusinessesInViewport = async (
         roles: [],
       }));
       
-    // Apply search filters if provided - FIX THE FILTER CHECK
-    if (parsedFilters && parsedFilters.textTerms && parsedFilters.textTerms.length > 0) {
+    // Apply search filters if provided
+    if (parsedFilters) {
       console.log('🔍 About to apply filters to spatial query results:', businesses.length, 'businesses');
       console.log('🔍 Applying these filters:', parsedFilters);
       const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);

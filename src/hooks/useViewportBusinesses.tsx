@@ -112,12 +112,14 @@ export const useViewportBusinesses = (searchFilters?: any) => {
       west: bounds.west - (bounds.east - bounds.west) * expansionFactor
     };
 
-    // Check expanded cache
-    const expandedCached = getCachedBusinesses(expandedBounds);
-    if (expandedCached && expandedCached.length > 200) {
-      setBusinesses(expandedCached);
-      setCurrentBounds(expandedBounds);
-      return;
+    // Check expanded cache (only when no search filters)
+    if (!searchFilters) {
+      const expandedCached = getCachedBusinesses(expandedBounds);
+      if (expandedCached && expandedCached.length > 200) {
+        setBusinesses(expandedCached);
+        setCurrentBounds(expandedBounds);
+        return;
+      }
     }
 
     // Request deduplication
