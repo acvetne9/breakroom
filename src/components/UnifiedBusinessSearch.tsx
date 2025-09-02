@@ -36,6 +36,9 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const searchSeqRef = useRef(0);
+  const lastFiltersRef = useRef<string | null>(null);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -47,40 +50,58 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    onChange(value);
-
-    if (value.trim()) {
-      setIsSearching(true);
+  // Debounced search based on input value
+  useEffect(() => {
+    const q = value.trim();
+    if (!q) {
+      setSearchResults([]);
+      setShowDropdown(false);
+      setIsSearching(false);
+      // Clear filters when search is empty
+      if (lastFiltersRef.current !== null) {
+        lastFiltersRef.current = null;
+        onChange(value, undefined, null);
+      }
+      return;
+    }
+    setIsSearching(true);
+    setShowDropdown(true);
+    const seq = ++searchSeqRef.current;
+    const timer = setTimeout(async () => {
       try {
-        const results = await searchBusinessesEnhanced(value.trim(), 10);
+        const results = await searchBusinessesEnhanced(q, 10);
+        if (seq !== searchSeqRef.current) return;
         setSearchResults(results);
-        setShowDropdown(true);
-        
-        // Parse and pass search filters 
-        const filters = parseSearchFilters(value.trim());
-        if (filters && (filters.textTerms.length > 0 || filters.salaryQuery || filters.roleFilter || filters.businessTypeFilter)) {
-          // Apply filters when search has meaningful criteria
-          onChange(value, undefined, filters);
-        } else if (results.length === 1) {
-          // Single specific business result - clear filters but don't zoom yet
-          onChange(value, results[0], null);
-        } else {
-          // Clear filters when no meaningful search
-          onChange(value, undefined, null);
+        // Build and apply filters if changed
+        const filters = parseSearchFilters(q);
+        const filtersKey = filters ? JSON.stringify(filters) : 'null';
+        if (filtersKey !== lastFiltersRef.current) {
+          lastFiltersRef.current = filtersKey;
+          onChange(value, undefined, filters || null);
+        }
+        // Auto-zoom when there's a clear single match (without changing input)
+        const exact = results.length === 1 && results[0];
+        if (exact) {
+          onBusinessSelect?.(exact);
+          onChange(value, exact, null);
         }
       } catch (error) {
         console.error('Search error:', error);
-        setSearchResults([]);
+        if (seq === searchSeqRef.current) setSearchResults([]);
       } finally {
-        setIsSearching(false);
+        if (seq === searchSeqRef.current) setIsSearching(false);
       }
-    } else {
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [value, onChange, onBusinessSelect]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    onChange(newValue);
+    if (!newValue.trim()) {
       setSearchResults([]);
       setShowDropdown(false);
-      // Clear filters when search is empty
-      onChange(value, undefined, null);
+      setIsSearching(false);
     }
   };
 
@@ -117,7 +138,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     setShowDropdown(false);
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       performSearch();
     }
@@ -144,7 +165,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           value={value}
           onChange={(e) => handleInputChange(e)}
           onBlur={handleInputBlur}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyDown}
           onFocus={() => {
             if (value.length > 2) {
               setShowDropdown(true);
