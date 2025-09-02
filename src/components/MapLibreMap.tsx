@@ -13,7 +13,7 @@ import {
 } from '../utils/featureProcessing';
 import {
   addLandLayer,
-  addParksLayer,
+  addParksAndCemeteriesLayer,
   addWaterLayer,
   addWaterwaysLayer,
   addRoadsLayer,
