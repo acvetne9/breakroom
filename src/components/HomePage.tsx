@@ -47,6 +47,18 @@ const HomePage: React.FC<HomePageProps> = ({
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
   const [showLoading, setShowLoading] = useState(true);
 
+  // Listen for search triggers from other pages
+  useEffect(() => {
+    const handleSearchTrigger = (event: CustomEvent) => {
+      const searchTerm = event.detail;
+      setSearchValue(searchTerm);
+      handleSearchChange(searchTerm);
+    };
+
+    window.addEventListener('triggerSearch', handleSearchTrigger as EventListener);
+    return () => window.removeEventListener('triggerSearch', handleSearchTrigger as EventListener);
+  }, []);
+
   const handleLoadingComplete = () => {
     setShowLoading(false);
   };

@@ -42,6 +42,7 @@ interface SettingsPageProps {
   onPostClick?: (post: Post) => void;
   onJobUpdate?: (jobData: { salary: string; role: string; location: string; timePeriod: string }) => void;
   onPageLeave?: () => void;
+  onSearchTrigger?: (searchTerm: string) => void;
 }
 
 const SettingsPage: React.FC<SettingsPageProps> = ({
@@ -50,7 +51,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   onStoriesClick,
   onPostClick,
   onJobUpdate,
-  onPageLeave
+  onPageLeave,
+  onSearchTrigger
 }) => {
   const { deviceId } = useDevice();
   const { toast } = useToast();
@@ -322,9 +324,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           {/* Coffee emoji button */}
           <button
             onClick={() => {
-              console.log("Searching for barista jobs at $20/hr");
+              onSearchTrigger?.('barista');
             }}
-            className="text-2xl"
+            className="text-2xl hover:scale-110 transition-transform"
+            title="Search for barista jobs"
           >
             ☕
           </button>
