@@ -149,13 +149,14 @@ export const searchBusinessesUnified = async (
         .lte('lng', bounds.east);
     }
     
-    // Apply text search on business name/type (broad OR across fields)
-    if (filters.textTerms.length > 0) {
-      console.log(`🔍 [unifiedSearch] Applying text terms: ${JSON.stringify(filters.textTerms)}`);
-      for (const term of filters.textTerms) {
-        baseQuery = baseQuery.or(`name.ilike.%${term}%,business_type.ilike.%${term}%`);
-      }
+  // Apply text search on business name/type (filtering out role terms)
+  const nonRoleTerms = filters.textTerms.filter(term => term !== filters.roleFilter);
+  if (nonRoleTerms.length > 0) {
+    console.log(`🔍 [unifiedSearch] Applying non-role text terms: ${JSON.stringify(nonRoleTerms)}`);
+    for (const term of nonRoleTerms) {
+      baseQuery = baseQuery.or(`name.ilike.%${term}%,business_type.ilike.%${term}%`);
     }
+  }
     
     // Apply business type filter
     if (filters.businessTypeFilter) {
@@ -172,17 +173,14 @@ export const searchBusinessesUnified = async (
     }
     console.log(`🔍 [unifiedSearch] Raw business query (name/type) returned ${nameMatches?.length || 0} results`);
     
-    // Fallback/Additional: find businesses by matching roles
+    // Find businesses by matching roles
     let roleMatchedBusinesses: any[] = [];
-    const roleTerms = (filters.roleFilter ? [filters.roleFilter] : filters.textTerms) || [];
-    if (roleTerms.length > 0) {
-      // Build OR clause for roles
-      const orClause = roleTerms.map(t => `role.ilike.%${t}%`).join(',');
-      console.log('🔍 [unifiedSearch] Searching roles with OR clause:', orClause);
+    if (filters.roleFilter) {
+      console.log('🔍 [unifiedSearch] Searching roles for:', filters.roleFilter);
       const { data: roleRows, error: roleSearchError } = await supabase
         .from('business_roles')
         .select('business_id')
-        .or(orClause)
+        .ilike('role', `%${filters.roleFilter}%`)
         .limit(5000);
       if (roleSearchError) {
         console.warn('⚠️ Role search error:', roleSearchError);
@@ -198,6 +196,16 @@ export const searchBusinessesUnified = async (
             .gte('lng', bounds.west)
             .lte('lng', bounds.east);
         }
+        
+        // Apply non-role text terms to role-matched businesses
+        const nonRoleTerms = filters.textTerms.filter(term => term !== filters.roleFilter);
+        if (nonRoleTerms.length > 0) {
+          console.log(`🔍 [unifiedSearch] Applying non-role terms to role-matched businesses: ${JSON.stringify(nonRoleTerms)}`);
+          for (const term of nonRoleTerms) {
+            roleBizQuery = roleBizQuery.or(`name.ilike.%${term}%,business_type.ilike.%${term}%`);
+          }
+        }
+        
         const { data: roleBizData, error: roleBizError } = await roleBizQuery.limit(limit);
         if (roleBizError) {
           console.warn('⚠️ Role-matched businesses fetch error:', roleBizError);

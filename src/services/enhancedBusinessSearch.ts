@@ -98,8 +98,9 @@ function parseSearchQuery(query: string): SearchFilters {
   // Use all text terms as potential place search (for business names)
   if (filters.textTerms && filters.textTerms.length > 0) {
     filters.place = filters.textTerms.join(' ');
-    // Also use first term as potential role search to cast a wider net
-    filters.role = filters.textTerms.join(' ');
+    // Use individual terms for role search, not the joined string
+    // This prevents searching for non-existent roles like "cashier pizza"
+    filters.role = filters.textTerms[0]; // Use first term as primary role filter
   }
   
   return filters;
@@ -156,6 +157,28 @@ export async function searchBusinessesEnhanced(query: string, limit: number = 50
       .ilike('business_roles.role', `%${filters.role}%`)
       .limit(limit) : { data: [] };
 
+    // If we have multiple text terms, also search for business type matches
+    const businessTypeResults = filters.textTerms && filters.textTerms.length > 1 ? await supabase
+      .from('businesses')
+      .select(`
+        id,
+        name,
+        lat,
+        lng,
+        atmosphere,
+        business_type,
+        website,
+        business_roles (
+          id,
+          role,
+          salary,
+          upvotes,
+          downvotes
+        )
+      `)
+      .ilike('business_type', `%${filters.textTerms.slice(1).join(' ')}%`)
+      .limit(limit) : { data: [] };
+
     // Combine and deduplicate results
     const allBusinesses = new Map();
     
@@ -169,6 +192,13 @@ export async function searchBusinessesEnhanced(query: string, limit: number = 50
     // Add role matches
     if (roleResults.data) {
       roleResults.data.forEach(business => {
+        allBusinesses.set(business.id, business);
+      });
+    }
+
+    // Add business type matches
+    if (businessTypeResults.data) {
+      businessTypeResults.data.forEach(business => {
         allBusinesses.set(business.id, business);
       });
     }
