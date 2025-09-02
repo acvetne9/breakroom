@@ -275,15 +275,25 @@ export const searchBusinessesUnified = async (
     
     // Apply filters with AND logic
     console.log(`🔍 [unifiedSearch] Applying role/salary filters to ${businessesWithRoles.length} businesses`);
+    
+    // Track which businesses came from role search to avoid double-filtering
+    const roleMatchedBusinessIds = new Set(roleMatchedBusinesses.map(b => b.id));
+    
     const filteredBusinesses = businessesWithRoles.filter(business => {
       // Role filter - must match if specified
       if (filters.roleFilter) {
-        const hasMatchingRole = business.roles?.some(role => 
-          role.role.toLowerCase().includes(filters.roleFilter!)
-        );
-        if (!hasMatchingRole) {
-          console.log(`🔍 [unifiedSearch] Business "${business.name}" filtered out: no matching role for "${filters.roleFilter}"`);
-          return false;
+        // If this business came from role search, it already matches the role filter
+        if (roleMatchedBusinessIds.has(business.id)) {
+          console.log(`🔍 [unifiedSearch] Business "${business.name}" auto-passed: found via role search`);
+        } else {
+          // Only apply role filter to businesses found via name/type search
+          const hasMatchingRole = business.roles?.some(role => 
+            role.role.toLowerCase().includes(filters.roleFilter!)
+          );
+          if (!hasMatchingRole) {
+            console.log(`🔍 [unifiedSearch] Business "${business.name}" filtered out: no matching role for "${filters.roleFilter}"`);
+            return false;
+          }
         }
       }
       
