@@ -151,6 +151,7 @@ export const searchBusinessesUnified = async (
     
     // Apply text search with AND logic - all terms must match in name OR business_type
     if (filters.textTerms.length > 0) {
+      console.log(`🔍 [unifiedSearch] Applying text terms: ${JSON.stringify(filters.textTerms)}`);
       for (const term of filters.textTerms) {
         baseQuery = baseQuery.or(`name.ilike.%${term}%,business_type.ilike.%${term}%`);
       }
@@ -158,11 +159,13 @@ export const searchBusinessesUnified = async (
     
     // Apply business type filter
     if (filters.businessTypeFilter) {
+      console.log(`🔍 [unifiedSearch] Applying business type filter: ${filters.businessTypeFilter}`);
       baseQuery = baseQuery.ilike('business_type', `%${filters.businessTypeFilter}%`);
     }
     
     baseQuery = baseQuery.limit(limit);
     
+    console.log(`🔍 [unifiedSearch] Executing query with filters:`, filters);
     const { data: businesses, error } = await baseQuery;
     
     if (error) {
@@ -170,7 +173,10 @@ export const searchBusinessesUnified = async (
       return [];
     }
     
+    console.log(`🔍 [unifiedSearch] Raw business query returned ${businesses?.length || 0} results`);
+    
     if (!businesses || businesses.length === 0) {
+      console.log('🔍 [unifiedSearch] No businesses found in base query');
       return [];
     }
     
@@ -222,13 +228,17 @@ export const searchBusinessesUnified = async (
     }));
     
     // Apply filters with AND logic
+    console.log(`🔍 [unifiedSearch] Applying role/salary filters to ${businessesWithRoles.length} businesses`);
     const filteredBusinesses = businessesWithRoles.filter(business => {
       // Role filter - must match if specified
       if (filters.roleFilter) {
         const hasMatchingRole = business.roles?.some(role => 
           role.role.toLowerCase().includes(filters.roleFilter!)
         );
-        if (!hasMatchingRole) return false;
+        if (!hasMatchingRole) {
+          console.log(`🔍 [unifiedSearch] Business "${business.name}" filtered out: no matching role for "${filters.roleFilter}"`);
+          return false;
+        }
       }
       
       // Salary filter - must match if specified
@@ -247,7 +257,10 @@ export const searchBusinessesUnified = async (
           }
         });
         
-        if (!hasMatchingSalary) return false;
+        if (!hasMatchingSalary) {
+          console.log(`🔍 [unifiedSearch] Business "${business.name}" filtered out: no matching salary for query`);
+          return false;
+        }
       }
       
       return true;

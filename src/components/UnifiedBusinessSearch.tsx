@@ -77,8 +77,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         if (seq !== searchSeqRef.current) return;
         setSearchResults(results);
         
-        // Only apply filters if this is a meaningful search AND the query has changed
-        if (q.length >= 2 && committedQueryRef.current !== q) {
+        // Only apply filters if this is a meaningful search (4+ chars) AND the query has changed
+        if (q.length >= 4 && committedQueryRef.current !== q) {
           const filters = parseSearchFilters(q);
           // Only proceed if filters have meaningful content
           if (filters && (
@@ -150,9 +150,9 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       return;
     }
     
-    // Commit the query and apply filters immediately
+    // Commit the query and apply filters immediately (require 4+ characters for meaningful search)
     const trimmedValue = value.trim();
-    if (trimmedValue.length >= 2 && committedQueryRef.current !== trimmedValue) {
+    if (trimmedValue.length >= 4 && committedQueryRef.current !== trimmedValue) {
       console.log('🔍 Committing search query:', trimmedValue);
       committedQueryRef.current = trimmedValue;
       const filters = parseSearchFilters(trimmedValue);
@@ -176,6 +176,12 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           onChange(value, undefined, null);
         }
       }
+    } else if (trimmedValue.length < 4 && lastFiltersRef.current !== null) {
+      // Clear filters if search is too short
+      console.log('🧹 Search too short, clearing filters');
+      lastFiltersRef.current = null;
+      committedQueryRef.current = '';
+      onChange(value, undefined, null);
     }
     setShowDropdown(false);
   };
