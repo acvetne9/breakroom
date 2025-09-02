@@ -55,6 +55,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const processedRef = useRef(false);
   const [currentZoom, setCurrentZoom] = useState(12);
   const layersAddedRef = useRef(false);
+  const lastFitKeyRef = useRef<string | null>(null);
 
   // Enhanced business click handler with viewport integration
   const handleBusinessClick = useCallback(async (business: any) => {
@@ -154,6 +155,26 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.warn('⚠️ Failed to reload businesses on filter change:', e);
     }
   }, [searchFilters, map, mapLoaded, isMobile, loadBusinessesInViewport]);
+
+  // Fit map to filtered results once per new search (Google Maps-like behavior)
+  useEffect(() => {
+    if (!map || !mapLoaded || !searchFilters) return;
+    const key = JSON.stringify(searchFilters);
+    if (businesses.length > 0 && lastFitKeyRef.current !== key) {
+      const lats = businesses.map((b: any) => b.position.lat);
+      const lngs = businesses.map((b: any) => b.position.lng);
+      const bounds: [[number, number], [number, number]] = [
+        [Math.min(...lngs), Math.min(...lats)],
+        [Math.max(...lngs), Math.max(...lats)]
+      ];
+      try {
+        map.fitBounds(bounds as any, { padding: 80, duration: 700 });
+        lastFitKeyRef.current = key;
+      } catch (e) {
+        console.warn('⚠️ fitBounds failed:', e);
+      }
+    }
+  }, [businesses, searchFilters, map, mapLoaded]);
 
   // Zoom to a specifically selected business (e.g. from search dropdown)
   useEffect(() => {
@@ -841,7 +862,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       </div>
       
       {/* Deck.GL Overlay for high-performance business rendering */}
-      {map && mapLoaded && businesses.length > 0 && (
+      {map && mapLoaded && (
         <DeckGLOverlay
           map={map}
           businesses={businesses}
