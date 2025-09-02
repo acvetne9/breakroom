@@ -5,6 +5,7 @@ import BusinessDetails from './BusinessDetails';
 import BreakroomLoading from './BreakroomLoading';
 import UnifiedBusinessSearch from './UnifiedBusinessSearch';
 import { EnhancedBusiness } from '@/services/enhancedBusinessSearch';
+import { parseSearchFilters } from '@/services/businessFiltering';
 
 import { useToast } from '@/hooks/use-toast';
 
@@ -51,8 +52,15 @@ const HomePage: React.FC<HomePageProps> = ({
   useEffect(() => {
     const handleSearchTrigger = (event: CustomEvent) => {
       const searchTerm = event.detail;
+      console.log('🔍 [triggerSearch] Received search trigger:', searchTerm);
       setSearchValue(searchTerm);
-      handleSearchChange(searchTerm);
+      
+      // Parse the search term to generate proper filters, just like UnifiedBusinessSearch does
+      const filters = parseSearchFilters(searchTerm);
+      console.log('🔍 [triggerSearch] Parsed filters:', filters);
+      
+      // Apply the filters to the map
+      setSearchFilters(filters);
     };
 
     window.addEventListener('triggerSearch', handleSearchTrigger as EventListener);
