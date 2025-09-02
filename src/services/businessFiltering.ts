@@ -31,12 +31,27 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
     ].includes(term.toLowerCase())
   );
 
-  return {
-    textTerms,
-    salaryQuery,
-    roleFilter,
-    businessTypeFilter
+  const filters: SearchFilters = {
+    textTerms
   };
+
+  // Only add optional filters if they have values
+  if (salaryQuery) {
+    filters.salaryQuery = salaryQuery;
+  }
+  if (roleFilter) {
+    filters.roleFilter = roleFilter;
+  }
+  if (businessTypeFilter) {
+    filters.businessTypeFilter = businessTypeFilter;
+  }
+
+  // Return null if no meaningful filters (only empty textTerms)
+  if (textTerms.length === 0 && !salaryQuery && !roleFilter && !businessTypeFilter) {
+    return null;
+  }
+
+  return filters;
 }
 
 export function applyBusinessFilters(businesses: Business[], filters: SearchFilters): Business[] {

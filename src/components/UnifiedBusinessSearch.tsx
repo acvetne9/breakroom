@@ -58,13 +58,16 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       setSearchResults([]);
       setShowDropdown(false);
       setIsSearching(false);
-      // Clear filters when search is empty
+      // Clear filters when search is empty - only if there were filters before
       if (lastFiltersRef.current !== null) {
+        console.log('🧹 Clearing search - removing all filters');
         lastFiltersRef.current = null;
+        committedQueryRef.current = '';
         onChange(value, undefined, null);
       }
       return;
     }
+    
     setIsSearching(true);
     setShowDropdown(true);
     const seq = ++searchSeqRef.current;
@@ -73,13 +76,23 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         const results = await searchBusinessesEnhanced(q, 10);
         if (seq !== searchSeqRef.current) return;
         setSearchResults(results);
-        // After idle, parse and apply filters only if changed
-        const filters = parseSearchFilters(q);
-        const filtersKey = filters ? JSON.stringify(filters) : 'null';
-        if (filtersKey !== lastFiltersRef.current) {
-          console.log('🔄 Applying new filters to map');
-          lastFiltersRef.current = filtersKey;
-          onChange(value, undefined, filters || null);
+        
+        // Only apply filters if this is a meaningful search AND the query has changed
+        if (q.length >= 2 && committedQueryRef.current !== q) {
+          const filters = parseSearchFilters(q);
+          // Only proceed if filters have meaningful content
+          if (filters && (
+            (filters.textTerms && filters.textTerms.length > 0) ||
+            filters.salaryQuery ||
+            filters.roleFilter ||
+            filters.businessTypeFilter
+          )) {
+            console.log('🔄 Auto-applying filters after idle:', filters);
+            committedQueryRef.current = q;
+            const filtersKey = JSON.stringify(filters);
+            lastFiltersRef.current = filtersKey;
+            onChange(value, undefined, filters);
+          }
         }
       } catch (error) {
         console.error('Search error:', error);
@@ -139,13 +152,30 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     
     // Commit the query and apply filters immediately
     const trimmedValue = value.trim();
-    if (committedQueryRef.current !== trimmedValue) {
+    if (trimmedValue.length >= 2 && committedQueryRef.current !== trimmedValue) {
       console.log('🔍 Committing search query:', trimmedValue);
       committedQueryRef.current = trimmedValue;
       const filters = parseSearchFilters(trimmedValue);
-      const filtersKey = filters ? JSON.stringify(filters) : 'null';
-      lastFiltersRef.current = filtersKey;
-      onChange(value, undefined, filters);
+      
+      // Only proceed if filters have meaningful content
+      if (filters && (
+        (filters.textTerms && filters.textTerms.length > 0) ||
+        filters.salaryQuery ||
+        filters.roleFilter ||
+        filters.businessTypeFilter
+      )) {
+        console.log('✅ Applying valid search filters:', filters);
+        const filtersKey = JSON.stringify(filters);
+        lastFiltersRef.current = filtersKey;
+        onChange(value, undefined, filters);
+      } else {
+        console.log('⚠️ No valid filters found, clearing search');
+        if (lastFiltersRef.current !== null) {
+          lastFiltersRef.current = null;
+          committedQueryRef.current = '';
+          onChange(value, undefined, null);
+        }
+      }
     }
     setShowDropdown(false);
   };

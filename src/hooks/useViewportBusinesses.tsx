@@ -94,54 +94,59 @@ export const useViewportBusinesses = (searchFilters?: any) => {
     // Prevent duplicate requests if already loading
     if (loading) return;
 
-    // Check if this is a new search (different filters)
-    const isNewSearch = JSON.stringify(searchFilters) !== JSON.stringify(lastSearchFilters);
-    
-    // Global search mode: search filters are present
-    if (searchFilters) {
-      // Clear businesses and start fresh search if filters changed
-      if (isNewSearch) {
-        console.log('🌍 New global search detected - clearing all businesses');
-        setBusinesses([]);
-        setIsSearching(true);
-        setLastSearchFilters(searchFilters);
-      } else {
-        // Same search - keep existing results and don't reload
-        console.log('🔄 Same search filters - keeping existing results');
+    // Don't trigger any search logic on initial undefined load
+    if (searchFilters === undefined && lastSearchFilters === undefined) {
+      // Both are undefined, this is just initial state - proceed with normal loading
+    } else {
+      // Check if this is a new search (different filters)
+      const isNewSearch = JSON.stringify(searchFilters) !== JSON.stringify(lastSearchFilters);
+      
+      // Global search mode: search filters are present
+      if (searchFilters) {
+        // Clear businesses and start fresh search if filters changed
+        if (isNewSearch) {
+          console.log('🌍 New global search detected - clearing all businesses');
+          setBusinesses([]);
+          setIsSearching(true);
+          setLastSearchFilters(searchFilters);
+        } else {
+          // Same search - keep existing results and don't reload
+          console.log('🔄 Same search filters - keeping existing results');
+          return;
+        }
+      
+        setLoading(true);
+        try {        
+          await progressiveSearch.searchBusinesses(
+            bounds,
+            searchFilters,
+            (progressBusinesses, isComplete) => {
+              // Update with current progress
+              console.log(`🌍 Global search progress: ${progressBusinesses.length} businesses found${isComplete ? ' (search complete)' : ''}`);
+              setBusinesses([...progressBusinesses]);
+              
+              if (isComplete) {
+                setLoading(false);
+                setIsSearching(false);
+                setCurrentBounds(bounds);
+                console.log(`✅ Global search completed with ${progressBusinesses.length} total businesses`);
+              }
+            },
+            3000 // Increased limit for global search
+          );
+        } catch (error) {
+          console.error('❌ Global search error:', error);
+          setLoading(false);
+          setIsSearching(false);
+        }
         return;
       }
-    
-      setLoading(true);
-      try {        
-        await progressiveSearch.searchBusinesses(
-          bounds,
-          searchFilters,
-          (progressBusinesses, isComplete) => {
-            // Update with current progress
-            console.log(`🌍 Global search progress: ${progressBusinesses.length} businesses found${isComplete ? ' (search complete)' : ''}`);
-            setBusinesses([...progressBusinesses]);
-            
-            if (isComplete) {
-              setLoading(false);
-              setIsSearching(false);
-              setCurrentBounds(bounds);
-              console.log(`✅ Global search completed with ${progressBusinesses.length} total businesses`);
-            }
-          },
-          3000 // Increased limit for global search
-        );
-      } catch (error) {
-        console.error('❌ Global search error:', error);
-        setLoading(false);
+      
+      // No search filters - clear search state and load normally
+      if (isNewSearch) {
+        setLastSearchFilters(null);
         setIsSearching(false);
       }
-      return;
-    }
-    
-    // No search filters - clear search state and load normally
-    if (isNewSearch) {
-      setLastSearchFilters(null);
-      setIsSearching(false);
     }
 
     // Check tile cache first (only if no search filters are active)

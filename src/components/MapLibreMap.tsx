@@ -115,10 +115,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // Reload businesses whenever search filters change - expand area significantly for comprehensive search
   useEffect(() => {
     if (!map || !mapLoaded) return;
+    
+    // Don't trigger on initial render when searchFilters is undefined
+    if (searchFilters === undefined) return;
+    
     console.log('🗺️ Map reloading businesses due to filter change:', searchFilters);
     
-    // Stop processing if filters are undefined/null (cleared)
-    if (searchFilters === undefined || searchFilters === null) {
+    // Stop processing if filters are null (explicitly cleared)
+    if (searchFilters === null) {
       console.log('🧹 Search filters cleared - loading normal businesses');
       // Reload normal businesses when filters are cleared
       try {
