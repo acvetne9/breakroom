@@ -8,7 +8,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
   const [isVisible, setIsVisible] = useState(true);
 
   // Easy horizontal adjustment - change this value to move the mug left/right
-  const mugHorizontalOffset = -3; // percentage from center (positive = right, negative = left)
+  const mugHorizontalOffset = 12; // percentage from center (positive = right, negative = left)
 
   useEffect(() => {
     // Auto-hide after animation completes (3 seconds)
@@ -121,27 +121,26 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       color: '#B22222',
       whiteSpace: 'nowrap' as const,
       display: 'flex',
-      justifyContent: 'center',
+      justifyContent: 'space-between',
       alignItems: 'center',
-      width: '300px',
+      width: '100vw',
       height: '50px',
-      overflow: 'visible'
+      overflow: 'visible',
+      paddingLeft: '10vw',
+      paddingRight: '10vw',
+      boxSizing: 'border-box'
     },
     textLeft: {
-      position: 'absolute' as const,
-      left: '50%',
-      transform: 'translateX(-50%)',
-      animation: 'slideFromCenter 0.8s ease-out 1.2s forwards',
+      animation: 'slideFromCenterLeft 0.8s ease-out 1.2s forwards',
       opacity: 0,
-      zIndex: 1
+      zIndex: 1,
+      letterSpacing: 'normal'
     },
     textRight: {
-      position: 'absolute' as const,
-      left: '50%',
-      transform: 'translateX(-50%)',
       animation: 'slideFromCenterRight 0.8s ease-out 1.2s forwards',
       opacity: 0,
-      zIndex: 1
+      zIndex: 1,
+      letterSpacing: 'normal'
     }
   };
 
@@ -180,33 +179,33 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
           }
         }
 
-        @keyframes slideFromCenter {
+        @keyframes slideFromCenterLeft {
           0% {
             opacity: 0;
-            transform: translateX(-50%);
+            transform: translateX(50vw);
           }
           30% {
             opacity: 0;
-            transform: translateX(-50%);
+            transform: translateX(50vw);
           }
           100% {
             opacity: 1;
-            transform: translateX(-100%) translateX(-4px);
+            transform: translateX(0);
           }
         }
 
         @keyframes slideFromCenterRight {
           0% {
             opacity: 0;
-            transform: translateX(-50%);
+            transform: translateX(-50vw);
           }
           30% {
             opacity: 0;
-            transform: translateX(-50%);
+            transform: translateX(-50vw);
           }
           100% {
             opacity: 1;
-            transform: translateX(0%) translateX(0px);
+            transform: translateX(0);
           }
         }
       `}</style>
