@@ -121,26 +121,27 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       color: '#B22222',
       whiteSpace: 'nowrap' as const,
       display: 'flex',
-      justifyContent: 'space-between',
+      justifyContent: 'center',
       alignItems: 'center',
       width: '100vw',
       height: '50px',
-      overflow: 'visible',
-      paddingLeft: '10vw',
-      paddingRight: '10vw',
-      boxSizing: 'border-box' as const
+      overflow: 'visible'
     },
     textLeft: {
-      animation: 'slideFromCenterLeft 0.8s ease-out 1.2s forwards',
+      position: 'absolute' as const,
+      left: '0',
+      transform: 'translateX(0)',
+      animation: 'slideToLeft 0.8s ease-out 1.2s forwards',
       opacity: 0,
-      zIndex: 1,
-      letterSpacing: 'normal'
+      zIndex: 1
     },
     textRight: {
-      animation: 'slideFromCenterRight 0.8s ease-out 1.2s forwards',
+      position: 'absolute' as const,
+      right: '0',
+      transform: 'translateX(0)',
+      animation: 'slideToRight 0.8s ease-out 1.2s forwards',
       opacity: 0,
-      zIndex: 1,
-      letterSpacing: 'normal'
+      zIndex: 1
     }
   };
 
@@ -179,33 +180,39 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
           }
         }
 
-        @keyframes slideFromCenterLeft {
+        @keyframes slideToLeft {
           0% {
             opacity: 0;
-            transform: translateX(50vw);
+            left: 50%;
+            transform: translateX(-50%);
           }
           30% {
             opacity: 0;
-            transform: translateX(50vw);
+            left: 50%;
+            transform: translateX(-50%);
           }
           100% {
             opacity: 1;
-            transform: translateX(0);
+            left: 50%;
+            transform: translateX(-100%) translateX(-0.2em);
           }
         }
 
-        @keyframes slideFromCenterRight {
+        @keyframes slideToRight {
           0% {
             opacity: 0;
-            transform: translateX(-50vw);
+            right: 50%;
+            transform: translateX(50%);
           }
           30% {
             opacity: 0;
-            transform: translateX(-50vw);
+            right: 50%;
+            transform: translateX(50%);
           }
           100% {
             opacity: 1;
-            transform: translateX(0);
+            right: 50%;
+            transform: translateX(100%) translateX(0.2em);
           }
         }
       `}</style>
