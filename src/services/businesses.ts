@@ -56,6 +56,69 @@ export const getBusinessesInViewport = async (
 ): Promise<Business[]> => {
   try {
     console.log(`🎯 Starting optimized spatial query for bounds:`, bounds);
+
+    // Parse filters once
+    const parsedFilters = searchFilters
+      ? (typeof searchFilters === 'string' ? parseSearchFilters(searchFilters) : searchFilters)
+      : null;
+
+    const needsRoleData = !!(parsedFilters?.roleFilter || parsedFilters?.salaryQuery);
+
+    // If we need role/salary-aware filtering, fetch roles within the bbox directly
+    if (needsRoleData) {
+      const { data, error } = await supabase
+        .from('businesses')
+        .select(`
+          id,
+          name,
+          lat,
+          lng,
+          atmosphere,
+          salary,
+          business_type,
+          website,
+          business_roles (
+            id,
+            role,
+            salary,
+            upvotes,
+            downvotes
+          )
+        `)
+        .gte('lat', bounds.south)
+        .lte('lat', bounds.north)
+        .gte('lng', bounds.west)
+        .lte('lng', bounds.east)
+        .limit(Math.min(limit, 5000));
+
+      if (error) {
+        console.error('❌ Error fetching businesses with roles for filtering:', error);
+        throw error;
+      }
+
+      const businesses: Business[] = (data || []).map((b: any) => ({
+        id: b.id,
+        name: b.name,
+        position: { lat: b.lat, lng: b.lng },
+        atmosphere: b.atmosphere || [],
+        salary: b.salary,
+        businessType: b.business_type,
+        website: b.website,
+        roles: Array.isArray(b.business_roles)
+          ? b.business_roles.map((r: any) => ({
+              role: r.role,
+              salary: r.salary,
+              upvotes: r.upvotes || 0,
+              downvotes: r.downvotes || 0,
+              userVote: null,
+            }))
+          : [],
+      }));
+
+      const filtered = parsedFilters ? applyBusinessFilters(businesses, parsedFilters) : businesses;
+      console.log(`🔍 Role/salary filter active: ${businesses.length} -> ${filtered.length} businesses`);
+      return filtered;
+    }
     
     // Try the new spatial function first (PostGIS optimized)
     const { data: spatialData, error: spatialError } = await supabase
@@ -82,16 +145,10 @@ export const getBusinessesInViewport = async (
       }));
       
       // Apply search filters if provided
-      if (searchFilters) {
-        const parsedFilters = typeof searchFilters === 'string' 
-          ? parseSearchFilters(searchFilters)
-          : searchFilters;
-          
-        if (parsedFilters) {
-          const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);
-          console.log(`🔍 Applied filters: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
-          return filteredBusinesses;
-        }
+      if (parsedFilters) {
+        const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);
+        console.log(`🔍 Applied filters: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
+        return filteredBusinesses;
       }
       
       return businesses;

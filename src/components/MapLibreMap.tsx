@@ -110,6 +110,34 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [map, mapLoaded, isMobile]); // Removed loadBusinessesInViewport to prevent re-renders
 
+  // Reload businesses whenever search filters change
+  useEffect(() => {
+    if (!map || !mapLoaded) return;
+    try {
+      const bounds = map.getBounds();
+      const viewportBounds = {
+        north: bounds.getNorth(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        west: bounds.getWest()
+      };
+      const businessLimit = isMobile ? 12000 : 25000;
+      loadBusinessesInViewport(viewportBounds, businessLimit, false);
+    } catch (e) {
+      console.warn('⚠️ Failed to reload businesses on filter change:', e);
+    }
+  }, [searchFilters, map, mapLoaded, isMobile, loadBusinessesInViewport]);
+
+  // Zoom to a specifically selected business (e.g. from search dropdown)
+  useEffect(() => {
+    if (!map || !mapLoaded || !selectedBusiness?.position) return;
+    map.easeTo({
+      center: [selectedBusiness.position.lng, selectedBusiness.position.lat],
+      zoom: Math.max(map.getZoom(), 16),
+      duration: 800
+    });
+  }, [selectedBusiness?.id, map, mapLoaded]);
+
   const processMapFeatures = useCallback(async () => {
     // Prevent duplicate processing across re-mounts (StrictMode/dev or crashes)
     const alreadyGlobalProcessed = (window as any).__MAP_FEATURES_PROCESSED__ === true;
