@@ -94,62 +94,79 @@ export const useViewportBusinesses = (searchFilters?: any) => {
     // Prevent duplicate requests if already loading
     if (loading) return;
 
-    // Don't trigger any search logic on initial undefined load
-    if (searchFilters === undefined && lastSearchFilters === undefined) {
-      // Both are undefined, this is just initial state - proceed with normal loading
-    } else {
-      // Check if this is a new search (different filters)
-      const isNewSearch = JSON.stringify(searchFilters) !== JSON.stringify(lastSearchFilters);
-      
-      // Global search mode: search filters are present
-      if (searchFilters) {
-        // Clear businesses and start fresh search if filters changed
-        if (isNewSearch) {
-          console.log('🌍 New global search detected - clearing all businesses');
-          setBusinesses([]);
-          setIsSearching(true);
-          setLastSearchFilters(searchFilters);
-        } else {
-          // Same search - keep existing results and don't reload
-          console.log('🔄 Same search filters - keeping existing results');
-          return;
-        }
-      
+    const isNewSearch = JSON.stringify(searchFilters) !== JSON.stringify(lastSearchFilters);
+    
+    // Handle search filter changes
+    if (searchFilters) {
+      if (isNewSearch) {
+        console.log('🗺️ New search filters - clearing businesses and searching in viewport');
+        setBusinesses([]);
+        setIsSearching(true);
+        setLastSearchFilters(searchFilters);
+        
         setLoading(true);
-        try {        
-          await progressiveSearch.searchBusinesses(
-            bounds,
-            searchFilters,
-            (progressBusinesses, isComplete) => {
-              // Update with current progress
-              console.log(`🌍 Global search progress: ${progressBusinesses.length} businesses found${isComplete ? ' (search complete)' : ''}`);
-              setBusinesses([...progressBusinesses]);
-              
-              if (isComplete) {
-                setLoading(false);
-                setIsSearching(false);
-                setCurrentBounds(bounds);
-                console.log(`✅ Global search completed with ${progressBusinesses.length} total businesses`);
-              }
-            },
-            3000 // Increased limit for global search
-          );
+        try {
+          const viewportBusinesses = await getBusinessesInViewport(bounds, limit, searchFilters);
+          setBusinesses(viewportBusinesses);
+          setCurrentBounds(bounds);
+          console.log(`✅ Viewport search completed with ${viewportBusinesses.length} businesses`);
         } catch (error) {
-          console.error('❌ Global search error:', error);
+          console.error('❌ Viewport search error:', error);
+        } finally {
           setLoading(false);
           setIsSearching(false);
         }
         return;
-      }
-      
-      // No search filters - clear search state and load normally
-      if (isNewSearch) {
-        setLastSearchFilters(null);
-        setIsSearching(false);
+      } else {
+        // Same search - accumulate results when panning to new areas
+        console.log('🔄 Same search filters - checking if we need to search new area');
+        
+        // Check if we're in a significantly different area
+        if (currentBounds) {
+          const boundsOverlap = !(
+            bounds.north < currentBounds.south ||
+            bounds.south > currentBounds.north ||
+            bounds.east < currentBounds.west ||
+            bounds.west > currentBounds.east
+          );
+          
+          // If there's significant overlap, don't search again
+          if (boundsOverlap) {
+            console.log('🔄 Area overlaps with previous search - keeping existing results');
+            return;
+          }
+        }
+        
+        // Search new area and add to existing results
+        console.log('🗺️ Searching new area and adding to existing results');
+        setLoading(true);
+        try {
+          const newBusinesses = await getBusinessesInViewport(bounds, limit, searchFilters);
+          setBusinesses(prev => {
+            const existingIds = new Set(prev.map(b => b.id));
+            const uniqueNew = newBusinesses.filter(b => !existingIds.has(b.id));
+            console.log(`📍 Adding ${uniqueNew.length} new businesses to existing ${prev.length}`);
+            return [...prev, ...uniqueNew];
+          });
+          setCurrentBounds(bounds);
+        } catch (error) {
+          console.error('❌ New area search error:', error);
+        } finally {
+          setLoading(false);
+        }
+        return;
       }
     }
+    
+    // No search filters - clear search state if needed
+    if (isNewSearch && lastSearchFilters) {
+      console.log('🧹 Clearing search state - no filters active');
+      setLastSearchFilters(null);
+      setIsSearching(false);
+      setBusinesses([]); // Clear search results
+    }
 
-    // Check tile cache first (only if no search filters are active)
+    // Rest of the normal viewport loading logic for no-filter case
     if (!searchFilters) {
       const cachedBusinesses = getCachedBusinesses(bounds);
       if (cachedBusinesses && cachedBusinesses.length > 200) {
@@ -160,7 +177,6 @@ export const useViewportBusinesses = (searchFilters?: any) => {
       }
     }
 
-    // Expand bounds for better coverage
     const isInitialLoad = businesses.length === 0;
     const expansionFactor = isInitialLoad ? 0.3 : 0.15;
     
@@ -171,7 +187,6 @@ export const useViewportBusinesses = (searchFilters?: any) => {
       west: bounds.west - (bounds.east - bounds.west) * expansionFactor
     };
 
-    // Check expanded cache (only when no search filters)
     if (!searchFilters) {
       const expandedCached = getCachedBusinesses(expandedBounds);
       if (expandedCached && expandedCached.length > 200) {
@@ -181,7 +196,6 @@ export const useViewportBusinesses = (searchFilters?: any) => {
       }
     }
 
-    // Request deduplication
     const filterKey = searchFilters ? JSON.stringify(searchFilters) : 'no-filter';
     const requestKey = `${expandedBounds.north}-${expandedBounds.south}-${expandedBounds.east}-${expandedBounds.west}-${limit}-${filterKey}`;
     if (inflightRequests.has(requestKey)) {
@@ -196,17 +210,14 @@ export const useViewportBusinesses = (searchFilters?: any) => {
       }
     }
 
-    // Clear previous timeout
     if (loadTimeoutRef.current) {
       clearTimeout(loadTimeoutRef.current);
     }
 
-    // Optimized debouncing
     const shouldLoadImmediately = businesses.length === 0;
     const delay = shouldLoadImmediately ? 0 : (isMoving ? 400 : 150);
 
     loadTimeoutRef.current = setTimeout(async () => {
-      // Skip similar viewport requests
       if (!shouldLoadImmediately && currentBounds && 
           Math.abs(currentBounds.north - expandedBounds.north) < 0.001 &&
           Math.abs(currentBounds.south - expandedBounds.south) < 0.001 &&
@@ -217,37 +228,27 @@ export const useViewportBusinesses = (searchFilters?: any) => {
 
       setLoading(true);
       
-      // Create and cache the request promise
       const requestPromise = getBusinessesInViewport(expandedBounds, limit, searchFilters);
       inflightRequests.set(requestKey, requestPromise);
       
       try {
         const viewportBusinesses = await requestPromise;
         
-        // Cache in tile system (only if no search filters)
         if (!searchFilters) {
           setCachedBusinesses(expandedBounds, viewportBusinesses);
         }
         
         if (searchFilters) {
-          // Replace businesses entirely when filters are active to remove non-matching dots
           setBusinesses(viewportBusinesses);
         } else {
-          // Stable accumulation - maintain existing business positions
           setBusinesses(prev => {
-            // Create a map of existing businesses by ID for fast lookup
             const existingMap = new Map(prev.map(b => [b.id, b]));
-            
-            // Only add truly new businesses
             const newBusinesses = viewportBusinesses.filter(b => !existingMap.has(b.id));
-            
-            // Return stable array - existing businesses keep their positions
             return [...prev, ...newBusinesses];
           });
         }
         setCurrentBounds(expandedBounds);
         
-        // Schedule preloading (only when no filters)
         if (!searchFilters) schedulePreload(expandedBounds);
         
       } catch (error) {
@@ -257,7 +258,7 @@ export const useViewportBusinesses = (searchFilters?: any) => {
         inflightRequests.delete(requestKey);
       }
     }, delay);
-  }, [loading, getCachedBusinesses, setCachedBusinesses, searchFilters, lastSearchFilters, isSearching, schedulePreload, progressiveSearch]);
+  }, [loading, getCachedBusinesses, setCachedBusinesses, searchFilters, lastSearchFilters, isSearching, schedulePreload, currentBounds, businesses.length]);
 
   // Cleanup progressive search and pending timeouts on filter changes
   useEffect(() => {

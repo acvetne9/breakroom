@@ -57,15 +57,14 @@ export const getBusinessesInViewport = async (
   onProgress?: (businesses: Business[], isComplete: boolean) => void
 ): Promise<Business[]> => {
   try {
-    console.log(`🎯 Starting optimized spatial query for bounds:`, bounds);
+    console.log(`🗺️ Searching businesses in viewport with bounds:`, bounds);
 
-    // Parse filters once - handle both string and object formats
+    // Parse filters once
     let parsedFilters = null;
     if (searchFilters) {
       if (typeof searchFilters === 'string') {
         parsedFilters = parseSearchFilters(searchFilters);
       } else if (searchFilters.textTerms || searchFilters.salaryQuery || searchFilters.roleFilter || searchFilters.businessTypeFilter) {
-        // Already parsed filters object; clone and derive any missing filters from textTerms
         parsedFilters = { ...searchFilters };
         if (Array.isArray(parsedFilters.textTerms) && parsedFilters.textTerms.length > 0) {
           const derived = parseSearchFilters(parsedFilters.textTerms.join(' '));
@@ -78,21 +77,9 @@ export const getBusinessesInViewport = async (
       }
     }
 
-    console.log('🎯 getBusinessesInViewport - searchFilters:', searchFilters);
-    console.log('🎯 getBusinessesInViewport - parsedFilters:', parsedFilters);
-
-    // Use progressive search for filtered queries
-    if (parsedFilters) {
-      console.log('🔄 Using progressive search for filtered query');
-      return await progressiveSearch.searchBusinesses(
-        bounds,
-        parsedFilters,
-        onProgress || (() => {}),
-        limit
-      );
-    }
+    console.log('🗺️ Using viewport search with filters:', parsedFilters);
     
-    // Try the new spatial function first (PostGIS optimized)
+    // Always use the spatial query for viewport bounds
     const { data: spatialData, error: spatialError } = await supabase
       .rpc('businesses_in_bbox', {
         west: bounds.west,
@@ -103,7 +90,7 @@ export const getBusinessesInViewport = async (
       });
 
     if (!spatialError && spatialData) {
-      console.log(`🚀 Spatial query successful: ${spatialData.length} businesses found`);
+      console.log(`🚀 Spatial query successful: ${spatialData.length} businesses found in viewport`);
       
       const businesses: Business[] = spatialData.map((business) => ({
         id: business.id,
@@ -116,16 +103,27 @@ export const getBusinessesInViewport = async (
         roles: [],
       }));
       
-    // Apply search filters if provided
-    if (parsedFilters) {
-      console.log('🔍 About to apply filters to spatial query results:', businesses.length, 'businesses');
-      console.log('🔍 Applying these filters:', parsedFilters);
-      const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);
-      console.log(`🔍 Applied filters: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
-      return filteredBusinesses;
-    }
-    
-    console.log('🔍 No valid filters to apply to spatial query, returning all businesses:', businesses.length);
+      // Apply search filters if provided
+      if (parsedFilters) {
+        console.log('🔍 Applying filters to viewport results:', businesses.length, 'businesses');
+        const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);
+        console.log(`🔍 Applied filters: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
+        
+        // Call progress callback if provided
+        if (onProgress) {
+          onProgress(filteredBusinesses, true);
+        }
+        
+        return filteredBusinesses;
+      }
+      
+      console.log('🔍 No filters to apply, returning all viewport businesses:', businesses.length);
+      
+      // Call progress callback if provided
+      if (onProgress) {
+        onProgress(businesses, true);
+      }
+      
       return businesses;
     }
 
@@ -160,19 +158,22 @@ export const getBusinessesInViewport = async (
     console.log(`✅ Fallback query returned ${businesses.length} businesses`);
     
     // Apply search filters if provided  
-    if (searchFilters) {
-      const parsedFilters = typeof searchFilters === 'string' 
-        ? parseSearchFilters(searchFilters)
-        : searchFilters;
-        
-      console.log('🔍 About to apply filters to fallback query results:', businesses.length, 'businesses');
-      console.log('🔍 Fallback parsedFilters:', parsedFilters);
-        
-      if (parsedFilters) {
-        const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);
-        console.log(`🔍 Applied filters: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
-        return filteredBusinesses;
+    if (parsedFilters) {
+      console.log('🔍 Applying filters to fallback results:', businesses.length, 'businesses');
+      const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);
+      console.log(`🔍 Applied filters: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
+      
+      // Call progress callback if provided
+      if (onProgress) {
+        onProgress(filteredBusinesses, true);
       }
+      
+      return filteredBusinesses;
+    }
+    
+    // Call progress callback if provided
+    if (onProgress) {
+      onProgress(businesses, true);
     }
     
     return businesses;
