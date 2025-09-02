@@ -74,8 +74,10 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         setSearchResults(results);
         // Build and apply filters if changed
         const filters = parseSearchFilters(q);
+        console.log('🔍 Search filters parsed:', filters);
         const filtersKey = filters ? JSON.stringify(filters) : 'null';
         if (filtersKey !== lastFiltersRef.current) {
+          console.log('🔄 Applying new filters to map');
           lastFiltersRef.current = filtersKey;
           onChange(value, undefined, filters || null);
         }
@@ -91,7 +93,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       } finally {
         if (seq === searchSeqRef.current) setIsSearching(false);
       }
-    }, 300);
+    }, 500);
     return () => clearTimeout(timer);
   }, [value, onChange, onBusinessSelect]);
 

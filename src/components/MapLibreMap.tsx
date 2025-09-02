@@ -113,6 +113,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // Reload businesses whenever search filters change
   useEffect(() => {
     if (!map || !mapLoaded) return;
+    console.log('🗺️ Map reloading businesses due to filter change:', searchFilters);
     try {
       const bounds = map.getBounds();
       const viewportBounds = {
