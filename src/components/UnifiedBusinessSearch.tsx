@@ -39,19 +39,46 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   const searchSeqRef = useRef(0);
   const lastFiltersRef = useRef<string | null>(null);
   const committedQueryRef = useRef<string>('');
+  const resultsCache = useRef<Map<string, EnhancedBusiness[]>>(new Map());
+  const isScrolling = useRef(false);
 
   useEffect(() => {
+    let scrollTimeout: NodeJS.Timeout;
+    
     const handleClickOutside = (event: MouseEvent) => {
+      // Don't close dropdown if we're scrolling within it
+      if (isScrolling.current) return;
+      
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowDropdown(false);
       }
     };
 
+    const handleScroll = () => {
+      isScrolling.current = true;
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        isScrolling.current = false;
+      }, 150);
+    };
+
+    // Add scroll listener to the dropdown
+    const dropdown = dropdownRef.current;
+    if (dropdown) {
+      dropdown.addEventListener('scroll', handleScroll);
+    }
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      if (dropdown) {
+        dropdown.removeEventListener('scroll', handleScroll);
+      }
+      clearTimeout(scrollTimeout);
+    };
   }, []);
 
-  // Debounced suggestions only - no auto-search execution
+  // Debounced suggestions with improved caching
   useEffect(() => {
     const q = value.trim();
     if (!q) {
@@ -68,6 +95,16 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       return;
     }
     
+    // Check cache first for better performance
+    const cachedResults = resultsCache.current.get(q);
+    if (cachedResults) {
+      console.log('💾 Using cached results for:', q);
+      setSearchResults(cachedResults);
+      setShowDropdown(true);
+      setIsSearching(false);
+      return;
+    }
+    
     // Only show suggestions, don't execute search automatically
     setIsSearching(true);
     setShowDropdown(true);
@@ -76,6 +113,16 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       try {
         const results = await searchBusinessesEnhanced(q, 10);
         if (seq !== searchSeqRef.current) return;
+        
+        // Cache the results
+        resultsCache.current.set(q, results);
+        
+        // Limit cache size to prevent memory issues
+        if (resultsCache.current.size > 50) {
+          const firstKey = resultsCache.current.keys().next().value;
+          resultsCache.current.delete(firstKey);
+        }
+        
         setSearchResults(results);
       } catch (error) {
         console.error('Search suggestions error:', error);
@@ -83,7 +130,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       } finally {
         if (seq === searchSeqRef.current) setIsSearching(false);
       }
-    }, 500); // Faster suggestions
+    }, 300); // Faster suggestions with caching
     return () => clearTimeout(timer);
   }, [value, onChange]);
 
@@ -194,10 +241,15 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   };
 
   const handleInputBlur = () => {
+    // Don't blur if we're scrolling in the dropdown
+    if (isScrolling.current) return;
+    
     // Delay blur to allow dropdown clicks
     setTimeout(() => {
-      setShowDropdown(false);
-      onBlur?.();
+      if (!isScrolling.current) {
+        setShowDropdown(false);
+        onBlur?.();
+      }
     }, 150);
   };
 
