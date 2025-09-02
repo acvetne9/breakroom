@@ -105,34 +105,27 @@ export const useViewportBusinesses = (searchFilters?: any) => {
         setBusinesses([]);
         setIsSearching(true);
         setLastSearchFilters(searchFilters);
-      }
-      
-      // If still the same search, keep existing results
-      if (!isNewSearch && !isSearching) {
+      } else {
+        // Same search - keep existing results and don't reload
         console.log('🔄 Same search filters - keeping existing results');
         return;
       }
-      
+    
       setLoading(true);
-      try {
-        const allFoundBusinesses: Business[] = [];
-        
+      try {        
         await progressiveSearch.searchBusinesses(
           bounds,
           searchFilters,
           (progressBusinesses, isComplete) => {
-            // Accumulate all found businesses
-            allFoundBusinesses.length = 0;
-            allFoundBusinesses.push(...progressBusinesses);
-            
+            // Update with current progress
             console.log(`🔍 Progressive search: ${progressBusinesses.length} businesses found${isComplete ? ' (search complete)' : ''}`);
-            setBusinesses([...allFoundBusinesses]);
+            setBusinesses([...progressBusinesses]);
             
             if (isComplete) {
               setLoading(false);
               setIsSearching(false);
               setCurrentBounds(bounds);
-              console.log(`✅ Search completed with ${allFoundBusinesses.length} total businesses`);
+              console.log(`✅ Search completed with ${progressBusinesses.length} total businesses`);
             }
           },
           limit
