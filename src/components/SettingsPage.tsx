@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Minus, Smartphone } from 'lucide-react';
 import JobSearchDropdown from './JobSearchDropdown';
 import BusinessSearchDropdown from './BusinessSearchDropdown';
+import UnifiedBusinessSearch from './UnifiedBusinessSearch';
 import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 import { useDevice } from '@/contexts/DeviceContext';
@@ -314,8 +315,40 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   return (
     <div className="relative w-full h-full flex items-center justify-center">
       <div className="app-card p-6 overflow-y-auto">
-        <h1 className="text-xl font-medium text-app-black mb-8">Your Info.</h1>
+        <h1 className="text-xl font-medium text-app-black mb-8">Your Page! 😊</h1>
         
+        {/* Quick Search Buttons */}
+        <div className="mb-6 flex space-x-3">
+          {/* Coffee emoji button */}
+          <button
+            onClick={() => {
+              console.log("Searching for barista jobs at $20/hr");
+            }}
+            className="text-2xl"
+          >
+            ☕
+          </button>
+        
+          {/* Example: Add more quick search buttons here */}
+          <button
+            onClick={() => {
+              console.log("Searching for tech jobs");
+            }}
+            className="px-4 py-2 bg-app-yellow text-app-black text-sm rounded hover:bg-app-yellow/90 transition-colors"
+          >
+            💻 Tech
+          </button>
+        
+          <button
+            onClick={() => {
+              console.log("Searching for designer jobs");
+            }}
+            className="px-4 py-2 bg-app-yellow text-app-black text-sm rounded hover:bg-app-yellow/90 transition-colors"
+          >
+            🎨 Designer
+          </button>
+        </div>
+
         
         {/* Current Job Section */}
         <div className="mb-8">
@@ -337,7 +370,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 onChange={e => handleCurrentTimePeriodChange(e.target.value)} 
                 className="px-4 py-3 bg-white text-sm"
                 style={{
-                  border: '1px solid hsl(var(--app-gray-light))',
+                  border: '2px solid hsl(var(--app-gray-light))',
                   borderRadius: '0.5rem',
                   height: '48px',
                   fontSize: '16px'
@@ -362,16 +395,18 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             </div>
 
             <div className="flex items-center space-x-3">
-              <BusinessSearchDropdown
-                value={currentJob.location}
-                onChange={handleCurrentJobLocationChange}
-                onBlur={handleCurrentJobLocationBlur}
-                className="app-input flex-1"
-                placeholder="Search businesses..."
-                salary={currentJob.salary}
-                role={currentJob.role}
-                timePeriod={currentTimePeriod}
-              />
+              <div className="flex-1">
+                <BusinessSearchDropdown
+                  value={currentJob.location}
+                  onChange={handleCurrentJobLocationChange}
+                  onBlur={handleCurrentJobLocationBlur}
+                  className="app-input w-full"
+                  placeholder="Search businesses..."
+                  salary={currentJob.salary}
+                  role={currentJob.role}
+                  timePeriod={currentTimePeriod}
+                />
+              </div>
               <div className="w-6"></div>
             </div>
           </div>
@@ -406,7 +441,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     onChange={e => updatePastJobTimePeriod(job.id, e.target.value)}
                     className="px-4 py-3 bg-white text-sm"
                     style={{
-                      border: '1px solid hsl(var(--app-gray-light))',
+                      border: '2px solid hsl(var(--app-gray-light))',
                       borderRadius: '0.5rem',
                       height: '48px',
                       fontSize: '16px'
@@ -431,16 +466,18 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 </div>
 
                 <div className="flex items-center space-x-3">
-                  <BusinessSearchDropdown
-                    value={job.location}
-                    onChange={value => updatePastJob(job.id, 'location', value)}
-                    onBlur={() => handlePastJobBlur(job.id, 'location', job.location)}
-                    className="app-input flex-1"
-                    placeholder="Search businesses..."
-                    salary={job.salary}
-                    role={job.role}
-                    timePeriod={pastJobTimePeriods[job.id]}
-                  />
+                  <div className="flex-1">
+                    <BusinessSearchDropdown
+                      value={currentJob.location}
+                      onChange={handleCurrentJobLocationChange}
+                      onBlur={handleCurrentJobLocationBlur}
+                      className="app-input w-full"
+                      placeholder="Search businesses..."
+                      salary={currentJob.salary}
+                      role={currentJob.role}
+                      timePeriod={currentTimePeriod}
+                    />
+                  </div>
                   <button 
                     onClick={() => removePastJob(job.id)} 
                     className="w-6 h-6 bg-app-yellow rounded-full flex items-center justify-center"

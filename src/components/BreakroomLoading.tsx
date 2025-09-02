@@ -55,20 +55,22 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       alignItems: 'center',
       marginBottom: '20px',
       transform: 'scale(1.5)',
-      marginRight: '-12px' // Offset to center the mug body instead of mug+handle
     },
+    
     coffeeMug: {
       position: 'relative' as const,
       animation: 'mugSmoothEntrance 1.2s ease-out 0s forwards',
       opacity: 0,
       transform: 'translateY(120px) scale(0.3)'
     },
+    
     mugBody: {
       width: '50px',
       height: '60px',
       backgroundColor: '#B22222',
       borderRadius: '3px',
       position: 'relative' as const,
+      transform: 'translateX(9px)', // <-- shift the body right so the base is centered
       boxShadow: `
         inset -6px 0 0 rgba(0, 0, 0, 0.2),
         inset 0 -6px 0 rgba(0, 0, 0, 0.15),
