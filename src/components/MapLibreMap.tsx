@@ -156,24 +156,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [searchFilters, map, mapLoaded, isMobile, loadBusinessesInViewport]);
 
-  // Fit map to filtered results once per new search (Google Maps-like behavior)
+  // Disable auto-zoom on search results to respect user preference
   useEffect(() => {
-    if (!map || !mapLoaded || !searchFilters) return;
-    const key = JSON.stringify(searchFilters);
-    if (businesses.length > 0 && lastFitKeyRef.current !== key) {
-      const lats = businesses.map((b: any) => b.position.lat);
-      const lngs = businesses.map((b: any) => b.position.lng);
-      const bounds: [[number, number], [number, number]] = [
-        [Math.min(...lngs), Math.min(...lats)],
-        [Math.max(...lngs), Math.max(...lats)]
-      ];
-      try {
-        map.fitBounds(bounds as any, { padding: 80, duration: 700 });
-        lastFitKeyRef.current = key;
-      } catch (e) {
-        console.warn('⚠️ fitBounds failed:', e);
-      }
-    }
+    // Intentionally no-op: do not fit/zoom when search results change
   }, [businesses, searchFilters, map, mapLoaded]);
 
   // Zoom to a specifically selected business (e.g. from search dropdown)
@@ -710,7 +695,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       // Debounce viewport changes
       moveTimeout = setTimeout(() => {
         isMovingRef.current = false;
-        handleViewportChange();
+        // Do not auto-load on pan/zoom while a search filter is active
+        if (!searchFilters) {
+          handleViewportChange();
+        }
       }, 300);
     };
     

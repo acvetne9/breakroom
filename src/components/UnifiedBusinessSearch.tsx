@@ -50,7 +50,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Debounced search based on input value
+  // Debounced suggestions and apply filters only after 1s idle (or on Enter/Search)
   useEffect(() => {
     const q = value.trim();
     if (!q) {
@@ -72,16 +72,14 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         const results = await searchBusinessesEnhanced(q, 10);
         if (seq !== searchSeqRef.current) return;
         setSearchResults(results);
-        // Build and apply filters if changed
+        // After idle, parse and apply filters only if changed
         const filters = parseSearchFilters(q);
-        console.log('🔍 Search filters parsed:', filters);
         const filtersKey = filters ? JSON.stringify(filters) : 'null';
         if (filtersKey !== lastFiltersRef.current) {
           console.log('🔄 Applying new filters to map');
           lastFiltersRef.current = filtersKey;
           onChange(value, undefined, filters || null);
         }
-        // Auto-zoom on typing disabled to avoid input overrides; will only trigger on explicit selection or Enter/icon click
       } catch (error) {
         console.error('Search error:', error);
         if (seq === searchSeqRef.current) setSearchResults([]);
@@ -90,7 +88,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       }
     }, 1000);
     return () => clearTimeout(timer);
-  }, [value, onChange, onBusinessSelect]);
+  }, [value, onChange]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;

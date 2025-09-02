@@ -254,11 +254,15 @@ export const useViewportBusinesses = (searchFilters?: any) => {
     }, delay);
   }, [loading, getCachedBusinesses, setCachedBusinesses, searchFilters, lastSearchFilters, isSearching, schedulePreload, progressiveSearch]);
 
-  // Cleanup progressive search on filter changes
+  // Cleanup progressive search and pending timeouts on filter changes
   useEffect(() => {
-    return () => {
-      progressiveSearch.abort();
-    };
+    progressiveSearch.abort();
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+    }
+    if (preloadTimeoutRef.current) {
+      clearTimeout(preloadTimeoutRef.current);
+    }
   }, [searchFilters]);
 
   
