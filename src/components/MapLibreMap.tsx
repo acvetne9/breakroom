@@ -150,20 +150,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       let businessLimit;
       
       if (searchFilters && Object.keys(searchFilters).length > 0) {
-        // Expand search area significantly to query all possible matching businesses
-        const expansionFactor = zoom > 13 ? 3.0 : zoom > 11 ? 4.0 : 5.0;
-        const latRange = mapBounds.getNorth() - mapBounds.getSouth();
-        const lngRange = mapBounds.getEast() - mapBounds.getWest();
-        
-        viewportBounds = {
-          north: center.lat + (latRange * expansionFactor) / 2,
-          south: center.lat - (latRange * expansionFactor) / 2,
-          east: center.lng + (lngRange * expansionFactor) / 2,
-          west: center.lng - (lngRange * expansionFactor) / 2
+        // Viewport-only search: use current map bounds with no expansion
+        const viewportBounds = {
+          north: mapBounds.getNorth(),
+          south: mapBounds.getSouth(),
+          east: mapBounds.getEast(),
+          west: mapBounds.getWest()
         };
-        businessLimit = 10000; // Higher limit for comprehensive search
-        
-        console.log(`🔍 Expanded search area by ${expansionFactor}x for filtering`);
+        const businessLimit = isMobile ? 12000 : 25000;
+        console.log('🔍 Viewport-only search: using current map bounds');
         loadBusinessesInViewport(viewportBounds, businessLimit, false);
       }
     } catch (e) {
@@ -710,10 +705,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       // Debounce viewport changes
       moveTimeout = setTimeout(() => {
         isMovingRef.current = false;
-        // Do not auto-load on pan/zoom while a search filter is active
-        if (!searchFilters) {
-          handleViewportChange();
-        }
+        // Always load on pan/zoom; hook will accumulate with active filters
+        handleViewportChange();
       }, 300);
     };
     
@@ -739,6 +732,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
     if (map.getSource('businesses')) {
       map.removeSource('businesses');
+    }
+    // Hide debug vector-tile businesses to avoid duplicate/unfiltered points
+    if (map.getLayer('nyc-businesses')) {
+      map.setLayoutProperty('nyc-businesses', 'visibility', 'none');
     }
   }, [mapLoaded, map]);
 
