@@ -7,6 +7,9 @@ interface BreakroomLoadingProps {
 const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
   const [isVisible, setIsVisible] = useState(true);
 
+  // Easy horizontal adjustment - change this value to move the mug left/right
+  const mugHorizontalOffset = 75; // pixels from center (positive = right, negative = left)
+
   useEffect(() => {
     // Auto-hide after animation completes (3 seconds)
     const timer = setTimeout(() => {
@@ -47,21 +50,20 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       justifyContent: 'center'
     },
 
-    // <-- KEEP original mugContainer; it's used and centered by the parent
     mugContainer: {
       position: 'relative' as const,
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      marginBottom: '20px',      // keeps same vertical spacing above the text
-      transform: 'scale(1.5)',   // exact same scale as original
+      marginBottom: '20px',
+      transform: 'scale(1.5)',
+      // Apply horizontal offset here
+      left: `${mugHorizontalOffset}px`
     },
 
-    // small wrapper whose width = mugBody width so centering affects the cup base,
-    // while the handle can overflow left without changing centering.
     mugVisualWrapper: {
-      width: '50px',                // same as mugBody width
-      height: '60px',               // same as mugBody height
+      width: '50px',
+      height: '60px',
       display: 'flex',
       alignItems: 'flex-end',
       justifyContent: 'center',
@@ -76,7 +78,6 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       transform: 'translateY(120px) scale(0.3)'
     },
 
-    // removed the translateX on mugBody so its center aligns with the wrapper center
     mugBody: {
       width: '50px',
       height: '60px',
@@ -90,7 +91,6 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       `
     },
     mugBodyBefore: {
-      // this is a real div inside mugBody (not a pseudo-element)
       position: 'absolute' as const,
       top: '6px',
       left: '6px',
@@ -100,7 +100,6 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       borderRadius: '1.5px'
     },
 
-    // handle remains absolutely positioned relative to the wrapper, so it can overflow left
     mugHandle: {
       position: 'absolute' as const,
       left: '-12px',
@@ -152,10 +151,8 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
 
       <div style={styles.animationContainer}>
 
-        {/* mug is ABOVE the text, centered by the parent's flex centering */}
         <div style={styles.mugContainer}>
           <div style={styles.coffeeMug}>
-            {/* wrapper ensures the base (mugBody) is centered */}
             <div style={styles.mugVisualWrapper}>
               <div style={styles.mugBody}>
                 <div style={styles.mugBodyBefore}></div>
