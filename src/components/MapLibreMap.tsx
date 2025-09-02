@@ -698,8 +698,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       onBusinessesLoaded();
     }
   }, [businessesLoading, businesses.length, onBusinessesLoaded]);
+  // Emoji markers with stable reference to prevent reloading
+  const [lastLandmarksHash, setLastLandmarksHash] = useState('');
+  
   useEffect(() => {
     if (!mapLoaded || !landmarks || !map) return;
+
+    // Create a hash of landmarks to check if they actually changed
+    const landmarksHash = JSON.stringify(landmarks.map(l => `${l.lat}-${l.lng}-${l.emoji}`));
+    if (landmarksHash === lastLandmarksHash) {
+      return; // No change in landmarks, skip reload
+    }
+    
+    setLastLandmarksHash(landmarksHash);
 
     console.log('Adding emoji landmarks:', landmarks);
 

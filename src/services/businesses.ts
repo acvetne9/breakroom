@@ -153,16 +153,16 @@ export const getBusinessesInViewport = async (
         roles: [],
       }));
       
-      // Apply search filters if provided
-      if (parsedFilters && (parsedFilters.textTerms?.length > 0 || parsedFilters.salaryQuery || parsedFilters.roleFilter || parsedFilters.businessTypeFilter)) {
-        console.log('🔍 About to apply filters to spatial query results:', businesses.length, 'businesses');
-        console.log('🔍 Applying these filters:', parsedFilters);
-        const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);
-        console.log(`🔍 Applied filters: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
-        return filteredBusinesses;
-      }
-      
-      console.log('🔍 No valid filters to apply to spatial query, returning all businesses:', businesses.length);
+    // Apply search filters if provided - FIX THE FILTER CHECK
+    if (parsedFilters && parsedFilters.textTerms && parsedFilters.textTerms.length > 0) {
+      console.log('🔍 About to apply filters to spatial query results:', businesses.length, 'businesses');
+      console.log('🔍 Applying these filters:', parsedFilters);
+      const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);
+      console.log(`🔍 Applied filters: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
+      return filteredBusinesses;
+    }
+    
+    console.log('🔍 No valid filters to apply to spatial query, returning all businesses:', businesses.length);
       return businesses;
     }
 
