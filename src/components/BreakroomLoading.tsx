@@ -88,6 +88,15 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       backgroundColor: 'rgba(0, 0, 0, 0.15)',
       borderRadius: '1.5px'
     },
+    mugContainer: {
+      position: 'relative' as const,
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: '20px',
+      // ✅ keep original vertical placement & scale
+      transform: 'scale(1.5) translateX(-25px)', // shift mug left
+    },
     mugHandle: {
       position: 'absolute' as const,
       left: '-12px',
