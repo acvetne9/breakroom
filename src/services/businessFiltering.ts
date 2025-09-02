@@ -70,7 +70,14 @@ export function applyBusinessFilters(businesses: Business[], filters: SearchFilt
   if (!filters) return businesses;
 
   console.log('🔍 [applyBusinessFilters] Called with:', businesses.length, 'businesses and filters:', filters);
-  console.log('🔍 [applyBusinessFilters] Sample business roles:', businesses.slice(0, 2).map(b => ({ name: b.name, rolesCount: b.roles?.length || 0, roles: b.roles?.map(r => r.role) })));
+  
+  // Sample roles with full detail for debugging
+  const sampleRoles = businesses.slice(0, 3).map(b => ({ 
+    name: b.name, 
+    rolesCount: b.roles?.length || 0, 
+    roles: b.roles?.map(r => ({ role: r.role, salary: r.salary })) || [] 
+  }));
+  console.log('🔍 [applyBusinessFilters] Sample business roles (detailed):', sampleRoles);
 
   const normalize = (s: string) => s?.toLowerCase().trim();
   const variantsOf = (term: string) => {
@@ -115,7 +122,16 @@ export function applyBusinessFilters(businesses: Business[], filters: SearchFilt
 
     // Role filter - also check if any text terms match roles when no specific roleFilter
     if (filters.roleFilter) {
-      const roleMatch = roles.some(r => matchesTermVariants(r.role || '', filters.roleFilter!));
+      console.log('🔍 [roleFilter] Checking business:', business.name, 'for role:', filters.roleFilter);
+      console.log('🔍 [roleFilter] Business roles:', roles.map(r => r.role));
+      
+      const roleMatch = roles.some(r => {
+        const match = matchesTermVariants(r.role || '', filters.roleFilter!);
+        console.log('🔍 [roleFilter] Role:', r.role, 'vs filter:', filters.roleFilter, 'match:', match);
+        return match;
+      });
+      
+      console.log('🔍 [roleFilter] Final roleMatch for', business.name + ':', roleMatch);
       if (!roleMatch) return false;
     } else if (filters.textTerms && filters.textTerms.length > 0) {
       // If no specific role filter but we have text terms, check if any match roles
