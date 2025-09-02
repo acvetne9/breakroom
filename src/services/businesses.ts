@@ -93,57 +93,136 @@ export const getBusinessesInViewport = async (
     console.log('🗺️ [getBusinessesInViewport] Needs role data for filtering:', needsRoleData);
 
     if (needsRoleData) {
-      // Load businesses with roles for proper filtering
-      console.log('🗺️ [getBusinessesInViewport] Loading businesses WITH roles for filtering');
+      // Try optimized role-based search with timeout handling
+      console.log('🗺️ [getBusinessesInViewport] Loading businesses WITH roles for filtering (timeout-resistant)');
       
-      const { data: businessesWithRoles, error: businessError } = await supabase
-        .from('businesses')
-        .select(`
-          id, name, lat, lng, atmosphere, business_type, website, salary,
-          business_roles (
-            id, role, salary, upvotes, downvotes
-          )
-        `)
-        .gte('lat', bounds.south)
-        .lte('lat', bounds.north)
-        .gte('lng', bounds.west)
-        .lte('lng', bounds.east)
-        .limit(limit);
+      try {
+        // Use smaller limit to avoid timeouts and add abortable query
+        const roleLimit = Math.min(limit, 3000); // Reduced limit for complex queries
+        
+        const { data: businessesWithRoles, error: businessError } = await supabase
+          .from('businesses')
+          .select(`
+            id, name, lat, lng, atmosphere, business_type, website, salary,
+            business_roles!inner (
+              id, role, salary, upvotes, downvotes
+            )
+          `)
+          .gte('lat', bounds.south)
+          .lte('lat', bounds.north)
+          .gte('lng', bounds.west)
+          .lte('lng', bounds.east)
+          .limit(roleLimit);
 
-      if (businessError) {
-        console.error('❌ Error loading businesses with roles:', businessError);
-        throw businessError;
+        if (businessError) {
+          console.warn('⚠️ JOIN query failed, trying fallback approach:', businessError);
+          throw businessError; // Will trigger fallback
+        }
+
+        console.log(`🗺️ [getBusinessesInViewport] Loaded ${businessesWithRoles?.length || 0} businesses with roles`);
+
+        const businesses: Business[] = (businessesWithRoles || []).map((business) => ({
+          id: business.id,
+          name: business.name,
+          position: { lat: business.lat, lng: business.lng },
+          atmosphere: business.atmosphere || [],
+          salary: business.salary,
+          businessType: business.business_type,
+          website: business.website,
+          roles: (business.business_roles || []).map((role: any) => ({
+            role: role.role,
+            salary: role.salary,
+            upvotes: role.upvotes || 0,
+            downvotes: role.downvotes || 0,
+            userVote: null
+          })),
+        }));
+
+        console.log('🔍 [getBusinessesInViewment] Applying filters to businesses WITH roles:', businesses.length);
+        const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);
+        console.log(`🔍 [getBusinessesInViewport] ROLE FILTERING RESULT: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
+        
+        // Call progress callback if provided
+        if (onProgress) {
+          onProgress(filteredBusinesses, true);
+        }
+        
+        return filteredBusinesses;
+        
+      } catch (joinError) {
+        // Fallback: Separate queries to avoid timeout
+        console.log('🚨 [getBusinessesInViewport] JOIN timed out, using separate queries fallback');
+        
+        // Step 1: Get businesses without roles first
+        const { data: basicBusinesses, error: basicError } = await supabase
+          .from('businesses')
+          .select('id, name, lat, lng, atmosphere, business_type, website, salary')
+          .gte('lat', bounds.south)
+          .lte('lat', bounds.north)
+          .gte('lng', bounds.west)
+          .lte('lng', bounds.east)
+          .limit(Math.min(limit, 5000));
+
+        if (basicError) {
+          console.error('❌ Even basic business query failed:', basicError);
+          return [];
+        }
+
+        console.log(`🔄 [getBusinessesInViewport] Fallback: loaded ${basicBusinesses?.length || 0} basic businesses`);
+
+        // Step 2: Get roles for these businesses
+        const businessIds = (basicBusinesses || []).map(b => b.id);
+        let allRoles: any[] = [];
+        
+        if (businessIds.length > 0) {
+          const { data: rolesData, error: rolesError } = await supabase
+            .from('business_roles')
+            .select('business_id, id, role, salary, upvotes, downvotes')
+            .in('business_id', businessIds);
+            
+          if (!rolesError && rolesData) {
+            allRoles = rolesData;
+            console.log(`🔄 [getBusinessesInViewport] Fallback: loaded ${allRoles.length} roles`);
+          } else {
+            console.warn('⚠️ Could not load roles in fallback:', rolesError);
+          }
+        }
+
+        // Step 3: Combine data
+        const businesses: Business[] = (basicBusinesses || []).map((business) => {
+          const businessRoles = allRoles
+            .filter(role => role.business_id === business.id)
+            .map(role => ({
+              role: role.role,
+              salary: role.salary,
+              upvotes: role.upvotes || 0,
+              downvotes: role.downvotes || 0,
+              userVote: null
+            }));
+
+          return {
+            id: business.id,
+            name: business.name,
+            position: { lat: business.lat, lng: business.lng },
+            atmosphere: business.atmosphere || [],
+            salary: business.salary,
+            businessType: business.business_type,
+            website: business.website,
+            roles: businessRoles,
+          };
+        });
+
+        console.log('🔍 [getBusinessesInViewport] Fallback: Applying filters to combined data:', businesses.length);
+        const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);
+        console.log(`🔍 [getBusinessesInViewport] Fallback ROLE FILTERING RESULT: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
+        
+        // Call progress callback if provided
+        if (onProgress) {
+          onProgress(filteredBusinesses, true);
+        }
+        
+        return filteredBusinesses;
       }
-
-      console.log(`🗺️ [getBusinessesInViewport] Loaded ${businessesWithRoles?.length || 0} businesses with roles`);
-
-      const businesses: Business[] = (businessesWithRoles || []).map((business) => ({
-        id: business.id,
-        name: business.name,
-        position: { lat: business.lat, lng: business.lng },
-        atmosphere: business.atmosphere || [],
-        salary: business.salary,
-        businessType: business.business_type,
-        website: business.website,
-        roles: (business.business_roles || []).map((role: any) => ({
-          role: role.role,
-          salary: role.salary,
-          upvotes: role.upvotes || 0,
-          downvotes: role.downvotes || 0,
-          userVote: null
-        })),
-      }));
-
-      console.log('🔍 [getBusinessesInViewment] Applying filters to businesses WITH roles:', businesses.length);
-      const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);
-      console.log(`🔍 [getBusinessesInViewport] ROLE FILTERING RESULT: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
-      
-      // Call progress callback if provided
-      if (onProgress) {
-        onProgress(filteredBusinesses, true);
-      }
-      
-      return filteredBusinesses;
     }
     
     // Use spatial query for basic viewport loading (no role filtering needed)
