@@ -35,12 +35,15 @@ export class ProgressiveBusinessSearch {
     console.log('🔍 Starting progressive search with filters:', parsedFilters);
     
     // Strategy 1: Global text search (for brand/name searches) - most efficient
-    if (parsedFilters.textTerms?.length > 0 && !parsedFilters.roleFilter && !parsedFilters.salaryQuery) {
+    if (parsedFilters.textTerms?.length > 0 && 
+        !parsedFilters.roleFilter && 
+        !parsedFilters.businessTypeFilter && 
+        !parsedFilters.salaryQuery) {
       return this.globalTextSearch(parsedFilters, onProgress, maxResults);
     }
     
     // Strategy 2: Global search with roles/salary (comprehensive but slower)
-    if (parsedFilters.roleFilter || parsedFilters.salaryQuery) {
+    if (parsedFilters.roleFilter || parsedFilters.businessTypeFilter || parsedFilters.salaryQuery) {
       return this.globalComplexSearch(parsedFilters, onProgress, maxResults);
     }
     
