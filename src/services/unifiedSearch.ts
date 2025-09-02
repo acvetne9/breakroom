@@ -149,7 +149,7 @@ export const searchBusinessesUnified = async (
         .lte('lng', bounds.east);
     }
     
-    // Apply text search with AND logic - all terms must match in name OR business_type
+    // Apply text search on business name/type (broad OR across fields)
     if (filters.textTerms.length > 0) {
       console.log(`🔍 [unifiedSearch] Applying text terms: ${JSON.stringify(filters.textTerms)}`);
       for (const term of filters.textTerms) {
@@ -166,17 +166,55 @@ export const searchBusinessesUnified = async (
     baseQuery = baseQuery.limit(limit);
     
     console.log(`🔍 [unifiedSearch] Executing query with filters:`, filters);
-    const { data: businesses, error } = await baseQuery;
+    const { data: nameMatches, error: nameError } = await baseQuery;
+    if (nameError) {
+      console.error('❌ Business search error:', nameError);
+    }
+    console.log(`🔍 [unifiedSearch] Raw business query (name/type) returned ${nameMatches?.length || 0} results`);
     
-    if (error) {
-      console.error('❌ Business search error:', error);
-      return [];
+    // Fallback/Additional: find businesses by matching roles
+    let roleMatchedBusinesses: any[] = [];
+    const roleTerms = (filters.roleFilter ? [filters.roleFilter] : filters.textTerms) || [];
+    if (roleTerms.length > 0) {
+      // Build OR clause for roles
+      const orClause = roleTerms.map(t => `role.ilike.%${t}%`).join(',');
+      console.log('🔍 [unifiedSearch] Searching roles with OR clause:', orClause);
+      const { data: roleRows, error: roleSearchError } = await supabase
+        .from('business_roles')
+        .select('business_id')
+        .or(orClause)
+        .limit(5000);
+      if (roleSearchError) {
+        console.warn('⚠️ Role search error:', roleSearchError);
+      }
+      const roleBusinessIds = Array.from(new Set((roleRows || []).map(r => r.business_id)));
+      console.log(`🔍 [unifiedSearch] Role search matched ${roleBusinessIds.length} unique businesses`);
+      if (roleBusinessIds.length > 0) {
+        let roleBizQuery = supabase.from('businesses').select('id, name, lat, lng, atmosphere, business_type, website, salary').in('id', roleBusinessIds);
+        if (bounds) {
+          roleBizQuery = roleBizQuery
+            .gte('lat', bounds.south)
+            .lte('lat', bounds.north)
+            .gte('lng', bounds.west)
+            .lte('lng', bounds.east);
+        }
+        const { data: roleBizData, error: roleBizError } = await roleBizQuery.limit(limit);
+        if (roleBizError) {
+          console.warn('⚠️ Role-matched businesses fetch error:', roleBizError);
+        }
+        roleMatchedBusinesses = roleBizData || [];
+        console.log(`🔍 [unifiedSearch] Role-matched businesses within bounds: ${roleMatchedBusinesses.length}`);
+      }
     }
     
-    console.log(`🔍 [unifiedSearch] Raw business query returned ${businesses?.length || 0} results`);
+    // Combine and dedupe business matches from name/type and role-based searches
+    const combinedMap = new Map<string, any>();
+    (nameMatches || []).forEach(b => combinedMap.set(b.id, b));
+    (roleMatchedBusinesses || []).forEach(b => combinedMap.set(b.id, b));
+    const businesses = Array.from(combinedMap.values());
     
     if (!businesses || businesses.length === 0) {
-      console.log('🔍 [unifiedSearch] No businesses found in base query');
+      console.log('🔍 [unifiedSearch] No businesses found after name/type and role-based matching');
       return [];
     }
     
