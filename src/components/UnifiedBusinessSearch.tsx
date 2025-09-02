@@ -81,12 +81,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           lastFiltersRef.current = filtersKey;
           onChange(value, undefined, filters || null);
         }
-        // Auto-zoom when there's a clear single match (without changing input)
-        const exact = results.length === 1 && results[0];
-        if (exact) {
-          onBusinessSelect?.(exact);
-          onChange(value, exact, null);
-        }
+        // Auto-zoom on typing disabled to avoid input overrides; will only trigger on explicit selection or Enter/icon click
       } catch (error) {
         console.error('Search error:', error);
         if (seq === searchSeqRef.current) setSearchResults([]);

@@ -54,7 +54,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       fontWeight: 'bold' as const,
       color: '#B22222',
       whiteSpace: 'nowrap' as const,
-      textAlign: 'center',
+      textAlign: 'center' as const,
       paddingTop: '90px' // space for mug above
     },
     coffeeMug: {

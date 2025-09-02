@@ -121,7 +121,8 @@ export const useViewportBusinesses = (searchFilters?: any) => {
     }
 
     // Request deduplication
-    const requestKey = `${expandedBounds.north}-${expandedBounds.south}-${expandedBounds.east}-${expandedBounds.west}-${limit}`;
+    const filterKey = searchFilters ? JSON.stringify(searchFilters) : 'no-filter';
+    const requestKey = `${expandedBounds.north}-${expandedBounds.south}-${expandedBounds.east}-${expandedBounds.west}-${limit}-${filterKey}`;
     if (inflightRequests.has(requestKey)) {
       console.log('🔄 Reusing in-flight request');
       try {
@@ -167,17 +168,22 @@ export const useViewportBusinesses = (searchFilters?: any) => {
           setCachedBusinesses(expandedBounds, viewportBusinesses);
         }
         
-        // Stable accumulation - maintain existing business positions
-        setBusinesses(prev => {
-          // Create a map of existing businesses by ID for fast lookup
-          const existingMap = new Map(prev.map(b => [b.id, b]));
-          
-          // Only add truly new businesses
-          const newBusinesses = viewportBusinesses.filter(b => !existingMap.has(b.id));
-          
-          // Return stable array - existing businesses keep their positions
-          return [...prev, ...newBusinesses];
-        });
+        if (searchFilters) {
+          // Replace businesses entirely when filters are active to remove non-matching dots
+          setBusinesses(viewportBusinesses);
+        } else {
+          // Stable accumulation - maintain existing business positions
+          setBusinesses(prev => {
+            // Create a map of existing businesses by ID for fast lookup
+            const existingMap = new Map(prev.map(b => [b.id, b]));
+            
+            // Only add truly new businesses
+            const newBusinesses = viewportBusinesses.filter(b => !existingMap.has(b.id));
+            
+            // Return stable array - existing businesses keep their positions
+            return [...prev, ...newBusinesses];
+          });
+        }
         setCurrentBounds(expandedBounds);
         
         // Schedule preloading
