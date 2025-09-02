@@ -69,7 +69,8 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
 export function applyBusinessFilters(businesses: Business[], filters: SearchFilters): Business[] {
   if (!filters) return businesses;
 
-  console.log('🔍 applyBusinessFilters called with:', businesses.length, 'businesses and filters:', filters);
+  console.log('🔍 [applyBusinessFilters] Called with:', businesses.length, 'businesses and filters:', filters);
+  console.log('🔍 [applyBusinessFilters] Sample business roles:', businesses.slice(0, 2).map(b => ({ name: b.name, rolesCount: b.roles?.length || 0, roles: b.roles?.map(r => r.role) })));
 
   const normalize = (s: string) => s?.toLowerCase().trim();
   const variantsOf = (term: string) => {

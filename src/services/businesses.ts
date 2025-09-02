@@ -57,7 +57,8 @@ export const getBusinessesInViewport = async (
   onProgress?: (businesses: Business[], isComplete: boolean) => void
 ): Promise<Business[]> => {
   try {
-    console.log(`🗺️ Searching businesses in viewport with bounds:`, bounds);
+    console.log(`🗺️ [getBusinessesInViewport] Starting search with bounds:`, bounds);
+    console.log(`🗺️ [getBusinessesInViewport] Received searchFilters:`, searchFilters);
 
     // Parse filters once
     let parsedFilters = null;
@@ -77,9 +78,76 @@ export const getBusinessesInViewport = async (
       }
     }
 
-    console.log('🗺️ Using viewport search with filters:', parsedFilters);
+    console.log('🗺️ [getBusinessesInViewport] Parsed filters:', parsedFilters);
     
-    // Always use the spatial query for viewport bounds
+    // Check if we need role data for filtering
+    const needsRoleData = parsedFilters && (
+      parsedFilters.roleFilter || 
+      parsedFilters.salaryQuery || 
+      (parsedFilters.textTerms && parsedFilters.textTerms.some((term: string) => 
+        ['barista','manager','cashier','server','cook','chef','waiter','waitress','host','hostess',
+         'bartender','barback','line cook','dishwasher','assistant','supervisor','lead','team'].includes(term.toLowerCase())
+      ))
+    );
+    
+    console.log('🗺️ [getBusinessesInViewport] Needs role data for filtering:', needsRoleData);
+
+    if (needsRoleData) {
+      // Load businesses with roles for proper filtering
+      console.log('🗺️ [getBusinessesInViewport] Loading businesses WITH roles for filtering');
+      
+      const { data: businessesWithRoles, error: businessError } = await supabase
+        .from('businesses')
+        .select(`
+          id, name, lat, lng, atmosphere, business_type, website, salary,
+          business_roles (
+            id, role, salary, upvotes, downvotes
+          )
+        `)
+        .gte('lat', bounds.south)
+        .lte('lat', bounds.north)
+        .gte('lng', bounds.west)
+        .lte('lng', bounds.east)
+        .limit(limit);
+
+      if (businessError) {
+        console.error('❌ Error loading businesses with roles:', businessError);
+        throw businessError;
+      }
+
+      console.log(`🗺️ [getBusinessesInViewport] Loaded ${businessesWithRoles?.length || 0} businesses with roles`);
+
+      const businesses: Business[] = (businessesWithRoles || []).map((business) => ({
+        id: business.id,
+        name: business.name,
+        position: { lat: business.lat, lng: business.lng },
+        atmosphere: business.atmosphere || [],
+        salary: business.salary,
+        businessType: business.business_type,
+        website: business.website,
+        roles: (business.business_roles || []).map((role: any) => ({
+          role: role.role,
+          salary: role.salary,
+          upvotes: role.upvotes || 0,
+          downvotes: role.downvotes || 0,
+          userVote: null
+        })),
+      }));
+
+      console.log('🔍 [getBusinessesInViewment] Applying filters to businesses WITH roles:', businesses.length);
+      const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);
+      console.log(`🔍 [getBusinessesInViewport] ROLE FILTERING RESULT: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
+      
+      // Call progress callback if provided
+      if (onProgress) {
+        onProgress(filteredBusinesses, true);
+      }
+      
+      return filteredBusinesses;
+    }
+    
+    // Use spatial query for basic viewport loading (no role filtering needed)
+    console.log('🗺️ [getBusinessesInViewport] Using spatial query (no role filtering needed)');
     const { data: spatialData, error: spatialError } = await supabase
       .rpc('businesses_in_bbox', {
         west: bounds.west,
@@ -90,7 +158,7 @@ export const getBusinessesInViewport = async (
       });
 
     if (!spatialError && spatialData) {
-      console.log(`🚀 Spatial query successful: ${spatialData.length} businesses found in viewport`);
+      console.log(`🚀 [getBusinessesInViewport] Spatial query successful: ${spatialData.length} businesses found in viewport`);
       
       const businesses: Business[] = spatialData.map((business) => ({
         id: business.id,
@@ -103,11 +171,11 @@ export const getBusinessesInViewport = async (
         roles: [],
       }));
       
-      // Apply search filters if provided
+      // Apply search filters if provided (should only be non-role filters at this point)
       if (parsedFilters) {
-        console.log('🔍 Applying filters to viewport results:', businesses.length, 'businesses');
+        console.log('🔍 [getBusinessesInViewport] Applying NON-ROLE filters to viewport results:', businesses.length, 'businesses');
         const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);
-        console.log(`🔍 Applied filters: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
+        console.log(`🔍 [getBusinessesInViewport] Applied NON-ROLE filters: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
         
         // Call progress callback if provided
         if (onProgress) {
@@ -117,7 +185,7 @@ export const getBusinessesInViewport = async (
         return filteredBusinesses;
       }
       
-      console.log('🔍 No filters to apply, returning all viewport businesses:', businesses.length);
+      console.log('🔍 [getBusinessesInViewport] No filters to apply, returning all viewport businesses:', businesses.length);
       
       // Call progress callback if provided
       if (onProgress) {
