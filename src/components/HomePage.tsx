@@ -101,7 +101,7 @@ const HomePage: React.FC<HomePageProps> = ({
       formatted_address: business.formatted_address || business.vicinity || business.name
     };
     handleBusinessClick(mapBusiness);
-    setSearchValue(''); // Clear search after selection
+    // Keep search value visible after selection
     // Don't clear search filters - keep them active so user continues to see filtered results
     console.log('🔍 Business selected from search - keeping filters active:', searchFilters);
   };
