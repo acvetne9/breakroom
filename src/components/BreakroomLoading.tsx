@@ -8,11 +8,10 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
-    // Auto-hide after animation completes (3 seconds)
     const timer = setTimeout(() => {
       setIsVisible(false);
       if (onComplete) {
-        setTimeout(onComplete, 500); // Wait for fade out
+        setTimeout(onComplete, 500);
       }
     }, 3000);
 
@@ -48,29 +47,31 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       alignItems: 'center',
       justifyContent: 'center'
     },
-    mugContainer: {
+    textContainer: {
       position: 'relative' as const,
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: '20px',
-      transform: 'scale(1.5)',
+      fontFamily: "'Courier New', Courier, monospace",
+      fontSize: '36px',
+      fontWeight: 'bold' as const,
+      color: '#B22222',
+      whiteSpace: 'nowrap' as const,
+      textAlign: 'center',
+      paddingTop: '90px' // space for mug above
     },
-    
     coffeeMug: {
-      position: 'relative' as const,
+      position: 'absolute' as const,
+      bottom: '100%', // sit above the text
+      left: '50%',
+      transform: 'translateX(-50%)',
       animation: 'mugSmoothEntrance 1.2s ease-out 0s forwards',
       opacity: 0,
-      transform: 'translateY(120px) scale(0.3)'
     },
-    
     mugBody: {
       width: '50px',
       height: '60px',
       backgroundColor: '#B22222',
       borderRadius: '3px',
       position: 'relative' as const,
-      transform: 'translateX(9px)', // <-- shift the body right so the base is centered
+      transform: 'translateX(9px)', // keeps the base centered
       boxShadow: `
         inset -6px 0 0 rgba(0, 0, 0, 0.2),
         inset 0 -6px 0 rgba(0, 0, 0, 0.15),
@@ -99,107 +100,56 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       background: 'transparent',
       boxShadow: 'inset 2px 0 0 rgba(0, 0, 0, 0.1)'
     },
-    textContainer: {
-      position: 'relative' as const,
-      fontFamily: "'Courier New', Courier, monospace",
-      fontSize: '36px',
-      fontWeight: 'bold' as const,
-      color: '#B22222',
-      whiteSpace: 'nowrap' as const,
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      width: '300px',
-      height: '50px',
-      overflow: 'visible'
-    },
     textLeft: {
-      position: 'absolute' as const,
-      left: '50%',
-      transform: 'translateX(-50%)',
-      animation: 'slideFromCenter 0.8s ease-out 1.2s forwards',
       opacity: 0,
-      zIndex: 1
+      animation: 'slideFromCenter 0.8s ease-out 1.2s forwards'
     },
     textRight: {
-      position: 'absolute' as const,
-      left: '50%',
-      transform: 'translateX(-50%)',
-      animation: 'slideFromCenterRight 0.8s ease-out 1.2s forwards',
       opacity: 0,
-      zIndex: 1
+      animation: 'slideFromCenterRight 0.8s ease-out 1.2s forwards'
     }
   };
 
   return (
     <div style={styles.container}>
       <div style={styles.background} />
-      
+
       <div style={styles.animationContainer}>
-        <div style={styles.mugContainer}>
+        <div style={styles.textContainer}>
           <div style={styles.coffeeMug}>
             <div style={styles.mugBody}>
               <div style={styles.mugBodyBefore}></div>
             </div>
             <div style={styles.mugHandle}></div>
           </div>
-        </div>
-        
-        <div style={styles.textContainer}>
+
           <span style={styles.textLeft}>break</span>
           <span style={styles.textRight}>room</span>
         </div>
       </div>
-      
+
       <style>{`
         @keyframes mugSmoothEntrance {
           0% {
             opacity: 0;
-            transform: translateY(120px) scale(0.3);
+            transform: translate(-50%, 120px) scale(0.3);
           }
           100% {
             opacity: 1;
-            transform: translateY(0) scale(1);
+            transform: translate(-50%, 0) scale(1);
           }
         }
-        
+
         @keyframes slideFromCenter {
-          0% {
-            opacity: 0;
-            transform: translateX(-50%);
-          }
-          30% {
-            opacity: 0;
-            transform: translateX(-50%);
-          }
-          100% {
-            opacity: 1;
-            transform: translateX(-100%) translateX(-4px);
-          }
+          0% { opacity: 0; transform: translateX(0); }
+          30% { opacity: 0; }
+          100% { opacity: 1; transform: translateX(0); }
         }
-        
+
         @keyframes slideFromCenterRight {
-          0% {
-            opacity: 0;
-            transform: translateX(-50%);
-          }
-          30% {
-            opacity: 0;
-            transform: translateX(-50%);
-          }
-          100% {
-            opacity: 1;
-            transform: translateX(0%) translateX(0px);
-          }
-        }
-        
-        @keyframes fadeOut {
-          from {
-            opacity: 1;
-          }
-          to {
-            opacity: 0;
-          }
+          0% { opacity: 0; transform: translateX(0); }
+          30% { opacity: 0; }
+          100% { opacity: 1; transform: translateX(0); }
         }
       `}</style>
     </div>
