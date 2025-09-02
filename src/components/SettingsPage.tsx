@@ -335,18 +335,18 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           {/* Example: Add more quick search buttons here */}
           <button
             onClick={() => {
-              console.log("Searching for tech jobs");
+              onSearchTrigger?.('barista');
             }}
-            className="px-4 py-2 bg-app-yellow text-app-black text-sm rounded hover:bg-app-yellow/90 transition-colors"
+            className="mb-6 flex space-x-3"
           >
-            💻 Tech
+            🍕
           </button>
         
           <button
             onClick={() => {
               console.log("Searching for designer jobs");
             }}
-            className="px-4 py-2 bg-app-yellow text-app-black text-sm rounded hover:bg-app-yellow/90 transition-colors"
+            className="mb-6 flex space-x-3"
           >
             🎨 Designer
           </button>
