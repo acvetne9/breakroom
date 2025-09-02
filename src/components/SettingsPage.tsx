@@ -337,16 +337,17 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             onClick={() => {
               onSearchTrigger?.('barista');
             }}
-            className="mb-6 flex space-x-3"
+            className="text-2xl hover:scale-110 transition-transform"
+            title="Search for barista jobs"
           >
             🍕
           </button>
         
           <button
             onClick={() => {
-              console.log("Searching for designer jobs");
+              onSearchTrigger?.('barista');
             }}
-            className="mb-6 flex space-x-3"
+            className="text-2xl hover:scale-110 transition-transform"
           >
             🎨 Designer
           </button>
