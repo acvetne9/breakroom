@@ -43,6 +43,7 @@ const HomePage: React.FC<HomePageProps> = ({
   onLocationSave
 }) => {
   const [searchValue, setSearchValue] = useState('');
+  const [searchFilters, setSearchFilters] = useState<any>(null);
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
   const [showLoading, setShowLoading] = useState(true);
 
@@ -80,8 +81,9 @@ const HomePage: React.FC<HomePageProps> = ({
 ]
   const { toast } = useToast();
 
-  const handleSearchChange = (value: string, business?: EnhancedBusiness) => {
+  const handleSearchChange = (value: string, business?: EnhancedBusiness, filters?: any) => {
     setSearchValue(value);
+    setSearchFilters(filters);
   };
 
   const handleSearchBusinessSelect = (business: EnhancedBusiness) => {
@@ -93,6 +95,7 @@ const HomePage: React.FC<HomePageProps> = ({
     };
     handleBusinessClick(mapBusiness);
     setSearchValue(''); // Clear search after selection
+    setSearchFilters(null); // Clear filters after selection
   };
 
   const handleBusinessClick = (business: any) => {
@@ -151,6 +154,7 @@ const HomePage: React.FC<HomePageProps> = ({
             onBusinessClick={handleBusinessClick}
             selectedBusiness={selectedBusiness}
             landmarks={landmarks}
+            searchFilters={searchFilters}
           />
         
   

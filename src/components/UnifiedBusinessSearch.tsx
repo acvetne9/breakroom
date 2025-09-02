@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { searchBusinessesEnhanced, EnhancedBusiness } from '@/services/enhancedBusinessSearch';
+import { parseSearchFilters } from '@/services/businessFiltering';
 import { isProfane } from '@/utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 import { Search } from 'lucide-react';
 
 interface UnifiedBusinessSearchProps {
   value: string;
-  onChange: (value: string, business?: EnhancedBusiness) => void;
+  onChange: (value: string, business?: EnhancedBusiness, filters?: any) => void;
   onBusinessSelect?: (business: EnhancedBusiness) => void;
   onBlur?: () => void;
   placeholder?: string;
@@ -46,21 +47,26 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleInputChange = async (inputValue: string) => {
-    onChange(inputValue);
+  const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    onChange(value);
 
-    if (inputValue.length === 0) {
-      setSearchResults([]);
-      setShowDropdown(false);
-      return;
-    }
-
-    if (inputValue.length > 2) {
+    if (value.trim()) {
       setIsSearching(true);
       try {
-        const results = await searchBusinessesEnhanced(inputValue, 10);
+        const results = await searchBusinessesEnhanced(value.trim(), 10);
         setSearchResults(results);
         setShowDropdown(true);
+        
+        // Parse and pass search filters for multi-result searches
+        const filters = parseSearchFilters(value.trim());
+        if (results.length > 1 && filters) {
+          // Call onChange with filters when there are multiple results
+          onChange(value, undefined, filters);
+        } else {
+          // Clear filters when only one result or no search
+          onChange(value, undefined, null);
+        }
       } catch (error) {
         console.error('Search error:', error);
         setSearchResults([]);
@@ -70,6 +76,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     } else {
       setSearchResults([]);
       setShowDropdown(false);
+      // Clear filters when search is empty
+      onChange(value, undefined, null);
     }
   };
 
@@ -133,7 +141,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           ref={inputRef}
           type="text"
           value={value}
-          onChange={(e) => handleInputChange(e.target.value)}
+          onChange={(e) => handleInputChange(e)}
           onBlur={handleInputBlur}
           onKeyPress={handleKeyPress}
           onFocus={() => {

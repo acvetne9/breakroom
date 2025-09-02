@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Business, BusinessRole } from '@/types/business';
+import { parseSearchFilters, applyBusinessFilters } from './businessFiltering';
 
 export async function getBusinessesBasic(limit: number = 2000): Promise<Business[]> {
   console.log(`🔄 Fetching ${limit} businesses from center outward...`);
@@ -50,7 +51,8 @@ export async function getBusinessesBasic(limit: number = 2000): Promise<Business
 
 export const getBusinessesInViewport = async (
   bounds: { north: number; south: number; east: number; west: number },
-  limit: number = 2000
+  limit: number = 2000,
+  searchFilters?: any
 ): Promise<Business[]> => {
   try {
     console.log(`🎯 Starting optimized spatial query for bounds:`, bounds);
@@ -78,6 +80,19 @@ export const getBusinessesInViewport = async (
         website: business.website,
         roles: [],
       }));
+      
+      // Apply search filters if provided
+      if (searchFilters) {
+        const parsedFilters = typeof searchFilters === 'string' 
+          ? parseSearchFilters(searchFilters)
+          : searchFilters;
+          
+        if (parsedFilters) {
+          const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);
+          console.log(`🔍 Applied filters: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
+          return filteredBusinesses;
+        }
+      }
       
       return businesses;
     }
@@ -111,6 +126,20 @@ export const getBusinessesInViewport = async (
     }));
 
     console.log(`✅ Fallback query returned ${businesses.length} businesses`);
+    
+    // Apply search filters if provided
+    if (searchFilters) {
+      const parsedFilters = typeof searchFilters === 'string' 
+        ? parseSearchFilters(searchFilters)
+        : searchFilters;
+        
+      if (parsedFilters) {
+        const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);
+        console.log(`🔍 Applied filters: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
+        return filteredBusinesses;
+      }
+    }
+    
     return businesses;
   } catch (error) {
     console.error('❌ Error in getBusinessesInViewport:', error);

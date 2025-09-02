@@ -27,6 +27,7 @@ interface MapLibreMapProps {
   landmarks?: { lat: number; lng: number; emoji: string }[];
   onMapLoaded?: () => void;
   onBusinessesLoaded?: () => void;
+  searchFilters?: any;
 }
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
@@ -34,7 +35,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   selectedBusiness,
   landmarks = [],
   onMapLoaded,
-  onBusinessesLoaded
+  onBusinessesLoaded,
+  searchFilters
 }) => {
   const isMobile = useIsMobile();
   const mapRef = useRef<HTMLDivElement>(null);
@@ -48,7 +50,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     loadBusinessesInViewport, 
     fetchFullBusinessDetails,
     clusterBusinesses 
-  } = useViewportBusinesses();
+  } = useViewportBusinesses(searchFilters);
   const processedRef = useRef(false);
   const [currentZoom, setCurrentZoom] = useState(12);
   const layersAddedRef = useRef(false);
