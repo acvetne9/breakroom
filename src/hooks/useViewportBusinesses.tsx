@@ -91,10 +91,14 @@ export const useViewportBusinesses = (searchFilters?: any) => {
   }, [getCachedBusinesses, setCachedBusinesses]);
 
   const loadBusinessesInViewport = useCallback(async (bounds: MapBounds, limit: number = 10000, isMoving: boolean = false) => {
+    console.log('🗺️ Searching businesses in viewport with bounds:', bounds);
+    console.log('🗺️ Using viewport search with filters:', searchFilters);
+    
     // Prevent duplicate requests if already loading
     if (loading) return;
 
     const isNewSearch = JSON.stringify(searchFilters) !== JSON.stringify(lastSearchFilters);
+    console.log('🔍 Search state check:', { isNewSearch, hasCurrentFilters: !!searchFilters, hasLastFilters: !!lastSearchFilters });
     
     // Handle search filter changes
     if (searchFilters) {

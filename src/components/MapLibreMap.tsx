@@ -84,6 +84,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // Movement state tracking for better debouncing
   const isMovingRef = useRef(false);
   const moveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Track if vector tile business layers should be hidden during search
+  const [hideVectorBusinesses, setHideVectorBusinesses] = useState(false);
 
   // Stable viewport change handler to prevent infinite re-renders
   const handleViewportChange = useCallback((isInitial: boolean = false) => {
@@ -120,6 +123,21 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (searchFilters === undefined) return;
     
     console.log('🗺️ Map reloading businesses due to filter change:', searchFilters);
+    console.log('🔍 Search filters state:', { 
+      hasFilters: !!searchFilters, 
+      filtersContent: searchFilters,
+      isNull: searchFilters === null,
+      isUndefined: searchFilters === undefined 
+    });
+    
+    // Handle search filter changes for vector tile visibility
+    if (searchFilters && Object.keys(searchFilters).length > 0) {
+      console.log('🔍 Active search - hiding vector tile businesses');
+      setHideVectorBusinesses(true);
+    } else {
+      console.log('🔍 No active search - showing vector tile businesses');
+      setHideVectorBusinesses(false);
+    }
     
     // Stop processing if filters are null (explicitly cleared)
     if (searchFilters === null) {
@@ -702,6 +720,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       // Clear existing timeout
       if (moveTimeout) clearTimeout(moveTimeout);
       
+      console.log('🗺️ Map moveend - current search filters:', searchFilters);
+      
       // Debounce viewport changes
       moveTimeout = setTimeout(() => {
         isMovingRef.current = false;
@@ -738,6 +758,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       map.setLayoutProperty('nyc-businesses', 'visibility', 'none');
     }
   }, [mapLoaded, map]);
+  
+  // Control vector tile business visibility during search
+  useEffect(() => {
+    if (!map || !mapLoaded) return;
+    
+    if (map.getLayer('nyc-businesses')) {
+      const visibility = hideVectorBusinesses ? 'none' : 'visible';
+      console.log(`🎯 Setting vector tile businesses visibility to: ${visibility}`);
+      map.setLayoutProperty('nyc-businesses', 'visibility', visibility);
+    }
+  }, [hideVectorBusinesses, map, mapLoaded]);
 
   // Notify parent when businesses are loaded
   useEffect(() => {
