@@ -51,7 +51,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Debounced suggestions and apply filters only after 1s idle (or on Enter/Search)
+  // Debounced suggestions only - no auto-search execution
   useEffect(() => {
     const q = value.trim();
     if (!q) {
@@ -68,6 +68,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       return;
     }
     
+    // Only show suggestions, don't execute search automatically
     setIsSearching(true);
     setShowDropdown(true);
     const seq = ++searchSeqRef.current;
@@ -76,31 +77,13 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         const results = await searchBusinessesEnhanced(q, 10);
         if (seq !== searchSeqRef.current) return;
         setSearchResults(results);
-        
-        // Only apply filters if this is a meaningful search (4+ chars) AND the query has changed
-        if (q.length >= 4 && committedQueryRef.current !== q) {
-          const filters = parseSearchFilters(q);
-          // Only proceed if filters have meaningful content
-          if (filters && (
-            (filters.textTerms && filters.textTerms.length > 0) ||
-            filters.salaryQuery ||
-            filters.roleFilter ||
-            filters.businessTypeFilter
-          )) {
-            console.log('🔄 Auto-applying filters after idle:', filters);
-            committedQueryRef.current = q;
-            const filtersKey = JSON.stringify(filters);
-            lastFiltersRef.current = filtersKey;
-            onChange(value, undefined, filters);
-          }
-        }
       } catch (error) {
-        console.error('Search error:', error);
+        console.error('Search suggestions error:', error);
         if (seq === searchSeqRef.current) setSearchResults([]);
       } finally {
         if (seq === searchSeqRef.current) setIsSearching(false);
       }
-    }, 1500);
+    }, 500); // Faster suggestions
     return () => clearTimeout(timer);
   }, [value, onChange]);
 
