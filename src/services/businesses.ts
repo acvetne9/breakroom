@@ -169,23 +169,55 @@ export const getBusinessesInViewport = async (
         }
 
         console.log(`🔄 [getBusinessesInViewport] Fallback: loaded ${basicBusinesses?.length || 0} basic businesses`);
+        
+        // Check for our known business with cashier roles
+        const testBusinessId = '860cbc87-ad60-48ef-af8d-19049d1bfc2d'; // 7-Eleven with known cashier roles
+        const testBusiness = basicBusinesses?.find(b => b.id === testBusinessId);
+        console.log(`🔍 [getBusinessesInViewport] Fallback: Test business (${testBusinessId}) found in basic query:`, !!testBusiness);
+        if (testBusiness) {
+          console.log(`🔍 [getBusinessesInViewport] Fallback: Test business details:`, { id: testBusiness.id, name: testBusiness.name });
+        }
 
         // Step 2: Get roles for these businesses
         const businessIds = (basicBusinesses || []).map(b => b.id);
+        console.log(`🔄 [getBusinessesInViewport] Fallback: trying to load roles for ${businessIds.length} business IDs`);
+        console.log(`🔄 [getBusinessesInViewport] Fallback: sample business IDs:`, businessIds.slice(0, 5));
         let allRoles: any[] = [];
         
         if (businessIds.length > 0) {
+          console.log(`🔄 [getBusinessesInViewport] Fallback: querying roles table for business IDs...`);
           const { data: rolesData, error: rolesError } = await supabase
             .from('business_roles')
             .select('business_id, id, role, salary, upvotes, downvotes')
             .in('business_id', businessIds);
             
+          console.log(`🔄 [getBusinessesInViewport] Fallback: roles query completed. Error:`, rolesError);
+          console.log(`🔄 [getBusinessesInViewport] Fallback: roles data length:`, rolesData?.length || 0);
+          console.log(`🔄 [getBusinessesInViewport] Fallback: sample roles:`, rolesData?.slice(0, 3));
+            
           if (!rolesError && rolesData) {
             allRoles = rolesData;
             console.log(`🔄 [getBusinessesInViewport] Fallback: loaded ${allRoles.length} roles`);
+            
+            // Log roles distribution by business_id
+            const rolesByBusiness = allRoles.reduce((acc, role) => {
+              acc[role.business_id] = (acc[role.business_id] || 0) + 1;
+              return acc;
+            }, {});
+            console.log(`🔄 [getBusinessesInViewport] Fallback: roles distribution:`, Object.keys(rolesByBusiness).length, 'businesses have roles');
+            console.log(`🔄 [getBusinessesInViewport] Fallback: sample roles by business:`, Object.entries(rolesByBusiness).slice(0, 3));
+            
+            // Check for our specific test business
+            const testBusinessRoles = allRoles.filter(role => role.business_id === testBusinessId);
+            console.log(`🔍 [getBusinessesInViewport] Fallback: Test business (${testBusinessId}) roles found:`, testBusinessRoles.length);
+            if (testBusinessRoles.length > 0) {
+              console.log(`🔍 [getBusinessesInViewport] Fallback: Test business roles:`, testBusinessRoles.map(r => ({ role: r.role, salary: r.salary })));
+            }
           } else {
             console.warn('⚠️ Could not load roles in fallback:', rolesError);
           }
+        } else {
+          console.log(`🔄 [getBusinessesInViewport] Fallback: no business IDs to query roles for`);
         }
 
         // Step 3: Combine data
