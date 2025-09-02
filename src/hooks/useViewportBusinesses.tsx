@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Business } from '@/types/business';
 import { getBusinessesInViewport, getFullBusinessDetails as getFullBusinessDetailsService } from '@/services/businesses';
+import { progressiveSearch } from '@/services/progressiveSearch';
 import { useTileCache } from './useTileCache';
 import { useMapWorker } from './useMapWorker';
 
@@ -90,6 +91,30 @@ export const useViewportBusinesses = (searchFilters?: any) => {
   const loadBusinessesInViewport = useCallback(async (bounds: MapBounds, limit: number = 10000, isMoving: boolean = false) => {
     // Prevent duplicate requests if already loading
     if (loading) return;
+
+    // Progressive search with filters - bypass cache entirely
+    if (searchFilters) {
+      setLoading(true);
+      try {
+        await progressiveSearch.searchBusinesses(
+          bounds,
+          searchFilters,
+          (progressBusinesses, isComplete) => {
+            console.log(`🔄 Progressive search: ${progressBusinesses.length} businesses${isComplete ? ' (complete)' : ''}`);
+            setBusinesses(progressBusinesses);
+            if (isComplete) {
+              setLoading(false);
+              setCurrentBounds(bounds);
+            }
+          },
+          limit
+        );
+      } catch (error) {
+        console.error('❌ Progressive search error:', error);
+        setLoading(false);
+      }
+      return;
+    }
 
     // Check tile cache first (only if no search filters are active)
     if (!searchFilters) {
@@ -199,7 +224,14 @@ export const useViewportBusinesses = (searchFilters?: any) => {
         inflightRequests.delete(requestKey);
       }
     }, delay);
-  }, [loading, getCachedBusinesses, setCachedBusinesses, searchFilters, schedulePreload]);
+  }, [loading, getCachedBusinesses, setCachedBusinesses, searchFilters, schedulePreload, progressiveSearch]);
+
+  // Cleanup progressive search on filter changes
+  useEffect(() => {
+    return () => {
+      progressiveSearch.abort();
+    };
+  }, [searchFilters]);
 
   
   // Remove the duplicate schedulePreload definition since it's now defined above

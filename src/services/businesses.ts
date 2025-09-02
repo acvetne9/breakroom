@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Business, BusinessRole } from '@/types/business';
 import { parseSearchFilters, applyBusinessFilters } from './businessFiltering';
+import { progressiveSearch } from './progressiveSearch';
 
 export async function getBusinessesBasic(limit: number = 2000): Promise<Business[]> {
   console.log(`🔄 Fetching ${limit} businesses from center outward...`);
@@ -52,7 +53,8 @@ export async function getBusinessesBasic(limit: number = 2000): Promise<Business
 export const getBusinessesInViewport = async (
   bounds: { north: number; south: number; east: number; west: number },
   limit: number = 2000,
-  searchFilters?: any
+  searchFilters?: any,
+  onProgress?: (businesses: Business[], isComplete: boolean) => void
 ): Promise<Business[]> => {
   try {
     console.log(`🎯 Starting optimized spatial query for bounds:`, bounds);
@@ -79,62 +81,15 @@ export const getBusinessesInViewport = async (
     console.log('🎯 getBusinessesInViewport - searchFilters:', searchFilters);
     console.log('🎯 getBusinessesInViewport - parsedFilters:', parsedFilters);
 
-    const needsRoleData = !!(parsedFilters && (parsedFilters.roleFilter || parsedFilters.salaryQuery));
-
-    // If we need role/salary-aware filtering, fetch roles within the bbox directly
-    if (needsRoleData) {
-      const { data, error } = await supabase
-        .from('businesses')
-        .select(`
-          id,
-          name,
-          lat,
-          lng,
-          atmosphere,
-          salary,
-          business_type,
-          website,
-          business_roles (
-            id,
-            role,
-            salary,
-            upvotes,
-            downvotes
-          )
-        `)
-        .gte('lat', bounds.south)
-        .lte('lat', bounds.north)
-        .gte('lng', bounds.west)
-        .lte('lng', bounds.east)
-        .limit(Math.min(limit, 2000));
-
-      if (error) {
-        console.error('❌ Error fetching businesses with roles for filtering:', error);
-        throw error;
-      }
-
-      const businesses: Business[] = (data || []).map((b: any) => ({
-        id: b.id,
-        name: b.name,
-        position: { lat: b.lat, lng: b.lng },
-        atmosphere: b.atmosphere || [],
-        salary: b.salary,
-        businessType: b.business_type,
-        website: b.website,
-        roles: Array.isArray(b.business_roles)
-          ? b.business_roles.map((r: any) => ({
-              role: r.role,
-              salary: r.salary,
-              upvotes: r.upvotes || 0,
-              downvotes: r.downvotes || 0,
-              userVote: null,
-            }))
-          : [],
-      }));
-
-      const filtered = parsedFilters ? applyBusinessFilters(businesses, parsedFilters) : businesses;
-      console.log(`🔍 Role/salary filter active: ${businesses.length} -> ${filtered.length} businesses`);
-      return filtered;
+    // Use progressive search for filtered queries
+    if (parsedFilters) {
+      console.log('🔄 Using progressive search for filtered query');
+      return await progressiveSearch.searchBusinesses(
+        bounds,
+        parsedFilters,
+        onProgress || (() => {}),
+        limit
+      );
     }
     
     // Try the new spatial function first (PostGIS optimized)
