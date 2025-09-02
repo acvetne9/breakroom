@@ -186,18 +186,39 @@ export const getBusinessesInViewport = async (
         
         if (businessIds.length > 0) {
           console.log(`🔄 [getBusinessesInViewport] Fallback: querying roles table for business IDs...`);
-          const { data: rolesData, error: rolesError } = await supabase
-            .from('business_roles')
-            .select('business_id, id, role, salary, upvotes, downvotes')
-            .in('business_id', businessIds);
+          
+          // Chunk business IDs to avoid URL length limits (Supabase has URL length limits)
+          const chunkSize = 100; // Safe chunk size to avoid URL length issues
+          console.log(`🔄 [getBusinessesInViewport] Fallback: chunking ${businessIds.length} IDs into chunks of ${chunkSize}`);
+          
+          for (let i = 0; i < businessIds.length; i += chunkSize) {
+            const chunk = businessIds.slice(i, i + chunkSize);
+            console.log(`🔄 [getBusinessesInViewport] Fallback: querying chunk ${Math.floor(i/chunkSize) + 1}/${Math.ceil(businessIds.length/chunkSize)} (${chunk.length} IDs)`);
             
-          console.log(`🔄 [getBusinessesInViewport] Fallback: roles query completed. Error:`, rolesError);
-          console.log(`🔄 [getBusinessesInViewport] Fallback: roles data length:`, rolesData?.length || 0);
-          console.log(`🔄 [getBusinessesInViewport] Fallback: sample roles:`, rolesData?.slice(0, 3));
+            try {
+              const { data: rolesData, error: rolesError } = await supabase
+                .from('business_roles')
+                .select('business_id, id, role, salary, upvotes, downvotes')
+                .in('business_id', chunk);
+              
+              console.log(`🔄 [getBusinessesInViewport] Fallback: chunk ${Math.floor(i/chunkSize) + 1} - Error:`, rolesError);
+              console.log(`🔄 [getBusinessesInViewport] Fallback: chunk ${Math.floor(i/chunkSize) + 1} - Got ${rolesData?.length || 0} roles`);
+              
+              if (!rolesError && rolesData) {
+                allRoles.push(...rolesData);
+              } else {
+                console.warn(`⚠️ Chunk ${Math.floor(i/chunkSize) + 1} failed:`, rolesError);
+              }
+            } catch (chunkError) {
+              console.error(`❌ Chunk ${Math.floor(i/chunkSize) + 1} exception:`, chunkError);
+            }
+          }
             
-          if (!rolesError && rolesData) {
-            allRoles = rolesData;
-            console.log(`🔄 [getBusinessesInViewport] Fallback: loaded ${allRoles.length} roles`);
+          console.log(`🔄 [getBusinessesInViewport] Fallback: combined all chunks - total roles:`, allRoles.length);
+          console.log(`🔄 [getBusinessesInViewport] Fallback: sample roles:`, allRoles.slice(0, 3));
+            
+          if (allRoles.length > 0) {
+            console.log(`🔄 [getBusinessesInViewport] Fallback: loaded ${allRoles.length} roles across all chunks`);
             
             // Log roles distribution by business_id
             const rolesByBusiness = allRoles.reduce((acc, role) => {
@@ -214,7 +235,7 @@ export const getBusinessesInViewport = async (
               console.log(`🔍 [getBusinessesInViewport] Fallback: Test business roles:`, testBusinessRoles.map(r => ({ role: r.role, salary: r.salary })));
             }
           } else {
-            console.warn('⚠️ Could not load roles in fallback:', rolesError);
+            console.warn('⚠️ Could not load any roles in fallback - all chunks failed');
           }
         } else {
           console.log(`🔄 [getBusinessesInViewport] Fallback: no business IDs to query roles for`);
