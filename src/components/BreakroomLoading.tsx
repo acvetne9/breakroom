@@ -8,19 +8,18 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
+    // Auto-hide after animation completes (3 seconds)
     const timer = setTimeout(() => {
       setIsVisible(false);
       if (onComplete) {
-        setTimeout(onComplete, 500);
+        setTimeout(onComplete, 500); // Wait for fade out
       }
     }, 3000);
 
     return () => clearTimeout(timer);
   }, [onComplete]);
 
-  if (!isVisible) {
-    return null;
-  }
+  if (!isVisible) return null;
 
   const styles = {
     container: {
@@ -47,31 +46,43 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       alignItems: 'center',
       justifyContent: 'center'
     },
-    textContainer: {
+
+    // <-- KEEP original mugContainer; it's used and centered by the parent
+    mugContainer: {
       position: 'relative' as const,
-      fontFamily: "'Courier New', Courier, monospace",
-      fontSize: '36px',
-      fontWeight: 'bold' as const,
-      color: '#B22222',
-      whiteSpace: 'nowrap' as const,
-      textAlign: 'center' as const,
-      paddingTop: '90px' // space for mug above
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: '20px',      // keeps same vertical spacing above the text
+      transform: 'scale(1.5)',   // exact same scale as original
     },
+
+    // small wrapper whose width = mugBody width so centering affects the cup base,
+    // while the handle can overflow left without changing centering.
+    mugVisualWrapper: {
+      width: '50px',                // same as mugBody width
+      height: '60px',               // same as mugBody height
+      display: 'flex',
+      alignItems: 'flex-end',
+      justifyContent: 'center',
+      position: 'relative' as const,
+      overflow: 'visible' as const
+    },
+
     coffeeMug: {
-      position: 'absolute' as const,
-      bottom: '100%', // sit above the text
-      left: '50%',
-      transform: 'translateX(-50%)',
+      position: 'relative' as const,
       animation: 'mugSmoothEntrance 1.2s ease-out 0s forwards',
       opacity: 0,
+      transform: 'translateY(120px) scale(0.3)'
     },
+
+    // removed the translateX on mugBody so its center aligns with the wrapper center
     mugBody: {
       width: '50px',
       height: '60px',
       backgroundColor: '#B22222',
       borderRadius: '3px',
       position: 'relative' as const,
-      transform: 'translateX(9px)', // keeps the base centered
       boxShadow: `
         inset -6px 0 0 rgba(0, 0, 0, 0.2),
         inset 0 -6px 0 rgba(0, 0, 0, 0.15),
@@ -79,7 +90,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       `
     },
     mugBodyBefore: {
-      content: '""',
+      // this is a real div inside mugBody (not a pseudo-element)
       position: 'absolute' as const,
       top: '6px',
       left: '6px',
@@ -88,15 +99,8 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       backgroundColor: 'rgba(0, 0, 0, 0.15)',
       borderRadius: '1.5px'
     },
-    mugContainer: {
-      position: 'relative' as const,
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: '20px',
-      // ✅ keep original vertical placement & scale
-      transform: 'scale(1.5) translateX(-25px)', // shift mug left
-    },
+
+    // handle remains absolutely positioned relative to the wrapper, so it can overflow left
     mugHandle: {
       position: 'absolute' as const,
       left: '-12px',
@@ -109,13 +113,36 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       background: 'transparent',
       boxShadow: 'inset 2px 0 0 rgba(0, 0, 0, 0.1)'
     },
+
+    textContainer: {
+      position: 'relative' as const,
+      fontFamily: "'Courier New', Courier, monospace",
+      fontSize: '36px',
+      fontWeight: 'bold' as const,
+      color: '#B22222',
+      whiteSpace: 'nowrap' as const,
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      width: '300px',
+      height: '50px',
+      overflow: 'visible'
+    },
     textLeft: {
+      position: 'absolute' as const,
+      left: '50%',
+      transform: 'translateX(-50%)',
+      animation: 'slideFromCenter 0.8s ease-out 1.2s forwards',
       opacity: 0,
-      animation: 'slideFromCenter 0.8s ease-out 1.2s forwards'
+      zIndex: 1
     },
     textRight: {
+      position: 'absolute' as const,
+      left: '50%',
+      transform: 'translateX(-50%)',
+      animation: 'slideFromCenterRight 0.8s ease-out 1.2s forwards',
       opacity: 0,
-      animation: 'slideFromCenterRight 0.8s ease-out 1.2s forwards'
+      zIndex: 1
     }
   };
 
@@ -124,14 +151,21 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       <div style={styles.background} />
 
       <div style={styles.animationContainer}>
-        <div style={styles.textContainer}>
-          <div style={styles.coffeeMug}>
-            <div style={styles.mugBody}>
-              <div style={styles.mugBodyBefore}></div>
-            </div>
-            <div style={styles.mugHandle}></div>
-          </div>
 
+        {/* mug is ABOVE the text, centered by the parent's flex centering */}
+        <div style={styles.mugContainer}>
+          <div style={styles.coffeeMug}>
+            {/* wrapper ensures the base (mugBody) is centered */}
+            <div style={styles.mugVisualWrapper}>
+              <div style={styles.mugBody}>
+                <div style={styles.mugBodyBefore}></div>
+              </div>
+              <div style={styles.mugHandle}></div>
+            </div>
+          </div>
+        </div>
+
+        <div style={styles.textContainer}>
           <span style={styles.textLeft}>break</span>
           <span style={styles.textRight}>room</span>
         </div>
@@ -141,24 +175,42 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
         @keyframes mugSmoothEntrance {
           0% {
             opacity: 0;
-            transform: translate(-50%, 120px) scale(0.3);
+            transform: translateY(120px) scale(0.3);
           }
           100% {
             opacity: 1;
-            transform: translate(-50%, 0) scale(1);
+            transform: translateY(0) scale(1);
           }
         }
 
         @keyframes slideFromCenter {
-          0% { opacity: 0; transform: translateX(0); }
-          30% { opacity: 0; }
-          100% { opacity: 1; transform: translateX(0); }
+          0% {
+            opacity: 0;
+            transform: translateX(-50%);
+          }
+          30% {
+            opacity: 0;
+            transform: translateX(-50%);
+          }
+          100% {
+            opacity: 1;
+            transform: translateX(-100%) translateX(-4px);
+          }
         }
 
         @keyframes slideFromCenterRight {
-          0% { opacity: 0; transform: translateX(0); }
-          30% { opacity: 0; }
-          100% { opacity: 1; transform: translateX(0); }
+          0% {
+            opacity: 0;
+            transform: translateX(-50%);
+          }
+          30% {
+            opacity: 0;
+            transform: translateX(-50%);
+          }
+          100% {
+            opacity: 1;
+            transform: translateX(0%) translateX(0px);
+          }
         }
       `}</style>
     </div>

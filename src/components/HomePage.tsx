@@ -134,7 +134,7 @@ const HomePage: React.FC<HomePageProps> = ({
         <BreakroomLoading onComplete={handleLoadingComplete} />
       )}
         <div>
-          {/* White bar at top - only show after search */}
+          {/* White bar at top - only show after search 
           {currentSlide === 1 && currentView === 'main' && searchValue && (
             <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none">
               <UnifiedBusinessSearch
@@ -147,7 +147,7 @@ const HomePage: React.FC<HomePageProps> = ({
                 onLocationSave={() => {}}
               />
             </div>
-          )}
+          )}*/}
           
           {/* MapLibre with OpenStreetMap base layer */}
           <MapLibreMap
