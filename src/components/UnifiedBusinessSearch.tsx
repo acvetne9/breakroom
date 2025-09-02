@@ -41,6 +41,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   const committedQueryRef = useRef<string>('');
   const resultsCache = useRef<Map<string, EnhancedBusiness[]>>(new Map());
   const isScrolling = useRef(false);
+  const lastExecutedQuery = useRef<string>('');
 
   useEffect(() => {
     let scrollTimeout: NodeJS.Timeout;
@@ -168,20 +169,30 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   const performSearch = () => {
     console.log('🔍 [performSearch] Called with value:', value);
     
-    if (!value.trim()) {
+    const trimmedValue = value.trim();
+    
+    // Check if this is the same query we just executed
+    if (trimmedValue === lastExecutedQuery.current && trimmedValue.length >= 4) {
+      console.log('🚫 [performSearch] Skipping - same query already executed:', trimmedValue);
+      setShowDropdown(false);
+      return;
+    }
+    
+    if (!trimmedValue) {
       // Clear search - commit empty query to clear filters
       if (committedQueryRef.current !== '') {
         console.log('🔄 Clearing search - removing all filters');
         committedQueryRef.current = '';
         lastFiltersRef.current = null;
+        lastExecutedQuery.current = '';
         onChange(value, undefined, null);
       }
       return;
     }
     
     // Check for profanity in search terms
-    if (isProfane(value)) {
-      console.log('🚫 Search blocked - profanity detected:', value);
+    if (isProfane(trimmedValue)) {
+      console.log('🚫 Search blocked - profanity detected:', trimmedValue);
       toast({
         title: "Search blocked",
         description: "Inappropriate search terms detected",
@@ -192,13 +203,14 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     }
     
     // Commit the query and apply filters immediately (require 4+ characters for meaningful search)
-    const trimmedValue = value.trim();
     console.log('🔍 [performSearch] Trimmed value:', trimmedValue, 'length:', trimmedValue.length);
     console.log('🔍 [performSearch] Current committed query:', committedQueryRef.current);
+    console.log('🔍 [performSearch] Last executed query:', lastExecutedQuery.current);
     
     if (trimmedValue.length >= 4 && committedQueryRef.current !== trimmedValue) {
       console.log('🔍 Committing search query:', trimmedValue);
       committedQueryRef.current = trimmedValue;
+      lastExecutedQuery.current = trimmedValue;
       const filters = parseSearchFilters(trimmedValue);
       console.log('🔍 [performSearch] Parsed filters:', filters);
       
@@ -219,6 +231,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         if (lastFiltersRef.current !== null) {
           lastFiltersRef.current = null;
           committedQueryRef.current = '';
+          lastExecutedQuery.current = '';
           onChange(value, undefined, null);
         }
       }
@@ -227,6 +240,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       console.log('🧹 Search too short, clearing filters');
       lastFiltersRef.current = null;
       committedQueryRef.current = '';
+      lastExecutedQuery.current = '';
       onChange(value, undefined, null);
     } else {
       console.log('🔍 [performSearch] No action taken - length:', trimmedValue.length, 'committed:', committedQueryRef.current);
