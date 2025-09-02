@@ -97,11 +97,11 @@ export const useViewportBusinesses = (searchFilters?: any) => {
     // Check if this is a new search (different filters)
     const isNewSearch = JSON.stringify(searchFilters) !== JSON.stringify(lastSearchFilters);
     
-    // Progressive search with filters - hide all businesses initially, then reveal as found
+    // Global search mode: search filters are present
     if (searchFilters) {
       // Clear businesses and start fresh search if filters changed
       if (isNewSearch) {
-        console.log('🧹 New search detected - clearing all businesses');
+        console.log('🌍 New global search detected - clearing all businesses');
         setBusinesses([]);
         setIsSearching(true);
         setLastSearchFilters(searchFilters);
@@ -118,20 +118,20 @@ export const useViewportBusinesses = (searchFilters?: any) => {
           searchFilters,
           (progressBusinesses, isComplete) => {
             // Update with current progress
-            console.log(`🔍 Progressive search: ${progressBusinesses.length} businesses found${isComplete ? ' (search complete)' : ''}`);
+            console.log(`🌍 Global search progress: ${progressBusinesses.length} businesses found${isComplete ? ' (search complete)' : ''}`);
             setBusinesses([...progressBusinesses]);
             
             if (isComplete) {
               setLoading(false);
               setIsSearching(false);
               setCurrentBounds(bounds);
-              console.log(`✅ Search completed with ${progressBusinesses.length} total businesses`);
+              console.log(`✅ Global search completed with ${progressBusinesses.length} total businesses`);
             }
           },
-          limit
+          3000 // Increased limit for global search
         );
       } catch (error) {
-        console.error('❌ Progressive search error:', error);
+        console.error('❌ Global search error:', error);
         setLoading(false);
         setIsSearching(false);
       }

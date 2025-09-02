@@ -6,7 +6,6 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
@@ -564,15 +563,11 @@ export type Database = {
         Returns: {
           atmosphere: string[]
           business_type: string
-          created_at: string
           id: string
           lat: number
           lng: number
           name: string
-          place_id: string
           salary: string
-          updated_at: string
-          url: string
           website: string
         }[]
       }
@@ -851,6 +846,26 @@ export type Database = {
         Args: { "": unknown }
         Returns: unknown
       }
+      gtrgm_compress: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      gtrgm_decompress: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      gtrgm_in: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      gtrgm_options: {
+        Args: { "": unknown }
+        Returns: undefined
+      }
+      gtrgm_out: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
       json: {
         Args: { "": unknown }
         Returns: Json
@@ -1052,6 +1067,39 @@ export type Database = {
       postgis_wagyu_version: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      search_businesses_global: {
+        Args: {
+          max_hourly?: number
+          min_hourly?: number
+          result_limit?: number
+          result_offset?: number
+          search_business_type?: string
+          search_query?: string
+          search_role?: string
+        }
+        Returns: {
+          atmosphere: string[]
+          business_type: string
+          id: string
+          lat: number
+          lng: number
+          name: string
+          salary: string
+          website: string
+        }[]
+      }
+      set_limit: {
+        Args: { "": number }
+        Returns: number
+      }
+      show_limit: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      show_trgm: {
+        Args: { "": string }
+        Returns: string[]
       }
       spheroid_in: {
         Args: { "": unknown }

@@ -34,12 +34,17 @@ export class ProgressiveBusinessSearch {
     
     console.log('🔍 Starting progressive search with filters:', parsedFilters);
     
-    // Strategy 1: Client-side text filtering first (fast)
+    // Strategy 1: Global text search (for brand/name searches) - most efficient
     if (parsedFilters.textTerms?.length > 0 && !parsedFilters.roleFilter && !parsedFilters.salaryQuery) {
-      return this.clientSideTextSearch(initialBounds, parsedFilters, onProgress, maxResults);
+      return this.globalTextSearch(parsedFilters, onProgress, maxResults);
     }
     
-    // Strategy 2: Progressive role-aware search (slower)
+    // Strategy 2: Global search with roles/salary (comprehensive but slower)
+    if (parsedFilters.roleFilter || parsedFilters.salaryQuery) {
+      return this.globalComplexSearch(parsedFilters, onProgress, maxResults);
+    }
+    
+    // Strategy 3: Progressive role-aware search (fallback)
     return this.progressiveRoleSearch(initialBounds, parsedFilters, onProgress, maxResults);
   }
   
@@ -209,6 +214,128 @@ export class ProgressiveBusinessSearch {
     return rings;
   }
   
+  // Global text search using the new RPC - fast for brand/name searches
+  private async globalTextSearch(
+    filters: any,
+    onProgress: (businesses: Business[], isComplete: boolean) => void,
+    maxResults: number
+  ): Promise<Business[]> {
+    console.log('🌍 Starting global text search:', filters.textTerms);
+    
+    const allBusinesses: Business[] = [];
+    const pageSize = 500;
+    let offset = 0;
+    
+    while (allBusinesses.length < maxResults) {
+      if (this.abortController?.signal.aborted) break;
+      
+      try {
+        const { data, error } = await supabase.rpc('search_businesses_global', {
+          search_query: filters.textTerms.join(' '),
+          search_role: null,
+          search_business_type: null,
+          min_hourly: null,
+          max_hourly: null,
+          result_limit: Math.min(pageSize, maxResults - allBusinesses.length),
+          result_offset: offset
+        });
+        
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        
+        const businesses: Business[] = data.map((b: any) => ({
+          id: b.id,
+          name: b.name,
+          position: { lat: b.lat, lng: b.lng },
+          atmosphere: b.atmosphere || [],
+          salary: b.salary,
+          businessType: b.business_type,
+          website: b.website,
+          roles: [], // Loaded separately if needed
+        }));
+        
+        allBusinesses.push(...businesses);
+        onProgress([...allBusinesses], data.length < pageSize);
+        
+        console.log(`🌍 Global search page ${Math.floor(offset/pageSize) + 1}: +${businesses.length} businesses (total: ${allBusinesses.length})`);
+        
+        if (data.length < pageSize) break; // No more results
+        offset += pageSize;
+        
+      } catch (error) {
+        console.warn('Global text search failed:', error);
+        break;
+      }
+    }
+    
+    return allBusinesses;
+  }
+  
+  // Global search with complex filters (roles, salary)
+  private async globalComplexSearch(
+    filters: any,
+    onProgress: (businesses: Business[], isComplete: boolean) => void,
+    maxResults: number
+  ): Promise<Business[]> {
+    console.log('🌍 Starting global complex search:', filters);
+    
+    const allBusinesses: Business[] = [];
+    const pageSize = 300; // Smaller pages for complex queries
+    let offset = 0;
+    
+    // Convert salary query to hourly rates if present
+    let minHourly = null;
+    let maxHourly = null;
+    if (filters.salaryQuery) {
+      minHourly = filters.salaryQuery.min || null;
+      maxHourly = filters.salaryQuery.max || null;
+    }
+    
+    while (allBusinesses.length < maxResults) {
+      if (this.abortController?.signal.aborted) break;
+      
+      try {
+        const { data, error } = await supabase.rpc('search_businesses_global', {
+          search_query: filters.textTerms?.length > 0 ? filters.textTerms.join(' ') : null,
+          search_role: filters.roleFilter || null,
+          search_business_type: filters.businessTypeFilter || null,
+          min_hourly: minHourly,
+          max_hourly: maxHourly,
+          result_limit: Math.min(pageSize, maxResults - allBusinesses.length),
+          result_offset: offset
+        });
+        
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        
+        const businesses: Business[] = data.map((b: any) => ({
+          id: b.id,
+          name: b.name,
+          position: { lat: b.lat, lng: b.lng },
+          atmosphere: b.atmosphere || [],
+          salary: b.salary,
+          businessType: b.business_type,
+          website: b.website,
+          roles: [], // Loaded separately if needed
+        }));
+        
+        allBusinesses.push(...businesses);
+        onProgress([...allBusinesses], data.length < pageSize);
+        
+        console.log(`🌍 Global complex search page ${Math.floor(offset/pageSize) + 1}: +${businesses.length} businesses (total: ${allBusinesses.length})`);
+        
+        if (data.length < pageSize) break; // No more results
+        offset += pageSize;
+        
+      } catch (error) {
+        console.warn('Global complex search failed:', error);
+        break;
+      }
+    }
+    
+    return allBusinesses;
+  }
+
   abort() {
     this.abortController?.abort();
   }

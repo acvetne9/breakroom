@@ -38,6 +38,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
 
   const searchSeqRef = useRef(0);
   const lastFiltersRef = useRef<string | null>(null);
+  const committedQueryRef = useRef<string>('');
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -114,7 +115,16 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   };
 
   const performSearch = () => {
-    if (!value.trim()) return;
+    if (!value.trim()) {
+      // Clear search - commit empty query to clear filters
+      if (committedQueryRef.current !== '') {
+        console.log('🔄 Clearing search - removing all filters');
+        committedQueryRef.current = '';
+        lastFiltersRef.current = null;
+        onChange(value, undefined, null);
+      }
+      return;
+    }
     
     // Check for profanity in search terms
     if (isProfane(value)) {
@@ -127,9 +137,16 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       return;
     }
     
-    // Apply search filters to trigger map filtering
-    const filters = parseSearchFilters(value.trim());
-    onChange(value, undefined, filters);
+    // Commit the query and apply filters immediately
+    const trimmedValue = value.trim();
+    if (committedQueryRef.current !== trimmedValue) {
+      console.log('🔍 Committing search query:', trimmedValue);
+      committedQueryRef.current = trimmedValue;
+      const filters = parseSearchFilters(trimmedValue);
+      const filtersKey = filters ? JSON.stringify(filters) : 'null';
+      lastFiltersRef.current = filtersKey;
+      onChange(value, undefined, filters);
+    }
     setShowDropdown(false);
   };
 
