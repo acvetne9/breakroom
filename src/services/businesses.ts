@@ -62,6 +62,9 @@ export const getBusinessesInViewport = async (
       ? (typeof searchFilters === 'string' ? parseSearchFilters(searchFilters) : searchFilters)
       : null;
 
+    console.log('🎯 getBusinessesInViewport - searchFilters:', searchFilters);
+    console.log('🎯 getBusinessesInViewport - parsedFilters:', parsedFilters);
+
     const needsRoleData = !!(parsedFilters?.roleFilter || parsedFilters?.salaryQuery);
 
     // If we need role/salary-aware filtering, fetch roles within the bbox directly
@@ -146,11 +149,13 @@ export const getBusinessesInViewport = async (
       
       // Apply search filters if provided
       if (parsedFilters) {
+        console.log('🔍 About to apply filters to spatial query results:', businesses.length, 'businesses');
         const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);
         console.log(`🔍 Applied filters: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
         return filteredBusinesses;
       }
       
+      console.log('🔍 No filters to apply to spatial query, returning all businesses:', businesses.length);
       return businesses;
     }
 
@@ -184,11 +189,14 @@ export const getBusinessesInViewport = async (
 
     console.log(`✅ Fallback query returned ${businesses.length} businesses`);
     
-    // Apply search filters if provided
+    // Apply search filters if provided  
     if (searchFilters) {
       const parsedFilters = typeof searchFilters === 'string' 
         ? parseSearchFilters(searchFilters)
         : searchFilters;
+        
+      console.log('🔍 About to apply filters to fallback query results:', businesses.length, 'businesses');
+      console.log('🔍 Fallback parsedFilters:', parsedFilters);
         
       if (parsedFilters) {
         const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);

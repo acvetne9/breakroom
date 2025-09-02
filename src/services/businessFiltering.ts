@@ -38,7 +38,9 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
 export function applyBusinessFilters(businesses: Business[], filters: SearchFilters): Business[] {
   if (!filters) return businesses;
 
-  return businesses.filter(business => {
+  console.log('🔍 applyBusinessFilters called with:', businesses.length, 'businesses and filters:', filters);
+
+  const filtered = businesses.filter(business => {
     // Text search across business name and type
     if (filters.textTerms.length > 0) {
       const searchableText = [
@@ -50,6 +52,8 @@ export function applyBusinessFilters(businesses: Business[], filters: SearchFilt
       const matchesText = filters.textTerms.every(term => 
         searchableText.includes(term.toLowerCase())
       );
+      
+      console.log(`🔍 Business "${business.name}" - searchableText: "${searchableText}" - matches: ${matchesText}`);
       
       if (!matchesText) return false;
     }
@@ -87,4 +91,7 @@ export function applyBusinessFilters(businesses: Business[], filters: SearchFilt
     
     return true;
   });
+
+  console.log(`🔍 applyBusinessFilters result: ${businesses.length} -> ${filtered.length} businesses`);
+  return filtered;
 }
