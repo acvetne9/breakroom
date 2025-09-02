@@ -1,7 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Business, BusinessRole } from '@/types/business';
-import { parseSearchFilters, applyBusinessFilters } from './businessFiltering';
-import { progressiveSearch } from './progressiveSearch';
 
 export async function getBusinessesBasic(limit: number = 2000): Promise<Business[]> {
   console.log(`🔄 Fetching ${limit} businesses from center outward...`);
@@ -56,283 +54,50 @@ export const getBusinessesInViewport = async (
   searchFilters?: any,
   onProgress?: (businesses: Business[], isComplete: boolean) => void
 ): Promise<Business[]> => {
+  console.log(`🗺️ [getBusinessesInViewport] Called with bounds:`, bounds);
+  console.log(`🗺️ [getBusinessesInViewport] Search filters:`, searchFilters);
+
   try {
-    console.log(`🗺️ [getBusinessesInViewport] Starting search with bounds:`, bounds);
-    console.log(`🗺️ [getBusinessesInViewport] Received searchFilters:`, searchFilters);
-
-    // Parse filters once
-    let parsedFilters = null;
+    // Use unified search if filters provided
     if (searchFilters) {
+      console.log(`🔍 [getBusinessesInViewport] Using unified search with filters`);
+      const { searchBusinessesUnified, parseUnifiedSearchFilters } = await import('./unifiedSearch');
+      
+      let unifiedFilters;
       if (typeof searchFilters === 'string') {
-        parsedFilters = parseSearchFilters(searchFilters);
-      } else if (searchFilters.textTerms || searchFilters.salaryQuery || searchFilters.roleFilter || searchFilters.businessTypeFilter) {
-        parsedFilters = { ...searchFilters };
-        if (Array.isArray(parsedFilters.textTerms) && parsedFilters.textTerms.length > 0) {
-          const derived = parseSearchFilters(parsedFilters.textTerms.join(' '));
-          if (derived) {
-            parsedFilters.roleFilter = parsedFilters.roleFilter ?? derived.roleFilter;
-            parsedFilters.businessTypeFilter = parsedFilters.businessTypeFilter ?? derived.businessTypeFilter;
-            parsedFilters.salaryQuery = parsedFilters.salaryQuery ?? derived.salaryQuery;
-          }
-        }
-      }
-    }
-
-    console.log('🗺️ [getBusinessesInViewport] Parsed filters:', parsedFilters);
-    
-    // Check if we need role data for filtering
-    const needsRoleData = parsedFilters && (
-      parsedFilters.roleFilter || 
-      parsedFilters.salaryQuery || 
-      (parsedFilters.textTerms && parsedFilters.textTerms.some((term: string) => 
-        ['barista','manager','cashier','server','cook','chef','waiter','waitress','host','hostess',
-         'bartender','barback','line cook','dishwasher','assistant','supervisor','lead','team'].includes(term.toLowerCase())
-      ))
-    );
-    
-    console.log('🗺️ [getBusinessesInViewport] Needs role data for filtering:', needsRoleData);
-
-    if (needsRoleData) {
-      // Try optimized role-based search with timeout handling
-      console.log('🗺️ [getBusinessesInViewport] Loading businesses WITH roles for filtering (timeout-resistant)');
-      
-      try {
-        // Use smaller limit to avoid timeouts and add abortable query
-        const roleLimit = Math.min(limit, 3000); // Reduced limit for complex queries
-        
-        const { data: businessesWithRoles, error: businessError } = await supabase
-          .from('businesses')
-          .select(`
-            id, name, lat, lng, atmosphere, business_type, website, salary,
-            business_roles!inner (
-              id, role, salary, upvotes, downvotes
-            )
-          `)
-          .gte('lat', bounds.south)
-          .lte('lat', bounds.north)
-          .gte('lng', bounds.west)
-          .lte('lng', bounds.east)
-          .limit(roleLimit);
-
-        if (businessError) {
-          console.warn('⚠️ JOIN query failed, trying fallback approach:', businessError);
-          throw businessError; // Will trigger fallback
-        }
-
-        console.log(`🗺️ [getBusinessesInViewport] Loaded ${businessesWithRoles?.length || 0} businesses with roles`);
-
-        const businesses: Business[] = (businessesWithRoles || []).map((business) => ({
-          id: business.id,
-          name: business.name,
-          position: { lat: business.lat, lng: business.lng },
-          atmosphere: business.atmosphere || [],
-          salary: business.salary,
-          businessType: business.business_type,
-          website: business.website,
-          roles: (business.business_roles || []).map((role: any) => ({
-            role: role.role,
-            salary: role.salary,
-            upvotes: role.upvotes || 0,
-            downvotes: role.downvotes || 0,
-            userVote: null
-          })),
-        }));
-
-        console.log('🔍 [getBusinessesInViewment] Applying filters to businesses WITH roles:', businesses.length);
-        const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);
-        console.log(`🔍 [getBusinessesInViewport] ROLE FILTERING RESULT: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
-        
-        // Call progress callback if provided
-        if (onProgress) {
-          onProgress(filteredBusinesses, true);
-        }
-        
-        return filteredBusinesses;
-        
-      } catch (joinError) {
-        // Fallback: Separate queries to avoid timeout
-        console.log('🚨 [getBusinessesInViewport] JOIN timed out, using separate queries fallback');
-        
-        // Step 1: Get businesses without roles first
-        const { data: basicBusinesses, error: basicError } = await supabase
-          .from('businesses')
-          .select('id, name, lat, lng, atmosphere, business_type, website, salary')
-          .gte('lat', bounds.south)
-          .lte('lat', bounds.north)
-          .gte('lng', bounds.west)
-          .lte('lng', bounds.east)
-          .limit(Math.min(limit, 5000));
-
-        if (basicError) {
-          console.error('❌ Even basic business query failed:', basicError);
-          return [];
-        }
-
-        console.log(`🔄 [getBusinessesInViewport] Fallback: loaded ${basicBusinesses?.length || 0} basic businesses`);
-        
-        // Check for our known business with cashier roles
-        const testBusinessId = '860cbc87-ad60-48ef-af8d-19049d1bfc2d'; // 7-Eleven with known cashier roles
-        const testBusiness = basicBusinesses?.find(b => b.id === testBusinessId);
-        console.log(`🔍 [getBusinessesInViewport] Fallback: Test business (${testBusinessId}) found in basic query:`, !!testBusiness);
-        if (testBusiness) {
-          console.log(`🔍 [getBusinessesInViewport] Fallback: Test business details:`, { id: testBusiness.id, name: testBusiness.name });
-        }
-
-        // Step 2: Get roles for these businesses
-        const businessIds = (basicBusinesses || []).map(b => b.id);
-        console.log(`🔄 [getBusinessesInViewport] Fallback: trying to load roles for ${businessIds.length} business IDs`);
-        console.log(`🔄 [getBusinessesInViewport] Fallback: sample business IDs:`, businessIds.slice(0, 5));
-        let allRoles: any[] = [];
-        
-        if (businessIds.length > 0) {
-          console.log(`🔄 [getBusinessesInViewport] Fallback: querying roles table for business IDs...`);
-          
-          // Chunk business IDs to avoid URL length limits (Supabase has URL length limits)
-          const chunkSize = 100; // Safe chunk size to avoid URL length issues
-          console.log(`🔄 [getBusinessesInViewport] Fallback: chunking ${businessIds.length} IDs into chunks of ${chunkSize}`);
-          
-          for (let i = 0; i < businessIds.length; i += chunkSize) {
-            const chunk = businessIds.slice(i, i + chunkSize);
-            console.log(`🔄 [getBusinessesInViewport] Fallback: querying chunk ${Math.floor(i/chunkSize) + 1}/${Math.ceil(businessIds.length/chunkSize)} (${chunk.length} IDs)`);
-            
-            try {
-              const { data: rolesData, error: rolesError } = await supabase
-                .from('business_roles')
-                .select('business_id, id, role, salary, upvotes, downvotes')
-                .in('business_id', chunk);
-              
-              console.log(`🔄 [getBusinessesInViewport] Fallback: chunk ${Math.floor(i/chunkSize) + 1} - Error:`, rolesError);
-              console.log(`🔄 [getBusinessesInViewport] Fallback: chunk ${Math.floor(i/chunkSize) + 1} - Got ${rolesData?.length || 0} roles`);
-              
-              if (!rolesError && rolesData) {
-                allRoles.push(...rolesData);
-              } else {
-                console.warn(`⚠️ Chunk ${Math.floor(i/chunkSize) + 1} failed:`, rolesError);
-              }
-            } catch (chunkError) {
-              console.error(`❌ Chunk ${Math.floor(i/chunkSize) + 1} exception:`, chunkError);
-            }
-          }
-            
-          console.log(`🔄 [getBusinessesInViewport] Fallback: combined all chunks - total roles:`, allRoles.length);
-          console.log(`🔄 [getBusinessesInViewport] Fallback: sample roles:`, allRoles.slice(0, 3));
-            
-          if (allRoles.length > 0) {
-            console.log(`🔄 [getBusinessesInViewport] Fallback: loaded ${allRoles.length} roles across all chunks`);
-            
-            // Log roles distribution by business_id
-            const rolesByBusiness = allRoles.reduce((acc, role) => {
-              acc[role.business_id] = (acc[role.business_id] || 0) + 1;
-              return acc;
-            }, {});
-            console.log(`🔄 [getBusinessesInViewport] Fallback: roles distribution:`, Object.keys(rolesByBusiness).length, 'businesses have roles');
-            console.log(`🔄 [getBusinessesInViewport] Fallback: sample roles by business:`, Object.entries(rolesByBusiness).slice(0, 3));
-            
-            // Check for our specific test business
-            const testBusinessRoles = allRoles.filter(role => role.business_id === testBusinessId);
-            console.log(`🔍 [getBusinessesInViewport] Fallback: Test business (${testBusinessId}) roles found:`, testBusinessRoles.length);
-            if (testBusinessRoles.length > 0) {
-              console.log(`🔍 [getBusinessesInViewport] Fallback: Test business roles:`, testBusinessRoles.map(r => ({ role: r.role, salary: r.salary })));
-            }
-          } else {
-            console.warn('⚠️ Could not load any roles in fallback - all chunks failed');
-          }
-        } else {
-          console.log(`🔄 [getBusinessesInViewport] Fallback: no business IDs to query roles for`);
-        }
-
-        // Step 3: Combine data
-        const businesses: Business[] = (basicBusinesses || []).map((business) => {
-          const businessRoles = allRoles
-            .filter(role => role.business_id === business.id)
-            .map(role => ({
-              role: role.role,
-              salary: role.salary,
-              upvotes: role.upvotes || 0,
-              downvotes: role.downvotes || 0,
-              userVote: null
-            }));
-
-          return {
-            id: business.id,
-            name: business.name,
-            position: { lat: business.lat, lng: business.lng },
-            atmosphere: business.atmosphere || [],
-            salary: business.salary,
-            businessType: business.business_type,
-            website: business.website,
-            roles: businessRoles,
-          };
-        });
-
-        console.log('🔍 [getBusinessesInViewport] Fallback: Applying filters to combined data:', businesses.length);
-        const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);
-        console.log(`🔍 [getBusinessesInViewport] Fallback ROLE FILTERING RESULT: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
-        
-        // Call progress callback if provided
-        if (onProgress) {
-          onProgress(filteredBusinesses, true);
-        }
-        
-        return filteredBusinesses;
-      }
-    }
-    
-    // Use spatial query for basic viewport loading (no role filtering needed)
-    console.log('🗺️ [getBusinessesInViewport] Using spatial query (no role filtering needed)');
-    const { data: spatialData, error: spatialError } = await supabase
-      .rpc('businesses_in_bbox', {
-        west: bounds.west,
-        south: bounds.south,
-        east: bounds.east,
-        north: bounds.north,
-        query_limit: limit
-      });
-
-    if (!spatialError && spatialData) {
-      console.log(`🚀 [getBusinessesInViewport] Spatial query successful: ${spatialData.length} businesses found in viewport`);
-      
-      const businesses: Business[] = spatialData.map((business) => ({
-        id: business.id,
-        name: business.name,
-        position: { lat: business.lat, lng: business.lng },
-        atmosphere: business.atmosphere || [],
-        salary: business.salary,
-        businessType: business.business_type,
-        website: business.website,
-        roles: [],
-      }));
-      
-      // Apply search filters if provided (should only be non-role filters at this point)
-      if (parsedFilters) {
-        console.log('🔍 [getBusinessesInViewport] Applying NON-ROLE filters to viewport results:', businesses.length, 'businesses');
-        const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);
-        console.log(`🔍 [getBusinessesInViewport] Applied NON-ROLE filters: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
-        
-        // Call progress callback if provided
-        if (onProgress) {
-          onProgress(filteredBusinesses, true);
-        }
-        
-        return filteredBusinesses;
+        unifiedFilters = parseUnifiedSearchFilters(searchFilters);
+      } else {
+        unifiedFilters = searchFilters;
       }
       
-      console.log('🔍 [getBusinessesInViewport] No filters to apply, returning all viewport businesses:', businesses.length);
+      if (!unifiedFilters) {
+        console.log('🔍 No valid filters parsed');
+        return [];
+      }
       
-      // Call progress callback if provided
+      const results = await searchBusinessesUnified(unifiedFilters, bounds, limit);
+      console.log(`🔍 [getBusinessesInViewport] Unified search returned ${results.length} businesses`);
+      
       if (onProgress) {
-        onProgress(businesses, true);
+        onProgress(results, true);
       }
       
-      return businesses;
+      return results;
     }
 
-    // Fallback to the old method if spatial query fails
-    console.log(`⚠️ Spatial query failed, falling back to coordinate filtering:`, spatialError);
-    
+    // Regular viewport load without search
     const { data, error } = await supabase
       .from('businesses')
-      .select('*')
+      .select(`
+        id,
+        name,
+        lat,
+        lng,
+        atmosphere,
+        business_type,
+        website,
+        salary
+      `)
       .gte('lat', bounds.south)
       .lte('lat', bounds.north)
       .gte('lng', bounds.west)
@@ -344,7 +109,7 @@ export const getBusinessesInViewport = async (
       throw error;
     }
 
-    const businesses: Business[] = (data || []).map((business) => ({
+    const businesses: Business[] = data?.map(business => ({
       id: business.id,
       name: business.name,
       position: { lat: business.lat, lng: business.lng },
@@ -352,33 +117,19 @@ export const getBusinessesInViewport = async (
       salary: business.salary,
       businessType: business.business_type,
       website: business.website,
-      roles: [],
-    }));
+      roles: []
+    })) || [];
 
-    console.log(`✅ Fallback query returned ${businesses.length} businesses`);
+    console.log(`✅ Regular viewport load completed with ${businesses.length} businesses`);
     
-    // Apply search filters if provided  
-    if (parsedFilters) {
-      console.log('🔍 Applying filters to fallback results:', businesses.length, 'businesses');
-      const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);
-      console.log(`🔍 Applied filters: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
-      
-      // Call progress callback if provided
-      if (onProgress) {
-        onProgress(filteredBusinesses, true);
-      }
-      
-      return filteredBusinesses;
-    }
-    
-    // Call progress callback if provided
     if (onProgress) {
       onProgress(businesses, true);
     }
     
     return businesses;
+
   } catch (error) {
-    console.error('❌ Error in getBusinessesInViewport:', error);
+    console.error('❌ Critical error in getBusinessesInViewport:', error);
     return [];
   }
 };
