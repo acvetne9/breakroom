@@ -128,7 +128,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       overflow: 'visible',
       paddingLeft: '10vw',
       paddingRight: '10vw',
-      boxSizing: 'border-box'
+      boxSizing: 'border-box' as const
     },
     textLeft: {
       animation: 'slideFromCenterLeft 0.8s ease-out 1.2s forwards',
