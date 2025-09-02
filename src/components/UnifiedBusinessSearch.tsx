@@ -255,11 +255,11 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                   <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
                     {business.businessType || 'Business'}
                   </span>
-                  {business.roles?.slice(0, 2).map((role, index) => (
-                    <span key={index} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                      {role.role} - {role.salary}
-                    </span>
-                  ))}
+                   {business.roles?.map((role, index) => (
+                     <span key={index} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                       {role.role} - {role.salary}
+                     </span>
+                   ))}
                 </div>
               </div>
             ))
