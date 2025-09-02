@@ -32,22 +32,22 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
   );
 
   const filters: SearchFilters = {
-    textTerms
+    textTerms: textTerms || []
   };
 
-  // Only add optional filters if they have values
+  // Only add optional filters if they have values (no undefined)
   if (salaryQuery) {
     filters.salaryQuery = salaryQuery;
   }
-  if (roleFilter) {
+  if (roleFilter && roleFilter.trim()) {
     filters.roleFilter = roleFilter;
   }
-  if (businessTypeFilter) {
+  if (businessTypeFilter && businessTypeFilter.trim()) {
     filters.businessTypeFilter = businessTypeFilter;
   }
 
   // Return null if no meaningful filters (only empty textTerms)
-  if (textTerms.length === 0 && !salaryQuery && !roleFilter && !businessTypeFilter) {
+  if ((!textTerms || textTerms.length === 0) && !salaryQuery && !roleFilter && !businessTypeFilter) {
     return null;
   }
 
