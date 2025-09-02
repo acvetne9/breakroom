@@ -17,14 +17,18 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
 
   const { salaryQuery, textTerms } = parseSearchTerms(searchQuery);
   
-  // Look for specific role mentions
+  // Look for specific role mentions (expanded, includes plural variations)
   const roleFilter = textTerms.find(term => 
-    ['barista', 'manager', 'cashier', 'server', 'cook', 'chef', 'waiter', 'host'].includes(term.toLowerCase())
+    [
+      'barista','manager','cashier','server','cook','chef','waiter','waitress','host','hostess','bartender','barback','line cook','dishwasher'
+    ].includes(term.toLowerCase())
   );
   
-  // Look for business type mentions
-  const businessTypeFilter = textTerms.find(term => 
-    ['restaurant', 'cafe', 'bar', 'store', 'shop', 'hotel', 'gym', 'salon'].includes(term.toLowerCase())
+  // Look for business type mentions (expanded with plurals/synonyms)
+  const businessTypeFilter = textTerms.find(term =>
+    [
+      'restaurant','restaurants','cafe','cafes','coffee','coffee shop','bar','bars','store','stores','shop','shops','hotel','hotels','gym','gyms','salon','salons','bakery','bakeries','deli','delis'
+    ].includes(term.toLowerCase())
   );
 
   return {
@@ -40,55 +44,84 @@ export function applyBusinessFilters(businesses: Business[], filters: SearchFilt
 
   console.log('🔍 applyBusinessFilters called with:', businesses.length, 'businesses and filters:', filters);
 
+  const normalize = (s: string) => s?.toLowerCase().trim();
+  const variantsOf = (term: string) => {
+    const t = normalize(term);
+    const variants = new Set<string>([t]);
+    if (t.endsWith('ies')) variants.add(t.slice(0, -3) + 'y');
+    if (t.endsWith('s')) variants.add(t.slice(0, -1));
+    variants.add(t + 's');
+    return Array.from(variants);
+  };
+
+  const matchesTermVariants = (haystack: string, term: string) => {
+    const h = normalize(haystack);
+    return variantsOf(term).some(v => h.includes(v));
+  };
+
+  const toHourly = (salary: string): number | null => {
+    if (!salary) return null;
+    const s = salary.toLowerCase();
+    const num = parseFloat(s.replace(/[^0-9.]/g, ''));
+    if (isNaN(num)) return null;
+    if (s.includes('/hr') || s.includes('hour')) return num;
+    if (s.includes('/mo') || s.includes('month')) return Math.round(num / 173);
+    if (s.includes('/yr') || s.includes('/year') || s.includes('year') || s.includes('annual')) return Math.round(num / 2080);
+    return num; // assume hourly if unit missing
+  };
+
   const filtered = businesses.filter(business => {
-    // Text search across business name and type
-    if (filters.textTerms.length > 0) {
-      const searchableText = [
-        business.name,
-        business.businessType,
-        ...(business.roles?.map(r => r.role) || [])
-      ].join(' ').toLowerCase();
-      
-      const matchesText = filters.textTerms.every(term => 
-        searchableText.includes(term.toLowerCase())
+    const name = business.name || '';
+    const type = business.businessType || '';
+    const roles = business.roles || [];
+
+    const searchableText = [name, type, ...roles.map(r => r.role || '')].join(' ').toLowerCase();
+
+    // Text terms across name, type, and roles with plural handling
+    if (filters.textTerms && filters.textTerms.length > 0) {
+      const allTermsMatch = filters.textTerms.every(term =>
+        variantsOf(term).some(v => searchableText.includes(v))
       );
-      
-      console.log(`🔍 Business "${business.name}" - searchableText: "${searchableText}" - matches: ${matchesText}`);
-      
-      if (!matchesText) return false;
+      if (!allTermsMatch) return false;
     }
-    
+
     // Role filter
     if (filters.roleFilter) {
-      const hasMatchingRole = business.roles?.some(role => 
-        role.role.toLowerCase().includes(filters.roleFilter!.toLowerCase())
-      );
-      if (!hasMatchingRole) return false;
+      const roleMatch = roles.some(r => matchesTermVariants(r.role || '', filters.roleFilter!));
+      if (!roleMatch) return false;
     }
-    
+
     // Business type filter
-    if (filters.businessTypeFilter && business.businessType) {
-      const matchesType = business.businessType.toLowerCase().includes(
-        filters.businessTypeFilter.toLowerCase()
-      );
-      if (!matchesType) return false;
+    if (filters.businessTypeFilter) {
+      const typeMatch = matchesTermVariants(type, filters.businessTypeFilter!);
+      if (!typeMatch) return false;
     }
-    
-    // Salary filter
-    if (filters.salaryQuery && business.roles?.length) {
-      const hasMatchingSalary = business.roles.some(role => {
-        const salary = parseFloat(role.salary.replace(/[^0-9.]/g, ''));
-        if (isNaN(salary)) return false;
-        
-        if (filters.salaryQuery!.min && salary < filters.salaryQuery!.min) return false;
-        if (filters.salaryQuery!.max && salary > filters.salaryQuery!.max) return false;
-        
+
+    // Salary filter: check roles first, then top-level salary as fallback
+    if (filters.salaryQuery) {
+      const { min, max } = filters.salaryQuery;
+
+      const roleSalaryMatch = roles.some(r => {
+        const hourly = toHourly(r.salary || '');
+        if (hourly == null || isNaN(hourly)) return false;
+        if (min != null && hourly < min) return false;
+        if (max != null && hourly > max) return false;
         return true;
       });
-      
-      if (!hasMatchingSalary) return false;
+
+      let topLevelSalaryMatch = false;
+      if (!roleSalaryMatch && business.salary) {
+        const topHourly = toHourly(business.salary || '');
+        if (topHourly != null && !isNaN(topHourly)) {
+          if ((min == null || topHourly >= min) && (max == null || topHourly <= max)) {
+            topLevelSalaryMatch = true;
+          }
+        }
+      }
+
+      if (!roleSalaryMatch && !topLevelSalaryMatch) return false;
     }
-    
+
     return true;
   });
 

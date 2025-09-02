@@ -71,7 +71,7 @@ export const getBusinessesInViewport = async (
     console.log('🎯 getBusinessesInViewport - searchFilters:', searchFilters);
     console.log('🎯 getBusinessesInViewport - parsedFilters:', parsedFilters);
 
-    const needsRoleData = !!(parsedFilters?.roleFilter || parsedFilters?.salaryQuery);
+    const needsRoleData = !!(parsedFilters && ((parsedFilters.roleFilter) || (parsedFilters.salaryQuery) || (parsedFilters.textTerms && parsedFilters.textTerms.length > 0)));
 
     // If we need role/salary-aware filtering, fetch roles within the bbox directly
     if (needsRoleData) {
