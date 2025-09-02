@@ -82,8 +82,15 @@ const HomePage: React.FC<HomePageProps> = ({
   const { toast } = useToast();
 
   const handleSearchChange = (value: string, business?: EnhancedBusiness, filters?: any) => {
+    console.log('🔍 Search change in HomePage:', { value, filters, hasFilters: !!filters });
     setSearchValue(value);
     setSearchFilters(filters);
+    
+    // Only clear filters when search is explicitly cleared (empty value and no filters)
+    if (!value && !filters) {
+      console.log('🧹 Search explicitly cleared - removing filters');
+      setSearchFilters(null);
+    }
   };
 
   const handleSearchBusinessSelect = (business: EnhancedBusiness) => {
@@ -95,7 +102,8 @@ const HomePage: React.FC<HomePageProps> = ({
     };
     handleBusinessClick(mapBusiness);
     setSearchValue(''); // Clear search after selection
-    setSearchFilters(null); // Clear filters after selection
+    // Don't clear search filters - keep them active so user continues to see filtered results
+    console.log('🔍 Business selected from search - keeping filters active:', searchFilters);
   };
 
   const handleBusinessClick = (business: any) => {

@@ -92,6 +92,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const handleViewportChange = useCallback((isInitial: boolean = false) => {
     if (!map || !mapLoaded) return;
 
+    console.log('🗺️ handleViewportChange called with searchFilters:', searchFilters);
+    console.log('🗺️ handleViewportChange searchFilters state:', { 
+      hasFilters: !!searchFilters, 
+      isNull: searchFilters === null,
+      isUndefined: searchFilters === undefined,
+      content: searchFilters 
+    });
+
     try {
       const bounds = map.getBounds();
       const center = map.getCenter();
@@ -106,6 +114,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       // Load businesses with appropriate limits
       const businessLimit = isMobile ? 12000 : 25000;
+      console.log('🗺️ About to call loadBusinessesInViewport with searchFilters:', searchFilters);
       loadBusinessesInViewport(viewportBounds, businessLimit, isMovingRef.current);
       
       setCurrentZoom(zoom);
@@ -113,7 +122,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     } catch (error) {
       console.error('❌ Error in handleViewportChange:', error);
     }
-  }, [map, mapLoaded, isMobile]); // Removed loadBusinessesInViewport to prevent re-renders
+  }, [map, mapLoaded, isMobile, searchFilters]); // Include searchFilters in dependencies
 
   // Reload businesses whenever search filters change - expand area significantly for comprehensive search
   useEffect(() => {

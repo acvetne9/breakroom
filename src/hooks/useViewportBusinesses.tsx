@@ -91,14 +91,31 @@ export const useViewportBusinesses = (searchFilters?: any) => {
   }, [getCachedBusinesses, setCachedBusinesses]);
 
   const loadBusinessesInViewport = useCallback(async (bounds: MapBounds, limit: number = 10000, isMoving: boolean = false) => {
-    console.log('🗺️ Searching businesses in viewport with bounds:', bounds);
-    console.log('🗺️ Using viewport search with filters:', searchFilters);
+    console.log('🗺️ [loadBusinessesInViewport] Called with bounds:', bounds);
+    console.log('🗺️ [loadBusinessesInViewport] searchFilters parameter in hook:', searchFilters);
+    console.log('🗺️ [loadBusinessesInViewport] searchFilters detailed state:', { 
+      hasFilters: !!searchFilters, 
+      isNull: searchFilters === null,
+      isUndefined: searchFilters === undefined,
+      type: typeof searchFilters,
+      content: searchFilters,
+      stringified: JSON.stringify(searchFilters)
+    });
     
     // Prevent duplicate requests if already loading
-    if (loading) return;
+    if (loading) {
+      console.log('🗺️ [loadBusinessesInViewport] Already loading, returning early');
+      return;
+    }
 
     const isNewSearch = JSON.stringify(searchFilters) !== JSON.stringify(lastSearchFilters);
-    console.log('🔍 Search state check:', { isNewSearch, hasCurrentFilters: !!searchFilters, hasLastFilters: !!lastSearchFilters });
+    console.log('🔍 [loadBusinessesInViewport] Search state check:', { 
+      isNewSearch, 
+      hasCurrentFilters: !!searchFilters, 
+      hasLastFilters: !!lastSearchFilters,
+      currentFilters: searchFilters,
+      lastFilters: lastSearchFilters 
+    });
     
     // Handle search filter changes
     if (searchFilters) {
