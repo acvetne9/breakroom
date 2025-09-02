@@ -912,13 +912,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         />
       )}
       
-      {/* Fallback message when no businesses are visible */}
+      {/* Fallback message when no businesses are visible 
       {map && mapLoaded && businesses.length === 0 && !businessesLoading && (
         <div className="absolute bottom-4 left-4 bg-yellow-500 bg-opacity-90 text-black text-sm p-3 rounded max-w-xs">
           <div className="font-semibold">No businesses in this area</div>
           <div className="text-xs">Try moving the map or zooming out to see more businesses</div>
         </div>
-      )}
+      )}*/}
     </div>
   );
 };
