@@ -164,7 +164,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     } catch (e) {
       console.warn('⚠️ Failed to reload businesses on filter change:', e);
     }
-  }, [searchFilters, map, mapLoaded, isMobile, loadBusinessesInViewport]);
+  }, [searchFilters, map, mapLoaded, isMobile]);
 
   // Disable auto-zoom on search results to respect user preference
   useEffect(() => {
