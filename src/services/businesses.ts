@@ -63,15 +63,23 @@ export const getBusinessesInViewport = async (
       if (typeof searchFilters === 'string') {
         parsedFilters = parseSearchFilters(searchFilters);
       } else if (searchFilters.textTerms || searchFilters.salaryQuery || searchFilters.roleFilter || searchFilters.businessTypeFilter) {
-        // Already parsed filters object
-        parsedFilters = searchFilters;
+        // Already parsed filters object; clone and derive any missing filters from textTerms
+        parsedFilters = { ...searchFilters };
+        if (Array.isArray(parsedFilters.textTerms) && parsedFilters.textTerms.length > 0) {
+          const derived = parseSearchFilters(parsedFilters.textTerms.join(' '));
+          if (derived) {
+            parsedFilters.roleFilter = parsedFilters.roleFilter ?? derived.roleFilter;
+            parsedFilters.businessTypeFilter = parsedFilters.businessTypeFilter ?? derived.businessTypeFilter;
+            parsedFilters.salaryQuery = parsedFilters.salaryQuery ?? derived.salaryQuery;
+          }
+        }
       }
     }
 
     console.log('🎯 getBusinessesInViewport - searchFilters:', searchFilters);
     console.log('🎯 getBusinessesInViewport - parsedFilters:', parsedFilters);
 
-    const needsRoleData = !!(parsedFilters && ((parsedFilters.roleFilter) || (parsedFilters.salaryQuery) || (parsedFilters.textTerms && parsedFilters.textTerms.length > 0)));
+    const needsRoleData = !!(parsedFilters && (parsedFilters.roleFilter || parsedFilters.salaryQuery));
 
     // If we need role/salary-aware filtering, fetch roles within the bbox directly
     if (needsRoleData) {
@@ -98,7 +106,7 @@ export const getBusinessesInViewport = async (
         .lte('lat', bounds.north)
         .gte('lng', bounds.west)
         .lte('lng', bounds.east)
-        .limit(Math.min(limit, 5000));
+        .limit(Math.min(limit, 2000));
 
       if (error) {
         console.error('❌ Error fetching businesses with roles for filtering:', error);

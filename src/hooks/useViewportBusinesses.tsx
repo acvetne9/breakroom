@@ -32,7 +32,8 @@ export const useViewportBusinesses = (searchFilters?: any) => {
     if (preloadTimeoutRef.current) {
       clearTimeout(preloadTimeoutRef.current);
     }
-    
+    // Disable preloading when search filters are active
+    if (searchFilters) return;
     preloadTimeoutRef.current = setTimeout(async () => {
       const boundsSize = {
         lat: bounds.north - bounds.south,
@@ -188,8 +189,8 @@ export const useViewportBusinesses = (searchFilters?: any) => {
         }
         setCurrentBounds(expandedBounds);
         
-        // Schedule preloading
-        schedulePreload(expandedBounds);
+        // Schedule preloading (only when no filters)
+        if (!searchFilters) schedulePreload(expandedBounds);
         
       } catch (error) {
         console.error('❌ Error loading viewport businesses:', error);
