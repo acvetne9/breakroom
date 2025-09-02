@@ -149,14 +149,14 @@ export const searchBusinessesUnified = async (
         .lte('lng', bounds.east);
     }
     
-  // Apply text search on business name/type (filtering out role terms)
-  const nonRoleTerms = filters.textTerms.filter(term => term !== filters.roleFilter);
-  if (nonRoleTerms.length > 0) {
-    console.log(`🔍 [unifiedSearch] Applying non-role text terms: ${JSON.stringify(nonRoleTerms)}`);
-    for (const term of nonRoleTerms) {
-      baseQuery = baseQuery.or(`name.ilike.%${term}%,business_type.ilike.%${term}%`);
-    }
-  }
+   // Apply text search on business name/type (filtering out role terms)
+   const nonRoleTerms = filters.textTerms.filter(term => term !== filters.roleFilter);
+   if (nonRoleTerms.length > 0) {
+     console.log(`🔍 [unifiedSearch] Searching business names and types for terms: ${JSON.stringify(nonRoleTerms)}`);
+     for (const term of nonRoleTerms) {
+       baseQuery = baseQuery.or(`name.ilike.%${term}%,business_type.ilike.%${term}%`);
+     }
+   }
     
     // Apply business type filter
     if (filters.businessTypeFilter) {
