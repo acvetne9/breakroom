@@ -8,7 +8,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
   const [isVisible, setIsVisible] = useState(true);
 
   // Easy horizontal adjustment - change this value to move the mug left/right
-  const mugHorizontalOffset = 12; // percentage from center (positive = right, negative = left)
+  const mugHorizontalOffset = -4; // percentage from center (positive = right, negative = left)
 
   useEffect(() => {
     // Auto-hide after animation completes (3 seconds)
@@ -137,7 +137,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
     },
     textRight: {
       position: 'absolute' as const,
-      right: '0',
+      right: '-1px',
       transform: 'translateX(0)',
       animation: 'slideToRight 0.8s ease-out 1.2s forwards',
       opacity: 0,
