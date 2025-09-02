@@ -116,6 +116,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (!map || !mapLoaded) return;
     console.log('🗺️ Map reloading businesses due to filter change:', searchFilters);
+    
+    // Stop processing if filters are undefined/null (cleared)
+    if (searchFilters === undefined || searchFilters === null) {
+      console.log('🧹 Search filters cleared - loading normal businesses');
+      // Reload normal businesses when filters are cleared
+      try {
+        const mapBounds = map.getBounds();
+        const viewportBounds = {
+          north: mapBounds.getNorth(),
+          south: mapBounds.getSouth(),
+          east: mapBounds.getEast(),
+          west: mapBounds.getWest()
+        };
+        const businessLimit = isMobile ? 12000 : 25000;
+        loadBusinessesInViewport(viewportBounds, businessLimit, false);
+      } catch (e) {
+        console.warn('⚠️ Failed to reload normal businesses:', e);
+      }
+      return;
+    }
+    
     try {
       const mapBounds = map.getBounds();
       const center = map.getCenter();
@@ -124,7 +145,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       let viewportBounds;
       let businessLimit;
       
-      if (searchFilters) {
+      if (searchFilters && Object.keys(searchFilters).length > 0) {
         // Expand search area significantly to query all possible matching businesses
         const expansionFactor = zoom > 13 ? 3.0 : zoom > 11 ? 4.0 : 5.0;
         const latRange = mapBounds.getNorth() - mapBounds.getSouth();
@@ -139,18 +160,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         businessLimit = 10000; // Higher limit for comprehensive search
         
         console.log(`🔍 Expanded search area by ${expansionFactor}x for filtering`);
-      } else {
-        // Normal viewport bounds for no filters
-        viewportBounds = {
-          north: mapBounds.getNorth(),
-          south: mapBounds.getSouth(),
-          east: mapBounds.getEast(),
-          west: mapBounds.getWest()
-        };
-        businessLimit = isMobile ? 12000 : 25000;
+        loadBusinessesInViewport(viewportBounds, businessLimit, false);
       }
-      
-      loadBusinessesInViewport(viewportBounds, businessLimit, false);
     } catch (e) {
       console.warn('⚠️ Failed to reload businesses on filter change:', e);
     }

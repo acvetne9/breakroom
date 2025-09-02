@@ -97,6 +97,13 @@ export const useViewportBusinesses = (searchFilters?: any) => {
     // Check if this is a new search (different filters)
     const isNewSearch = JSON.stringify(searchFilters) !== JSON.stringify(lastSearchFilters);
     
+    // Stop searching if filters are undefined/null/empty
+    if (searchFilters === undefined || searchFilters === null || 
+        (searchFilters && Object.keys(searchFilters).length === 0)) {
+      console.log('🛑 Stopping search - no valid filters');
+      return;
+    }
+    
     // Progressive search with filters - hide all businesses initially, then reveal as found
     if (searchFilters) {
       // Clear businesses and start fresh search if filters changed
