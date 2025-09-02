@@ -57,10 +57,16 @@ export const getBusinessesInViewport = async (
   try {
     console.log(`🎯 Starting optimized spatial query for bounds:`, bounds);
 
-    // Parse filters once
-    const parsedFilters = searchFilters
-      ? (typeof searchFilters === 'string' ? parseSearchFilters(searchFilters) : searchFilters)
-      : null;
+    // Parse filters once - handle both string and object formats
+    let parsedFilters = null;
+    if (searchFilters) {
+      if (typeof searchFilters === 'string') {
+        parsedFilters = parseSearchFilters(searchFilters);
+      } else if (searchFilters.textTerms || searchFilters.salaryQuery || searchFilters.roleFilter || searchFilters.businessTypeFilter) {
+        // Already parsed filters object
+        parsedFilters = searchFilters;
+      }
+    }
 
     console.log('🎯 getBusinessesInViewport - searchFilters:', searchFilters);
     console.log('🎯 getBusinessesInViewport - parsedFilters:', parsedFilters);
@@ -148,14 +154,15 @@ export const getBusinessesInViewport = async (
       }));
       
       // Apply search filters if provided
-      if (parsedFilters) {
+      if (parsedFilters && (parsedFilters.textTerms?.length > 0 || parsedFilters.salaryQuery || parsedFilters.roleFilter || parsedFilters.businessTypeFilter)) {
         console.log('🔍 About to apply filters to spatial query results:', businesses.length, 'businesses');
+        console.log('🔍 Applying these filters:', parsedFilters);
         const filteredBusinesses = applyBusinessFilters(businesses, parsedFilters);
         console.log(`🔍 Applied filters: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
         return filteredBusinesses;
       }
       
-      console.log('🔍 No filters to apply to spatial query, returning all businesses:', businesses.length);
+      console.log('🔍 No valid filters to apply to spatial query, returning all businesses:', businesses.length);
       return businesses;
     }
 
