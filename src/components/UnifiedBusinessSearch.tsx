@@ -86,7 +86,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       } finally {
         if (seq === searchSeqRef.current) setIsSearching(false);
       }
-    }, 1000);
+    }, 1500);
     return () => clearTimeout(timer);
   }, [value, onChange]);
 
