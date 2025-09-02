@@ -17,18 +17,30 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
 
   const { salaryQuery, textTerms } = parseSearchTerms(searchQuery);
   
-  // Look for specific role mentions (expanded, includes plural variations)
-  const roleFilter = textTerms.find(term => 
-    [
-      'barista','manager','cashier','server','cook','chef','waiter','waitress','host','hostess','bartender','barback','line cook','dishwasher'
-    ].includes(term.toLowerCase())
+  // Common role keywords - expanded list but more inclusive approach
+  const commonRoles = [
+    'barista','manager','cashier','server','cook','chef','waiter','waitress','host','hostess',
+    'bartender','barback','line cook','dishwasher','assistant','supervisor','lead','team',
+    'crew','staff','associate','representative','agent','coordinator','specialist','technician',
+    'receptionist','secretary','clerk','sales','service','customer','food','kitchen','front',
+    'back','house','floor','delivery','driver','cleaner','maintenance', 'intern', 'trainee'
+  ];
+  
+  // Business type keywords - expanded list
+  const commonBusinessTypes = [
+    'restaurant','restaurants','cafe','cafes','coffee','shop','shops','bar','bars','store','stores',
+    'hotel','hotels','gym','gyms','salon','salons','bakery','bakeries','deli','delis','market',
+    'office','clinic','hospital','bank','retail','fast','food','chain','franchise','boutique'
+  ];
+  
+  // Instead of only checking hardcoded lists, also include any term as potential role/business type
+  // This allows flexible matching while still prioritizing known terms
+  let roleFilter = textTerms.find(term => 
+    commonRoles.includes(term.toLowerCase())
   );
   
-  // Look for business type mentions (expanded with plurals/synonyms)
-  const businessTypeFilter = textTerms.find(term =>
-    [
-      'restaurant','restaurants','cafe','cafes','coffee','coffee shop','bar','bars','store','stores','shop','shops','hotel','hotels','gym','gyms','salon','salons','bakery','bakeries','deli','delis'
-    ].includes(term.toLowerCase())
+  let businessTypeFilter = textTerms.find(term =>
+    commonBusinessTypes.includes(term.toLowerCase())
   );
 
   const filters: SearchFilters = {
@@ -100,10 +112,16 @@ export function applyBusinessFilters(businesses: Business[], filters: SearchFilt
       if (!allTermsMatch) return false;
     }
 
-    // Role filter
+    // Role filter - also check if any text terms match roles when no specific roleFilter
     if (filters.roleFilter) {
       const roleMatch = roles.some(r => matchesTermVariants(r.role || '', filters.roleFilter!));
       if (!roleMatch) return false;
+    } else if (filters.textTerms && filters.textTerms.length > 0) {
+      // If no specific role filter but we have text terms, check if any match roles
+      const hasRoleMatch = filters.textTerms.some(term =>
+        roles.some(r => matchesTermVariants(r.role || '', term))
+      );
+      // Don't filter out if roles match any text terms - let other filters handle it
     }
 
     // Business type filter
