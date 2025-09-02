@@ -236,20 +236,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           const coord = (e as any).coord;
           console.log(`📍 Tile loaded: ${coord ? `${coord.z}/${coord.x}/${coord.y}` : 'unknown'}`);
           
-          // Immediately query this specific tile's features
-          setTimeout(() => {
-            try {
-              const allFeatures = mapInstance.querySourceFeatures('nyc-tiles');
-              const sourceLayers = Array.from(new Set(allFeatures.map((f: any) => f.sourceLayer)));
-              console.log(`🔍 After tile load - Features: ${allFeatures.length}, Source-layers: [${sourceLayers.join(', ')}]`);
-              
-              if (allFeatures.length > 0) {
-                console.log('📋 Sample feature:', JSON.stringify(allFeatures[0], null, 2));
+            // Immediately query this specific tile's features
+            setTimeout(() => {
+              try {
+                if (mapInstance && mapInstance.isSourceLoaded && mapInstance.isSourceLoaded('nyc-tiles')) {
+                  const allFeatures = mapInstance.querySourceFeatures('nyc-tiles');
+                  const sourceLayers = Array.from(new Set(allFeatures.map((f: any) => f.sourceLayer)));
+                  console.log(`🔍 After tile load - Features: ${allFeatures.length}, Source-layers: [${sourceLayers.join(', ')}]`);
+                  
+                  if (allFeatures.length > 0) {
+                    console.log('📋 Sample feature:', JSON.stringify(allFeatures[0], null, 2));
+                  }
+                }
+              } catch (err) {
+                console.warn('⚠️ Error querying features after tile load:', err);
               }
-            } catch (err) {
-              console.warn('⚠️ Error querying features after tile load:', err);
-            }
-          }, 100);
+            }, 100);
         }
         
         // Try adding layers on any significant event
@@ -316,141 +318,142 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             queryAttempts.forEach((delay, index) => {
               setTimeout(() => {
                 try {
-                  const features = mapInstance.querySourceFeatures('nyc-tiles');
-                  const sourceLayers = Array.from(new Set(features.map((f: any) => f.sourceLayer)));
-                  
-                  console.log(`🔍 Query attempt ${index + 1} (${delay}ms delay): ${features.length} features, source-layers: [${sourceLayers.join(', ')}]`);
-                  
-                  // If no source-layers detected yet, proactively probe the known layer name
-                  if (sourceLayers.length === 0 && !layersAddedRef.current) {
-                    try {
-                      const guess = mapInstance.querySourceFeatures('nyc-tiles', { sourceLayer: 'examplepoints' as any });
-                      console.log(`🧪 Probe 'examplepoints': ${guess.length} features`);
-                      if (guess.length > 0) {
-                        const detectedLayer = 'examplepoints';
-                        console.log('🧭 Using probed layer:', detectedLayer);
-                        
-                        // Add land/park polygon layers with proper colors
-                        try {
-                          mapInstance.addLayer({
-                            id: 'nyc-land',
-                            type: 'fill',
-                            source: 'nyc-tiles',
-                            'source-layer': detectedLayer,
-                            paint: {
-                              'fill-color': '#F5F5DC', // Wheat color for land
-                              'fill-opacity': 1.0
-                            },
-                            filter: ['==', ['geometry-type'], 'Polygon']
-                          });
-                          console.log('✅ Added land layer (probed)');
-                        } catch (landErr) {
-                          console.warn('⚠️ Land layer (probed) failed:', landErr);
-                        }
-                        
-                        // Add parks layer
-                        try {
-                          mapInstance.addLayer({
-                            id: 'nyc-parks',
-                            type: 'fill',
-                            source: 'nyc-tiles',
-                            'source-layer': detectedLayer,
-                            paint: {
-                              'fill-color': '#87C17A', // Green for parks
-                              'fill-opacity': 1.0
-                            },
-                            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'leisure']]
-                          });
-                          console.log('✅ Added parks layer (probed)');
-                        } catch (parksErr) {
-                          console.warn('⚠️ Parks layer (probed) failed:', parksErr);
-                        }
-                        
-                        // Add water layer
-                        try {
-                          mapInstance.addLayer({
-                            id: 'nyc-water',
-                            type: 'fill',
-                            source: 'nyc-tiles',
-                            'source-layer': detectedLayer,
-                            paint: {
-                              'fill-color': '#6CA4E1', // Blue for water
-                              'fill-opacity': 1.0
-                            },
-                            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']]
-                          });
-                          console.log('✅ Added water layer (probed)');
-                        } catch (waterErr) {
-                          console.warn('⚠️ Water layer (probed) failed:', waterErr);
-                        }
-                        
-                        // Add roads layer
-                        try {
-                          mapInstance.addLayer({
-                            id: 'nyc-roads',
-                            type: 'line',
-                            source: 'nyc-tiles',
-                            'source-layer': detectedLayer,
-                            paint: {
-                              'line-color': '#666666', // Dark gray for roads
-                              'line-width': 2,
-                              'line-opacity': 1.0
-                            },
-                            filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
-                          });
-                          console.log('✅ Added roads layer (probed)');
-                        } catch (roadsErr) {
-                          console.warn('⚠️ Roads layer (probed) failed:', roadsErr);
-                        }
-                        
-                        // Add waterways layer
-                        try {
-                          mapInstance.addLayer({
-                            id: 'nyc-waterways',
-                            type: 'line',
-                            source: 'nyc-tiles',
-                            'source-layer': detectedLayer,
-                            paint: {
-                              'line-color': '#999999', // Light gray for waterways
-                              'line-width': 1,
-                              'line-opacity': 0.6
-                            },
-                            filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'waterway']]
-                          });
-                          console.log('✅ Added waterways layer (probed)');
-                        } catch (waterwaysErr) {
-                          console.warn('⚠️ Waterways layer (probed) failed:', waterwaysErr);
-                        }
-                        
-                        // Add businesses points layer
-                        try {
-                          mapInstance.addLayer({
-                            id: 'nyc-businesses',
-                            type: 'circle',
-                            source: 'nyc-tiles',
-                            'source-layer': detectedLayer,
-                            paint: {
-                              'circle-color': '#FACC15', // Yellow for businesses
-                              'circle-radius': 8,
-                              'circle-opacity': 1.0,
-                              'circle-stroke-width': 2,
-                              'circle-stroke-color': '#FFFFFF'
-                            },
-                            filter: ['==', ['geometry-type'], 'Point']
-                          });
-                          console.log('✅ Added businesses layer (probed)');
-                        } catch (businessesErr) {
-                          console.warn('⚠️ Businesses layer (probed) failed:', businessesErr);
-                        }
-                        
-                        layersAddedRef.current = true;
-                        console.log('🎉 NYC layers added successfully! (probed)');
-                        return; // stop further attempts
-                      }
-                    } catch (probeErr) {
-                      console.warn('🧪 Probe failed:', probeErr);
-                    }
-                  }
+                  if (mapInstance && mapInstance.isSourceLoaded && mapInstance.isSourceLoaded('nyc-tiles')) {
+                    const features = mapInstance.querySourceFeatures('nyc-tiles');
+                    const sourceLayers = Array.from(new Set(features.map((f: any) => f.sourceLayer)));
+                    
+                    console.log(`🔍 Query attempt ${index + 1} (${delay}ms delay): ${features.length} features, source-layers: [${sourceLayers.join(', ')}]`);
+                    
+                     // If no source-layers detected yet, proactively probe the known layer name
+                     if (sourceLayers.length === 0 && !layersAddedRef.current) {
+                       try {
+                         const guess = mapInstance.querySourceFeatures('nyc-tiles', { sourceLayer: 'examplepoints' as any });
+                         console.log(`🧪 Probe 'examplepoints': ${guess.length} features`);
+                         if (guess.length > 0) {
+                           const detectedLayer = 'examplepoints';
+                           console.log('🧭 Using probed layer:', detectedLayer);
+                         
+                         // Add land/park polygon layers with proper colors
+                         try {
+                           mapInstance.addLayer({
+                             id: 'nyc-land',
+                             type: 'fill',
+                             source: 'nyc-tiles',
+                             'source-layer': detectedLayer,
+                             paint: {
+                               'fill-color': '#F5F5DC', // Wheat color for land
+                               'fill-opacity': 1.0
+                             },
+                             filter: ['==', ['geometry-type'], 'Polygon']
+                           });
+                           console.log('✅ Added land layer (probed)');
+                         } catch (landErr) {
+                           console.warn('⚠️ Land layer (probed) failed:', landErr);
+                         }
+                         
+                         // Add parks layer
+                         try {
+                           mapInstance.addLayer({
+                             id: 'nyc-parks',
+                             type: 'fill',
+                             source: 'nyc-tiles',
+                             'source-layer': detectedLayer,
+                             paint: {
+                               'fill-color': '#87C17A', // Green for parks
+                               'fill-opacity': 1.0
+                             },
+                             filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'leisure']]
+                           });
+                           console.log('✅ Added parks layer (probed)');
+                         } catch (parksErr) {
+                           console.warn('⚠️ Parks layer (probed) failed:', parksErr);
+                         }
+                         
+                         // Add water layer
+                         try {
+                           mapInstance.addLayer({
+                             id: 'nyc-water',
+                             type: 'fill',
+                             source: 'nyc-tiles',
+                             'source-layer': detectedLayer,
+                             paint: {
+                               'fill-color': '#6CA4E1', // Blue for water
+                               'fill-opacity': 1.0
+                             },
+                             filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']]
+                           });
+                           console.log('✅ Added water layer (probed)');
+                         } catch (waterErr) {
+                           console.warn('⚠️ Water layer (probed) failed:', waterErr);
+                         }
+                         
+                         // Add roads layer
+                         try {
+                           mapInstance.addLayer({
+                             id: 'nyc-roads',
+                             type: 'line',
+                             source: 'nyc-tiles',
+                             'source-layer': detectedLayer,
+                             paint: {
+                               'line-color': '#666666', // Dark gray for roads
+                               'line-width': 2,
+                               'line-opacity': 1.0
+                             },
+                             filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
+                           });
+                           console.log('✅ Added roads layer (probed)');
+                         } catch (roadsErr) {
+                           console.warn('⚠️ Roads layer (probed) failed:', roadsErr);
+                         }
+                         
+                         // Add waterways layer
+                         try {
+                           mapInstance.addLayer({
+                             id: 'nyc-waterways',
+                             type: 'line',
+                             source: 'nyc-tiles',
+                             'source-layer': detectedLayer,
+                             paint: {
+                               'line-color': '#999999', // Light gray for waterways
+                               'line-width': 1,
+                               'line-opacity': 0.6
+                             },
+                             filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'waterway']]
+                           });
+                           console.log('✅ Added waterways layer (probed)');
+                         } catch (waterwaysErr) {
+                           console.warn('⚠️ Waterways layer (probed) failed:', waterwaysErr);
+                         }
+                         
+                         // Add businesses points layer
+                         try {
+                           mapInstance.addLayer({
+                             id: 'nyc-businesses',
+                             type: 'circle',
+                             source: 'nyc-tiles',
+                             'source-layer': detectedLayer,
+                             paint: {
+                               'circle-color': '#FACC15', // Yellow for businesses
+                               'circle-radius': 8,
+                               'circle-opacity': 1.0,
+                               'circle-stroke-width': 2,
+                               'circle-stroke-color': '#FFFFFF'
+                             },
+                             filter: ['==', ['geometry-type'], 'Point']
+                           });
+                           console.log('✅ Added businesses layer (probed)');
+                         } catch (businessesErr) {
+                           console.warn('⚠️ Businesses layer (probed) failed:', businessesErr);
+                         }
+                         
+                         layersAddedRef.current = true;
+                         console.log('🎉 NYC layers added successfully! (probed)');
+                         return; // stop further attempts
+                         }
+                       } catch (probeErr) {
+                         console.warn('⚠️ Probe failed (may be fine if layer name differs):', probeErr);
+                       }
+                     }
                   
                   if (sourceLayers.length > 0 && !layersAddedRef.current) {
                     const detectedLayer = sourceLayers[0];
@@ -571,12 +574,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                     
                     layersAddedRef.current = true;
                     console.log('🎉 NYC layers added successfully!');
-                  }
-                } catch (queryErr) {
-                  console.warn(`⚠️ Query attempt ${index + 1} failed:`, queryErr);
-                }
-              }, delay);
-            });
+                   }
+                 }
+               } catch (queryErr) {
+                 console.warn(`⚠️ Query attempt ${index + 1} failed:`, queryErr);
+               }
+             }, delay);
+           });
             
           } catch (error) {
             console.error('🚨 Error in layer addition process:', error);

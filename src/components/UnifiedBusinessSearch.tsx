@@ -58,13 +58,16 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         setSearchResults(results);
         setShowDropdown(true);
         
-        // Parse and pass search filters for multi-result searches
+        // Parse and pass search filters 
         const filters = parseSearchFilters(value.trim());
-        if (results.length > 1 && filters) {
-          // Call onChange with filters when there are multiple results
+        if (filters && (filters.textTerms.length > 0 || filters.salaryQuery || filters.roleFilter || filters.businessTypeFilter)) {
+          // Apply filters when search has meaningful criteria
           onChange(value, undefined, filters);
+        } else if (results.length === 1) {
+          // Single specific business result - clear filters but don't zoom yet
+          onChange(value, results[0], null);
         } else {
-          // Clear filters when only one result or no search
+          // Clear filters when no meaningful search
           onChange(value, undefined, null);
         }
       } catch (error) {
@@ -108,12 +111,10 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       return;
     }
     
-    // Search functionality temporarily disabled for viewport-based loading
-    // TODO: Implement server-side search or integrate with viewport businesses
-    toast({
-      title: "Search coming soon",
-      description: "Search functionality will be available with the new map system",
-    });
+    // Apply search filters to trigger map filtering
+    const filters = parseSearchFilters(value.trim());
+    onChange(value, undefined, filters);
+    setShowDropdown(false);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
