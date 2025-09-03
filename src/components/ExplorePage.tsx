@@ -186,11 +186,23 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                     {(!comments[post.id] || comments[post.id].length === 0) && <h4 className="text-sm font-medium mb-2 text-slate-500 text-left">Be the first to share! 😉</h4>}
                     <div className="space-y-2 mb-3">
                       {(comments[post.id] || []).map((comment, idx) => 
-                        <TranslatedText 
-                          key={idx}
-                          text={comment}
-                          className="text-sm text-app-gray-dark"
-                        />
+                        <div>
+                          <TranslatedText 
+                            key={idx}
+                            text={comment}
+                            className="text-sm text-app-gray-dark"
+                          />
+                          <div className="absolute bottom-1 right-1">
+                            <VotingComponent 
+                              upvotes={post.upvotes} 
+                              downvotes={post.downvotes} 
+                              userVote={post.userVote} 
+                              onVote={voteType => handlePostVote(post.id, voteType)}
+                              isOwner={post.author === 'You'}
+                              onDelete={() => handlePostDelete(post.id)}
+                            />
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>}
