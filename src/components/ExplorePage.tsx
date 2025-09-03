@@ -136,7 +136,9 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
       ? posts.filter(post => post.author === 'You' && !post.isJobUpdate)
       : posts;
   }, [posts, filteredBusinessId, filteredUserStories]);
-  return <div className="relative w-full h-full">
+
+  
+  return ( <div className="relative w-full h-full">
       {/* Header for filtered views */}
       {filteredBusinessId || filteredUserStories}
       
