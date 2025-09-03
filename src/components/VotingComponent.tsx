@@ -45,7 +45,7 @@ useEffect(() => {
     const rect = deleteButtonRef.current.getBoundingClientRect();
     const popupRect = popupRef.current.getBoundingClientRect();
     const margin = 8;
-    const shiftLeft = window.innerWidth * 0.05;
+    const shiftLeft = window.innerWidth;
 
     let top = rect.bottom + window.scrollY + margin;
 
