@@ -20,6 +20,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
   onDelete
 }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  
   const netScore = upvotes - downvotes;
 
   const handleUpvote = (e: React.MouseEvent) => {
@@ -40,11 +41,6 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
     } else {
       setShowDeleteConfirm(true);
     }
-  };
-
-  const handleCancelDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowDeleteConfirm(false);
   };
 
   return (
@@ -103,24 +99,10 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
               🗑️
             </span>
           </button>
-
+          
           {showDeleteConfirm && (
-            <div className="absolute -top-2 -right-2 z-50 bg-yellow-100 border border-yellow-300 rounded-lg shadow-lg p-3 min-w-[200px]">
-              <p className="text-sm text-gray-800 mb-2">Do you want to delete this post?</p>
-              <div className="flex space-x-2">
-                <button
-                  onClick={handleDelete}
-                  className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors"
-                >
-                  Delete
-                </button>
-                <button
-                  onClick={handleCancelDelete}
-                  className="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
+            <div className="absolute top-8 left-0 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-[200px]">
+              <p className="text-sm text-gray-800">Click the trash can again to delete this post</p>
             </div>
           )}
         </div>
@@ -129,4 +111,4 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
   );
 };
 
-export default VotingComponent;
+export const VotingComponent;
