@@ -47,17 +47,14 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
   
       setPopupStyle({
         position: "absolute",
-        top: rect.bottom + window.scrollY + margin, // 8px gap below button
-        // Align to the right edge of the button, but keep inside viewport
-        left: Math.max(
-          margin,
-          rect.right + window.scrollX - maxWidth
-        ),
+        top: rect.bottom + window.scrollY + margin, // place below button
+        right: window.innerWidth - rect.right - window.scrollX, // anchor to button’s right edge
         maxWidth: maxWidth,
         zIndex: 999999,
       });
     }
   }, [showDeleteConfirm]);
+
 
 
   return (
