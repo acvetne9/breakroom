@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface VotingComponentProps {
   upvotes: number;
@@ -100,11 +101,18 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
             </span>
           </button>
           
-          {showDeleteConfirm && (
-            <div className="absolute top-full mt-2 -left-72 right-0 z-[99999] mx-auto bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-4 w-max">
-              <p className="text-sm text-gray-800 text-center whitespace-nowrap">Are you sure you want to delete this post?</p>
-            </div>
-          )}
+          {showDeleteConfirm &&
+            createPortal(
+              <div className="fixed inset-0 z-[99999] flex items-center justify-center px-4">
+                <div className="bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-4 max-w-[90vw] break-words">
+                  <p className="text-sm text-gray-800 text-center">
+                    Are you sure you want to delete this post?
+                  </p>
+                </div>
+              </div>,
+              document.body
+            )
+          }
         </div>
       )}
     </div>
