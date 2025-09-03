@@ -42,34 +42,35 @@ const popupRef = useRef<HTMLDivElement | null>(null);
 
 useEffect(() => {
   if (showDeleteConfirm && deleteButtonRef.current && popupRef.current) {
-    const margin = 8;
-    const buttonRect = deleteButtonRef.current.getBoundingClientRect();
+    const rect = deleteButtonRef.current.getBoundingClientRect();
     const popupRect = popupRef.current.getBoundingClientRect();
+    const margin = 8;
+    const shiftLeft = window.innerWidth * 0.05;
 
-    // Default: center popup under the button
-    let left =
-      buttonRect.left +
-      window.scrollX +
-      buttonRect.width / 2 -
-      popupRect.width / 2;
+    let top = rect.bottom + window.scrollY + margin;
 
-    // Clamp inside viewport
-    if (left < margin) left = margin;
+    // Default: align popup's RIGHT edge with button's RIGHT edge
+    let left = rect.right + window.scrollX - popupRect.width;
+
+    // Apply 5% left shift
+    left -= shiftLeft;
+
+    // Clamp so popup is fully visible
+    if (left < margin) {
+      left = margin;
+    }
     if (left + popupRect.width > window.innerWidth - margin) {
       left = window.innerWidth - popupRect.width - margin;
     }
 
     setPopupStyle({
       position: "absolute",
-      top: buttonRect.bottom + window.scrollY + margin, // directly under button
+      top,
       left,
       zIndex: 999999,
     });
   }
 }, [showDeleteConfirm]);
-
-
-
 
 
   return (
@@ -130,7 +131,7 @@ useEffect(() => {
         </div>
       )}
 
-     {showDeleteConfirm &&
+      {showDeleteConfirm &&
   createPortal(
     <div
       ref={popupRef}
@@ -143,7 +144,6 @@ useEffect(() => {
     </div>,
     document.body
   )}
-
 
 
 
