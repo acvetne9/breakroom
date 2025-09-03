@@ -301,20 +301,16 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
 
       {/* Search Results Dropdown */}
       {showDropdown && (searchResults.length > 0 || isSearching) && (
-        <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 bg-background border border-border rounded-md shadow-lg z-50 max-h-60 overflow-y-auto`}>
+        <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 bg-background border border-border rounded-md shadow-lg z-50 max-h-60 overflow-y-auto p-1`}>
           {isSearching ? (
-            <div className="flex items-center justify-center py-4 rounded-md">
+            <div className="flex items-center justify-center py-4 mx-1 bg-accent/50 rounded-md">
               <div className="text-sm text-muted-foreground">Searching...</div>
             </div>
           ) : (
             searchResults.map((business, index) => (
               <div
                 key={business.id}
-                className={`flex flex-col py-2 px-3 cursor-pointer hover:bg-accent border-b border-border last:border-b-0 ${
-                  index === 0 ? 'rounded-t-md' : ''
-                } ${
-                  index === searchResults.length - 1 ? 'rounded-b-md' : ''
-                }`}
+                className="flex flex-col py-2 px-3 mx-1 mb-1 last:mb-0 cursor-pointer hover:bg-accent bg-background rounded-md border border-border/50"
                 onClick={() => handleBusinessClick(business)}
               >
                 <div className="flex justify-between items-center">
