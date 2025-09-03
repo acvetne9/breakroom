@@ -37,7 +37,8 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
       setShowDeleteConfirm(true);
     }
   };
-
+  
+const popupRef = useRef<HTMLDivElement | null>(null);
 
 useEffect(() => {
   if (showDeleteConfirm && deleteButtonRef.current && popupRef.current) {
@@ -70,6 +71,7 @@ useEffect(() => {
     });
   }
 }, [showDeleteConfirm]);
+
 
 
 
@@ -144,6 +146,7 @@ useEffect(() => {
     </div>,
     document.body
   )}
+
 
 
 
