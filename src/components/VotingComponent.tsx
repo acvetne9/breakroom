@@ -38,26 +38,21 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
     }
   };
 
-  // Measure button position to anchor popup
   useEffect(() => {
-    if (showDeleteConfirm && deleteButtonRef.current) {
-      const rect = deleteButtonRef.current.getBoundingClientRect();
-      const margin = 8;
-      const maxWidth = window.innerWidth - margin * 2;
-  
-      setPopupStyle({
-        position: "absolute",
-        top: rect.bottom + window.scrollY + margin, // 8px gap below button
-        // Align to the right edge of the button, but keep inside viewport
-        left: Math.max(
-          margin,
-          rect.right + window.scrollX - maxWidth
-        ),
-        maxWidth: maxWidth,
-        zIndex: 999999,
-      });
-    }
-  }, [showDeleteConfirm]);
+  if (showDeleteConfirm && deleteButtonRef.current) {
+    const rect = deleteButtonRef.current.getBoundingClientRect();
+    const margin = 8;
+    const maxWidth = window.innerWidth - margin * 2;
+
+    setPopupStyle({
+      position: "absolute",
+      top: rect.bottom + window.scrollY + margin, // 8px gap below
+      left: rect.right + window.scrollX + margin, // start at button’s right edge
+      maxWidth: maxWidth,
+      zIndex: 999999,
+    });
+  }
+}, [showDeleteConfirm]);
 
   return (
     <div className={`flex items-center space-x-1 text-sm ${className}`} data-voting-component>
