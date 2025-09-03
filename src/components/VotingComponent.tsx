@@ -6,6 +6,8 @@ interface VotingComponentProps {
   userVote?: 'up' | 'down' | null;
   onVote: (voteType: 'up' | 'down') => void;
   className?: string;
+  isOwner?: boolean;
+  onDelete?: () => void;
 }
 
 const VotingComponent: React.FC<VotingComponentProps> = ({
@@ -13,7 +15,9 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
   downvotes,
   userVote,
   onVote,
-  className = ""
+  className = "",
+  isOwner = false,
+  onDelete
 }) => {
   const netScore = upvotes - downvotes;
 
@@ -25,6 +29,11 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
   const handleDownvote = (e: React.MouseEvent) => {
     e.stopPropagation();
     onVote('down');
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete?.();
   };
 
   return (
@@ -64,6 +73,17 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
           🚫
         </span>
       </button>
+      
+      {isOwner && (
+        <button
+          onClick={handleDelete}
+          className="p-1 rounded transition-all hover:bg-red-50 hover:scale-105"
+        >
+          <span className="transition-all">
+            🗑️
+          </span>
+        </button>
+      )}
     </div>
   );
 };
