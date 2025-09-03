@@ -232,19 +232,26 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                       </h4>
                     ) : (
                       (comments[post.id] || []).map((comment) => (
-                        <div key={comment.id} className="text-sm text-app-gray-dark">
-                          <TranslatedText text={comment.text} />
-                          <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                        <div 
+                          key={comment.id} 
+                          className="flex items-center justify-between py-1"
+                        >
+                          <TranslatedText 
+                            text={comment.text}
+                            className="text-sm text-app-gray-dark pr-2"
+                          />
+                          <div className="flex-shrink-0">
                             <VotingComponent 
-                              upvotes={post.upvotes} 
-                              downvotes={post.downvotes} 
-                              userVote={post.userVote} 
-                              onVote={voteType => handlePostVote(post.id, voteType)}
-                              isOwner={post.author === 'You'}
-                              onDelete={() => handlePostDelete(post.id)}
+                              upvotes={0} 
+                              downvotes={0} 
+                              userVote={null} 
+                              onVote={() => {}} 
+                              isOwner={comment.author === 'You'}
+                              onDelete={() => handleCommentDelete(post.id, comment.id)}
                             />
                           </div>
                         </div>
+
                       ))
                     )}
                   </div>
