@@ -39,41 +39,43 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
   return (
     <div className={`flex items-center space-x-1 text-sm ${className}`} data-voting-component>
       {!isOwner && (
-        <button
-          onClick={handleUpvote}
-          className={`p-1 rounded transition-all ${
-            userVote === 'up' 
-              ? 'bg-green-100 scale-110' 
-              : 'hover:bg-green-50 hover:scale-105'
-          }`}
-        >
-          <span 
-            className="transition-all"
-            style={{ filter: userVote === 'up' ? 'grayscale(0%)' : 'grayscale(90%)' }}
+        <div>
+          <button
+            onClick={handleUpvote}
+            className={`p-1 rounded transition-all ${
+              userVote === 'up' 
+                ? 'bg-green-100 scale-110' 
+                : 'hover:bg-green-50 hover:scale-105'
+            }`}
           >
-            ✅
+            <span 
+              className="transition-all"
+              style={{ filter: userVote === 'up' ? 'grayscale(0%)' : 'grayscale(90%)' }}
+            >
+              ✅
+            </span>
+          </button>
+          
+          <span className="font-medium text-app-black min-w-[20px] text-center">
+            {netScore}
           </span>
-        </button>
-        
-        <span className="font-medium text-app-black min-w-[20px] text-center">
-          {netScore}
-        </span>
-        
-        <button
-          onClick={handleDownvote}
-          className={`p-1 rounded transition-all ${
-            userVote === 'down' 
-              ? 'bg-red-100 scale-110' 
-              : 'hover:bg-red-50 hover:scale-105'
-          }`}
-        >
-          <span 
-            className="transition-all"
-            style={{ filter: userVote === 'down' ? 'grayscale(0%)' : 'grayscale(90%)' }}
+          
+          <button
+            onClick={handleDownvote}
+            className={`p-1 rounded transition-all ${
+              userVote === 'down' 
+                ? 'bg-red-100 scale-110' 
+                : 'hover:bg-red-50 hover:scale-105'
+            }`}
           >
-            🚫
-          </span>
-        </button>
+            <span 
+              className="transition-all"
+              style={{ filter: userVote === 'down' ? 'grayscale(0%)' : 'grayscale(90%)' }}
+            >
+              🚫
+            </span>
+          </button>
+        </div>
       )}
       
       {isOwner && (
