@@ -1,7 +1,15 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 
-interface VotingComponentProps { upvotes: number; downvotes: number; userVote?: 'up' | 'down' | null; onVote: (voteType: 'up' | 'down') => void; className?: string; isOwner?: boolean; onDelete?: () => void; }
+interface VotingComponentProps {
+  upvotes: number;
+  downvotes: number;
+  userVote?: 'up' | 'down' | null;
+  onVote: (voteType: 'up' | 'down') => void;
+  className?: string;
+  isOwner?: boolean;
+  onDelete?: () => void;
+}
 
 const VotingComponent: React.FC<VotingComponentProps> = ({
   upvotes,
@@ -15,6 +23,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({});
   const deleteButtonRef = useRef<HTMLButtonElement | null>(null);
+  const popupRef = useRef<HTMLDivElement | null>(null);
 
   const netScore = upvotes - downvotes;
 
@@ -28,50 +37,106 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
     onVote('down');
   };
 
+  // Toggle: first click -> open (measure & position), second click -> confirm delete
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (showDeleteConfirm) {
       onDelete?.();
       setShowDeleteConfirm(false);
     } else {
+      // Show popup in an off-screen/hidden state so we can render and measure its natural size
+      setPopupStyle({
+        position: 'absolute',
+        left: -9999,
+        top: -9999,
+        visibility: 'hidden',
+      });
       setShowDeleteConfirm(true);
     }
   };
-  
-const popupRef = useRef<HTMLDivElement | null>(null);
 
-useEffect(() => {
-  if (showDeleteConfirm && deleteButtonRef.current && popupRef.current) {
-    const rect = deleteButtonRef.current.getBoundingClientRect();
-    const popupRect = popupRef.current.getBoundingClientRect();
-    const margin = 8;
-    const shiftLeft = window.innerWidth * 0.05;
+  // Measure & position synchronously after DOM writes (pre-paint)
+  useLayoutEffect(() => {
+    if (!showDeleteConfirm) return;
+    if (!deleteButtonRef.current || !popupRef.current) return;
 
-    let top = rect.bottom + window.scrollY + margin;
+    const margin = 8; // safe padding from viewport edges
+    const buttonRect = deleteButtonRef.current.getBoundingClientRect();
+    const scrollX = window.scrollX || window.pageXOffset;
+    const scrollY = window.scrollY || window.pageYOffset;
+    const maxAllowedWidth = Math.max(0, window.innerWidth - margin * 2);
 
-    // Default: align popup's RIGHT edge with button's RIGHT edge
-    let left = rect.right + window.scrollX - popupRect.width;
+    const popupEl = popupRef.current;
+    const popupRect = popupEl.getBoundingClientRect();
 
-    // Apply 5% left shift
-    left -= shiftLeft;
-
-    // Clamp so popup is fully visible
-    if (left < margin) {
-      left = margin;
+    // PHASE 1: if the popup's natural width is bigger than viewport, set width -> maxAllowedWidth and re-run.
+    // We rely on useLayoutEffect re-running after setPopupStyle changes popupStyle.width.
+    if (popupRect.width > maxAllowedWidth && popupStyle.width !== `${maxAllowedWidth}px`) {
+      setPopupStyle(prev => ({
+        ...prev,
+        width: `${maxAllowedWidth}px`,
+        position: 'absolute',
+        left: -9999,
+        top: -9999,
+        visibility: 'hidden',
+      }));
+      return; // wait for reflow with new width then re-measure
     }
-    if (left + popupRect.width > window.innerWidth - margin) {
-      left = window.innerWidth - popupRect.width - margin;
+
+    // PHASE 2: compute right-aligned placement
+    // Desired right edge (viewport coordinates) is the button's right, but clamp to viewport right margin
+    const viewportRightLimit = window.innerWidth - margin;
+    const buttonRight = Math.min(buttonRect.right, viewportRightLimit);
+
+    // left coordinate in document coordinates:
+    let left = buttonRight + scrollX - popupRect.width;
+
+    // Ensure not offscreen to the left (clamp)
+    const minLeft = margin + scrollX;
+    if (left < minLeft) left = minLeft;
+
+    // If it still overflows right for any reason, clamp left so popup fits
+    if (left + popupRect.width > window.innerWidth + scrollX - margin) {
+      left = window.innerWidth + scrollX - margin - popupRect.width;
+      if (left < minLeft) left = minLeft;
     }
 
+    const top = buttonRect.bottom + scrollY + margin;
+
+    // Final visible style
     setPopupStyle({
-      position: "absolute",
+      position: 'absolute',
       top,
       left,
+      width: popupRect.width ? `${popupRect.width}px` : undefined, // set measured width for stability
+      visibility: 'visible',
       zIndex: 999999,
     });
-  }
-}, [showDeleteConfirm]);
+    // dependencies: include popupStyle.width so phase-1 triggers re-run when we set width
+  }, [showDeleteConfirm, popupStyle.width]);
 
+  // Keep popup positioned if user resizes / rotates / scrolls while open
+  useEffect(() => {
+    if (!showDeleteConfirm) return;
+    const onChange = () => {
+      // Re-open measurement: hide, then measurement hook will run and compute again
+      setPopupStyle({
+        position: 'absolute',
+        left: -9999,
+        top: -9999,
+        visibility: 'hidden',
+      });
+    };
+    window.addEventListener('resize', onChange);
+    window.addEventListener('orientationchange', onChange);
+    window.addEventListener('scroll', onChange, { passive: true });
+
+    return () => {
+      window.removeEventListener('resize', onChange);
+      window.removeEventListener('orientationchange', onChange);
+      window.removeEventListener('scroll', onChange);
+    };
+  }, [showDeleteConfirm]);
 
   return (
     <div className={`flex items-center space-x-1 text-sm ${className}`} data-voting-component>
@@ -132,22 +197,18 @@ useEffect(() => {
       )}
 
       {showDeleteConfirm &&
-  createPortal(
-    <div
-      ref={popupRef}
-      style={popupStyle}
-      className="bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-4 break-words"
-    >
-      <p className="text-sm text-gray-800 text-center">
-        Are you sure you want to delete this post?
-      </p>
-    </div>,
-    document.body
-  )}
-
-
-
-
+        createPortal(
+          <div
+            ref={popupRef}
+            style={popupStyle}
+            className="bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-4 break-words inline-block whitespace-normal"
+          >
+            <p className="text-sm text-gray-800 text-center">
+              Are you sure you want to delete this post?
+            </p>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };
