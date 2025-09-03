@@ -204,7 +204,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
             className="bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-4 break-words inline-block whitespace-normal"
           >
             <p className="text-sm text-gray-800 text-center">
-              Are you sure you want to delete this post?
+              Are you sure you want to delete this?
             </p>
           </div>,
           document.body
