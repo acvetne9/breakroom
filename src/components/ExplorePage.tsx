@@ -30,6 +30,7 @@ interface ExplorePageProps {
   onPostSubmit?: (text: string, businessId?: string) => void;
   onBackToAllPosts?: () => void;
   onPostVote?: (postId: string, voteType: 'up' | 'down') => void;
+  onPostDelete?: (postId: string) => void;
 }
 const ExplorePage: React.FC<ExplorePageProps> = memo(({
   posts,
@@ -40,7 +41,8 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   onCommentSubmit,
   onPostSubmit,
   onBackToAllPosts,
-  onPostVote
+  onPostVote,
+  onPostDelete
 }) => {
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [comments, setComments] = useState<{
@@ -99,6 +101,10 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   };
   const handlePostVote = (postId: string, voteType: 'up' | 'down') => {
     onPostVote?.(postId, voteType);
+  };
+
+  const handlePostDelete = (postId: string) => {
+    onPostDelete?.(postId);
   };
 
   // Memoized filtered posts for performance
@@ -164,7 +170,14 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                   
                   {/* Voting component in bottom right */}
                   <div className="absolute bottom-1 right-1">
-                    <VotingComponent upvotes={post.upvotes} downvotes={post.downvotes} userVote={post.userVote} onVote={voteType => handlePostVote(post.id, voteType)} />
+                    <VotingComponent 
+                      upvotes={post.upvotes} 
+                      downvotes={post.downvotes} 
+                      userVote={post.userVote} 
+                      onVote={voteType => handlePostVote(post.id, voteType)}
+                      isOwner={post.author === 'You'}
+                      onDelete={() => handlePostDelete(post.id)}
+                    />
                   </div>
                 </div>
 

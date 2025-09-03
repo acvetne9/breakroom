@@ -267,6 +267,10 @@ const MobileApp: React.FC = () => {
     });
   };
 
+  const handlePostDelete = (postId: string) => {
+    setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
+  };
+
   const handleRoleVote = (businessId: string, roleIndex: number, voteType: 'up' | 'down') => {
     setBusinesses(prevBusinesses => {
       const updatedBusinesses = prevBusinesses.map(business => {
@@ -485,6 +489,7 @@ const MobileApp: React.FC = () => {
               onPostSubmit={handlePostSubmit}
               onBackToAllPosts={handleBackToAllPosts}
               onPostVote={handlePostVote}
+              onPostDelete={handlePostDelete}
             />
           </Suspense>
         </motion.div>
