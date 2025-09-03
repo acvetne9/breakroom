@@ -38,25 +38,26 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
     }
   };
 
-  const popupRef = useRef<HTMLDivElement | null>(null);
 
 useEffect(() => {
   if (showDeleteConfirm && deleteButtonRef.current && popupRef.current) {
     const rect = deleteButtonRef.current.getBoundingClientRect();
     const popupRect = popupRef.current.getBoundingClientRect();
     const margin = 8;
-    const shiftLeft = window.innerWidth;
+    const shiftLeft = window.innerWidth * 0.05;
 
     let top = rect.bottom + window.scrollY + margin;
 
-    // Default: right edge of popup aligns with button right
+    // Default: align popup's RIGHT edge with button's RIGHT edge
     let left = rect.right + window.scrollX - popupRect.width;
 
-    // Apply 5% shift to the left
+    // Apply 5% left shift
     left -= shiftLeft;
 
-    // Clamp inside viewport
-    if (left < margin) left = margin;
+    // Clamp so popup is fully visible
+    if (left < margin) {
+      left = margin;
+    }
     if (left + popupRect.width > window.innerWidth - margin) {
       left = window.innerWidth - popupRect.width - margin;
     }
@@ -69,6 +70,7 @@ useEffect(() => {
     });
   }
 }, [showDeleteConfirm]);
+
 
 
   return (
@@ -142,6 +144,7 @@ useEffect(() => {
     </div>,
     document.body
   )}
+
 
 
     </div>
