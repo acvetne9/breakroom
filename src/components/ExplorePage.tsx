@@ -225,33 +225,33 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
 
                 {/* Expanded view */}
                 {expandedPost === post.id && (
-                  <div className="mt-4 pt-4 border-t border-app-gray-light">
+                  <div className="mt-4 pt-4 border-t border-app-gray-light space-y-2">
                     {(!comments[post.id] || comments[post.id].length === 0) ? (
                       <h4 className="text-sm font-medium mb-2 text-slate-500 text-left">
                         Be the first to share! 😉
                       </h4>
                     ) : (
                       (comments[post.id] || []).map((comment) => (
-                        <div key={comment.id} className="relative">
-                          <TranslatedText 
-                            text={comment.text}
-                            className="text-sm text-app-gray-dark"
-                          />
-                          <div className="absolute bottom-1 right-1">
-                            <VotingComponent 
-                              upvotes={0} 
-                              downvotes={0} 
-                              userVote={null} 
-                              onVote={() => {}} 
-                              isOwner={comment.author === 'You'}
-                              onDelete={() => handleCommentDelete(post.id, comment.id)}
-                            />
-                          </div>
+                        <div key={comment.id} className="text-sm text-app-gray-dark">
+                          <TranslatedText text={comment.text} />
                         </div>
                       ))
                     )}
+                
+                    {/* Centered voting system just for the post */}
+                    <div className="flex justify-center pt-2">
+                      <VotingComponent 
+                        upvotes={post.upvotes} 
+                        downvotes={post.downvotes} 
+                        userVote={post.userVote} 
+                        onVote={voteType => handlePostVote(post.id, voteType)}
+                        isOwner={post.author === 'You'}
+                        onDelete={() => handlePostDelete(post.id)}
+                      />
+                    </div>
                   </div>
                 )}
+
               </div>
             </div>
           ))}
