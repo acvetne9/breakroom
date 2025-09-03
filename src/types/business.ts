@@ -15,4 +15,5 @@ export interface Business {
   roles?: BusinessRole[];
   businessType?: string;
   website?: string;
+  address?: string;
 }
