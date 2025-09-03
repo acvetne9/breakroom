@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
-...
+interface VotingComponentProps { upvotes: number; downvotes: number; userVote?: 'up' | 'down' | null; onVote: (voteType: 'up' | 'down') => void; className?: string; isOwner?: boolean; onDelete?: () => void; }
 
 const VotingComponent: React.FC<VotingComponentProps> = ({
   upvotes,
