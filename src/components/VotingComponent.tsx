@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 interface VotingComponentProps {
   upvotes: number;
@@ -19,6 +19,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
   isOwner = false,
   onDelete
 }) => {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const netScore = upvotes - downvotes;
 
   const handleUpvote = (e: React.MouseEvent) => {
@@ -33,7 +34,17 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onDelete?.();
+    if (showDeleteConfirm) {
+      onDelete?.();
+      setShowDeleteConfirm(false);
+    } else {
+      setShowDeleteConfirm(true);
+    }
+  };
+
+  const handleCancelDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowDeleteConfirm(false);
   };
 
   return (
@@ -79,7 +90,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
       )}
       
       {isOwner && (
-        <div>
+        <div className="relative">
           <span className="font-medium text-app-black min-w-[20px] text-center">
             {netScore}
           </span>
@@ -92,6 +103,26 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
               🗑️
             </span>
           </button>
+
+          {showDeleteConfirm && (
+            <div className="absolute top-0 right-8 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-[200px]">
+              <p className="text-sm text-gray-700 mb-2">Do you want to delete this post?</p>
+              <div className="flex space-x-2">
+                <button
+                  onClick={handleDelete}
+                  className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors"
+                >
+                  Delete
+                </button>
+                <button
+                  onClick={handleCancelDelete}
+                  className="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
