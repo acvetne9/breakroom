@@ -45,9 +45,14 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   onPostDelete
 }) => {
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
-  const [comments, setComments] = useState<{
-    [postId: string]: string[];
-  }>({});
+  interface Comment {
+    id: string;
+    author: string;
+    text: string;
+    createdAt: Date;
+  }
+  
+  const [comments, setComments] = useState<{ [postId: string]: Comment[] }>({});
   const [postText, setPostText] = useState('');
   const [commentText, setCommentText] = useState('');
   const {
@@ -73,24 +78,40 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   };
   const handleCommentSubmit = () => {
     if (!commentText.trim() || !expandedPost) return;
-
-    // Check for profanity
+  
     if (isProfane(commentText)) {
       toast({
         title: "Comment blocked",
         description: "Inappropriate content detected",
-        variant: "destructive"
+        variant: "destructive",
       });
-      setCommentText(''); // Clear the input
+      setCommentText('');
       return;
     }
+  
+    const newComment: Comment = {
+      id: crypto.randomUUID(),
+      author: "You", // replace with logged-in user’s name/id
+      text: commentText,
+      createdAt: new Date(),
+    };
+  
     setComments({
       ...comments,
-      [expandedPost]: [...(comments[expandedPost] || []), commentText]
+      [expandedPost]: [...(comments[expandedPost] || []), newComment],
     });
+  
     setCommentText('');
     onCommentSubmit?.(expandedPost, commentText);
   };
+
+  const handleCommentDelete = (postId: string, commentId: string) => {
+    setComments({
+      ...comments,
+      [postId]: (comments[postId] || []).filter(c => c.id !== commentId),
+    });
+  };
+
   const handlePostClick = (postId: string) => {
     const newExpandedPost = expandedPost === postId ? null : postId;
     setExpandedPost(newExpandedPost);
@@ -183,28 +204,25 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
 
                 {/* Expanded view */}
                 {expandedPost === post.id && <div className="mt-4 pt-4 border-t border-app-gray-light">
-                    {(!comments[post.id] || comments[post.id].length === 0) && <h4 className="text-sm font-medium mb-2 text-slate-500 text-left">Be the first to share! 😉</h4>}
-                    <div className="space-y-2 mb-3">
-                      {(comments[post.id] || []).map((comment, idx) => 
-                        <div>
-                          <TranslatedText 
-                            key={idx}
-                            text={comment}
-                            className="text-sm text-app-gray-dark"
-                          />
-                          <div className="absolute bottom-1 right-1">
-                            <VotingComponent 
-                              upvotes={post.upvotes} 
-                              downvotes={post.downvotes} 
-                              userVote={post.userVote} 
-                              onVote={voteType => handlePostVote(post.id, voteType)}
-                              isOwner={post.author === 'You'}
-                              onDelete={() => handlePostDelete(post.id)}
-                            />
-                          </div>
-                        </div>
-                      )}
+                    {(comments[post.id] || []).map((comment) => (
+                    <div key={comment.id} className="relative">
+                      <TranslatedText 
+                        text={comment.text}
+                        className="text-sm text-app-gray-dark"
+                      />
+                      <div className="absolute bottom-1 right-1">
+                        <VotingComponent 
+                          upvotes={0} 
+                          downvotes={0} 
+                          userVote={null} 
+                          onVote={() => {}} 
+                          isOwner={comment.author === 'You'}
+                          onDelete={() => handleCommentDelete(post.id, comment.id)}
+                        />
+                      </div>
                     </div>
+                  ))}
+
                   </div>}
               </div>
             </div>)}
