@@ -39,20 +39,36 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
   };
 
   useEffect(() => {
-  if (showDeleteConfirm && deleteButtonRef.current) {
+    if (!showDeleteConfirm || !deleteButtonRef.current) return;
+  
+    const margin = 8; // viewport padding
     const rect = deleteButtonRef.current.getBoundingClientRect();
-    const margin = 8;
-    const maxWidth = window.innerWidth - margin * 2;
-
-    setPopupStyle({
-      position: "absolute",
-      top: rect.bottom + window.scrollY + margin, // 8px gap below
-      left: rect.right + window.scrollX + margin, // start at button’s right edge
-      maxWidth: maxWidth,
-      zIndex: 999999,
-    });
-  }
-}, [showDeleteConfirm]);
+  
+    const top = rect.bottom + margin;                // below button
+    const left = rect.right + margin;                // start to the right of button
+    const maxWidthToRight = Math.max(0, window.innerWidth - left - margin);
+  
+    // If there's space to the right of the button, use it.
+    // Otherwise, fall back to aligning with the viewport's right edge.
+    if (maxWidthToRight >= 1) {
+      setPopupStyle({
+        position: "fixed",
+        top,
+        left,
+        maxWidth: maxWidthToRight, // prevents right overflow
+        zIndex: 999999,
+      });
+    } else {
+      setPopupStyle({
+        position: "fixed",
+        top,
+        right: margin, // stick to viewport right safely
+        left: "auto",
+        maxWidth: window.innerWidth - margin * 2,
+        zIndex: 999999,
+      });
+    }
+  }, [showDeleteConfirm]);
 
   return (
     <div className={`flex items-center space-x-1 text-sm ${className}`} data-voting-component>
@@ -116,7 +132,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
         createPortal(
           <div
             style={popupStyle}
-            className="bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-4 inline-block w-auto break-words"
+            className="bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-4 inline-block whitespace-normal break-words"
           >
             <p className="text-sm text-gray-800">
               Are you sure you want to delete this post?
@@ -124,6 +140,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
           </div>,
           document.body
         )}
+
     </div>
   );
 };
