@@ -75,7 +75,6 @@ const HomePage: React.FC<HomePageProps> = ({
   const selectedBusiness = propSelectedBusiness;
   const landmarks = [
     {lat: 40.690331, lng: -74.045414, emoji: "🗽"},
-    //{lat: 40.705330, lng: -73.995885, emoji: "🌉"},
     {lat: 40.75266, lng: -73.97729, emoji: "🚃"},
     {lat: 40.75058, lng: -73.99358, emoji: "🚃"},
     {lat: 40.548575, lng: -74.0321778, emoji: "🐬"},
@@ -203,7 +202,7 @@ const HomePage: React.FC<HomePageProps> = ({
               value={searchValue}
               onChange={handleSearchChange}
               onBusinessSelect={handleSearchBusinessSelect}
-              placeholder="Search places, roles, pay (e.g. 'Starbucks barista $15', 'manager $20+')..."
+              placeholder="Search places, roles, pay (e.g. ' barista $15')..."
               variant="search-bar"
               showIcon={true}
               onLocationSave={onLocationSave}
