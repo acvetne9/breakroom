@@ -268,7 +268,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         center: [-73.986104, 40.715245],
         zoom: 12.77,
         maxZoom: 18,
-        minZoom: 8,
+        minZoom: 9,
         renderWorldCopies: false,
         attributionControl: false
       });
