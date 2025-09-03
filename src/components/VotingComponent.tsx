@@ -130,8 +130,6 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
           </div>,
           document.body
         )}
-
-
     </div>
   );
 };
