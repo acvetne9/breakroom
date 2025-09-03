@@ -49,7 +49,7 @@ const HomePage: React.FC<HomePageProps> = ({
   const [showLoading, setShowLoading] = useState(true);
 
   // Listen for search triggers from other pages
-  useEffect(() => {
+  useEffect(() => {UnifiedBusinessSearch
     const handleSearchTrigger = (event: CustomEvent) => {
       const searchTerm = event.detail;
       console.log('🔍 [triggerSearch] Received search trigger:', searchTerm);
