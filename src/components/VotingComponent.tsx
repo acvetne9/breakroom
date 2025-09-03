@@ -38,37 +38,35 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
     }
   };
 
-  useEffect(() => {
-    if (!showDeleteConfirm || !deleteButtonRef.current) return;
-  
-    const margin = 8; // viewport padding
-    const rect = deleteButtonRef.current.getBoundingClientRect();
-  
-    const top = rect.bottom + margin;                // below button
-    const left = rect.right + margin;                // start to the right of button
-    const maxWidthToRight = Math.max(0, window.innerWidth - left - margin);
-  
-    // If there's space to the right of the button, use it.
-    // Otherwise, fall back to aligning with the viewport's right edge.
-    if (maxWidthToRight >= 1) {
-      setPopupStyle({
-        position: "fixed",
-        top,
-        left,
-        maxWidth: maxWidthToRight, // prevents right overflow
-        zIndex: 999999,
-      });
-    } else {
-      setPopupStyle({
-        position: "fixed",
-        top,
-        right: margin, // stick to viewport right safely
-        left: "auto",
-        maxWidth: window.innerWidth - margin * 2,
-        zIndex: 999999,
-      });
-    }
-  }, [showDeleteConfirm]);
+useEffect(() => {
+  if (!showDeleteConfirm || !deleteButtonRef.current) return;
+
+  const margin = 8; // vertical gap
+  const rect = deleteButtonRef.current.getBoundingClientRect();
+
+  // Position below the button
+  let top = rect.bottom + window.scrollY + margin;
+
+  // Start with the popup aligned to the button’s right edge
+  let left = rect.right + window.scrollX;
+
+  // Apply your requested 5% shift left
+  const shiftLeft = window.innerWidth * 0.05;
+  left = left - shiftLeft;
+
+  // Measure max available width
+  const maxWidth = window.innerWidth - 2 * margin;
+
+  setPopupStyle({
+    position: "absolute",
+    top,
+    left: Math.max(margin, Math.min(left, window.innerWidth - margin)), // clamp so it stays in viewport
+    maxWidth,
+    whiteSpace: "normal", // wrap text
+    zIndex: 999999,
+  });
+}, [showDeleteConfirm]);
+
 
   return (
     <div className={`flex items-center space-x-1 text-sm ${className}`} data-voting-component>
@@ -129,17 +127,18 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
       )}
 
       {showDeleteConfirm &&
-        createPortal(
-          <div
-            style={popupStyle}
-            className="bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-4 inline-block whitespace-normal break-words"
-          >
-            <p className="text-sm text-gray-800">
-              Are you sure you want to delete this post?
-            </p>
-          </div>,
-          document.body
-        )}
+  createPortal(
+    <div
+      style={popupStyle}
+      className="bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-4 inline-block break-words w-auto"
+    >
+      <p className="text-sm text-gray-800 text-center">
+        Are you sure you want to delete this post?
+      </p>
+    </div>,
+    document.body
+  )}
+
 
     </div>
   );
