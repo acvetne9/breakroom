@@ -40,17 +40,25 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
 
   // Measure button position to anchor popup
   useEffect(() => {
-    if (showDeleteConfirm && deleteButtonRef.current) {
-      const rect = deleteButtonRef.current.getBoundingClientRect();
-      setPopupStyle({
-        position: 'absolute',
-        top: rect.bottom + window.scrollY + 8, // 8px gap
-        left: rect.left + window.scrollX,
-        maxWidth: 'calc(100vw - 2rem)',
-        zIndex: 999999,
-      });
-    }
-  }, [showDeleteConfirm]);
+  if (showDeleteConfirm && deleteButtonRef.current) {
+    const rect = deleteButtonRef.current.getBoundingClientRect();
+    const margin = 8;
+    const maxWidth = window.innerWidth - margin * 2;
+
+    setPopupStyle({
+      position: 'absolute',
+      top: rect.bottom + window.scrollY + margin, // 8px gap below button
+      left: Math.min(
+        rect.left + window.scrollX,
+        window.innerWidth - maxWidth - margin
+      ), // shift left if it would overflow
+      maxWidth: maxWidth,
+      zIndex: 999999,
+    });
+  }
+}, [showDeleteConfirm]);
+
+  
 
   return (
     <div className={`flex items-center space-x-1 text-sm ${className}`} data-voting-component>
@@ -114,7 +122,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
         createPortal(
           <div
             style={popupStyle}
-            className="bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-4 inline-block max-w-[90vw] break-words whitespace-normal"
+            className="bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-4 inline-block break-words w-fit"
           >
             <p className="text-sm text-gray-800 text-center">
               Are you sure you want to delete this post?
@@ -122,6 +130,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
           </div>,
           document.body
         )}
+
 
 
     </div>
