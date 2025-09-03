@@ -227,12 +227,23 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                 {/* Expanded view */}
                 {expandedPost === post.id && (
                   <div className="mt-4 pt-4 border-t border-app-gray-light space-y-2">
-                    {orderedComments.length === 0 ? (
-                      <h4 className="text-sm font-medium mb-2 text-slate-500 text-left">
-                        Be the first to share! 😉
-                      </h4>
-                    ) : (
-                      orderedComments.map(comment => (
+                    {(() => {
+                      // Order comments: post author's comments first
+                      const orderedComments = (comments[post.id] || []).slice().sort((a, b) => {
+                        if (a.author === post.author && b.author !== post.author) return -1;
+                        if (b.author === post.author && a.author !== post.author) return 1;
+                        return a.createdAt.getTime() - b.createdAt.getTime();
+                      });
+                
+                      if (orderedComments.length === 0) {
+                        return (
+                          <h4 className="text-sm font-medium mb-2 text-slate-500 text-left">
+                            Be the first to share! 😉
+                          </h4>
+                        );
+                      }
+                
+                      return orderedComments.map(comment => (
                         <div key={comment.id} className="flex items-center justify-between py-1">
                           <TranslatedText text={comment.text} className="text-sm text-app-gray-dark pr-2" />
                           <div className="flex-shrink-0">
@@ -246,10 +257,11 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                             />
                           </div>
                         </div>
-                      ))
-                    )}
+                      ));
+                    })()}
                   </div>
                 )}
+
 
 
               </div>
