@@ -1,15 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
-interface VotingComponentProps {
-  upvotes: number;
-  downvotes: number;
-  userVote?: 'up' | 'down' | null;
-  onVote: (voteType: 'up' | 'down') => void;
-  className?: string;
-  isOwner?: boolean;
-  onDelete?: () => void;
-}
+...
 
 const VotingComponent: React.FC<VotingComponentProps> = ({
   upvotes,
@@ -21,7 +13,9 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
   onDelete
 }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  
+  const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({});
+  const deleteButtonRef = useRef<HTMLButtonElement | null>(null);
+
   const netScore = upvotes - downvotes;
 
   const handleUpvote = (e: React.MouseEvent) => {
@@ -44,6 +38,20 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
     }
   };
 
+  // Measure button position to anchor popup
+  useEffect(() => {
+    if (showDeleteConfirm && deleteButtonRef.current) {
+      const rect = deleteButtonRef.current.getBoundingClientRect();
+      setPopupStyle({
+        position: 'absolute',
+        top: rect.bottom + window.scrollY + 8, // 8px gap
+        left: rect.left + window.scrollX,
+        maxWidth: 'calc(100vw - 2rem)',
+        zIndex: 999999,
+      });
+    }
+  }, [showDeleteConfirm]);
+
   return (
     <div className={`flex items-center space-x-1 text-sm ${className}`} data-voting-component>
       {!isOwner && (
@@ -51,32 +59,32 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
           <button
             onClick={handleUpvote}
             className={`p-1 rounded transition-all ${
-              userVote === 'up' 
-                ? 'bg-green-100 scale-110' 
+              userVote === 'up'
+                ? 'bg-green-100 scale-110'
                 : 'hover:bg-green-50 hover:scale-105'
             }`}
           >
-            <span 
+            <span
               className="transition-all"
               style={{ filter: userVote === 'up' ? 'grayscale(0%)' : 'grayscale(90%)' }}
             >
               ✅
             </span>
           </button>
-          
+
           <span className="font-medium text-app-black min-w-[20px] text-center">
             {netScore}
           </span>
-          
+
           <button
             onClick={handleDownvote}
             className={`p-1 rounded transition-all ${
-              userVote === 'down' 
-                ? 'bg-red-100 scale-110' 
+              userVote === 'down'
+                ? 'bg-red-100 scale-110'
                 : 'hover:bg-red-50 hover:scale-105'
             }`}
           >
-            <span 
+            <span
               className="transition-all"
               style={{ filter: userVote === 'down' ? 'grayscale(0%)' : 'grayscale(90%)' }}
             >
@@ -85,33 +93,35 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
           </button>
         </div>
       )}
-      
+
       {isOwner && (
         <div className="relative">
           <span className="font-medium text-app-black min-w-[20px] text-center">
             {netScore}
           </span>
-        
+
           <button
+            ref={deleteButtonRef}
             onClick={handleDelete}
             className="p-1 rounded transition-all hover:bg-red-50 hover:scale-105"
           >
-            <span className="transition-all">
-              🗑️
-            </span>
+            <span className="transition-all">🗑️</span>
           </button>
-          
-          {showDeleteConfirm && (
-            <div className="absolute top-full mt-2 left-0 right-0 z-[99999999999] 
-                            bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-4 
-                            w-full max-w-[calc(100vw-2rem)] break-words">
-              <p className="text-sm text-gray-800 text-center">
-                Are you sure you want to delete this post?
-              </p>
-            </div>
-          )}
         </div>
       )}
+
+      {showDeleteConfirm &&
+        createPortal(
+          <div
+            style={popupStyle}
+            className="bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-4 break-words"
+          >
+            <p className="text-sm text-gray-800 text-center">
+              Are you sure you want to delete this post?
+            </p>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };
