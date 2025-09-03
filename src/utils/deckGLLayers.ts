@@ -19,6 +19,16 @@ export const createBusinessScatterplotLayer = ({
   const layerId = 'businesses-scatter';
   
   console.log(`🎯 Creating scatterplot layer with ${businesses.length} clickable businesses`);
+  console.log(`🎯 onClick handler provided:`, !!onBusinessClick);
+  
+  // Log sample business data to debug
+  if (businesses.length > 0) {
+    console.log(`🎯 Sample business data:`, {
+      id: businesses[0].id,
+      name: businesses[0].name,
+      position: businesses[0].position
+    });
+  }
   
   return new ScatterplotLayer({
     id: layerId,
@@ -41,8 +51,15 @@ export const createBusinessScatterplotLayer = ({
     getRadius: (_d: Business) => 8, // Fixed size for all dots
     getFillColor: (_d: Business) => [250, 204, 21, 255], // Consistent yellow for all
     getLineColor: (_d: Business) => [255, 255, 255, 200], // Consistent white border
-    onClick: onBusinessClick ? (info) => {
-      if (info.object && info.object.id) {
+    onClick: onBusinessClick ? (info, event) => {
+      console.log('🎯 DeckGL click event triggered!', { 
+        hasObject: !!info.object, 
+        objectName: info.object?.name,
+        objectId: info.object?.id,
+        pickingInfos: info,
+        event: event 
+      });
+      if (info.object) {
         console.log('🎯 Business clicked:', info.object.name, 'ID:', info.object.id);
         onBusinessClick(info.object as Business);
       } else {

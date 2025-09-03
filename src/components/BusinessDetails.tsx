@@ -96,7 +96,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
               text={business.name}
               className="text-xl font-medium text-app-black"
             />
-            {business.address && (
+            {business.address && business.address.trim() && (
               <div className="mt-1">
                 <span className="text-sm text-app-gray-medium">
                   {business.address}
