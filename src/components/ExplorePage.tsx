@@ -234,21 +234,19 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                       (comments[post.id] || []).map((comment) => (
                         <div key={comment.id} className="text-sm text-app-gray-dark">
                           <TranslatedText text={comment.text} />
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                            <VotingComponent 
+                              upvotes={post.upvotes} 
+                              downvotes={post.downvotes} 
+                              userVote={post.userVote} 
+                              onVote={voteType => handlePostVote(post.id, voteType)}
+                              isOwner={post.author === 'You'}
+                              onDelete={() => handlePostDelete(post.id)}
+                            />
+                          </div>
                         </div>
                       ))
                     )}
-                
-                    {/* Centered voting system just for the post */}
-                    <div className="flex justify-center pt-2">
-                      <VotingComponent 
-                        upvotes={post.upvotes} 
-                        downvotes={post.downvotes} 
-                        userVote={post.userVote} 
-                        onVote={voteType => handlePostVote(post.id, voteType)}
-                        isOwner={post.author === 'You'}
-                        onDelete={() => handlePostDelete(post.id)}
-                      />
-                    </div>
                   </div>
                 )}
 
