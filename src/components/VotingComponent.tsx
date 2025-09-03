@@ -121,14 +121,15 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
         createPortal(
           <div
             style={popupStyle}
-            className="bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-4 inline-block break-words w-fit"
+            className="bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-4 inline-block w-auto break-words"
           >
-            <p className="text-sm text-gray-800 text-center">
+            <p className="text-sm text-gray-800">
               Are you sure you want to delete this post?
             </p>
           </div>,
           document.body
         )}
+
     </div>
   );
 };
