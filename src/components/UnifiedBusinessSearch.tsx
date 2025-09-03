@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { searchBusinessesEnhanced, EnhancedBusiness } from '@/services/enhancedBusinessSearch';
+import { parseSearchFilters } from '@/services/businessFiltering';
 import { isProfane } from '@/utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 import { Search } from 'lucide-react';
 
 interface UnifiedBusinessSearchProps {
   value: string;
-  onChange: (value: string, business?: EnhancedBusiness) => void;
+  onChange: (value: string, business?: EnhancedBusiness, filters?: any) => void;
   onBusinessSelect?: (business: EnhancedBusiness) => void;
   onBlur?: () => void;
   placeholder?: string;
@@ -35,46 +36,125 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const searchSeqRef = useRef(0);
+  const lastFiltersRef = useRef<string | null>(null);
+  const committedQueryRef = useRef<string>('');
+  const resultsCache = useRef<Map<string, EnhancedBusiness[]>>(new Map());
+  const isScrolling = useRef(false);
+  const lastExecutedQuery = useRef<string>('');
+
   useEffect(() => {
+    let scrollTimeout: NodeJS.Timeout;
+    
     const handleClickOutside = (event: MouseEvent) => {
+      // Don't close dropdown if we're scrolling within it
+      if (isScrolling.current) return;
+      
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowDropdown(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    const handleScroll = () => {
+      isScrolling.current = true;
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        isScrolling.current = false;
+      }, 150);
+    };
 
-  const handleInputChange = async (inputValue: string) => {
-    onChange(inputValue);
-
-    if (inputValue.length === 0) {
-      setSearchResults([]);
-      setShowDropdown(false);
-      return;
+    // Add scroll listener to the dropdown
+    const dropdown = dropdownRef.current;
+    if (dropdown) {
+      dropdown.addEventListener('scroll', handleScroll);
     }
 
-    if (inputValue.length > 2) {
-      setIsSearching(true);
-      try {
-        const results = await searchBusinessesEnhanced(inputValue, 10);
-        setSearchResults(results);
-        setShowDropdown(true);
-      } catch (error) {
-        console.error('Search error:', error);
-        setSearchResults([]);
-      } finally {
-        setIsSearching(false);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      if (dropdown) {
+        dropdown.removeEventListener('scroll', handleScroll);
       }
-    } else {
+      clearTimeout(scrollTimeout);
+    };
+  }, []);
+
+  // Debounced suggestions with improved caching
+  useEffect(() => {
+    const q = value.trim();
+    if (!q) {
       setSearchResults([]);
       setShowDropdown(false);
+      setIsSearching(false);
+      // Clear filters when search is empty - only if there were filters before
+      if (lastFiltersRef.current !== null) {
+        console.log('🧹 Clearing search - removing all filters');
+        lastFiltersRef.current = null;
+        committedQueryRef.current = '';
+        onChange(value, undefined, null);
+      }
+      return;
+    }
+    
+    // Check cache first for better performance
+    const cachedResults = resultsCache.current.get(q);
+    if (cachedResults) {
+      console.log('💾 Using cached results for:', q);
+      setSearchResults(cachedResults);
+      setShowDropdown(true);
+      setIsSearching(false);
+      return;
+    }
+    
+    // Only show suggestions, don't execute search automatically
+    setIsSearching(true);
+    setShowDropdown(true);
+    const seq = ++searchSeqRef.current;
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchBusinessesEnhanced(q, 10);
+        if (seq !== searchSeqRef.current) return;
+        
+        // Cache the results
+        resultsCache.current.set(q, results);
+        
+        // Limit cache size to prevent memory issues
+        if (resultsCache.current.size > 50) {
+          const firstKey = resultsCache.current.keys().next().value;
+          resultsCache.current.delete(firstKey);
+        }
+        
+        setSearchResults(results);
+      } catch (error) {
+        console.error('Search suggestions error:', error);
+        if (seq === searchSeqRef.current) setSearchResults([]);
+      } finally {
+        if (seq === searchSeqRef.current) setIsSearching(false);
+      }
+    }, 300); // Faster suggestions with caching
+    return () => clearTimeout(timer);
+  }, [value, onChange]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    onChange(newValue);
+    if (!newValue.trim()) {
+      setSearchResults([]);
+      setShowDropdown(false);
+      setIsSearching(false);
     }
   };
 
   const handleBusinessClick = (business: EnhancedBusiness) => {
-    onChange(business.name, business);
+    console.log('🏢 [handleBusinessClick] Business clicked:', business.name);
+    console.log('🏢 [handleBusinessClick] Current search value:', value);
+    console.log('🏢 [handleBusinessClick] Should perform search instead of just saving business');
+    
+    // Instead of just saving the business, we should execute the search with the current search term
+    // and then optionally save the location
+    performSearch();
+    
+    // Still call the business select callback for any other handling needed
     onBusinessSelect?.(business);
     setShowDropdown(false);
     setSearchResults([]);
@@ -87,10 +167,32 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   };
 
   const performSearch = () => {
-    if (!value.trim()) return;
+    console.log('🔍 [performSearch] Called with value:', value);
+    
+    const trimmedValue = value.trim();
+    
+    // Check if this is the same query we just executed
+    if (trimmedValue === lastExecutedQuery.current && trimmedValue.length >= 4) {
+      console.log('🚫 [performSearch] Skipping - same query already executed:', trimmedValue);
+      setShowDropdown(false);
+      return;
+    }
+    
+    if (!trimmedValue) {
+      // Clear search - commit empty query to clear filters
+      if (committedQueryRef.current !== '') {
+        console.log('🔄 Clearing search - removing all filters');
+        committedQueryRef.current = '';
+        lastFiltersRef.current = null;
+        lastExecutedQuery.current = '';
+        onChange(value, undefined, null);
+      }
+      return;
+    }
     
     // Check for profanity in search terms
-    if (isProfane(value)) {
+    if (isProfane(trimmedValue)) {
+      console.log('🚫 Search blocked - profanity detected:', trimmedValue);
       toast({
         title: "Search blocked",
         description: "Inappropriate search terms detected",
@@ -100,25 +202,68 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       return;
     }
     
-    // Search functionality temporarily disabled for viewport-based loading
-    // TODO: Implement server-side search or integrate with viewport businesses
-    toast({
-      title: "Search coming soon",
-      description: "Search functionality will be available with the new map system",
-    });
+    // Commit the query and apply filters immediately (require 4+ characters for meaningful search)
+    console.log('🔍 [performSearch] Trimmed value:', trimmedValue, 'length:', trimmedValue.length);
+    console.log('🔍 [performSearch] Current committed query:', committedQueryRef.current);
+    console.log('🔍 [performSearch] Last executed query:', lastExecutedQuery.current);
+    
+    if (trimmedValue.length >= 4 && committedQueryRef.current !== trimmedValue) {
+      console.log('🔍 Committing search query:', trimmedValue);
+      committedQueryRef.current = trimmedValue;
+      lastExecutedQuery.current = trimmedValue;
+      const filters = parseSearchFilters(trimmedValue);
+      console.log('🔍 [performSearch] Parsed filters:', filters);
+      
+      // Only proceed if filters have meaningful content
+      if (filters && (
+        (filters.textTerms && filters.textTerms.length > 0) ||
+        filters.salaryQuery ||
+        filters.roleFilter ||
+        filters.businessTypeFilter
+      )) {
+        console.log('✅ Applying valid search filters:', filters);
+        const filtersKey = JSON.stringify(filters);
+        lastFiltersRef.current = filtersKey;
+        onChange(value, undefined, filters);
+      } else {
+        console.log('⚠️ No valid filters found for query:', trimmedValue);
+        console.log('⚠️ Filters object:', filters);
+        if (lastFiltersRef.current !== null) {
+          lastFiltersRef.current = null;
+          committedQueryRef.current = '';
+          lastExecutedQuery.current = '';
+          onChange(value, undefined, null);
+        }
+      }
+    } else if (trimmedValue.length < 4 && lastFiltersRef.current !== null) {
+      // Clear filters if search is too short
+      console.log('🧹 Search too short, clearing filters');
+      lastFiltersRef.current = null;
+      committedQueryRef.current = '';
+      lastExecutedQuery.current = '';
+      onChange(value, undefined, null);
+    } else {
+      console.log('🔍 [performSearch] No action taken - length:', trimmedValue.length, 'committed:', committedQueryRef.current);
+    }
+    setShowDropdown(false);
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       performSearch();
     }
   };
 
   const handleInputBlur = () => {
+    // Don't blur if we're scrolling in the dropdown
+    if (isScrolling.current) return;
+    
     // Delay blur to allow dropdown clicks
     setTimeout(() => {
-      setShowDropdown(false);
-      onBlur?.();
+      if (!isScrolling.current) {
+        setShowDropdown(false);
+        onBlur?.();
+      }
     }, 150);
   };
 
@@ -133,9 +278,9 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           ref={inputRef}
           type="text"
           value={value}
-          onChange={(e) => handleInputChange(e.target.value)}
+          onChange={(e) => handleInputChange(e)}
           onBlur={handleInputBlur}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyDown}
           onFocus={() => {
             if (value.length > 2) {
               setShowDropdown(true);
@@ -176,11 +321,11 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                   <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
                     {business.businessType || 'Business'}
                   </span>
-                  {business.roles?.slice(0, 2).map((role, index) => (
-                    <span key={index} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                      {role.role} - {role.salary}
-                    </span>
-                  ))}
+                   {business.roles?.map((role, index) => (
+                     <span key={index} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                       {role.role} - {role.salary}
+                     </span>
+                   ))}
                 </div>
               </div>
             ))

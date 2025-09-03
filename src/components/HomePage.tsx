@@ -5,6 +5,7 @@ import BusinessDetails from './BusinessDetails';
 import BreakroomLoading from './BreakroomLoading';
 import UnifiedBusinessSearch from './UnifiedBusinessSearch';
 import { EnhancedBusiness } from '@/services/enhancedBusinessSearch';
+import { parseSearchFilters } from '@/services/businessFiltering';
 
 import { useToast } from '@/hooks/use-toast';
 
@@ -43,8 +44,28 @@ const HomePage: React.FC<HomePageProps> = ({
   onLocationSave
 }) => {
   const [searchValue, setSearchValue] = useState('');
+  const [searchFilters, setSearchFilters] = useState<any>(null);
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
   const [showLoading, setShowLoading] = useState(true);
+
+  // Listen for search triggers from other pages
+  useEffect(() => {
+    const handleSearchTrigger = (event: CustomEvent) => {
+      const searchTerm = event.detail;
+      console.log('🔍 [triggerSearch] Received search trigger:', searchTerm);
+      setSearchValue(searchTerm);
+      
+      // Parse the search term to generate proper filters, just like UnifiedBusinessSearch does
+      const filters = parseSearchFilters(searchTerm);
+      console.log('🔍 [triggerSearch] Parsed filters:', filters);
+      
+      // Apply the filters to the map
+      setSearchFilters(filters);
+    };
+
+    window.addEventListener('triggerSearch', handleSearchTrigger as EventListener);
+    return () => window.removeEventListener('triggerSearch', handleSearchTrigger as EventListener);
+  }, []);
 
   const handleLoadingComplete = () => {
     setShowLoading(false);
@@ -80,8 +101,16 @@ const HomePage: React.FC<HomePageProps> = ({
 ]
   const { toast } = useToast();
 
-  const handleSearchChange = (value: string, business?: EnhancedBusiness) => {
+  const handleSearchChange = (value: string, business?: EnhancedBusiness, filters?: any) => {
+    console.log('🔍 Search change in HomePage:', { value, filters, hasFilters: !!filters });
     setSearchValue(value);
+    setSearchFilters(filters);
+    
+    // Only clear filters when search is explicitly cleared (empty value and no filters)
+    if (!value && !filters) {
+      console.log('🧹 Search explicitly cleared - removing filters');
+      setSearchFilters(null);
+    }
   };
 
   const handleSearchBusinessSelect = (business: EnhancedBusiness) => {
@@ -92,7 +121,9 @@ const HomePage: React.FC<HomePageProps> = ({
       formatted_address: business.formatted_address || business.vicinity || business.name
     };
     handleBusinessClick(mapBusiness);
-    setSearchValue(''); // Clear search after selection
+    // Keep search value visible after selection
+    // Don't clear search filters - keep them active so user continues to see filtered results
+    console.log('🔍 Business selected from search - keeping filters active:', searchFilters);
   };
 
   const handleBusinessClick = (business: any) => {
@@ -131,26 +162,13 @@ const HomePage: React.FC<HomePageProps> = ({
         <BreakroomLoading onComplete={handleLoadingComplete} />
       )}
         <div>
-          {/* White bar at top - only show after search */}
-          {currentSlide === 1 && currentView === 'main' && searchValue && (
-            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none">
-              <UnifiedBusinessSearch
-                value={searchValue}
-                onChange={() => {}}          // no-op so it can't change
-                onBusinessSelect={() => {}}  // no-op
-                placeholder=""
-                variant="search-bar"
-                showIcon={false}             // hide search icon if you want
-                onLocationSave={() => {}}
-              />
-            </div>
-          )}
           
           {/* MapLibre with OpenStreetMap base layer */}
           <MapLibreMap
             onBusinessClick={handleBusinessClick}
             selectedBusiness={selectedBusiness}
             landmarks={landmarks}
+            searchFilters={searchFilters}
           />
         
   

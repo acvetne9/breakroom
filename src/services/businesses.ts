@@ -50,44 +50,54 @@ export async function getBusinessesBasic(limit: number = 2000): Promise<Business
 
 export const getBusinessesInViewport = async (
   bounds: { north: number; south: number; east: number; west: number },
-  limit: number = 2000
+  limit: number = 2000,
+  searchFilters?: any,
+  onProgress?: (businesses: Business[], isComplete: boolean) => void
 ): Promise<Business[]> => {
-  try {
-    console.log(`🎯 Starting optimized spatial query for bounds:`, bounds);
-    
-    // Try the new spatial function first (PostGIS optimized)
-    const { data: spatialData, error: spatialError } = await supabase
-      .rpc('businesses_in_bbox', {
-        west: bounds.west,
-        south: bounds.south,
-        east: bounds.east,
-        north: bounds.north,
-        query_limit: limit
-      });
+  console.log(`🗺️ [getBusinessesInViewport] Called with bounds:`, bounds);
+  console.log(`🗺️ [getBusinessesInViewport] Search filters:`, searchFilters);
 
-    if (!spatialError && spatialData) {
-      console.log(`🚀 Spatial query successful: ${spatialData.length} businesses found`);
+  try {
+    // Use unified search if filters provided
+    if (searchFilters) {
+      console.log(`🔍 [getBusinessesInViewport] Using unified search with filters`);
+      const { searchBusinessesUnified, parseUnifiedSearchFilters } = await import('./unifiedSearch');
       
-      const businesses: Business[] = spatialData.map((business) => ({
-        id: business.id,
-        name: business.name,
-        position: { lat: business.lat, lng: business.lng },
-        atmosphere: business.atmosphere || [],
-        salary: business.salary,
-        businessType: business.business_type,
-        website: business.website,
-        roles: [],
-      }));
+      let unifiedFilters;
+      if (typeof searchFilters === 'string') {
+        unifiedFilters = parseUnifiedSearchFilters(searchFilters);
+      } else {
+        unifiedFilters = searchFilters;
+      }
       
-      return businesses;
+      if (!unifiedFilters) {
+        console.log('🔍 No valid filters parsed');
+        return [];
+      }
+      
+      const results = await searchBusinessesUnified(unifiedFilters, bounds, limit);
+      console.log(`🔍 [getBusinessesInViewport] Unified search returned ${results.length} businesses`);
+      
+      if (onProgress) {
+        onProgress(results, true);
+      }
+      
+      return results;
     }
 
-    // Fallback to the old method if spatial query fails
-    console.log(`⚠️ Spatial query failed, falling back to coordinate filtering:`, spatialError);
-    
+    // Regular viewport load without search
     const { data, error } = await supabase
       .from('businesses')
-      .select('*')
+      .select(`
+        id,
+        name,
+        lat,
+        lng,
+        atmosphere,
+        business_type,
+        website,
+        salary
+      `)
       .gte('lat', bounds.south)
       .lte('lat', bounds.north)
       .gte('lng', bounds.west)
@@ -99,7 +109,7 @@ export const getBusinessesInViewport = async (
       throw error;
     }
 
-    const businesses: Business[] = (data || []).map((business) => ({
+    const businesses: Business[] = data?.map(business => ({
       id: business.id,
       name: business.name,
       position: { lat: business.lat, lng: business.lng },
@@ -107,13 +117,19 @@ export const getBusinessesInViewport = async (
       salary: business.salary,
       businessType: business.business_type,
       website: business.website,
-      roles: [],
-    }));
+      roles: []
+    })) || [];
 
-    console.log(`✅ Fallback query returned ${businesses.length} businesses`);
+    console.log(`✅ Regular viewport load completed with ${businesses.length} businesses`);
+    
+    if (onProgress) {
+      onProgress(businesses, true);
+    }
+    
     return businesses;
+
   } catch (error) {
-    console.error('❌ Error in getBusinessesInViewport:', error);
+    console.error('❌ Critical error in getBusinessesInViewport:', error);
     return [];
   }
 };

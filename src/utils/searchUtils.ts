@@ -35,7 +35,7 @@ const parseSalaryToHourly = (salary: string): number | null => {
 };
 
 // Parse search terms into salary and text components
-const parseSearchTerms = (searchTerm: string): { salaryQuery: { min?: number; max?: number; isRange: boolean } | null; textTerms: string[] } => {
+export const parseSearchTerms = (searchTerm: string): { salaryQuery: { min?: number; max?: number; isRange: boolean } | null; textTerms: string[] } => {
   const term = searchTerm.toLowerCase().trim();
   
   // Check for salary patterns like "$15", "$15/hr", "$15-20", "$15-$20/hr", etc.

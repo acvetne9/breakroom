@@ -21,26 +21,35 @@ export const addLandLayer = (map: maplibregl.Map, landData: any) => {
   console.log('Added NYC land layer');
 };
 
-export const addParksLayer = (map: maplibregl.Map, parkFeatures: any[]) => {
-  if (parkFeatures.length === 0) return;
-  
-  const parksCollection = { type: 'FeatureCollection' as const, features: parkFeatures };
-  
-  if (map.getSource('simple-parks')) {
-    (map.getSource('simple-parks') as maplibregl.GeoJSONSource).setData(parksCollection as any);
+export const addParksAndCemeteriesLayer = (
+  map: maplibregl.Map,
+  parkFeatures: any[],
+  cemeteryFeatures: any[]
+) => {
+  const greenFeatures = [...parkFeatures, ...cemeteryFeatures];
+  if (greenFeatures.length === 0) return;
+
+  const greenCollection: FeatureCollection = {
+    type: 'FeatureCollection',
+    features: greenFeatures
+  };
+
+  if (map.getSource('parks-simple')) {
+    (map.getSource('parks-simple') as maplibregl.GeoJSONSource).setData(greenCollection);
   } else {
-    map.addSource('simple-parks', { type: 'geojson', data: parksCollection });
+    map.addSource('parks-simple', { type: 'geojson', data: greenCollection });
     map.addLayer({
       id: 'parks-simple',
       type: 'fill',
-      source: 'simple-parks',
+      source: 'parks-simple',
       paint: {
-        'fill-color': '#87C17A', // 80% green + 20% wheat
+        'fill-color': '#87C17A', // green for parks + cemeteries
         'fill-opacity': 1.0
       }
     });
   }
 };
+
 
 export const addWaterLayer = (map: maplibregl.Map, waterFeatures: any[]) => {
   if (waterFeatures.length === 0) return;

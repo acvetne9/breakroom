@@ -430,6 +430,15 @@ const MobileApp: React.FC = () => {
                 setCurrentSlide(2); // Navigate to explore page
               }}
               onJobUpdate={handleJobUpdate}
+              onSearchTrigger={(searchTerm) => {
+                // Navigate to home page and trigger search
+                setCurrentSlide(1);
+                // Set search state that will be picked up by HomePage
+                setTimeout(() => {
+                  const searchEvent = new CustomEvent('triggerSearch', { detail: searchTerm });
+                  window.dispatchEvent(searchEvent);
+                }, 100);
+              }}
             />
           </Suspense>
         </motion.div>

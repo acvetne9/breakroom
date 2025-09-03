@@ -42,6 +42,7 @@ interface SettingsPageProps {
   onPostClick?: (post: Post) => void;
   onJobUpdate?: (jobData: { salary: string; role: string; location: string; timePeriod: string }) => void;
   onPageLeave?: () => void;
+  onSearchTrigger?: (searchTerm: string) => void;
 }
 
 const SettingsPage: React.FC<SettingsPageProps> = ({
@@ -50,7 +51,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   onStoriesClick,
   onPostClick,
   onJobUpdate,
-  onPageLeave
+  onPageLeave,
+  onSearchTrigger
 }) => {
   const { deviceId } = useDevice();
   const { toast } = useToast();
@@ -322,9 +324,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           {/* Coffee emoji button */}
           <button
             onClick={() => {
-              console.log("Searching for barista jobs at $20/hr");
+              onSearchTrigger?.('barista');
             }}
-            className="text-2xl"
+            className="text-2xl hover:scale-110 transition-transform"
+            title="Search for barista jobs"
           >
             ☕
           </button>
@@ -332,20 +335,21 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           {/* Example: Add more quick search buttons here */}
           <button
             onClick={() => {
-              console.log("Searching for tech jobs");
+              onSearchTrigger?.('barista');
             }}
-            className="px-4 py-2 bg-app-yellow text-app-black text-sm rounded hover:bg-app-yellow/90 transition-colors"
+            className="text-2xl hover:scale-110 transition-transform"
+            title="Search for barista jobs"
           >
-            💻 Tech
+            🍕
           </button>
         
           <button
             onClick={() => {
-              console.log("Searching for designer jobs");
+              onSearchTrigger?.('government');
             }}
-            className="px-4 py-2 bg-app-yellow text-app-black text-sm rounded hover:bg-app-yellow/90 transition-colors"
+            className="text-2xl hover:scale-110 transition-transform"
           >
-            🎨 Designer
+            👨‍⚖️
           </button>
         </div>
 

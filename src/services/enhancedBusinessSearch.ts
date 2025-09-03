@@ -90,25 +90,17 @@ function parseSearchQuery(query: string): SearchFilters {
       }
     }
     
-    // Check for common job roles
-    const commonRoles = [
-      'barista', 'cashier', 'server', 'bartender', 'cook', 'chef', 'manager', 
-      'assistant', 'clerk', 'receptionist', 'sales', 'waiter', 'waitress',
-      'host', 'hostess', 'dishwasher', 'busser', 'driver', 'delivery'
-    ];
-    
-    if (commonRoles.some(role => word.includes(role) || role.includes(word))) {
-      filters.role = word;
-      continue;
-    }
-    
-    // Everything else is considered a place/general search term
+    // Add all remaining terms as both potential roles and text terms
+    // This allows flexible matching - the database will find matches in both business names and roles
     filters.textTerms?.push(word);
   }
   
-  // If we have text terms, consider the first one as a potential place
+  // Use all text terms as potential place search (for business names)
   if (filters.textTerms && filters.textTerms.length > 0) {
     filters.place = filters.textTerms.join(' ');
+    // Use individual terms for role search, not the joined string
+    // This prevents searching for non-existent roles like "cashier pizza"
+    filters.role = filters.textTerms[0]; // Use first term as primary role filter
   }
   
   return filters;
@@ -120,7 +112,31 @@ export async function searchBusinessesEnhanced(query: string, limit: number = 50
   const filters = parseSearchQuery(query);
   
   try {
-    let queryBuilder = supabase
+    // Search for businesses that match either name OR roles  
+    // First, get businesses that match the name
+    const nameResults = filters.place ? await supabase
+      .from('businesses')
+      .select(`
+        id,
+        name,
+        lat,
+        lng,
+        atmosphere,
+        business_type,
+        website,
+        business_roles (
+          id,
+          role,
+          salary,
+          upvotes,
+          downvotes
+        )
+      `)
+      .ilike('name', `%${filters.place}%`)
+      .limit(limit) : { data: [] };
+
+    // Then, get businesses that match roles
+    const roleResults = filters.role ? await supabase
       .from('businesses')
       .select(`
         id,
@@ -137,34 +153,65 @@ export async function searchBusinessesEnhanced(query: string, limit: number = 50
           upvotes,
           downvotes
         )
-      `);
+      `)
+      .ilike('business_roles.role', `%${filters.role}%`)
+      .limit(limit) : { data: [] };
+
+    // If we have multiple text terms, also search for business type matches
+    const businessTypeResults = filters.textTerms && filters.textTerms.length > 1 ? await supabase
+      .from('businesses')
+      .select(`
+        id,
+        name,
+        lat,
+        lng,
+        atmosphere,
+        business_type,
+        website,
+        business_roles (
+          id,
+          role,
+          salary,
+          upvotes,
+          downvotes
+        )
+      `)
+      .ilike('business_type', `%${filters.textTerms.slice(1).join(' ')}%`)
+      .limit(limit) : { data: [] };
+
+    // Combine and deduplicate results
+    const allBusinesses = new Map();
     
-    // Apply filters
-    if (filters.place) {
-      queryBuilder = queryBuilder.ilike('name', `%${filters.place}%`);
+    // Add name matches
+    if (nameResults.data) {
+      nameResults.data.forEach(business => {
+        allBusinesses.set(business.id, business);
+      });
     }
     
-    if (filters.role) {
-      queryBuilder = queryBuilder.ilike('business_roles.role', `%${filters.role}%`);
+    // Add role matches
+    if (roleResults.data) {
+      roleResults.data.forEach(business => {
+        allBusinesses.set(business.id, business);
+      });
     }
-    
-    // Limit results
-    queryBuilder = queryBuilder.limit(limit);
-    
-    const { data, error } = await queryBuilder;
-    
-    if (error) {
-      console.error('Enhanced search error:', error);
-      return [];
+
+    // Add business type matches
+    if (businessTypeResults.data) {
+      businessTypeResults.data.forEach(business => {
+        allBusinesses.set(business.id, business);
+      });
     }
+
+    const data = Array.from(allBusinesses.values());
     
-    if (!data) return [];
+    if (!data || data.length === 0) return [];
     
     // Process and filter by salary if needed
     const processedBusinesses: EnhancedBusiness[] = data.map(business => {
       const roles = Array.isArray(business.business_roles) 
         ? business.business_roles 
-        : [business.business_roles];
+        : business.business_roles ? [business.business_roles] : [];
       
       // Filter roles by minimum pay if specified
       let filteredRoles = roles;
@@ -209,7 +256,7 @@ export async function searchBusinessesEnhanced(query: string, limit: number = 50
       };
     }).filter(business => business !== null) as EnhancedBusiness[];
     
-    return processedBusinesses;
+    return processedBusinesses.slice(0, limit);
     
   } catch (error) {
     console.error('Enhanced search error:', error);

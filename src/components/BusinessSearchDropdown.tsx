@@ -51,17 +51,42 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
   
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const resultsCache = useRef<Map<string, any[]>>(new Map());
+  const isScrolling = useRef(false);
 
   useEffect(() => {
+    let scrollTimeout: NodeJS.Timeout;
+    
     const handleClickOutside = (event: MouseEvent) => {
+      if (isScrolling.current) return;
+      
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowDropdown(false);
         setInternalShowAddForm(false);
       }
     };
 
+    const handleScroll = () => {
+      isScrolling.current = true;
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        isScrolling.current = false;
+      }, 150);
+    };
+
+    const dropdown = dropdownRef.current;
+    if (dropdown) {
+      dropdown.addEventListener('scroll', handleScroll);
+    }
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      if (dropdown) {
+        dropdown.removeEventListener('scroll', handleScroll);
+      }
+      clearTimeout(scrollTimeout);
+    };
   }, []);
 
   const handleInputChange = (inputValue: string) => {
@@ -75,8 +100,28 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
     }
 
     if (inputValue.length > 2) {
+      // Check cache first
+      const cachedResults = resultsCache.current.get(inputValue.toLowerCase());
+      if (cachedResults) {
+        setSearchResults(cachedResults.slice(0, 5));
+        setShowDropdown(true);
+        setInternalShowAddForm(false);
+        return;
+      }
+      
       const { filteredBusinesses } = searchBusinesses(businesses, inputValue);
-      setSearchResults(filteredBusinesses.slice(0, 5));
+      const results = filteredBusinesses.slice(0, 5);
+      
+      // Cache the results
+      resultsCache.current.set(inputValue.toLowerCase(), results);
+      
+      // Limit cache size
+      if (resultsCache.current.size > 30) {
+        const firstKey = resultsCache.current.keys().next().value;
+        resultsCache.current.delete(firstKey);
+      }
+      
+      setSearchResults(results);
       setShowDropdown(true);
       setInternalShowAddForm(false);
     } else {
@@ -93,16 +138,20 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
   };
 
   const handleInputBlur = () => {
+    if (isScrolling.current) return;
+    
     // Delay blur to allow dropdown clicks
     setTimeout(() => {
-      if (value && !businesses.find(b => b.name.toLowerCase() === value.toLowerCase())) {
-        // Business doesn't exist - don't auto-show form, let parent handle it
-        setShowDropdown(false);
-      } else {
-        setShowDropdown(false);
-        setInternalShowAddForm(false);
+      if (!isScrolling.current) {
+        if (value && !businesses.find(b => b.name.toLowerCase() === value.toLowerCase())) {
+          // Business doesn't exist - don't auto-show form, let parent handle it
+          setShowDropdown(false);
+        } else {
+          setShowDropdown(false);
+          setInternalShowAddForm(false);
+        }
+        onBlur?.();
       }
-      onBlur?.();
     }, 150);
   };
 
