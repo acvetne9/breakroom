@@ -114,7 +114,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
         createPortal(
           <div
             style={popupStyle}
-            className="bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-4 break-words"
+            className="bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-4 inline-block max-w-xs break-words"
           >
             <p className="text-sm text-gray-800 text-center">
               Are you sure you want to delete this post?
@@ -122,6 +122,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
           </div>,
           document.body
         )}
+
     </div>
   );
 };
