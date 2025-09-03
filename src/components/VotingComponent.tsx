@@ -102,7 +102,8 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
           </button>
           
           {showDeleteConfirm && (
-            <div className="absolute top-full mt-2 left-0 z-[99999] bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-3 max-w-[90vw] break-words">
+            <div className="absolute top-full mt-2 left-0 z-[99999] bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-4 
+                            max-w-[calc(100vw-2rem)] w-fit break-words">
               <p className="text-sm text-gray-800 text-center">
                 Are you sure you want to delete this post?
               </p>
