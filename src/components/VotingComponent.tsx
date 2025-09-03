@@ -101,18 +101,13 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
             </span>
           </button>
           
-          {showDeleteConfirm &&
-            createPortal(
-              <div className="fixed inset-0 z-[99999] flex items-center justify-center px-4">
-                <div className="bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-4 max-w-[90vw] break-words">
-                  <p className="text-sm text-gray-800 text-center">
-                    Are you sure you want to delete this post?
-                  </p>
-                </div>
-              </div>,
-              document.body
-            )
-          }
+          {showDeleteConfirm && (
+            <div className="absolute top-full mt-2 left-0 z-[99999] bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-3 max-w-[90vw] break-words">
+              <p className="text-sm text-gray-800 text-center">
+                Are you sure you want to delete this post?
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>
