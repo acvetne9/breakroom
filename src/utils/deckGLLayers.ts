@@ -30,7 +30,7 @@ export const createBusinessScatterplotLayer = ({
     radiusScale: 1,
     radiusMinPixels: 10,
     radiusMaxPixels: 15,
-    lineWidthMinPixels: 1,
+    lineWidthMinPixels: 2,
     getPosition: (d: Business) => {
       if (!d || !d.position) {
         console.warn('⚠️ Invalid business data:', d);
@@ -69,8 +69,8 @@ export const createBusinessClusterLayer = (data: any[], onBusinessClick?: (busin
     stroked: true,
     filled: true,
     radiusScale: 1,
-    radiusMinPixels: 8,
-    radiusMaxPixels: 50,
+    radiusMinPixels: 10,
+    radiusMaxPixels: 15,
     lineWidthMinPixels: 2,
     getPosition: (d: any) => {
       if (d.type === 'cluster') {
