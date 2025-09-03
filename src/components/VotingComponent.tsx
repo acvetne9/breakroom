@@ -38,33 +38,36 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
     }
   };
 
+  const popupRef = useRef<HTMLDivElement | null>(null);
+
 useEffect(() => {
-  if (!showDeleteConfirm || !deleteButtonRef.current) return;
+  if (showDeleteConfirm && deleteButtonRef.current && popupRef.current) {
+    const rect = deleteButtonRef.current.getBoundingClientRect();
+    const popupRect = popupRef.current.getBoundingClientRect();
+    const margin = 8;
+    const shiftLeft = window.innerWidth * 0.05;
 
-  const margin = 8; // vertical gap
-  const rect = deleteButtonRef.current.getBoundingClientRect();
+    let top = rect.bottom + window.scrollY + margin;
 
-  // Position below the button
-  let top = rect.bottom + window.scrollY + margin;
+    // Default: right edge of popup aligns with button right
+    let left = rect.right + window.scrollX - popupRect.width;
 
-  // Start with the popup aligned to the button’s right edge
-  let left = rect.right + window.scrollX;
+    // Apply 5% shift to the left
+    left -= shiftLeft;
 
-  // Apply your requested 5% shift left
-  const shiftLeft = window.innerWidth * 0.05;
-  left = left - shiftLeft;
+    // Clamp inside viewport
+    if (left < margin) left = margin;
+    if (left + popupRect.width > window.innerWidth - margin) {
+      left = window.innerWidth - popupRect.width - margin;
+    }
 
-  // Measure max available width
-  const maxWidth = window.innerWidth - 2 * margin;
-
-  setPopupStyle({
-    position: "absolute",
-    top,
-    left: Math.max(margin, Math.min(left, window.innerWidth - margin)), // clamp so it stays in viewport
-    maxWidth,
-    whiteSpace: "normal", // wrap text
-    zIndex: 999999,
-  });
+    setPopupStyle({
+      position: "absolute",
+      top,
+      left,
+      zIndex: 999999,
+    });
+  }
 }, [showDeleteConfirm]);
 
 
@@ -129,8 +132,9 @@ useEffect(() => {
       {showDeleteConfirm &&
   createPortal(
     <div
+      ref={popupRef}
       style={popupStyle}
-      className="bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-4 inline-block break-words w-auto"
+      className="bg-white rounded-xl border-2 border-yellow-400 shadow-lg p-4 break-words"
     >
       <p className="text-sm text-gray-800 text-center">
         Are you sure you want to delete this post?
