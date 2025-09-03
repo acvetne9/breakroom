@@ -79,6 +79,10 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
       )}
       
       {isOwner && (
+        <span className="font-medium text-app-black min-w-[20px] text-center">
+          {netScore}
+        </span>
+      
         <button
           onClick={handleDelete}
           className="p-1 rounded transition-all hover:bg-red-50 hover:scale-105"
