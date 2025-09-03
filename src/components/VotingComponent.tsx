@@ -55,6 +55,28 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
     }
   };
 
+    // Close popup if clicking outside
+  useEffect(() => {
+    if (!showDeleteConfirm) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        popupRef.current &&
+        !popupRef.current.contains(target) &&
+        deleteButtonRef.current &&
+        !deleteButtonRef.current.contains(target)
+      ) {
+        setShowDeleteConfirm(false);
+      }
+    };
+
+    document.addEventListener("click", handleClickOutside);
+    return () => {
+      document.removeEventListener("click", handleClickOutside);
+    };
+  }, [showDeleteConfirm]);
+
   // Measure & position synchronously after DOM writes (pre-paint)
   useLayoutEffect(() => {
     if (!showDeleteConfirm) return;
