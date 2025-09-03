@@ -48,29 +48,36 @@ export const DeckGLOverlay: React.FC<DeckGLOverlayProps> = ({
     return newOverlay;
   }, [map]);
 
-  // Optimized layer creation - removed map dependency to prevent infinite loops
+  // Always show individual clickable businesses - no clustering
   const layers = useMemo(() => {
     if (!businesses.length) return [];
     
-    // Use clustered data if available, otherwise decide based on count and zoom
+    // If data is pre-clustered from worker, extract individual businesses
     if (isClusteredData) {
-      console.log(`🎯 Using pre-clustered data: ${businesses.length} items`);
-      return [createBusinessClusterLayer(businesses, onBusinessClick, map)];
-    }
-    
-    const shouldCluster = enableClustering && (businesses.length > 5000 || zoom < 11);
-    
-    console.log(`🎯 Creating ${shouldCluster ? 'clustered' : 'scatter'} layer for ${businesses.length} businesses at zoom ${zoom}`);
-    
-    if (shouldCluster) {
-      return [createBusinessClusterLayer(businesses, onBusinessClick, map)];
-    } else {
+      console.log(`🎯 Extracting individual businesses from clustered data: ${businesses.length} items`);
+      const individualBusinesses = businesses.flatMap((item: any) => {
+        if (item.type === 'cluster' && item.businesses) {
+          return item.businesses;
+        } else if (item.type !== 'cluster') {
+          return [item];
+        }
+        return [];
+      });
+      
       return [createBusinessScatterplotLayer({
-        businesses: businesses as Business[],
+        businesses: individualBusinesses as Business[],
         selectedBusinessId,
         onBusinessClick,
       })];
     }
+    
+    console.log(`🎯 Creating scatter layer with ${businesses.length} individual clickable businesses`);
+    
+    return [createBusinessScatterplotLayer({
+      businesses: businesses as Business[],
+      selectedBusinessId,
+      onBusinessClick,
+    })];
   }, [businesses, selectedBusinessId, onBusinessClick, enableClustering, isClusteredData, zoom]); // Removed map dependency
 
   // Smooth layer updates with improved transitions
