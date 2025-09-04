@@ -47,3 +47,50 @@ const nycNeighborhoods = {
     { name: "New Dorp", lat: 40.5732, lon: -74.1165 }
   ]
 };
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const toRad = deg => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Given two points, compute geographic midpoint
+function midpoint(lat1, lon1, lat2, lon2) {
+  return {
+    lat: (lat1 + lat2) / 2,
+    lon: (lon1 + lon2) / 2
+  };
+}
+
+// Generate quasi-circle points for a neighborhood
+function generateNeighborhoodBoundary(neighborhood, neighbors, bufferKm = 0.5, pointsPerArc = 5) {
+  const arcs = [];
+
+  neighbors.forEach(n => {
+    const mid = midpoint(neighborhood.lat, neighborhood.lon, n.lat, n.lon);
+    const dist = haversine(neighborhood.lat, neighborhood.lon, mid.lat, mid.lon) + bufferKm;
+
+    // Place points along the arc from center to midpoint
+    for (let i = 0; i <= pointsPerArc; i++) {
+      const ratio = i / pointsPerArc;
+      const lat = neighborhood.lat + (mid.lat - neighborhood.lat) * ratio;
+      const lon = neighborhood.lon + (mid.lon - neighborhood.lon) * ratio;
+      arcs.push({ lat, lon });
+    }
+  });
+
+  // Sort arcs by angle from center for simple polygon ordering
+  arcs.sort((a, b) => {
+    const angleA = Math.atan2(a.lat - neighborhood.lat, a.lon - neighborhood.lon);
+    const angleB = Math.atan2(b.lat - neighborhood.lat, b.lon - neighborhood.lon);
+    return angleA - angleB;
+  });
+
+  return arcs; // array of {lat, lon} forming boundary
+}
+
