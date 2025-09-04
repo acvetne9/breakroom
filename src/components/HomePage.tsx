@@ -49,8 +49,9 @@ const HomePage: React.FC<HomePageProps> = ({
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
   const [showLoading, setShowLoading] = useState(true);
 
-  // 👇 new state for welcome banner
+  // 👇 new state for welcome banner + loading closed
   const [showWelcome, setShowWelcome] = useState(false);
+  const [loadingClosed, setLoadingClosed] = useState(false);
 
   // Listen for search triggers from other pages
   useEffect(() => {
@@ -79,13 +80,19 @@ const HomePage: React.FC<HomePageProps> = ({
     return () => window.removeEventListener('triggerSearch', handleSearchTrigger as EventListener);
   }, []);
 
-  // 👇 when loading completes, show welcome for 6s
+  // 👇 when loading completes, mark it closed first
   const handleLoadingComplete = () => {
     setShowLoading(false);
-    setShowWelcome(true);
+    setLoadingClosed(true);
+
+    // wait a moment to ensure initiation popup is fully gone before showing welcome
     setTimeout(() => {
-      setShowWelcome(false);
-    }, 6000);
+      setShowWelcome(true);
+
+      setTimeout(() => {
+        setShowWelcome(false);
+      }, 6000);
+    }, 500); // small delay after loading closes
   };
   
   const selectedBusiness = propSelectedBusiness;
@@ -177,8 +184,8 @@ const HomePage: React.FC<HomePageProps> = ({
         <BreakroomLoading onComplete={handleLoadingComplete} />
       )}
 
-      {/* 👇 Welcome banner appears after loading, disappears after 6s */}
-      {showWelcome && (
+      {/* 👇 Welcome banner only appears AFTER initiation popup closes */}
+      {loadingClosed && showWelcome && (
         <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-30 w-[90%] max-w-lg">
           <div className="bg-white rounded-2xl shadow-md px-4 py-3 text-center text-sm font-medium border border-gray-200">
             <p>Welcome to breakroom!</p>
