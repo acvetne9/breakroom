@@ -49,20 +49,45 @@ const HomePage: React.FC<HomePageProps> = ({
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
   const [showLoading, setShowLoading] = useState(true);
 
-  // 👇 banner state
+  // 👇 new state for welcome banner
   const [showWelcome, setShowWelcome] = useState(false);
-  const [fadeOut, setFadeOut] = useState(false);
 
-  // show welcome after loading, then fade out
+  // Listen for search triggers from other pages
+  useEffect(() => {
+    const handleSearchTrigger = (event: CustomEvent) => {
+      const searchTerm = event.detail;
+      console.log('🔍 [triggerSearch] Received search trigger:', searchTerm);
+      setSearchValue(searchTerm);
+      
+      const filters = parseSearchFilters(searchTerm);
+      console.log('🔍 [triggerSearch] Parsed filters:', filters);
+      
+      if (filters?.neighborhoodFilter) {
+        const neighborhoodCoords = {
+          lat: filters.neighborhoodFilter.center.lat,
+          lon: filters.neighborhoodFilter.center.lon
+        };
+        console.log('🏙️ Setting neighborhood center from trigger:', neighborhoodCoords);
+        setNeighborhoodCenter(neighborhoodCoords);
+      } else {
+        setNeighborhoodCenter(null);
+      }
+      setSearchFilters(filters);
+    };
+
+    window.addEventListener('triggerSearch', handleSearchTrigger as EventListener);
+    return () => window.removeEventListener('triggerSearch', handleSearchTrigger as EventListener);
+  }, []);
+
+  // 👇 when loading completes, show welcome for 6s
   const handleLoadingComplete = () => {
     setShowLoading(false);
     setShowWelcome(true);
     setTimeout(() => {
-      setFadeOut(true); // start fade out
-      setTimeout(() => setShowWelcome(false), 1000); // remove from DOM after fade
+      setShowWelcome(false);
     }, 6000);
   };
-
+  
   const selectedBusiness = propSelectedBusiness;
   const landmarks = [
     {lat: 40.690331, lng: -74.045414, emoji: "🗽"},
@@ -91,14 +116,19 @@ const HomePage: React.FC<HomePageProps> = ({
   const { toast } = useToast();
 
   const handleSearchChange = (value: string, business?: EnhancedBusiness, filters?: any, neighborhoodCoords?: { lat: number; lon: number }) => {
+    console.log('🔍 Search change in HomePage:', { value, filters, neighborhoodCoords, hasFilters: !!filters });
     setSearchValue(value);
     setSearchFilters(filters);
+    
     if (neighborhoodCoords) {
+      console.log('🏙️ Setting neighborhood center:', neighborhoodCoords);
       setNeighborhoodCenter(neighborhoodCoords);
     } else {
       setNeighborhoodCenter(null);
     }
+    
     if (!value && !filters) {
+      console.log('🧹 Search explicitly cleared - removing filters');
       setSearchFilters(null);
       setNeighborhoodCenter(null);
     }
@@ -111,15 +141,34 @@ const HomePage: React.FC<HomePageProps> = ({
       formatted_address: business.formatted_address || business.vicinity || business.name
     };
     handleBusinessClick(mapBusiness);
+    console.log('🔍 Business selected from search - keeping filters active:', searchFilters);
   };
 
   const handleBusinessClick = (business: any) => {
     onBusinessSelect?.(business);
     setShowBusinessDetails(false);
+    
     if (onLocationSave && business.name) {
       const fullLocation = business.formatted_address || business.vicinity || business.name;
       onLocationSave(business.name, fullLocation);
     }
+  };
+
+  const handleShowBusinessDetails = () => {
+    setShowBusinessDetails(true);
+  };
+
+  const handleBusinessStoriesClick = () => {
+    onBusinessStoriesClick?.(selectedBusiness.id);
+  };
+
+  const handleClosePreview = () => {
+    onBusinessSelect?.(null);
+    setShowBusinessDetails(false);
+  };
+
+  const handleBackToPreview = () => {
+    setShowBusinessDetails(false);
   };
 
   return (
@@ -128,16 +177,12 @@ const HomePage: React.FC<HomePageProps> = ({
         <BreakroomLoading onComplete={handleLoadingComplete} />
       )}
 
-      {/* 👇 Welcome banner with fade-in / fade-out */}
+      {/* 👇 Welcome banner appears after loading, disappears after 6s */}
       {showWelcome && (
-        <div
-          className={`absolute top-6 left-1/2 transform -translate-x-1/2 z-30 w-[90%] max-w-lg transition-opacity duration-1000 ${
-            fadeOut ? 'opacity-0' : 'opacity-100'
-          }`}
-        >
+        <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-30 w-[90%] max-w-lg">
           <div className="bg-white rounded-2xl shadow-md px-4 py-3 text-center text-sm font-medium border border-gray-200">
-            <p>Welcome to breakroom!</p>
-            <p>Click on one a yellow dot to discover one of 54k businesses</p>
+            <p>Welcome to breakroom! 🥳</p>
+            <p>Click on a yellow dot to discover one of our 54k businesses 👇</p>
           </div>
         </div>
       )}
@@ -157,9 +202,9 @@ const HomePage: React.FC<HomePageProps> = ({
           <BusinessPreview 
             business={selectedBusiness}
             posts={posts}
-            onClose={() => onBusinessSelect?.(null)}
-            onShowDetails={() => setShowBusinessDetails(true)}
-            onStoriesClick={() => onBusinessStoriesClick?.(selectedBusiness.id)}
+            onClose={handleClosePreview}
+            onShowDetails={handleShowBusinessDetails}
+            onStoriesClick={handleBusinessStoriesClick}
           />
         )}
   
@@ -168,8 +213,8 @@ const HomePage: React.FC<HomePageProps> = ({
           <BusinessDetails 
             business={selectedBusiness}
             posts={posts}
-            onClose={() => onBusinessSelect?.(null)}
-            onBackToPreview={() => setShowBusinessDetails(false)}
+            onClose={handleClosePreview}
+            onBackToPreview={handleBackToPreview}
             onStoriesClick={() => onBusinessStoriesClick?.(selectedBusiness.id)}
             onPostClick={onPostClick}
             onRoleVote={onRoleVote}
