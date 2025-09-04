@@ -6,7 +6,7 @@ import UnifiedBusinessSearch from './UnifiedBusinessSearch';
 import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 import { useDevice } from '@/contexts/DeviceContext';
-import { nycNeighborhoods } from'../utils/nyc_neighborhoods'
+import { nycNeighborhoods } from '../utils/nyc_neighborhoods'
 
 interface UserInfo {
   salary: string;
