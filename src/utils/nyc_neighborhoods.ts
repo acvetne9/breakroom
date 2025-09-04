@@ -1,4 +1,4 @@
-const nycNeighborhoods = {
+export const nycNeighborhoods = {
   Manhattan: [
     { name: "Harlem", lat: 40.8116, lon: -73.9465 },
     { name: "Upper East Side", lat: 40.7736, lon: -73.9566 },
@@ -48,7 +48,7 @@ const nycNeighborhoods = {
   ]
 };
 
-function haversine(lat1, lon1, lat2, lon2) {
+export function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const toRad = deg => (deg * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1);
@@ -68,7 +68,7 @@ function midpoint(lat1, lon1, lat2, lon2) {
 }
 
 // Generate quasi-circle points for a neighborhood
-function generateNeighborhoodBoundary(neighborhood, neighbors, bufferKm = 0.5, pointsPerArc = 5) {
+export function generateNeighborhoodBoundary(neighborhood, neighbors, bufferKm = 0.5, pointsPerArc = 5) {
   const arcs = [];
 
   neighbors.forEach(n => {
