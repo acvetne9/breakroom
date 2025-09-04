@@ -60,6 +60,18 @@ const HomePage: React.FC<HomePageProps> = ({
       const filters = parseSearchFilters(searchTerm);
       console.log('🔍 [triggerSearch] Parsed filters:', filters);
       
+      // Set neighborhood center if it's a neighborhood search
+      if (filters?.neighborhoodFilter) {
+        const neighborhoodCoords = {
+          lat: filters.neighborhoodFilter.center.lat,
+          lon: filters.neighborhoodFilter.center.lon
+        };
+        console.log('🏙️ Setting neighborhood center from trigger:', neighborhoodCoords);
+        setNeighborhoodCenter(neighborhoodCoords);
+      } else {
+        setNeighborhoodCenter(null);
+      }
+      
       // Apply the filters to the map
       setSearchFilters(filters);
     };
