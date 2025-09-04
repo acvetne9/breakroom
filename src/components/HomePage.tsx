@@ -45,11 +45,12 @@ const HomePage: React.FC<HomePageProps> = ({
 }) => {
   const [searchValue, setSearchValue] = useState('');
   const [searchFilters, setSearchFilters] = useState<any>(null);
+  const [neighborhoodCenter, setNeighborhoodCenter] = useState<{ lat: number; lon: number } | null>(null);
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
   const [showLoading, setShowLoading] = useState(true);
 
   // Listen for search triggers from other pages
-  useEffect(() => {UnifiedBusinessSearch
+  useEffect(() => {
     const handleSearchTrigger = (event: CustomEvent) => {
       const searchTerm = event.detail;
       console.log('🔍 [triggerSearch] Received search trigger:', searchTerm);
@@ -100,15 +101,25 @@ const HomePage: React.FC<HomePageProps> = ({
 ]
   const { toast } = useToast();
 
-  const handleSearchChange = (value: string, business?: EnhancedBusiness, filters?: any) => {
-    console.log('🔍 Search change in HomePage:', { value, filters, hasFilters: !!filters });
+  const handleSearchChange = (value: string, business?: EnhancedBusiness, filters?: any, neighborhoodCoords?: { lat: number; lon: number }) => {
+    console.log('🔍 Search change in HomePage:', { value, filters, neighborhoodCoords, hasFilters: !!filters });
     setSearchValue(value);
     setSearchFilters(filters);
+    
+    // Set neighborhood center if provided
+    if (neighborhoodCoords) {
+      console.log('🏙️ Setting neighborhood center:', neighborhoodCoords);
+      setNeighborhoodCenter(neighborhoodCoords);
+    } else {
+      // Clear neighborhood center if no coords provided (regular search or clear)
+      setNeighborhoodCenter(null);
+    }
     
     // Only clear filters when search is explicitly cleared (empty value and no filters)
     if (!value && !filters) {
       console.log('🧹 Search explicitly cleared - removing filters');
       setSearchFilters(null);
+      setNeighborhoodCenter(null);
     }
   };
 
@@ -168,6 +179,7 @@ const HomePage: React.FC<HomePageProps> = ({
             selectedBusiness={selectedBusiness}
             landmarks={landmarks}
             searchFilters={searchFilters}
+            neighborhoodCenter={neighborhoodCenter}
           />
         
   

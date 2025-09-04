@@ -8,7 +8,7 @@ import { Search } from 'lucide-react';
 
 interface UnifiedBusinessSearchProps {
   value: string;
-  onChange: (value: string, business?: EnhancedBusiness, filters?: any) => void;
+  onChange: (value: string, business?: EnhancedBusiness, filters?: any, neighborhoodCoords?: { lat: number; lon: number }) => void;
   onBusinessSelect?: (business: EnhancedBusiness) => void;
   onBlur?: () => void;
   placeholder?: string;
@@ -180,13 +180,18 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       // Update the search input with just the neighborhood name
       onChange(neighborhoodName);
       
-      // Trigger neighborhood search
+      // Trigger neighborhood search with coordinates
       const filters = parseSearchFilters(neighborhoodName);
-      if (filters) {
+      if (filters?.neighborhoodFilter) {
+        const neighborhoodCoords = {
+          lat: filters.neighborhoodFilter.center.lat,
+          lon: filters.neighborhoodFilter.center.lon
+        };
+        
         committedQueryRef.current = neighborhoodName;
         lastExecutedQuery.current = neighborhoodName;
         lastFiltersRef.current = JSON.stringify(filters);
-        onChange(neighborhoodName, undefined, filters);
+        onChange(neighborhoodName, undefined, filters, neighborhoodCoords);
       }
     } else {
       // Handle business click
