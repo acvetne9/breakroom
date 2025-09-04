@@ -356,15 +356,16 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         {/* Neighborhoods Section */}
         <div className="mb-6">
           <h3 className="text-lg font-semibold mb-2">Neighborhoods</h3>
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={() => {
-                onSearchTrigger?.('Williamsburg');
-              }}
-              className="px-4 py-2 bg-app-yellow text-app-black rounded hover:bg-app-yellow/90 transition-colors"
-            >
-              Williamsburg
-            </button>
+          <div className="flex flex-wrap gap-1">
+            {Object.values(nycNeighborhoods).flat().map(n => (
+              <button
+                key={n.name}
+                onClick={() => onSearchTrigger?.(n.name)}
+                className="px-2 py-1 bg-app-yellow text-app-black rounded text-sm hover:bg-app-yellow/90 transition-colors"
+              >
+                {n.name}
+              </button>
+            ))}
           </div>
         </div>
 
