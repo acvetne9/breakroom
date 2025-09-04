@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from '@/hooks/useTranslation'
-import { Skeleton } from '@/components/ui/skeleton'
 
 interface TranslatedTextProps {
   text: string
@@ -8,56 +7,60 @@ interface TranslatedTextProps {
   showIndicator?: boolean
 }
 
-export function TranslatedText({ text, className = '', showIndicator = true }: TranslatedTextProps) {
+export function TranslatedText({
+  text,
+  className = '',
+  showIndicator = true,
+}: TranslatedTextProps) {
   const { translateText, getLanguageName } = useTranslation()
   const [translationResult, setTranslationResult] = useState<{
     translatedText: string
     sourceLanguage: string
     isTranslated: boolean
   } | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    let isMounted = true
+
     const loadTranslation = async () => {
       if (!text || !text.trim()) {
-        setIsLoading(false)
         return
       }
 
-      setIsLoading(true)
       try {
         const result = await translateText(text)
-        setTranslationResult(result)
+        if (isMounted) {
+          setTranslationResult(result)
+        }
       } catch (error) {
         console.error('Translation component error:', error)
-        // Fallback to show original text
-        setTranslationResult({
-          translatedText: text,
-          sourceLanguage: 'unknown',
-          isTranslated: false
-        })
-      } finally {
-        setIsLoading(false)
+        if (isMounted) {
+          setTranslationResult({
+            translatedText: text,
+            sourceLanguage: 'unknown',
+            isTranslated: false,
+          })
+        }
       }
     }
 
     loadTranslation()
+    return () => {
+      isMounted = false
+    }
   }, [text])
 
-  if (isLoading) {
-    return <Skeleton className={`h-4 w-full ${className}`} />
-  }
-
-  if (!translationResult) {
-    return <span className={className}>{text}</span>
-  }
+  const showTranslation =
+    translationResult &&
+    translationResult.isTranslated &&
+    translationResult.translatedText !== text
 
   return (
     <div className={className}>
-      <span>{translationResult.translatedText}</span>
-      {showIndicator && translationResult.isTranslated && (
+      <span>{showTranslation ? translationResult?.translatedText : text}</span>
+      {showIndicator && showTranslation && (
         <div className="text-xs text-muted-foreground/60 mt-1">
-          Translated from {getLanguageName(translationResult.sourceLanguage)}
+          Translated from {getLanguageName(translationResult!.sourceLanguage)}
         </div>
       )}
     </div>
