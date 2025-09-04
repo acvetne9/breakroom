@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { searchBusinessesEnhanced, EnhancedBusiness } from '@/services/enhancedBusinessSearch';
 import { parseSearchFilters } from '@/services/businessFiltering';
+import { findNeighborhood } from '@/services/neighborhoodSearch';
 import { isProfane } from '@/utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 import { Search } from 'lucide-react';
@@ -17,6 +18,15 @@ interface UnifiedBusinessSearchProps {
   onLocationSave?: (location: string, fullLocation: string) => void;
 }
 
+interface NeighborhoodResult {
+  id: string;
+  name: string;
+  isNeighborhood: true;
+  borough: string;
+}
+
+type SearchResult = EnhancedBusiness | NeighborhoodResult;
+
 const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   value,
   onChange,
@@ -28,7 +38,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   showIcon = false,
   onLocationSave
 }) => {
-  const [searchResults, setSearchResults] = useState<EnhancedBusiness[]>([]);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const { toast } = useToast();
@@ -39,7 +49,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   const searchSeqRef = useRef(0);
   const lastFiltersRef = useRef<string | null>(null);
   const committedQueryRef = useRef<string>('');
-  const resultsCache = useRef<Map<string, EnhancedBusiness[]>>(new Map());
+  const resultsCache = useRef<Map<string, SearchResult[]>>(new Map());
   const isScrolling = useRef(false);
   const lastExecutedQuery = useRef<string>('');
 
@@ -112,7 +122,23 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     const seq = ++searchSeqRef.current;
     const timer = setTimeout(async () => {
       try {
-        const results = await searchBusinessesEnhanced(q, 10);
+        const results: SearchResult[] = [];
+        
+        // Check if the query matches a neighborhood
+        const neighborhood = findNeighborhood(q);
+        if (neighborhood) {
+          results.push({
+            id: `neighborhood-${neighborhood.name}`,
+            name: `${neighborhood.name} - Search Neighborhood`,
+            isNeighborhood: true as const,
+            borough: neighborhood.borough
+          });
+        }
+        
+        // Get business results
+        const businessResults = await searchBusinessesEnhanced(q, 10);
+        results.push(...businessResults);
+        
         if (seq !== searchSeqRef.current) return;
         
         // Cache the results
@@ -145,25 +171,43 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     }
   };
 
-  const handleBusinessClick = (business: EnhancedBusiness) => {
-    console.log('🏢 [handleBusinessClick] Business clicked:', business.name);
-    console.log('🏢 [handleBusinessClick] Current search value:', value);
-    console.log('🏢 [handleBusinessClick] Should perform search instead of just saving business');
+  const handleResultClick = (result: SearchResult) => {
+    if ('isNeighborhood' in result && result.isNeighborhood) {
+      // Handle neighborhood click - search for all businesses in that neighborhood
+      const neighborhoodName = result.name.replace(' - Search Neighborhood', '');
+      console.log('🏙️ [handleResultClick] Neighborhood clicked:', neighborhoodName);
+      
+      // Update the search input with just the neighborhood name
+      onChange(neighborhoodName);
+      
+      // Trigger neighborhood search
+      const filters = parseSearchFilters(neighborhoodName);
+      if (filters) {
+        committedQueryRef.current = neighborhoodName;
+        lastExecutedQuery.current = neighborhoodName;
+        lastFiltersRef.current = JSON.stringify(filters);
+        onChange(neighborhoodName, undefined, filters);
+      }
+    } else {
+      // Handle business click
+      const business = result as EnhancedBusiness;
+      console.log('🏢 [handleResultClick] Business clicked:', business.name);
+      
+      // Perform search with current value
+      performSearch();
+      
+      // Still call the business select callback for any other handling needed
+      onBusinessSelect?.(business);
+      
+      // Save the clicked business location
+      if (onLocationSave && business.name) {
+        const fullLocation = business.formatted_address || business.vicinity || business.name;
+        onLocationSave(business.name, fullLocation);
+      }
+    }
     
-    // Instead of just saving the business, we should execute the search with the current search term
-    // and then optionally save the location
-    performSearch();
-    
-    // Still call the business select callback for any other handling needed
-    onBusinessSelect?.(business);
     setShowDropdown(false);
     setSearchResults([]);
-    
-    // Save the clicked business location
-    if (onLocationSave && business.name) {
-      const fullLocation = business.formatted_address || business.vicinity || business.name;
-      onLocationSave(business.name, fullLocation);
-    }
   };
 
   const performSearch = () => {
@@ -172,7 +216,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     const trimmedValue = value.trim();
     
     // Check if this is the same query we just executed
-    if (trimmedValue === lastExecutedQuery.current && trimmedValue.length >= 4) {
+    if (trimmedValue === lastExecutedQuery.current && trimmedValue.length >= 3) {
       console.log('🚫 [performSearch] Skipping - same query already executed:', trimmedValue);
       setShowDropdown(false);
       return;
@@ -207,7 +251,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     console.log('🔍 [performSearch] Current committed query:', committedQueryRef.current);
     console.log('🔍 [performSearch] Last executed query:', lastExecutedQuery.current);
     
-    if (trimmedValue.length >= 4 && committedQueryRef.current !== trimmedValue) {
+    if (trimmedValue.length >= 3 && committedQueryRef.current !== trimmedValue) {
       console.log('🔍 Committing search query:', trimmedValue);
       committedQueryRef.current = trimmedValue;
       lastExecutedQuery.current = trimmedValue;
@@ -219,7 +263,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         (filters.textTerms && filters.textTerms.length > 0) ||
         filters.salaryQuery ||
         filters.roleFilter ||
-        filters.businessTypeFilter
+        filters.businessTypeFilter ||
+        filters.neighborhoodFilter
       )) {
         console.log('✅ Applying valid search filters:', filters);
         const filtersKey = JSON.stringify(filters);
@@ -235,7 +280,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           onChange(value, undefined, null);
         }
       }
-    } else if (trimmedValue.length < 4 && lastFiltersRef.current !== null) {
+    } else if (trimmedValue.length < 3 && lastFiltersRef.current !== null) {
       // Clear filters if search is too short
       console.log('🧹 Search too short, clearing filters');
       lastFiltersRef.current = null;
@@ -307,26 +352,37 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
               <div className="text-sm text-muted-foreground">Searching...</div>
             </div>
           ) : (
-            searchResults.map((business, index) => (
+            searchResults.map((result, index) => (
               <div
-                key={business.id}
+                key={result.id}
                 className="flex flex-col py-2 px-3 mx-1 mb-1 last:mb-0 cursor-pointer hover:bg-accent bg-background rounded-md border border-border/50"
-                onClick={() => handleBusinessClick(business)}
+                onClick={() => handleResultClick(result)}
               >
-                <div className="flex justify-between items-center">
-                  <span className="font-medium">{business.name}</span>
-                  <span className="text-sm text-muted-foreground">{business.salary}</span>
-                </div>
-                <div className="flex gap-2 mt-1">
-                  <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                    {business.businessType || 'Business'}
-                  </span>
-                   {business.roles?.map((role, index) => (
-                     <span key={index} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                       {role.role} - {role.salary}
-                     </span>
-                   ))}
-                </div>
+                {'isNeighborhood' in result && result.isNeighborhood ? (
+                  // Neighborhood result
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">{result.name}</span>
+                    <span className="text-xs text-muted-foreground">{result.borough}</span>
+                  </div>
+                ) : (
+                  // Business result
+                  <>
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium">{result.name}</span>
+                      <span className="text-sm text-muted-foreground">{(result as EnhancedBusiness).salary}</span>
+                    </div>
+                    <div className="flex gap-2 mt-1">
+                      <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                        {(result as EnhancedBusiness).businessType || 'Business'}
+                      </span>
+                      {(result as EnhancedBusiness).roles?.map((role, index) => (
+                        <span key={index} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          {role.role} - {role.salary}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             ))
           )}
