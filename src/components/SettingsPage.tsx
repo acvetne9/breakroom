@@ -357,7 +357,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         {/* Neighborhoods Section */}
         <div className="mb-6">
           <h3 className="text-lg font-semibold mb-2">Neighborhoods</h3>
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-y-1 gap-x-2">
             {Object.values(nycNeighborhoods).flat().map(n => (
               <button
                 key={n.name}
