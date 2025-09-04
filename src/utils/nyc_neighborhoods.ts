@@ -18,7 +18,8 @@ export const nycNeighborhoods = {
     { name: "Brooklyn Heights", lat: 40.6959, lon: -73.9956 },
     { name: "Coney Island", lat: 40.5755, lon: -73.9707 },
     { name: "Brownsville", lat: 40.6629, lon: -73.9133 },
-    { name: "Bensonhurst", lat: 40.6113, lon: -73.997 }
+    { name: "Bensonhurst", lat: 40.6113, lon: -73.997 },
+    { name: "Canarsie", lat: 40.638590, lon: -73.897079 }
   ],
   Queens: [
     { name: "Astoria", lat: 40.7644, lon: -73.9235 },
