@@ -21,6 +21,7 @@ interface BusinessDetailsProps {
     name: string;
     atmosphere: string[];
     salary?: string;
+    address?: string;
     stories?: Array<{
       id: string;
       text: string;
@@ -95,6 +96,13 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
               text={business.name}
               className="text-xl font-medium text-app-black"
             />
+            {business.address && business.address.trim() && (
+              <div className="mt-1">
+                <span className="text-sm text-app-gray-medium">
+                  {business.address}
+                </span>
+              </div>
+            )}
             <div className="flex items-center mt-2">
               <span className="text-app-gray-medium">
                 {business.atmosphere.join(' • ')}

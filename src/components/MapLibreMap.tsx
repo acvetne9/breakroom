@@ -268,7 +268,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         center: [-73.986104, 40.715245],
         zoom: 12.77,
         maxZoom: 18,
-        minZoom: 8,
+        minZoom: 9,
         renderWorldCopies: false,
         attributionControl: false
       });
@@ -532,24 +532,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                          
                          // Add businesses points layer
                          try {
-                           mapInstance.addLayer({
-                             id: 'nyc-businesses',
-                             type: 'circle',
-                             source: 'nyc-tiles',
-                             'source-layer': detectedLayer,
-                             paint: {
-                               'circle-color': '#FACC15', // Yellow for businesses
-                               'circle-radius': 8,
-                               'circle-opacity': 1.0,
-                               'circle-stroke-width': 2,
-                               'circle-stroke-color': '#FFFFFF'
-                             },
-                             filter: ['==', ['geometry-type'], 'Point']
-                           });
-                           console.log('✅ Added businesses layer (probed)');
-                         } catch (businessesErr) {
-                           console.warn('⚠️ Businesses layer (probed) failed:', businessesErr);
-                         }
+                          mapInstance.addLayer({
+                            id: 'nyc-businesses',
+                            type: 'circle',
+                            source: 'nyc-tiles',
+                            'source-layer': detectedLayer,
+                            paint: {
+                              'circle-color': '#FACC15', // Yellow for businesses - matches DeckGL
+                              'circle-radius': 8, // Same as DeckGL BUSINESS_DOT_STYLE.radius
+                              'circle-opacity': 1.0,
+                              'circle-stroke-width': 2, // Same as DeckGL
+                              'circle-stroke-color': '#FFFFFF', // White border - matches DeckGL
+                              'circle-stroke-opacity': 1.0 // Slightly transparent to match DeckGL
+                            },
+                            filter: ['==', ['geometry-type'], 'Point']
+                          });
+                          console.log('✅ Added businesses layer');
+                        } catch (businessesErr) {
+                          console.warn('⚠️ Businesses layer failed:', businessesErr);
+                        }
                          
                          layersAddedRef.current = true;
                          console.log('🎉 NYC layers added successfully! (probed)');

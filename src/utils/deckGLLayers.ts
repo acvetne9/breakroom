@@ -18,6 +18,18 @@ export const createBusinessScatterplotLayer = ({
   // Use stable ID to prevent layer recreation
   const layerId = 'businesses-scatter';
   
+  console.log(`🎯 Creating scatterplot layer with ${businesses.length} clickable businesses`);
+  console.log(`🎯 onClick handler provided:`, !!onBusinessClick);
+  
+  // Log sample business data to debug
+  if (businesses.length > 0) {
+    console.log(`🎯 Sample business data:`, {
+      id: businesses[0].id,
+      name: businesses[0].name,
+      position: businesses[0].position
+    });
+  }
+  
   return new ScatterplotLayer({
     id: layerId,
     data: businesses,
@@ -26,27 +38,40 @@ export const createBusinessScatterplotLayer = ({
     stroked: true,
     filled: true,
     radiusScale: 1,
-    radiusMinPixels: 8,
-    radiusMaxPixels: 24,
-    lineWidthMinPixels: 1.5,
-    getPosition: (d: Business) => [d.position.lng, d.position.lat],
-    getRadius: (_d: Business) => 6,
-    getFillColor: [250, 204, 21, 255],
-    getLineColor: [255, 255, 255, 200],
-    onClick: onBusinessClick ? (info) => {
+    radiusMinPixels: 10,
+    radiusMaxPixels: 15,
+    lineWidthMinPixels: 2,
+    getPosition: (d: Business) => {
+      if (!d || !d.position) {
+        console.warn('⚠️ Invalid business data:', d);
+        return [0, 0];
+      }
+      return [d.position.lng, d.position.lat];
+    },
+    getRadius: (_d: Business) => 8, // Fixed size for all dots
+    getFillColor: (_d: Business) => [250, 204, 21, 255], // Consistent yellow for all
+    getLineColor: (_d: Business) => [255, 255, 255, 200], // Consistent white border
+    onClick: onBusinessClick ? (info, event) => {
+      console.log('🎯 DeckGL click event triggered!', { 
+        hasObject: !!info.object, 
+        objectName: info.object?.name,
+        objectId: info.object?.id,
+        pickingInfos: info,
+        event: event 
+      });
       if (info.object) {
-        console.log('🎯 Business clicked:', info.object.name);
+        console.log('🎯 Business clicked:', info.object.name, 'ID:', info.object.id);
         onBusinessClick(info.object as Business);
+      } else {
+        console.warn('⚠️ Click on invalid business object:', info.object);
       }
     } : undefined,
     // Update triggers - dots will appear/disappear instantly when data changes
     updateTriggers: {
       getPosition: [businesses],
       getRadius: [businesses.length],
-      getFillColor: []
+      getFillColor: [businesses.length]
     }
-    // REMOVED: transitions - no more flying animations
-    // REMOVED: dataComparator - dots are destroyed/recreated with data changes
   });
 };
 
@@ -61,8 +86,8 @@ export const createBusinessClusterLayer = (data: any[], onBusinessClick?: (busin
     stroked: true,
     filled: true,
     radiusScale: 1,
-    radiusMinPixels: 8,
-    radiusMaxPixels: 50,
+    radiusMinPixels: 10,
+    radiusMaxPixels: 15,
     lineWidthMinPixels: 2,
     getPosition: (d: any) => {
       if (d.type === 'cluster') {

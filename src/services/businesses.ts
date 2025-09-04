@@ -10,9 +10,10 @@ export async function getBusinessesBasic(limit: number = 2000): Promise<Business
   
   const { data: businessesData, error } = await supabase
     .from('businesses')
-    .select('id, name, lat, lng')
+    .select('id, name, lat, lng, address')
     .order('lat')
-    .limit(limit); // Limit for performance - can increase gradually
+    .limit(limit)
+    .returns<any[]>(); // Limit for performance - can increase gradually
 
   if (error) {
     console.error('❌ Supabase error:', error);
@@ -38,6 +39,7 @@ export async function getBusinessesBasic(limit: number = 2000): Promise<Business
   const basicBusinesses: Business[] = businessesWithDistance.map((business: any) => ({
     id: business.id,
     name: business.name,
+    address: business.address,
     position: { lat: business.lat, lng: business.lng },
     atmosphere: [],
     salary: '0',
@@ -96,13 +98,15 @@ export const getBusinessesInViewport = async (
         atmosphere,
         business_type,
         website,
+        address,
         salary
       `)
       .gte('lat', bounds.south)
       .lte('lat', bounds.north)
       .gte('lng', bounds.west)
       .lte('lng', bounds.east)
-      .limit(limit);
+      .limit(limit)
+      .returns<any[]>();
 
     if (error) {
       console.error('❌ Error fetching businesses in viewport:', error);
@@ -112,6 +116,7 @@ export const getBusinessesInViewport = async (
     const businesses: Business[] = data?.map(business => ({
       id: business.id,
       name: business.name,
+      address: business.address,
       position: { lat: business.lat, lng: business.lng },
       atmosphere: business.atmosphere || [],
       salary: business.salary,
@@ -186,6 +191,7 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
   const fullBusiness: Business = {
     id: businessData.id,
     name: businessData.name,
+    address: (businessData as any).address,
     businessType: businessData.business_type,
     position: { lat: businessData.lat, lng: businessData.lng },
     atmosphere: businessData.atmosphere || [],
