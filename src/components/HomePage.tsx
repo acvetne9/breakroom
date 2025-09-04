@@ -181,8 +181,8 @@ const HomePage: React.FC<HomePageProps> = ({
       {showWelcome && (
         <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-30 w-[90%] max-w-lg">
           <div className="bg-white rounded-2xl shadow-md px-4 py-3 text-center text-sm font-medium border border-gray-200">
-            <p>Welcome to breakroom! 🥳</p>
-            <p>Click on a yellow dot to discover one of our 54k businesses 👇</p>
+            <p>Welcome to breakroom!</p>
+            <p>Click on one a yellow dot to discover one of 54k businesses</p>
           </div>
         </div>
       )}
@@ -228,7 +228,7 @@ const HomePage: React.FC<HomePageProps> = ({
               value={searchValue}
               onChange={handleSearchChange}
               onBusinessSelect={handleSearchBusinessSelect}
-              placeholder="Search places, roles, pay (e.g. ' barista $15')..."
+              placeholder="Search roles, pay, places, and neighborhoods..."
               variant="search-bar"
               showIcon={true}
               onLocationSave={onLocationSave}
