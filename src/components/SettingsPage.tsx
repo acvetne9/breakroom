@@ -353,6 +353,21 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           </button>
         </div>
 
+        {/* Neighborhoods Section */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-2">Neighborhoods</h3>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => {
+                onSearchTrigger?.('Williamsburg');
+              }}
+              className="px-4 py-2 bg-app-yellow text-app-black rounded hover:bg-app-yellow/90 transition-colors"
+            >
+              Williamsburg
+            </button>
+          </div>
+        </div>
+
         
         {/* Current Job Section */}
         <div className="mb-8">
