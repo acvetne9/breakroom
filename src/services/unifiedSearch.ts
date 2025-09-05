@@ -222,24 +222,55 @@ export const searchBusinessesUnified = async (
     
     console.log(`🔍 Found ${businesses.length} businesses, loading all roles...`);
     
-    // Load ALL roles at once for maximum speed - Supabase can handle large IN queries
+    // Load roles in safe batches to avoid oversized URLs
     const businessIds = businesses.map(b => b.id);
     let allRoles: any[] = [];
-    
-    try {
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('business_roles')
-        .select('business_id, id, role, salary, upvotes, downvotes')
-        .in('business_id', businessIds);
-      
-      if (rolesError) {
-        console.error('❌ Role loading error:', rolesError);
-      } else {
-        allRoles = rolesData || [];
-        console.log(`✅ Loaded ${allRoles.length} roles for ${businesses.length} businesses`);
+
+    if (businessIds.length > 0) {
+      const BATCH_SIZE = 150; // keep URL well under limits
+      const CONCURRENCY = 6;  // fast but safe parallelism
+      const chunks: string[][] = [];
+      for (let i = 0; i < businessIds.length; i += BATCH_SIZE) {
+        chunks.push(businessIds.slice(i, i + BATCH_SIZE));
       }
-    } catch (error) {
-      console.error('❌ Role loading failed:', error);
+
+      const executeBatch = async (ids: string[]) => {
+        const { data, error } = await supabase
+          .from('business_roles')
+          .select('business_id, id, role, salary, upvotes, downvotes')
+          .in('business_id', ids);
+        if (error) {
+          console.error('❌ Roles batch error:', error);
+          return [] as any[];
+        }
+        return (data || []) as any[];
+      };
+
+      let active = 0;
+      let pointer = 0;
+      await new Promise<void>((resolve) => {
+        const launch = () => {
+          if (pointer >= chunks.length) {
+            if (active === 0) resolve();
+            return;
+          }
+          const ids = chunks[pointer++];
+          active++;
+          executeBatch(ids)
+            .then((rows) => {
+              allRoles.push(...rows);
+            })
+            .catch((e) => console.error('❌ Roles batch failed:', e))
+            .finally(() => {
+              active--;
+              launch();
+            });
+        };
+        const starters = Math.min(CONCURRENCY, chunks.length);
+        for (let i = 0; i < starters; i++) launch();
+      });
+
+      console.log(`✅ Loaded ${allRoles.length} roles for ${businesses.length} businesses in ${chunks.length} batches`);
     }
     
     // Only check for empty roles table if no roles loaded and we expected some
