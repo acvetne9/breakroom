@@ -227,6 +227,7 @@ export const searchBusinessesUnified = async (
     }
     
     console.log(`🔍 Found ${businesses.length} businesses, now loading roles...`);
+    console.log(`🔍 Business IDs to load roles for:`, businesses.slice(0, 5).map(b => ({ id: b.id, name: b.name })));
     
     // Load roles for all businesses efficiently in chunks
     const businessIds = businesses.map(b => b.id);
@@ -236,6 +237,7 @@ export const searchBusinessesUnified = async (
     const chunkSize = 50; // Conservative chunk size
     for (let i = 0; i < businessIds.length; i += chunkSize) {
       const chunk = businessIds.slice(i, i + chunkSize);
+      console.log(`🔍 Loading roles for chunk ${i / chunkSize + 1}, business IDs:`, chunk.slice(0, 3));
       
       try {
         const { data: rolesData, error: rolesError } = await supabase
@@ -243,15 +245,40 @@ export const searchBusinessesUnified = async (
           .select('business_id, id, role, salary, upvotes, downvotes')
           .in('business_id', chunk);
         
-        if (!rolesError && rolesData) {
-          allRoles.push(...rolesData);
+        if (rolesError) {
+          console.error('❌ Role loading error:', rolesError);
+        } else {
+          console.log(`🔍 Chunk ${i / chunkSize + 1} returned ${rolesData?.length || 0} roles`);
+          if (rolesData && rolesData.length > 0) {
+            allRoles.push(...rolesData);
+            console.log(`🔍 Sample roles from chunk:`, rolesData.slice(0, 3).map(r => ({ businessId: r.business_id, role: r.role, salary: r.salary })));
+          }
         }
       } catch (chunkError) {
-        console.warn('⚠️ Role chunk failed:', chunkError);
+        console.error('❌ Role chunk failed:', chunkError);
       }
     }
     
     console.log(`🔍 Loaded ${allRoles.length} roles total`);
+    
+    // If no roles loaded, check if business_roles table exists and has data
+    if (allRoles.length === 0) {
+      console.log('⚠️ No roles loaded - checking business_roles table...');
+      try {
+        const { data: sampleRoles, error: sampleError } = await supabase
+          .from('business_roles')
+          .select('business_id, role, salary')
+          .limit(5);
+        
+        if (sampleError) {
+          console.error('❌ Error checking business_roles table:', sampleError);
+        } else {
+          console.log('🔍 Sample roles from business_roles table:', sampleRoles);
+        }
+      } catch (error) {
+        console.error('❌ Failed to check business_roles table:', error);
+      }
+    }
     
     // Combine businesses with their roles
     const businessesWithRoles: Business[] = businesses.map(business => ({
