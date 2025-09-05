@@ -135,27 +135,35 @@ export async function searchBusinessesEnhanced(query: string, limit: number = 50
       .ilike('name', `%${filters.place}%`)
       .limit(limit) : { data: [] };
 
-    // Then, get businesses that match roles
-    const roleResults = filters.role ? await supabase
-      .from('businesses')
-      .select(`
+    // Then, get businesses that match roles (without join to avoid PostgREST relationship requirement)
+    let roleResults: { data: any[] | null } = { data: [] };
+    if (filters.role) {
+      const { data: roleRows, error: roleErr } = await supabase
+        .from('business_roles')
+        .select('business_id')
+        .ilike('role', `%${filters.role}%`)
+        .limit(5000);
+
+      if (!roleErr && roleRows && roleRows.length > 0) {
+        const ids = Array.from(new Set(roleRows.map((r: any) => r.business_id)));
+        const { data: businessesByRole } = await supabase
+          .from('businesses')
+          .select(`
         id,
         name,
         lat,
         lng,
         atmosphere,
         business_type,
-        website,
-        business_roles!inner (
-          id,
-          role,
-          salary,
-          upvotes,
-          downvotes
-        )
+        website
       `)
-      .ilike('business_roles.role', `%${filters.role}%`)
-      .limit(limit) : { data: [] };
+          .in('id', ids)
+          .limit(limit);
+        roleResults = { data: businessesByRole || [] };
+      } else {
+        roleResults = { data: [] };
+      }
+    }
 
     // If we have multiple text terms, also search for business type matches
     const businessTypeResults = filters.textTerms && filters.textTerms.length > 1 ? await supabase

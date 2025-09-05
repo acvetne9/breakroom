@@ -151,6 +151,25 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         }
         
         setSearchResults(results);
+        // Debounced idle search: parse filters and push to parent for live filtering
+        try {
+          const parsed = parseSearchFilters(q);
+          const filtersKey = parsed ? JSON.stringify(parsed) : null;
+          if (lastFiltersRef.current !== filtersKey) {
+            lastFiltersRef.current = filtersKey;
+            if (parsed?.neighborhoodFilter) {
+              const neighborhoodCoords = {
+                lat: parsed.neighborhoodFilter.center.lat,
+                lon: parsed.neighborhoodFilter.center.lon
+              };
+              onChange(q, undefined, parsed, neighborhoodCoords);
+            } else {
+              onChange(q, undefined, parsed || null);
+            }
+          }
+        } catch (e) {
+          console.warn('Idle search filter parse failed:', e);
+        }
       } catch (error) {
         console.error('Search suggestions error:', error);
         if (seq === searchSeqRef.current) setSearchResults([]);
