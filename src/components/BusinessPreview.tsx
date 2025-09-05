@@ -37,26 +37,36 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = memo(({ business, posts,
   // Get stories (posts) for this business
   const businessStories = posts.filter(post => post.businessId === business.id && post.isStory).slice(0, 3);
 
-  // Calculate average salary from roles
-  const calculateAverageSalary = () => {
+  // Calculate average salary per role type
+  const calculateRoleAverages = () => {
     if (!business.roles || business.roles.length === 0) {
-      return null;
+      return [];
     }
 
-    const salaries = business.roles.map(role => {
-      // Extract numeric value from salary string
+    // Group roles by role name
+    const roleGroups: { [key: string]: number[] } = {};
+    
+    business.roles.forEach(role => {
       const match = role.salary.match(/\$?(\d+(?:\.\d+)?)/);
-      return match ? parseFloat(match[1]) : 0;
-    }).filter(salary => salary > 0);
+      const salary = match ? parseFloat(match[1]) : 0;
+      
+      if (salary > 0) {
+        if (!roleGroups[role.role]) {
+          roleGroups[role.role] = [];
+        }
+        roleGroups[role.role].push(salary);
+      }
+    });
 
-    if (salaries.length === 0) return null;
-
-    const average = salaries.reduce((sum, salary) => sum + salary, 0) / salaries.length;
-    return `$${average.toFixed(1)}`;
+    // Calculate averages for each role
+    return Object.entries(roleGroups).map(([roleName, salaries]) => ({
+      role: roleName,
+      averageSalary: `$${(salaries.reduce((sum, salary) => sum + salary, 0) / salaries.length).toFixed(1)}`,
+      count: salaries.length
+    }));
   };
 
-  const averageSalary = calculateAverageSalary();
-  const roleCount = business.roles?.length || 0;
+  const roleAverages = calculateRoleAverages();
 
   const handleStoryClick = (e: React.MouseEvent) => {
     e.stopPropagation();
