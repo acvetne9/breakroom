@@ -130,8 +130,45 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
               Share A Past Or Current Job
             </h1>
           </div>
-
+        
           <div className="space-y-6">
+            <div className="text-center">
+              <p className="text-app-black mb-4 text-lg font-normal">
+                3 Easy Questions. Kept Anonymous 🤐
+              </p>
+            </div>
+        
+            {/* Business (Location) */}
+            <div>
+              <BusinessSearchDropdown
+                value={location}
+                onChange={handleLocationChange}
+                onBlur={handleLocationBlur}
+                placeholder="Where'd you work?..."
+                className="app-input"
+                salary={salary}
+                role={role}
+                timePeriod={timePeriod}
+              />
+            </div>
+        
+            <div className="text-center">
+              <p className="text-app-black mb-4 text-lg">
+                Find Work That Works For You 👷‍♀️
+              </p>
+            </div>
+        
+            {/* Role */}
+            <div>
+              <JobSearchDropdown
+                value={role}
+                onChange={handleRoleChange}
+                onBlur={checkForCompletion}
+                placeholder="Search or select a job role..."
+                className="app-input"
+              />
+            </div>
+        
             {/* Salary + Time Period */}
             <div>
               <div className="flex items-center space-x-3">
@@ -156,50 +193,13 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                 </select>
               </div>
             </div>
-
-            <div className="text-center">
-              <p className="text-app-black mb-4 text-lg font-normal">
-                3 Easy Questions. Kept Anonymous 🤐
-              </p>
-            </div>
-
-            {/* Role */}
-            <div>
-              <JobSearchDropdown
-                value={role}
-                onChange={handleRoleChange}
-                onBlur={checkForCompletion}
-                placeholder="Search or select a job role..."
-                className="app-input"
-              />
-            </div>
-
-            <div className="text-center">
-              <p className="text-app-black mb-4 text-lg">
-                Find Work That Works For You 👷‍♀️
-              </p>
-            </div>
-
-            {/* Location */}
-            <div>
-              <BusinessSearchDropdown
-                value={location}
-                onChange={handleLocationChange}
-                onBlur={handleLocationBlur}
-                placeholder="Where'd you work?..."
-                className="app-input"
-                salary={salary}
-                role={role}
-                timePeriod={timePeriod}
-              />
-            </div>
-
+        
             <div className="text-center mt-8">
               <p className="text-app-black text-lg">
                 Don't worry, your boss won't find out 😉
               </p>
             </div>
-
+        
             {/* New Business Form */}
             {showNewBusinessForm && (
               <div className="space-y-4 mt-6">
@@ -233,9 +233,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                       }
                       setIsCreatingBusiness(true);
                       try {
-                        await new Promise((resolve) =>
-                          setTimeout(resolve, 500)
-                        ); // Simulate creation
+                        await new Promise((resolve) => setTimeout(resolve, 500));
                         toast({
                           title: 'Business created!',
                           description: 'New business has been added to the map',
@@ -246,8 +244,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                       } catch {
                         toast({
                           title: 'Error',
-                          description:
-                            'Failed to create business. Please try again.',
+                          description: 'Failed to create business. Please try again.',
                           variant: 'destructive',
                         });
                       } finally {
@@ -257,9 +254,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                     disabled={isCreatingBusiness}
                     className="app-input flex-1 bg-app-yellow text-app-black font-medium"
                   >
-                    {isCreatingBusiness
-                      ? 'Adding Business...'
-                      : 'Add New Business'}
+                    {isCreatingBusiness ? 'Adding Business...' : 'Add New Business'}
                   </button>
                   <button
                     onClick={() => {
@@ -276,6 +271,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
             )}
           </div>
         </div>
+
       </div>
     </div>
   );
