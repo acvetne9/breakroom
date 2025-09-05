@@ -370,49 +370,51 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
 
       {/* Search Results Dropdown */}
       {showDropdown && (searchResults.length > 0 || isSearching) && (
-        <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 bg-background border border-border rounded-md shadow-lg z-50 max-h-60 overflow-y-auto p-1`}
+        <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 z-50 max-h-60 overflow-y-auto`}
              onScroll={() => {
                isScrolling.current = true;
                setTimeout(() => { isScrolling.current = false; }, 200);
              }}>
           {isSearching ? (
-            <div className="flex items-center justify-center py-4 mx-1 text-sm text-muted-foreground bg-accent/50" style={{ borderRadius: '6px', border: '2px solid hsl(var(--border))' }}>
+            <div className="flex items-center justify-center py-4 text-sm text-muted-foreground bg-background shadow-lg" style={{ borderRadius: '6px', border: '2px solid hsl(var(--border))' }}>
               Searching...
             </div>
           ) : (
-            searchResults.map((result, index) => (
-              <div
-                key={result.id}
-                className="flex flex-col py-2 px-3 mx-1 mb-1 last:mb-0 cursor-pointer hover:bg-accent bg-background rounded-md border border-border/50"
-                onClick={() => handleResultClick(result)}
-              >
-                {'isNeighborhood' in result && result.isNeighborhood ? (
-                  // Neighborhood result
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">{result.name}</span>
-                    <span className="text-xs text-muted-foreground">{result.borough}</span>
-                  </div>
-                ) : (
-                  // Business result
-                  <>
+            <div className="bg-background border border-border rounded-md shadow-lg p-1">
+              {searchResults.map((result, index) => (
+                <div
+                  key={result.id}
+                  className="flex flex-col py-2 px-3 mx-1 mb-1 last:mb-0 cursor-pointer hover:bg-accent bg-background rounded-md border border-border/50"
+                  onClick={() => handleResultClick(result)}
+                >
+                  {'isNeighborhood' in result && result.isNeighborhood ? (
+                    // Neighborhood result
                     <div className="flex justify-between items-center">
                       <span className="font-medium">{result.name}</span>
-                      <span className="text-sm text-muted-foreground">{(result as EnhancedBusiness).salary}</span>
+                      <span className="text-xs text-muted-foreground">{result.borough}</span>
                     </div>
-                    <div className="flex gap-2 mt-1">
-                      <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                        {(result as EnhancedBusiness).businessType || 'Business'}
-                      </span>
-                      {(result as EnhancedBusiness).roles?.map((role, index) => (
-                        <span key={index} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                          {role.role} - {role.salary}
+                  ) : (
+                    // Business result
+                    <>
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">{result.name}</span>
+                        <span className="text-sm text-muted-foreground">{(result as EnhancedBusiness).salary}</span>
+                      </div>
+                      <div className="flex gap-2 mt-1">
+                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                          {(result as EnhancedBusiness).businessType || 'Business'}
                         </span>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            ))
+                        {(result as EnhancedBusiness).roles?.map((role, index) => (
+                          <span key={index} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                            {role.role} - {role.salary}
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
