@@ -45,21 +45,34 @@ const HomePage: React.FC<HomePageProps> = ({
 }) => {
   const [searchValue, setSearchValue] = useState('');
   const [searchFilters, setSearchFilters] = useState<any>(null);
+  const [neighborhoodCenter, setNeighborhoodCenter] = useState<{ lat: number; lon: number } | null>(null);
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
   const [showLoading, setShowLoading] = useState(true);
 
+  // 👇 new state for welcome banner + loading closed
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [loadingClosed, setLoadingClosed] = useState(false);
+
   // Listen for search triggers from other pages
-  useEffect(() => {UnifiedBusinessSearch
+  useEffect(() => {
     const handleSearchTrigger = (event: CustomEvent) => {
       const searchTerm = event.detail;
       console.log('🔍 [triggerSearch] Received search trigger:', searchTerm);
       setSearchValue(searchTerm);
       
-      // Parse the search term to generate proper filters, just like UnifiedBusinessSearch does
       const filters = parseSearchFilters(searchTerm);
       console.log('🔍 [triggerSearch] Parsed filters:', filters);
       
-      // Apply the filters to the map
+      if (filters?.neighborhoodFilter) {
+        const neighborhoodCoords = {
+          lat: filters.neighborhoodFilter.center.lat,
+          lon: filters.neighborhoodFilter.center.lon
+        };
+        console.log('🏙️ Setting neighborhood center from trigger:', neighborhoodCoords);
+        setNeighborhoodCenter(neighborhoodCoords);
+      } else {
+        setNeighborhoodCenter(null);
+      }
       setSearchFilters(filters);
     };
 
@@ -67,11 +80,21 @@ const HomePage: React.FC<HomePageProps> = ({
     return () => window.removeEventListener('triggerSearch', handleSearchTrigger as EventListener);
   }, []);
 
+  // 👇 when loading completes, mark it closed first
   const handleLoadingComplete = () => {
     setShowLoading(false);
+    setLoadingClosed(true);
+
+    // wait a moment to ensure initiation popup is fully gone before showing welcome
+    setTimeout(() => {
+      setShowWelcome(true);
+
+      setTimeout(() => {
+        setShowWelcome(false);
+      }, 6000);
+    }, 500); // small delay after loading closes
   };
   
-  // Use prop-controlled selectedBusiness if available, otherwise use local state
   const selectedBusiness = propSelectedBusiness;
   const landmarks = [
     {lat: 40.690331, lng: -74.045414, emoji: "🗽"},
@@ -96,32 +119,35 @@ const HomePage: React.FC<HomePageProps> = ({
     {lat: 40.708890, lng: -74.008396, emoji: "🏦"},
     {lat: 40.850103, lng: -73.876716, emoji: "🐾"},
     {lat: 40.625569, lng: -74.115425, emoji: "🐾"},
-     
-]
+  ];
   const { toast } = useToast();
 
-  const handleSearchChange = (value: string, business?: EnhancedBusiness, filters?: any) => {
-    console.log('🔍 Search change in HomePage:', { value, filters, hasFilters: !!filters });
+  const handleSearchChange = (value: string, business?: EnhancedBusiness, filters?: any, neighborhoodCoords?: { lat: number; lon: number }) => {
+    console.log('🔍 Search change in HomePage:', { value, filters, neighborhoodCoords, hasFilters: !!filters });
     setSearchValue(value);
     setSearchFilters(filters);
     
-    // Only clear filters when search is explicitly cleared (empty value and no filters)
+    if (neighborhoodCoords) {
+      console.log('🏙️ Setting neighborhood center:', neighborhoodCoords);
+      setNeighborhoodCenter(neighborhoodCoords);
+    } else {
+      setNeighborhoodCenter(null);
+    }
+    
     if (!value && !filters) {
       console.log('🧹 Search explicitly cleared - removing filters');
       setSearchFilters(null);
+      setNeighborhoodCenter(null);
     }
   };
 
   const handleSearchBusinessSelect = (business: EnhancedBusiness) => {
-    // Convert EnhancedBusiness to the format expected by the map
     const mapBusiness = {
       ...business,
       businessType: business.businessType || business.business_type,
       formatted_address: business.formatted_address || business.vicinity || business.name
     };
     handleBusinessClick(mapBusiness);
-    // Keep search value visible after selection
-    // Don't clear search filters - keep them active so user continues to see filtered results
     console.log('🔍 Business selected from search - keeping filters active:', searchFilters);
   };
 
@@ -129,14 +155,11 @@ const HomePage: React.FC<HomePageProps> = ({
     onBusinessSelect?.(business);
     setShowBusinessDetails(false);
     
-    // Save the clicked business location
     if (onLocationSave && business.name) {
-      // Use business name as location, and try to construct a fuller address if available
       const fullLocation = business.formatted_address || business.vicinity || business.name;
       onLocationSave(business.name, fullLocation);
     }
   };
-
 
   const handleShowBusinessDetails = () => {
     setShowBusinessDetails(true);
@@ -160,17 +183,27 @@ const HomePage: React.FC<HomePageProps> = ({
       {showLoading && (
         <BreakroomLoading onComplete={handleLoadingComplete} />
       )}
-        <div>
-          
-          {/* MapLibre with OpenStreetMap base layer */}
-          <MapLibreMap
-            onBusinessClick={handleBusinessClick}
-            selectedBusiness={selectedBusiness}
-            landmarks={landmarks}
-            searchFilters={searchFilters}
-          />
-        
-  
+
+      {/* 👇 Welcome banner only appears AFTER initiation popup closes */}
+      {loadingClosed && showWelcome && (
+        <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-30 w-[90%] max-w-lg">
+          <div className="bg-white rounded-2xl shadow-md px-4 py-3 text-center text-sm font-medium border border-gray-200">
+            <p>Welcome to breakroom!</p>
+            <p>Click on one a yellow dot to discover one of 54k businesses</p>
+          </div>
+        </div>
+      )}
+
+      <div>
+        {/* MapLibre with OpenStreetMap base layer */}
+        <MapLibreMap
+          onBusinessClick={handleBusinessClick}
+          selectedBusiness={selectedBusiness}
+          landmarks={landmarks}
+          searchFilters={searchFilters}
+          neighborhoodCenter={neighborhoodCenter}
+        />
+      
         {/* Business Preview Popup */}
         {selectedBusiness && !showBusinessDetails && (
           <BusinessPreview 
@@ -195,22 +228,21 @@ const HomePage: React.FC<HomePageProps> = ({
           />
         )}
 
-        {/* Search input bar at bottom - only show on home slide and not during initiation */}
+        {/* Search input bar at bottom */}
         {currentSlide === 1 && currentView === 'main' && (
           <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
             <UnifiedBusinessSearch
               value={searchValue}
               onChange={handleSearchChange}
               onBusinessSelect={handleSearchBusinessSelect}
-              placeholder="Search places, roles, pay (e.g. ' barista $15')..."
+              placeholder="Search roles, pay, places, and neighborhoods!"
               variant="search-bar"
               showIcon={true}
               onLocationSave={onLocationSave}
             />
           </div>
         )}
-        </div>
-      
+      </div>
     </div>
   );
 };

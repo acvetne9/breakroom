@@ -28,6 +28,7 @@ interface MapLibreMapProps {
   onMapLoaded?: () => void;
   onBusinessesLoaded?: () => void;
   searchFilters?: any;
+  neighborhoodCenter?: { lat: number; lon: number } | null;
 }
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
@@ -36,7 +37,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   landmarks = [],
   onMapLoaded,
   onBusinessesLoaded,
-  searchFilters
+  searchFilters,
+  neighborhoodCenter
 }) => {
   const isMobile = useIsMobile();
   const mapRef = useRef<HTMLDivElement>(null);
@@ -207,6 +209,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       duration: 800
     });
   }, [selectedBusiness?.id, map, mapLoaded]);
+
+  // Center map on neighborhood when neighborhood is selected
+  useEffect(() => {
+    if (!map || !mapLoaded || !neighborhoodCenter) return;
+    
+    console.log('🏙️ Centering map on neighborhood:', neighborhoodCenter);
+    map.easeTo({
+      center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
+      zoom: 14, // Good zoom level for neighborhood view
+      duration: 1000
+    });
+  }, [neighborhoodCenter, map, mapLoaded]);
 
   const processMapFeatures = useCallback(async () => {
     // Prevent duplicate processing across re-mounts (StrictMode/dev or crashes)
