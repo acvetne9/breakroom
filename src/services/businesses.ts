@@ -180,6 +180,7 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
   const businessRoles: BusinessRole[] = (rolesData || []).map((role: any) => {
     const userVote = userVotesData.find(vote => vote.business_role_id === role.id)?.vote_type;
     return {
+      id: role.id,
       role: role.role,
       salary: role.salary,
       upvotes: role.upvotes || 0,

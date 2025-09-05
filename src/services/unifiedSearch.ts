@@ -295,6 +295,7 @@ export const searchBusinessesUnified = async (
       roles: allRoles
         .filter(role => role.business_id === business.id)
         .map(role => ({
+          id: role.id,
           role: role.role,
           salary: role.salary,
           upvotes: role.upvotes || 0,

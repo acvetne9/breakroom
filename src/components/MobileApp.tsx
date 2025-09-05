@@ -9,6 +9,7 @@ const SettingsPage = React.lazy(() => import('./SettingsPage'));
 const ExplorePage = React.lazy(() => import('./ExplorePage'));
 
 import { useBusinessesData } from '../hooks/useBusinessesData';
+import { handleRoleVote as handleRoleVoteService } from '@/services/roleVoting';
 
 interface UserData {
   salary: string;
@@ -271,7 +272,17 @@ const MobileApp: React.FC = () => {
     setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
   };
 
-  const handleRoleVote = (businessId: string, roleIndex: number, voteType: 'up' | 'down') => {
+  const handleRoleVote = async (businessId: string, roleIndex: number, voteType: 'up' | 'down') => {
+    // Find the role ID from the business
+    const business = businesses.find(b => b.id === businessId);
+    if (!business?.roles?.[roleIndex]?.id) {
+      console.error('Role not found for voting');
+      return;
+    }
+
+    const roleId = business.roles[roleIndex].id;
+
+    // Optimistically update UI first
     setBusinesses(prevBusinesses => {
       const updatedBusinesses = prevBusinesses.map(business => {
         if (business.id === businessId && business.roles) {
@@ -317,19 +328,76 @@ const MobileApp: React.FC = () => {
             return role;
           });
 
-          // Auto-delete roles with score <= -3
-          const filteredRoles = updatedRoles.filter(role => (role.upvotes - role.downvotes) > -3);
-
           return {
             ...business,
-            roles: filteredRoles
+            roles: updatedRoles
           };
         }
         return business;
       });
-
       return updatedBusinesses;
     });
+
+    // Then persist to database
+    const result = await handleRoleVoteService(businessId, roleId, voteType);
+    
+    if (!result.success) {
+      console.error('Failed to persist vote:', result.error);
+      // Revert optimistic update on error
+      setBusinesses(prevBusinesses => {
+        const updatedBusinesses = prevBusinesses.map(business => {
+          if (business.id === businessId && business.roles) {
+            const updatedRoles = business.roles.map((role, index) => {
+              if (index === roleIndex) {
+                let revertUpvotes = role.upvotes;
+                let revertDownvotes = role.downvotes;
+                let revertUserVote: 'up' | 'down' | null = role.userVote;
+
+                // Revert the optimistic update
+                if (voteType === 'up') {
+                  if (role.userVote === null) {
+                    revertUpvotes--;
+                    revertUserVote = 'up';
+                  } else if (role.userVote === 'up') {
+                    revertDownvotes++;
+                    revertUpvotes--;
+                    revertUserVote = 'down';
+                  } else {
+                    revertUserVote = null;
+                  }
+                } else {
+                  if (role.userVote === null) {
+                    revertDownvotes--;
+                    revertUserVote = 'down';  
+                  } else if (role.userVote === 'down') {
+                    revertUpvotes++;
+                    revertDownvotes--;
+                    revertUserVote = 'up';
+                  } else {
+                    revertUserVote = null;
+                  }
+                }
+
+                return {
+                  ...role,
+                  upvotes: revertUpvotes,
+                  downvotes: revertDownvotes,
+                  userVote: revertUserVote
+                };
+              }
+              return role;
+            });
+
+            return {
+              ...business,
+              roles: updatedRoles
+            };
+          }
+          return business;
+        });
+        return updatedBusinesses;
+      });
+    }
   };
 
   // Sync selectedBusiness when businesses data changes (for voting updates)
