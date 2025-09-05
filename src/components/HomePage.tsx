@@ -231,3 +231,21 @@ const HomePage: React.FC<HomePageProps> = ({
 
         {/* Search input bar at bottom */}
         {currentSlide === 1 && currentView === 'main' && (
+          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
+            <UnifiedBusinessSearch
+              value={searchValue}
+              onChange={handleSearchChange}
+              onBusinessSelect={handleSearchBusinessSelect}
+              placeholder="Search roles, pay, places, and neighborhoods!"
+              variant="search-bar"
+              showIcon={true}
+              onLocationSave={onLocationSave}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default HomePage;
