@@ -376,7 +376,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                setTimeout(() => { isScrolling.current = false; }, 200);
              }}>
           {isSearching ? (
-            <div className="flex items-center justify-center py-4 mx-1 text-sm text-muted-foreground bg-accent/50 rounded-md border-2 border-border">
+            <div className="flex items-center justify-center py-4 mx-1 text-sm text-muted-foreground bg-accent/50" style={{ borderRadius: '6px', border: '2px solid hsl(var(--border))' }}>
               Searching...
             </div>
           ) : (
