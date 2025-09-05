@@ -376,8 +376,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                setTimeout(() => { isScrolling.current = false; }, 200);
              }}>
           {isSearching ? (
-            <div className="flex items-center justify-center py-4 mx-1 bg-accent/50 rounded-md border-2 border-border">
-              <div className="text-sm text-muted-foreground">Searching...</div>
+            <div className="flex items-center justify-center py-4 mx-1 text-sm text-muted-foreground bg-accent/50 rounded-md border-2 border-border">
+              Searching...
             </div>
           ) : (
             searchResults.map((result, index) => (
