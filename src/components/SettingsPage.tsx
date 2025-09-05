@@ -253,27 +253,20 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           </div>
           <div className="space-y-4">
             {pastJobs.map(job => (
-              <div key={job.id} className="space-y-3">
+              <div key={job.id} className="space-y-3 w-full">
                 {/* Location */}
-                <div className="flex items-center space-x-3">
-                  <div className="flex-1">
-                    <BusinessSearchDropdown
-                      value={job.location}
-                      onChange={(value) => updatePastJob(job.id, 'location', value)}
-                      onBlur={() => handlePastJobBlur(job.id, 'location', job.location)}
-                      className="app-input w-full"
-                      placeholder="Where'd you work?..."
-                      salary={job.salary}
-                      role={job.role}
-                      timePeriod={pastJobTimePeriods[job.id]}
-                    />
-                  </div>
-                  <button onClick={() => removePastJob(job.id)} className="w-6 h-6 bg-app-yellow rounded-full flex items-center justify-center">
-                    <Minus className="w-4 h-4 text-app-black" />
-                  </button>
-                </div>
+                <BusinessSearchDropdown
+                  value={job.location}
+                  onChange={(value) => updatePastJob(job.id, 'location', value)}
+                  onBlur={() => handlePastJobBlur(job.id, 'location', job.location)}
+                  className="app-input w-full"
+                  placeholder="Where'd you work?..."
+                  salary={job.salary}
+                  role={job.role}
+                  timePeriod={pastJobTimePeriods[job.id]}
+                />
                 <p className="text-app-black mb-4 text-lg text-center">Find Work That Works For You 👷‍♀️</p>
-
+        
                 {/* Role */}
                 <JobSearchDropdown
                   value={job.role}
@@ -283,21 +276,42 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   className="app-input w-full"
                 />
                 <p className="text-app-black mb-4 text-lg text-center font-normal">3 Easy Questions. Kept Anonymous 🤐</p>
-
-                {/* Salary + Time Period */}
+        
+                {/* Salary + Time Period + Remove Button */}
                 <div className="flex items-center space-x-3">
-                  <input type="text" inputMode="numeric" value={job.salary} onChange={e => updatePastJob(job.id, 'salary', e.target.value)} className="app-input flex-1" placeholder="$17" />
-                  <select value={pastJobTimePeriods[job.id] || 'HR'} onChange={e => updatePastJobTimePeriod(job.id, e.target.value)} className="px-4 py-3 bg-white text-sm" style={{ border: '2px solid hsl(var(--app-gray-light))', borderRadius: '0.5rem', height: '48px', fontSize: '16px' }}>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={job.salary}
+                    onChange={e => updatePastJob(job.id, 'salary', e.target.value)}
+                    className="app-input flex-1"
+                    placeholder="$17"
+                  />
+                  <select
+                    value={pastJobTimePeriods[job.id] || 'HR'}
+                    onChange={e => updatePastJobTimePeriod(job.id, e.target.value)}
+                    className="px-4 py-3 bg-white text-sm"
+                    style={{
+                      border: '2px solid hsl(var(--app-gray-light))',
+                      borderRadius: '0.5rem',
+                      height: '48px',
+                      fontSize: '16px'
+                    }}
+                  >
                     <option value="HR">HR</option>
                     <option value="MO">MO</option>
                     <option value="YR">YR</option>
                   </select>
-                  <div className="w-6"></div>
+                  {/* Remove button only here at bottom */}
+                  <button onClick={() => removePastJob(job.id)} className="w-6 h-6 bg-app-yellow rounded-full flex items-center justify-center">
+                    <Minus className="w-4 h-4 text-app-black" />
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         </div>
+
 
         {/* Your Stories */}
         <div className="mt-8">
