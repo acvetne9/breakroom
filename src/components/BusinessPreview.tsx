@@ -101,20 +101,30 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = memo(({ business, posts,
           </div>
         </div>
 
-        {/* Show averaged salary from roles */}
-        {averageSalary && (
+        {/* Show averaged salary per role */}
+        {roleAverages.length > 0 && (
           <div className="mb-4">
-            <p className="text-app-black">
-              <span className="font-medium">
-                {averageSalary}
-                <span className="text-xs text-app-gray-medium ml-1">/hr avg</span>
-              </span>
-              {roleCount > 1 && (
-                <span className="text-xs text-app-gray-medium ml-2">
-                  ({roleCount} roles)
-                </span>
-              )}
-            </p>
+            <div 
+              className="space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
+              style={{ 
+                maxHeight: roleAverages.length > 3 ? '72px' : 'auto' // 3 rows * 24px per row
+              }}
+            >
+              {roleAverages.map((roleAvg, index) => (
+                <div key={index} className="flex justify-between items-center h-6 flex-shrink-0">
+                  <span className="text-app-black text-sm">{roleAvg.role}</span>
+                  <span className="font-medium text-app-black text-sm">
+                    {roleAvg.averageSalary}
+                    <span className="text-xs text-app-gray-medium ml-1">/hr</span>
+                    {roleAvg.count > 1 && (
+                      <span className="text-xs text-app-gray-medium ml-1">
+                        (avg of {roleAvg.count})
+                      </span>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
