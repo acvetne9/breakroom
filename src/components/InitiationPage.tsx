@@ -137,7 +137,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
               value={location}
               onChange={handleLocationChange}
               onBlur={handleLocationBlur}
-              placeholder="Where'd you work?..."
+              placeholder="Where do you work?..."
               className="app-input"
               salary={salary}
               role={role}
