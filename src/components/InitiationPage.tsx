@@ -131,146 +131,145 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
             </h1>
           </div>
         
-          <div className="space-y-6">
+          {/* Business (Location) */}
+          <div>
+            <BusinessSearchDropdown
+              value={location}
+              onChange={handleLocationChange}
+              onBlur={handleLocationBlur}
+              placeholder="Where'd you work?..."
+              className="app-input"
+              salary={salary}
+              role={role}
+              timePeriod={timePeriod}
+            />
+          </div>
         
-            {/* Business (Location) */}
-            <div>
-              <BusinessSearchDropdown
-                value={location}
-                onChange={handleLocationChange}
-                onBlur={handleLocationBlur}
-                placeholder="Where'd you work?..."
-                className="app-input"
-                salary={salary}
-                role={role}
-                timePeriod={timePeriod}
-              />
-            </div>
+          <div className="text-center">
+            <p className="text-app-black mb-4 text-lg">
+              Find Work That Works For You 👷‍♀️
+            </p>
+          </div>
         
-            <div className="text-center">
-              <p className="text-app-black mb-4 text-lg">
-                Find Work That Works For You 👷‍♀️
-              </p>
-            </div>
+          {/* Role */}
+          <div>
+            <JobSearchDropdown
+              value={role}
+              onChange={handleRoleChange}
+              onBlur={checkForCompletion}
+              placeholder="Search or select a job role..."
+              className="app-input"
+            />
+          </div>
         
-            {/* Role */}
-            <div>
-              <div className="text-center">
-                <p className="text-app-black mb-4 text-lg font-normal">
-                  3 Easy Questions. Kept Anonymous 🤐
-                </p>
-              </div>
-              <JobSearchDropdown
-                value={role}
-                onChange={handleRoleChange}
+          <div className="text-center">
+            <p className="text-app-black mb-4 text-lg font-normal">
+              3 Easy Questions. Kept Anonymous 🤐
+            </p>
+          </div>
+        
+          {/* Salary + Time Period */}
+          <div>
+            <div className="flex items-center space-x-3">
+              <input
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]*[.,]?[0-9]*"
+                value={salary}
+                onChange={handleSalaryChange}
                 onBlur={checkForCompletion}
-                placeholder="Search or select a job role..."
-                className="app-input"
+                placeholder="$0.00"
+                className="app-input text-center text-lg flex-1 !py-0 h-12"
               />
+              <select
+                value={timePeriod}
+                onChange={(e) => setTimePeriod(e.target.value)}
+                className="app-input text-lg w-auto !py-0 h-12"
+              >
+                <option value="HR">HR</option>
+                <option value="MO">MO</option>
+                <option value="YR">YR</option>
+              </select>
             </div>
+          </div>
         
-            {/* Salary + Time Period */}
-            <div>
-              <div className="flex items-center space-x-3">
+          <div className="text-center mt-8">
+            <p className="text-app-black text-lg">
+              Don't worry, your boss won't find out 😉
+            </p>
+          </div>
+        
+          {/* New Business Form */}
+          {showNewBusinessForm && (
+            <div className="space-y-4 mt-6">
+              <div>
                 <input
                   type="text"
-                  inputMode="decimal"
-                  pattern="[0-9]*[.,]?[0-9]*"
-                  value={salary}
-                  onChange={handleSalaryChange}
-                  onBlur={checkForCompletion}
-                  placeholder="$0.00"
-                  className="app-input text-center text-lg flex-1 !py-0 h-12"
+                  value={newBusinessAddress}
+                  onChange={(e) => setNewBusinessAddress(e.target.value)}
+                  placeholder="Enter business address..."
+                  className="app-input"
                 />
-                <select
-                  value={timePeriod}
-                  onChange={(e) => setTimePeriod(e.target.value)}
-                  className="app-input text-lg w-auto !py-0 h-12"
-                >
-                  <option value="HR">HR</option>
-                  <option value="MO">MO</option>
-                  <option value="YR">YR</option>
-                </select>
               </div>
-            </div>
-        
-            <div className="text-center mt-8">
-              <p className="text-app-black text-lg">
-                Don't worry, your boss won't find out 😉
-              </p>
-            </div>
-        
-            {/* New Business Form */}
-            {showNewBusinessForm && (
-              <div className="space-y-4 mt-6">
-                <div>
-                  <input
-                    type="text"
-                    value={newBusinessAddress}
-                    onChange={(e) => setNewBusinessAddress(e.target.value)}
-                    placeholder="Enter business address..."
-                    className="app-input"
-                  />
-                </div>
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={async () => {
-                      if (!newBusinessAddress.trim()) {
-                        toast({
-                          title: 'Address required',
-                          description: 'Please enter the business address',
-                          variant: 'destructive',
-                        });
-                        return;
-                      }
-                      if (!salary || !role) {
-                        toast({
-                          title: 'Missing information',
-                          description: 'Please fill in salary and role first',
-                          variant: 'destructive',
-                        });
-                        return;
-                      }
-                      setIsCreatingBusiness(true);
-                      try {
-                        await new Promise((resolve) => setTimeout(resolve, 500));
-                        toast({
-                          title: 'Business created!',
-                          description: 'New business has been added to the map',
-                        });
-                        setShowNewBusinessForm(false);
-                        setNewBusinessAddress('');
-                        setTimeout(() => checkForCompletion(), 100);
-                      } catch {
-                        toast({
-                          title: 'Error',
-                          description: 'Failed to create business. Please try again.',
-                          variant: 'destructive',
-                        });
-                      } finally {
-                        setIsCreatingBusiness(false);
-                      }
-                    }}
-                    disabled={isCreatingBusiness}
-                    className="app-input flex-1 bg-app-yellow text-app-black font-medium"
-                  >
-                    {isCreatingBusiness ? 'Adding Business...' : 'Add New Business'}
-                  </button>
-                  <button
-                    onClick={() => {
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={async () => {
+                    if (!newBusinessAddress.trim()) {
+                      toast({
+                        title: 'Address required',
+                        description: 'Please enter the business address',
+                        variant: 'destructive',
+                      });
+                      return;
+                    }
+                    if (!salary || !role) {
+                      toast({
+                        title: 'Missing information',
+                        description: 'Please fill in salary and role first',
+                        variant: 'destructive',
+                      });
+                      return;
+                    }
+                    setIsCreatingBusiness(true);
+                    try {
+                      await new Promise((resolve) => setTimeout(resolve, 500));
+                      toast({
+                        title: 'Business created!',
+                        description: 'New business has been added to the map',
+                      });
                       setShowNewBusinessForm(false);
                       setNewBusinessAddress('');
-                      setLocation('');
-                    }}
-                    className="app-input w-auto px-6 bg-gray-100 text-app-gray-dark"
-                  >
-                    Cancel
-                  </button>
-                </div>
+                      setTimeout(() => checkForCompletion(), 100);
+                    } catch {
+                      toast({
+                        title: 'Error',
+                        description: 'Failed to create business. Please try again.',
+                        variant: 'destructive',
+                      });
+                    } finally {
+                      setIsCreatingBusiness(false);
+                    }
+                  }}
+                  disabled={isCreatingBusiness}
+                  className="app-input flex-1 bg-app-yellow text-app-black font-medium"
+                >
+                  {isCreatingBusiness ? 'Adding Business...' : 'Add New Business'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowNewBusinessForm(false);
+                    setNewBusinessAddress('');
+                    setLocation('');
+                  }}
+                  className="app-input w-auto px-6 bg-gray-100 text-app-gray-dark"
+                >
+                  Cancel
+                </button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
+
 
       </div>
     </div>
