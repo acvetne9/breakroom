@@ -49,9 +49,8 @@ const HomePage: React.FC<HomePageProps> = ({
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
   const [showLoading, setShowLoading] = useState(true);
 
-  // 👇 new state for welcome banner + loading closed
+  // 👇 state for welcome banner
   const [showWelcome, setShowWelcome] = useState(false);
-  const [loadingClosed, setLoadingClosed] = useState(false);
 
   // Listen for search triggers from other pages
   useEffect(() => {
@@ -80,20 +79,22 @@ const HomePage: React.FC<HomePageProps> = ({
     return () => window.removeEventListener('triggerSearch', handleSearchTrigger as EventListener);
   }, []);
 
-  // 👇 when loading completes, mark it closed first
+  // 👇 when loading completes, mark it closed
   const handleLoadingComplete = () => {
     setShowLoading(false);
-    setLoadingClosed(true);
-
-    // wait a moment to ensure initiation popup is fully gone before showing welcome
-    setTimeout(() => {
-      setShowWelcome(true);
-
-      setTimeout(() => {
-        setShowWelcome(false);
-      }, 6000);
-    }, 500); // small delay after loading closes
   };
+
+  // 👇 Show welcome banner ONLY after initiation card closes
+  useEffect(() => {
+    if (!showLoading && currentView === 'main') {
+      const timer1 = setTimeout(() => {
+        setShowWelcome(true);
+        const timer2 = setTimeout(() => setShowWelcome(false), 6000);
+        return () => clearTimeout(timer2);
+      }, 500); // small delay to avoid overlap
+      return () => clearTimeout(timer1);
+    }
+  }, [showLoading, currentView]);
   
   const selectedBusiness = propSelectedBusiness;
   const landmarks = [
@@ -184,9 +185,9 @@ const HomePage: React.FC<HomePageProps> = ({
         <BreakroomLoading onComplete={handleLoadingComplete} />
       )}
 
-      {/* 👇 Welcome banner only appears AFTER initiation popup closes */}
-      {loadingClosed && showWelcome && (
-        <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-30 w-[90%] max-w-lg">
+      {/* 👇 Welcome banner only appears AFTER initiation card closes */}
+      {showWelcome && (
+        <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-30 w-[90%] max-w-lg transition-opacity duration-700">
           <div className="bg-white rounded-2xl shadow-md px-4 py-3 text-center text-sm font-medium border border-gray-200">
             <p>Welcome to breakroom!</p>
             <p>Click on one a yellow dot to discover one of 54k businesses</p>
@@ -230,21 +231,3 @@ const HomePage: React.FC<HomePageProps> = ({
 
         {/* Search input bar at bottom */}
         {currentSlide === 1 && currentView === 'main' && (
-          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
-            <UnifiedBusinessSearch
-              value={searchValue}
-              onChange={handleSearchChange}
-              onBusinessSelect={handleSearchBusinessSelect}
-              placeholder="Search roles, pay, places, and neighborhoods!"
-              variant="search-bar"
-              showIcon={true}
-              onLocationSave={onLocationSave}
-            />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export default HomePage;
