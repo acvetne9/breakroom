@@ -192,16 +192,17 @@ export const useViewportBusinesses = (searchFilters?: any) => {
       }
     }
     
-    // No search filters - clear search state if needed
+    // No search filters - only clear search state flag, keep results visible
     if (isNewSearch && lastSearchFilters) {
-      console.log('🧹 Clearing search state - no filters active');
+      console.log('🧹 Search cleared but keeping results visible');
       setLastSearchFilters(null);
       setIsSearching(false);
-      setBusinesses([]); // Clear search results
+      // Don't clear businesses - let them persist until explicit clear or new search
     }
 
     // Rest of the normal viewport loading logic for no-filter case
-    if (!searchFilters) {
+    // Don't override existing search results with cached data
+    if (!searchFilters && !lastSearchFilters) {
       const cachedBusinesses = getCachedBusinesses(bounds);
       if (cachedBusinesses && cachedBusinesses.length > 200) {
         setBusinesses(cachedBusinesses);
@@ -221,7 +222,7 @@ export const useViewportBusinesses = (searchFilters?: any) => {
       west: bounds.west - (bounds.east - bounds.west) * expansionFactor
     };
 
-    if (!searchFilters) {
+    if (!searchFilters && !lastSearchFilters) {
       const expandedCached = getCachedBusinesses(expandedBounds);
       if (expandedCached && expandedCached.length > 200) {
         setBusinesses(expandedCached);
