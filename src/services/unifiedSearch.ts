@@ -311,13 +311,14 @@ export const searchBusinessesUnified = async (
     const roleMatchedBusinessIds = new Set(roleMatchedBusinesses.map(b => b.id));
     
     const filteredBusinesses = businessesWithRoles.filter(business => {
-      // Role filter - must match if specified
+      // Role filter - must match if specified  
       if (filters.roleFilter) {
-        // If this business came from role search, it already matches the role filter
+        // If this business came from role search, it already passes
         if (roleMatchedBusinessIds.has(business.id)) {
           console.log(`🔍 [unifiedSearch] Business "${business.name}" auto-passed: found via role search`);
+          return true; // Early return for role-matched businesses
         } else {
-          // Only apply role filter to businesses found via name/type search
+          // For businesses found via name/type search, check if they have matching roles
           const hasMatchingRole = business.roles?.some(role => 
             role.role.toLowerCase().includes(filters.roleFilter!)
           );
