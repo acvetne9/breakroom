@@ -268,12 +268,15 @@ export const searchBusinessesUnified = async (
         const { data: sampleRoles, error: sampleError } = await supabase
           .from('business_roles')
           .select('business_id, role, salary')
-          .limit(5);
+          .limit(10);
         
         if (sampleError) {
           console.error('❌ Error checking business_roles table:', sampleError);
         } else {
           console.log('🔍 Sample roles from business_roles table:', sampleRoles);
+          if (sampleRoles && sampleRoles.length === 0) {
+            console.error('❌ CRITICAL: business_roles table is empty - no role data exists in database!');
+          }
         }
       } catch (error) {
         console.error('❌ Failed to check business_roles table:', error);

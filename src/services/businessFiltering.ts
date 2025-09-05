@@ -46,6 +46,10 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
     'back','house','floor','delivery','driver','cleaner','maintenance', 'intern', 'trainee'
   ];
   
+  console.log('🔍 [parseSearchFilters] Checking if any text terms match role keywords');
+  console.log('🔍 [parseSearchFilters] Text terms:', filteredTextTerms);
+  console.log('🔍 [parseSearchFilters] Available role keywords:', commonRoles.slice(0, 10), '...');
+  
   // Business type keywords - expanded list
   const commonBusinessTypes = [
     'restaurant','restaurants','cafe','cafes','coffee','shop','shops','bar','bars','store','stores',
@@ -58,6 +62,12 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
   let roleFilter = filteredTextTerms.find(term => 
     commonRoles.includes(term.toLowerCase())
   );
+  
+  // If no exact role match found, treat the first text term as a potential role
+  if (!roleFilter && filteredTextTerms.length > 0) {
+    console.log('🔍 [parseSearchFilters] No exact role match found, using first term as potential role:', filteredTextTerms[0]);
+    roleFilter = filteredTextTerms[0];
+  }
   
   let businessTypeFilter = filteredTextTerms.find(term =>
     commonBusinessTypes.includes(term.toLowerCase())
