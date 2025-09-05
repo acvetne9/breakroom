@@ -102,13 +102,14 @@ export const useViewportBusinesses = (searchFilters?: any) => {
       stringified: JSON.stringify(searchFilters)
     });
     
-    // Prevent duplicate requests if already loading
-    if (loading) {
-      console.log('🗺️ [loadBusinessesInViewport] Already loading, returning early');
+    const isNewSearch = JSON.stringify(searchFilters) !== JSON.stringify(lastSearchFilters);
+    
+    // Only prevent loading for identical requests, allow new searches to interrupt
+    if (loading && !isNewSearch) {
+      console.log('🗺️ [loadBusinessesInViewport] Already loading same request, returning early');
       return;
     }
 
-    const isNewSearch = JSON.stringify(searchFilters) !== JSON.stringify(lastSearchFilters);
     console.log('🔍 [loadBusinessesInViewport] Search state check:', { 
       isNewSearch, 
       hasCurrentFilters: !!searchFilters, 

@@ -327,13 +327,13 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     // Don't blur if we're scrolling in the dropdown
     if (isScrolling.current) return;
     
-    // Delay blur to allow dropdown clicks
+    // Delay blur to allow dropdown clicks and scrolling
     setTimeout(() => {
       if (!isScrolling.current) {
         setShowDropdown(false);
         onBlur?.();
       }
-    }, 150);
+    }, 200);
   };
 
   const baseInputClasses = variant === 'search-bar' 
@@ -370,7 +370,11 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
 
       {/* Search Results Dropdown */}
       {showDropdown && (searchResults.length > 0 || isSearching) && (
-        <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 bg-background border border-border rounded-md shadow-lg z-50 max-h-60 overflow-y-auto p-1`}>
+        <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 bg-background border border-border rounded-md shadow-lg z-50 max-h-60 overflow-y-auto p-1`}
+             onScroll={() => {
+               isScrolling.current = true;
+               setTimeout(() => { isScrolling.current = false; }, 200);
+             }}>
           {isSearching ? (
             <div className="flex items-center justify-center py-4 mx-1 bg-accent/50 rounded-md">
               <div className="text-sm text-muted-foreground">Searching...</div>
