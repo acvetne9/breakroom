@@ -132,11 +132,6 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
           </div>
         
           <div className="space-y-6">
-            <div className="text-center">
-              <p className="text-app-black mb-4 text-lg font-normal">
-                3 Easy Questions. Kept Anonymous 🤐
-              </p>
-            </div>
         
             {/* Business (Location) */}
             <div>
@@ -160,6 +155,11 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
         
             {/* Role */}
             <div>
+              <div className="text-center">
+                <p className="text-app-black mb-4 text-lg font-normal">
+                  3 Easy Questions. Kept Anonymous 🤐
+                </p>
+              </div>
               <JobSearchDropdown
                 value={role}
                 onChange={handleRoleChange}
