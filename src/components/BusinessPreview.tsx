@@ -128,7 +128,7 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = memo(({ business, posts,
                     <span className="text-xs text-app-gray-medium ml-1">/hr</span>
                     {roleAvg.count > 1 && (
                       <span className="text-xs text-app-gray-medium ml-1">
-                        (avg of {roleAvg.count})
+                        ({roleAvg.count})
                       </span>
                     )}
                   </span>
