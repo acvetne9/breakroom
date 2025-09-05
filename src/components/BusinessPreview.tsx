@@ -1,4 +1,3 @@
-
 import React, { memo } from 'react';
 import { formatTimeAgo } from '../utils/timeAgo';
 
@@ -19,6 +18,13 @@ interface BusinessPreviewProps {
     name: string;
     atmosphere: string[];
     salary?: string;
+    roles?: Array<{
+      role: string;
+      salary: string;
+      upvotes?: number;
+      downvotes?: number;
+      userVote?: 'up' | 'down' | null;
+    }>;
     stories?: Array<{ id: string; text: string; author: string }>;
   };
   posts: Post[];
@@ -30,6 +36,27 @@ interface BusinessPreviewProps {
 const BusinessPreview: React.FC<BusinessPreviewProps> = memo(({ business, posts, onClose, onShowDetails, onStoriesClick }) => {
   // Get stories (posts) for this business
   const businessStories = posts.filter(post => post.businessId === business.id && post.isStory).slice(0, 3);
+
+  // Calculate average salary from roles
+  const calculateAverageSalary = () => {
+    if (!business.roles || business.roles.length === 0) {
+      return null;
+    }
+
+    const salaries = business.roles.map(role => {
+      // Extract numeric value from salary string
+      const match = role.salary.match(/\$?(\d+(?:\.\d+)?)/);
+      return match ? parseFloat(match[1]) : 0;
+    }).filter(salary => salary > 0);
+
+    if (salaries.length === 0) return null;
+
+    const average = salaries.reduce((sum, salary) => sum + salary, 0) / salaries.length;
+    return `$${average.toFixed(1)}`;
+  };
+
+  const averageSalary = calculateAverageSalary();
+  const roleCount = business.roles?.length || 0;
 
   const handleStoryClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -74,15 +101,19 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = memo(({ business, posts,
           </div>
         </div>
 
-        {business.salary && (
+        {/* Show averaged salary from roles */}
+        {averageSalary && (
           <div className="mb-4">
             <p className="text-app-black">
               <span className="font-medium">
-                {business.salary}
-                {!business.salary.includes('/') && (
-                  <span className="text-xs text-app-gray-medium ml-1">/hr</span>
-                )}
-              </span> Barista
+                {averageSalary}
+                <span className="text-xs text-app-gray-medium ml-1">/hr avg</span>
+              </span>
+              {roleCount > 1 && (
+                <span className="text-xs text-app-gray-medium ml-2">
+                  ({roleCount} roles)
+                </span>
+              )}
             </p>
           </div>
         )}
