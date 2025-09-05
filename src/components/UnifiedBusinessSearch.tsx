@@ -380,7 +380,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
               Searching...
             </div>
           ) : (
-            <div className="bg-background border border-border rounded-md shadow-lg p-1">
+            <div className="bg-background shadow-lg p-1" style={{ borderRadius: '6px', border: '2px solid hsl(var(--border))' }}>
               {searchResults.map((result, index) => (
                 <div
                   key={result.id}
