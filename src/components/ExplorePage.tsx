@@ -1,434 +1,393 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { searchBusinessesEnhanced, EnhancedBusiness } from '@/services/enhancedBusinessSearch';
-import { parseSearchFilters } from '@/services/businessFiltering';
-import { findNeighborhood } from '@/services/neighborhoodSearch';
-import { isProfane } from '@/utils/profanityFilter';
+import React, { useState, useMemo, memo, useEffect } from 'react';
+import { Eye } from 'lucide-react';
+import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
-import { Search } from 'lucide-react';
+import VotingComponent from './VotingComponent';
+import { formatTimeAgo } from '../utils/timeAgo';
+import { TranslatedText } from './TranslatedText';
 
-interface UnifiedBusinessSearchProps {
-  value: string;
-  onChange: (value: string, business?: EnhancedBusiness, filters?: any, neighborhoodCoords?: { lat: number; lon: number }) => void;
-  onBusinessSelect?: (business: EnhancedBusiness) => void;
-  onBlur?: () => void;
-  placeholder?: string;
-  className?: string;
-  variant?: 'dropdown' | 'search-bar';
-  showIcon?: boolean;
-  onLocationSave?: (location: string, fullLocation: string) => void;
-}
-
-interface NeighborhoodResult {
+interface Post {
   id: string;
-  name: string;
-  isNeighborhood: true;
-  borough: string;
+  author: string;
+  text: string;
+  businessId?: string;
+  businessName?: string;
+  images?: string[];
+  isStory?: boolean;
+  isJobUpdate?: boolean;
+  linkedLocation?: string;
+  upvotes: number;
+  downvotes: number;
+  userVote?: 'up' | 'down' | null;
+  createdAt: Date;
 }
 
-type SearchResult = EnhancedBusiness | NeighborhoodResult;
+interface ExplorePageProps {
+  posts: Post[];
+  filteredBusinessId?: string;
+  filteredUserStories?: boolean;
+  onBusinessView?: (businessId: string) => void;
+  onExpandedPostChange?: (postId: string | null) => void;
+  onCommentSubmit?: (postId: string, comment: string) => void;
+  onPostSubmit?: (text: string, businessId?: string) => void;
+  onBackToAllPosts?: () => void;
+  onPostVote?: (postId: string, voteType: 'up' | 'down') => void;
+  onPostDelete?: (postId: string) => void;
+}
 
-const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
-  value,
-  onChange,
-  onBusinessSelect,
-  onBlur,
-  placeholder = "Search businesses, roles, salary...",
-  className = "",
-  variant = 'dropdown',
-  showIcon = false,
-  onLocationSave
+const ExplorePage: React.FC<ExplorePageProps> = memo(({
+  posts,
+  filteredBusinessId,
+  filteredUserStories = false,
+  onBusinessView,
+  onExpandedPostChange,
+  onCommentSubmit,
+  onPostSubmit,
+  onBackToAllPosts,
+  onPostVote,
+  onPostDelete
 }) => {
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
+  const [expandedPost, setExpandedPost] = useState<string | null>(null);
+  const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
+  const [hideSystemPost, setHideSystemPost] = useState(false);
+
+  interface Comment {
+    id: string;
+    author: string;
+    text: string;
+    createdAt: Date;
+  }
+
+  const [comments, setComments] = useState<{ [postId: string]: Comment[] }>({});
+  const [postText, setPostText] = useState('');
+  const [commentText, setCommentText] = useState('');
   const { toast } = useToast();
-  
-  const inputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const searchSeqRef = useRef(0);
-  const lastFiltersRef = useRef<string | null>(null);
-  const committedQueryRef = useRef<string>('');
-  const resultsCache = useRef<Map<string, SearchResult[]>>(new Map());
-  const isScrolling = useRef(false);
-  const lastExecutedQuery = useRef<string>('');
+  // Check if we need to fade out the system post when real posts are added
+  const realPosts = useMemo(() => {
+    return filteredBusinessId 
+      ? posts.filter(post => post.businessId === filteredBusinessId && !post.isJobUpdate && post.author !== 'System')
+      : filteredUserStories 
+      ? posts.filter(post => post.author === 'You' && !post.isJobUpdate)
+      : posts.filter(post => post.author !== 'System');
+  }, [posts, filteredBusinessId, filteredUserStories]);
 
   useEffect(() => {
-    let scrollTimeout: NodeJS.Timeout;
-    
-    const handleClickOutside = (event: MouseEvent) => {
-      // Don't close dropdown if we're scrolling within it
-      if (isScrolling.current) return;
+    if (filteredBusinessId && realPosts.length > 0 && !fadeOutSystemPost && !hideSystemPost) {
+      // Start fade out animation
+      setFadeOutSystemPost(true);
       
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowDropdown(false);
-      }
-    };
-
-    const handleScroll = () => {
-      isScrolling.current = true;
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        isScrolling.current = false;
-      }, 150);
-    };
-
-    // Add scroll listener to the dropdown
-    const dropdown = dropdownRef.current;
-    if (dropdown) {
-      dropdown.addEventListener('scroll', handleScroll);
-    }
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      if (dropdown) {
-        dropdown.removeEventListener('scroll', handleScroll);
-      }
-      clearTimeout(scrollTimeout);
-    };
-  }, []);
-
-  // Debounced suggestions with improved caching
-  useEffect(() => {
-    const q = value.trim();
-    if (!q) {
-      setSearchResults([]);
-      setShowDropdown(false);
-      setIsSearching(false);
-      // Clear filters when search is empty - only if there were filters before
-      if (lastFiltersRef.current !== null) {
-        console.log('🧹 Clearing search - removing all filters');
-        lastFiltersRef.current = null;
-        committedQueryRef.current = '';
-        onChange(value, undefined, null);
-      }
-      return;
+      // After animation completes, hide the system post
+      setTimeout(() => {
+        setHideSystemPost(true);
+        setFadeOutSystemPost(false);
+      }, 500); // Match the animation duration
     }
     
-    // Check cache first for better performance
-    const cachedResults = resultsCache.current.get(q);
-    if (cachedResults) {
-      console.log('💾 Using cached results for:', q);
-      setSearchResults(cachedResults);
-      setShowDropdown(true);
-      setIsSearching(false);
-      return;
+    // Reset states when switching to different business or no filter
+    if (!filteredBusinessId || realPosts.length === 0) {
+      setFadeOutSystemPost(false);
+      setHideSystemPost(false);
     }
-    
-    // Only show suggestions, don't execute search automatically
-    setIsSearching(true);
-    setShowDropdown(true);
-    const seq = ++searchSeqRef.current;
-    const timer = setTimeout(async () => {
-      try {
-        const results: SearchResult[] = [];
-        
-        // Check if the query matches a neighborhood
-        const neighborhood = findNeighborhood(q);
-        if (neighborhood) {
-          results.push({
-            id: `neighborhood-${neighborhood.name}`,
-            name: `${neighborhood.name} - Search Neighborhood`,
-            isNeighborhood: true as const,
-            borough: neighborhood.borough
-          });
-        }
-        
-        // Get business results
-        const businessResults = await searchBusinessesEnhanced(q, 10);
-        results.push(...businessResults);
-        
-        if (seq !== searchSeqRef.current) return;
-        
-        // Cache the results
-        resultsCache.current.set(q, results);
-        
-        // Limit cache size to prevent memory issues
-        if (resultsCache.current.size > 50) {
-          const firstKey = resultsCache.current.keys().next().value;
-          resultsCache.current.delete(firstKey);
-        }
-        
-        setSearchResults(results);
-        // Debounced idle search: parse filters and push to parent for live filtering
-        try {
-          const parsed = parseSearchFilters(q);
-          const filtersKey = parsed ? JSON.stringify(parsed) : null;
-          if (lastFiltersRef.current !== filtersKey) {
-            lastFiltersRef.current = filtersKey;
-            if (parsed?.neighborhoodFilter) {
-              const neighborhoodCoords = {
-                lat: parsed.neighborhoodFilter.center.lat,
-                lon: parsed.neighborhoodFilter.center.lon
-              };
-              onChange(q, undefined, parsed, neighborhoodCoords);
-            } else {
-              onChange(q, undefined, parsed || null);
-            }
-          }
-        } catch (e) {
-          console.warn('Idle search filter parse failed:', e);
-        }
-      } catch (error) {
-        console.error('Search suggestions error:', error);
-        if (seq === searchSeqRef.current) setSearchResults([]);
-      } finally {
-        if (seq === searchSeqRef.current) setIsSearching(false);
-      }
-    }, 300); // Faster suggestions with caching
-    return () => clearTimeout(timer);
-  }, [value, onChange]);
+  }, [realPosts.length, filteredBusinessId, fadeOutSystemPost, hideSystemPost]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    onChange(newValue);
-    if (!newValue.trim()) {
-      setSearchResults([]);
-      setShowDropdown(false);
-      setIsSearching(false);
-    }
-  };
+  const handlePostSubmit = () => {
+    if (!postText.trim()) return;
 
-  const handleResultClick = (result: SearchResult) => {
-    if ('isNeighborhood' in result && result.isNeighborhood) {
-      // Handle neighborhood click - search for all businesses in that neighborhood
-      const neighborhoodName = result.name.replace(' - Search Neighborhood', '');
-      console.log('🏙️ [handleResultClick] Neighborhood clicked:', neighborhoodName);
-      
-      // Update the search input with just the neighborhood name
-      onChange(neighborhoodName);
-      
-      // Trigger neighborhood search with coordinates
-      const filters = parseSearchFilters(neighborhoodName);
-      if (filters?.neighborhoodFilter) {
-        const neighborhoodCoords = {
-          lat: filters.neighborhoodFilter.center.lat,
-          lon: filters.neighborhoodFilter.center.lon
-        };
-        
-        committedQueryRef.current = neighborhoodName;
-        lastExecutedQuery.current = neighborhoodName;
-        lastFiltersRef.current = JSON.stringify(filters);
-        onChange(neighborhoodName, undefined, filters, neighborhoodCoords);
-      }
-    } else {
-      // Handle business click
-      const business = result as EnhancedBusiness;
-      console.log('🏢 [handleResultClick] Business clicked:', business.name);
-      
-      // Perform search with current value
-      performSearch();
-      
-      // Still call the business select callback for any other handling needed
-      onBusinessSelect?.(business);
-      
-      // Save the clicked business location
-      if (onLocationSave && business.name) {
-        const fullLocation = business.formatted_address || business.vicinity || business.name;
-        onLocationSave(business.name, fullLocation);
-      }
-    }
-    
-    setShowDropdown(false);
-    setSearchResults([]);
-  };
-
-  const performSearch = () => {
-    console.log('🔍 [performSearch] Called with value:', value);
-    
-    const trimmedValue = value.trim();
-    
-    // Check if this is the same query we just executed
-    if (trimmedValue === lastExecutedQuery.current && trimmedValue.length >= 3) {
-      console.log('🚫 [performSearch] Skipping - same query already executed:', trimmedValue);
-      setShowDropdown(false);
-      return;
-    }
-    
-    if (!trimmedValue) {
-      // Clear search - commit empty query to clear filters
-      if (committedQueryRef.current !== '') {
-        console.log('🔄 Clearing search - removing all filters');
-        committedQueryRef.current = '';
-        lastFiltersRef.current = null;
-        lastExecutedQuery.current = '';
-        onChange(value, undefined, null);
-      }
-      return;
-    }
-    
-    // Check for profanity in search terms
-    if (isProfane(trimmedValue)) {
-      console.log('🚫 Search blocked - profanity detected:', trimmedValue);
+    if (isProfane(postText)) {
       toast({
-        title: "Search blocked",
-        description: "Inappropriate search terms detected",
+        title: "Post blocked",
+        description: "Inappropriate content detected",
         variant: "destructive"
       });
-      onChange(''); // Clear the search input
+      setPostText('');
       return;
     }
-    
-    // Commit the query and apply filters immediately (require 4+ characters for meaningful search)
-    console.log('🔍 [performSearch] Trimmed value:', trimmedValue, 'length:', trimmedValue.length);
-    console.log('🔍 [performSearch] Current committed query:', committedQueryRef.current);
-    console.log('🔍 [performSearch] Last executed query:', lastExecutedQuery.current);
-    
-    if (trimmedValue.length >= 3 && committedQueryRef.current !== trimmedValue) {
-      console.log('🔍 Committing search query:', trimmedValue);
-      committedQueryRef.current = trimmedValue;
-      lastExecutedQuery.current = trimmedValue;
-      const filters = parseSearchFilters(trimmedValue);
-      console.log('🔍 [performSearch] Parsed filters:', filters);
+    if (onPostSubmit) {
+      onPostSubmit(postText, filteredBusinessId);
+      setPostText('');
+    }
+  };
+
+  const handleCommentSubmit = () => {
+    if (!commentText.trim() || !expandedPost) return;
+
+    if (isProfane(commentText)) {
+      toast({
+        title: "Comment blocked",
+        description: "Inappropriate content detected",
+        variant: "destructive",
+      });
+      setCommentText('');
+      return;
+    }
+
+    const newComment: Comment = {
+      id: crypto.randomUUID(),
+      author: "You", // replace with logged-in user's name/id
+      text: commentText,
+      createdAt: new Date(),
+    };
+
+    setComments({
+      ...comments,
+      [expandedPost]: [...(comments[expandedPost] || []), newComment],
+    });
+
+    setCommentText('');
+    onCommentSubmit?.(expandedPost, commentText);
+  };
+
+  const handleCommentDelete = (postId: string, commentId: string) => {
+    setComments({
+      ...comments,
+      [postId]: (comments[postId] || []).filter(c => c.id !== commentId),
+    });
+  };
+
+  const handlePostClick = (postId: string) => {
+    // If clicking the same post, toggle closed
+    setExpandedPost(prev => prev === postId ? null : postId);
+    onExpandedPostChange?.(expandedPost === postId ? null : postId);
+  };
+
+  const handleBusinessView = (businessId: string) => {
+    console.log('👀 Eye clicked - navigating to business:', businessId);
+    onBusinessView?.(businessId);
+  };
+
+  const handlePostVote = (postId: string, voteType: 'up' | 'down') => {
+    onPostVote?.(postId, voteType);
+  };
+
+  const handlePostDelete = (postId: string) => {
+    onPostDelete?.(postId);
+  };
+
+  const displayPosts = useMemo(() => {
+    const filtered = filteredBusinessId 
+      ? posts.filter(post => post.businessId === filteredBusinessId && !post.isJobUpdate)
+      : filteredUserStories 
+      ? posts.filter(post => post.author === 'You' && !post.isJobUpdate)
+      : posts;
+
+    console.log('📋 Display posts calculation:', {
+      filteredBusinessId,
+      filteredPostsCount: filtered.length,
+      realPostsCount: realPosts.length,
+      hideSystemPost,
+      willShowDefaultPost: filteredBusinessId && realPosts.length === 0 && !hideSystemPost
+    });
+
+    // Add default post if viewing a specific business with no posts and system post is not hidden
+    if (filteredBusinessId && realPosts.length === 0 && !hideSystemPost) {
+      const defaultPost: Post = {
+        id: `default-${filteredBusinessId}`,
+        author: 'System',
+        text: 'Share a thought about this business 💭',
+        businessId: filteredBusinessId,
+        isStory: true,
+        upvotes: 0,
+        downvotes: 0,
+        userVote: null,
+        createdAt: new Date()
+      };
       
-      // Only proceed if filters have meaningful content
-      if (filters && (
-        (filters.textTerms && filters.textTerms.length > 0) ||
-        filters.salaryQuery ||
-        filters.roleFilter ||
-        filters.businessTypeFilter ||
-        filters.neighborhoodFilter
-      )) {
-        console.log('✅ Applying valid search filters:', filters);
-        const filtersKey = JSON.stringify(filters);
-        lastFiltersRef.current = filtersKey;
-        onChange(value, undefined, filters);
-      } else {
-        console.log('⚠️ No valid filters found for query:', trimmedValue);
-        console.log('⚠️ Filters object:', filters);
-        if (lastFiltersRef.current !== null) {
-          lastFiltersRef.current = null;
-          committedQueryRef.current = '';
-          lastExecutedQuery.current = '';
-          onChange(value, undefined, null);
-        }
+      console.log('➕ Adding default system post');
+      
+      // If we have real posts but haven't hidden the system post yet, show both during transition
+      if (realPosts.length > 0) {
+        return [defaultPost, ...filtered.filter(post => post.author !== 'System')];
       }
-    } else if (trimmedValue.length < 3 && lastFiltersRef.current !== null) {
-      // Clear filters if search is too short
-      console.log('🧹 Search too short, clearing filters');
-      lastFiltersRef.current = null;
-      committedQueryRef.current = '';
-      lastExecutedQuery.current = '';
-      onChange(value, undefined, null);
-    } else {
-      console.log('🔍 [performSearch] No action taken - length:', trimmedValue.length, 'committed:', committedQueryRef.current);
+      
+      return [defaultPost];
     }
-    setShowDropdown(false);
-  };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      performSearch();
-    }
-  };
-
-  const handleInputBlur = () => {
-    // Don't blur if we're scrolling in the dropdown
-    if (isScrolling.current) return;
-    
-    // Delay blur to allow dropdown clicks and scrolling
-    setTimeout(() => {
-      if (!isScrolling.current) {
-        setShowDropdown(false);
-        onBlur?.();
-      }
-    }, 200);
-  };
-
-  const baseInputClasses = variant === 'search-bar' 
-    ? "search-bar pr-12" 
-    : "w-full px-3 py-2 border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring";
+    return filtered;
+  }, [posts, filteredBusinessId, filteredUserStories, realPosts.length, hideSystemPost]);
 
   return (
-    <div className="relative" ref={dropdownRef}>
-      <div className="relative">
-        <input
-          ref={inputRef}
-          type="text"
-          value={value}
-          onChange={(e) => handleInputChange(e)}
-          onBlur={handleInputBlur}
-          onKeyDown={handleKeyDown}
-          onFocus={() => {
-            if (value.length > 2) {
-              setShowDropdown(true);
-            }
-          }}
-          placeholder={placeholder}
-          className={`${baseInputClasses} ${className}`}
-        />
-        {showIcon && variant === 'search-bar' && (
-          <button
-            onClick={performSearch}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-app-gray-medium hover:text-app-gray-dark transition-colors"
-          >
-            <Search size={18} />
-          </button>
-        )}
-      </div>
+    <div className="relative w-full h-full">
+      {/* Posts list */}
+      <div className={`h-full overflow-y-auto pb-20 ${filteredBusinessId || filteredUserStories ? 'pt-20' : 'pt-20'}`}>
+        <div className="space-y-4 px-4">
+          {displayPosts.map(post => (
+            <div key={post.id} className="relative">
+              {/* Post with background collage if business has 5+ photos */}
+              <div
+                className={`app-popup-transparent p-4 cursor-pointer ${post.images && post.images.length >= 5 ? 'relative overflow-hidden' : ''} ${
+                  post.author === 'System' && fadeOutSystemPost ? 'animate-fade-out opacity-0 transition-opacity duration-500' : ''
+                }`}
+                onClick={() => handlePostClick(post.id)}
+                style={{
+                  backgroundImage: post.images && post.images.length >= 5 ? `url(${post.images[0]})` : undefined,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center'
+                }}
+              >
+                {/* Background collage overlay */}
+                {post.images && post.images.length >= 5 && (
+                  <div className="absolute inset-0 opacity-30">
+                    <div className="grid grid-cols-3 h-full">
+                      {post.images.slice(0, 6).map((img, idx) => (
+                        <div
+                          key={idx}
+                          className="bg-cover bg-center"
+                          style={{ backgroundImage: `url(${img})` }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-      {/* Search Results Dropdown */}
-      {showDropdown && (searchResults.length > 0 || isSearching) && (
-        <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 z-50`}>
-          <div 
-            className="bg-background shadow-lg border-2 max-h-60 overflow-y-auto"
-            style={{ borderRadius: '6px', borderColor: 'hsl(var(--border))' }}
-            onScroll={() => {
-              isScrolling.current = true;
-              setTimeout(() => { isScrolling.current = false; }, 200);
-            }}
-          >
-            {isSearching ? (
-              <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
-                Searching...
-              </div>
-            ) : (
-              <div className="p-3">
-                {searchResults.map((result, index) => (
-                  <React.Fragment key={result.id}>
-                    <div
-                      className="cursor-pointer py-1.5 px-0 rounded transition-colors hover:bg-accent/20"
-                      onClick={() => handleResultClick(result)}
-                    >
-                      {'isNeighborhood' in result && result.isNeighborhood ? (
-                        // Neighborhood result
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium">{result.name}</span>
-                          <span className="text-xs opacity-70">{result.borough}</span>
-                        </div>
-                      ) : (
-                        // Business result
-                        <div>
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">{result.name}</span>
-                            <span className="text-sm opacity-70">{(result as EnhancedBusiness).salary}</span>
-                          </div>
-                          <div className="flex gap-2 mt-1">
-                            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">
-                              {(result as EnhancedBusiness).businessType || 'Business'}
-                            </span>
-                            {(result as EnhancedBusiness).roles?.map((role, roleIndex) => (
-                              <span key={roleIndex} className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
-                                {role.role} - {role.salary}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
+                {/* Post content */}
+                <div className={`relative z-10 pb-10 ${post.images && post.images.length >= 5 ? 'post-overlay rounded-lg p-3' : ''}`}>
+                  <div className="flex items-start justify-between mb-2">
+                    <TranslatedText 
+                      text={post.text}
+                      className={`flex-1 pr-4 break-words overflow-wrap-break-word ${
+                        post.author === 'System' 
+                          ? 'text-app-gray-medium italic' 
+                          : 'text-app-black'
+                      }`}
+                    />
+                    <div className="flex-shrink-0 w-8 flex justify-center mt-1 my-0">
+                      {(post.businessId || post.isJobUpdate) && (
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            if (post.businessId) {
+                              handleBusinessView(post.businessId);
+                            } else if (post.linkedLocation) {
+                              toast({
+                                title: "Location",
+                                description: post.linkedLocation
+                              });
+                            }
+                          }}
+                          className="flex items-center space-x-1 text-app-gray-medium hover:text-app-black"
+                        >
+                          <span className="py-0 my-0">👀</span>
+                        </button>
                       )}
                     </div>
-                    {index < searchResults.length - 1 && (
-                      <div className="h-px bg-border/30 my-1.5"></div>
-                    )}
-                  </React.Fragment>
-                ))}
+                  </div>
+                  
+                  {/* Timestamp in bottom left */}
+                  <div className="absolute bottom-1 left-1">
+                    <span className="text-xs text-gray-400">
+                      {post.author === 'System' ? 'Click to share!' : formatTimeAgo(post.createdAt)}
+                    </span>
+                  </div>
+                  
+                  {/* Voting component in bottom right */}
+                  {post.author !== 'System' && (
+                    <div className="absolute bottom-1 right-1">
+                      <VotingComponent 
+                        upvotes={post.upvotes} 
+                        downvotes={post.downvotes} 
+                        userVote={post.userVote} 
+                        onVote={voteType => handlePostVote(post.id, voteType)}
+                        isOwner={post.author === 'You'}
+                        onDelete={() => handlePostDelete(post.id)}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Expanded view */}
+                {expandedPost === post.id && (
+                  <div className="mt-4 pt-4 border-t border-app-gray-light space-y-2">
+                    {(() => {
+                      // Order comments: post author's comments first
+                      const orderedComments = (comments[post.id] || []).slice().sort((a, b) => {
+                        if (a.author === post.author && b.author !== post.author) return -1;
+                        if (b.author === post.author && a.author !== post.author) return 1;
+                        return a.createdAt.getTime() - b.createdAt.getTime();
+                      });
+                
+                      if (orderedComments.length === 0) {
+                        return (
+                          <h4 className="text-sm font-medium mb-2 text-slate-500 text-left">
+                            Be the first to share! 😉
+                          </h4>
+                        );
+                      }
+                
+                      return orderedComments.map(comment => (
+                        <div key={comment.id} className="flex items-center justify-between py-1">
+                          <TranslatedText text={comment.text} className="text-sm text-app-gray-dark pr-2" />
+                          <div className="flex-shrink-0">
+                            <VotingComponent
+                              upvotes={0}
+                              downvotes={0}
+                              userVote={null}
+                              onVote={() => {}}
+                              isOwner={comment.author === 'You'}
+                              onDelete={() => handleCommentDelete(post.id, comment.id)}
+                            />
+                          </div>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </div>
+          ))}
         </div>
-      )}
+      </div>
+
+      {/* Input bar at bottom */}
+      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
+        {expandedPost ? (
+          // Comment input when post is expanded
+          <div className="relative">
+            <input
+              type="text"
+              value={commentText}
+              onChange={e => setCommentText(e.target.value)}
+              placeholder="Leave a comment!"
+              className="search-bar pr-14"
+              onKeyPress={e => {
+                if (e.key === 'Enter') {
+                  handleCommentSubmit();
+                }
+              }}
+            />
+            <button
+              onClick={handleCommentSubmit}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-lg bg-transparent"
+            >
+              🗣️
+            </button>
+          </div>
+        ) : (
+          // Post input for explore page
+          <div className="relative">
+            <input
+              type="text"
+              value={postText}
+              onChange={e => setPostText(e.target.value)}
+              placeholder={filteredBusinessId ? "Thoughts about this business?" : "How's work?"}
+              className="search-bar pr-14"
+              onKeyPress={e => {
+                if (e.key === 'Enter') {
+                  handlePostSubmit();
+                }
+              }}
+            />
+            <button
+              onClick={handlePostSubmit}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-lg bg-transparent"
+            >
+              🗣️
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
-};
+});
 
-export default UnifiedBusinessSearch;
+export default ExplorePage;
