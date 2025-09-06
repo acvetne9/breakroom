@@ -59,13 +59,18 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
   };
   const handleCompassClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    
+  
     // Try business website first, then Google Maps page, then fallback to Google search
-    const destination = business.website || 
-                       business.url || 
+    const destination = business.website ||
+                       business.url ||
                        `https://www.google.com/search?q=${encodeURIComponent(business.name)}`;
-    
-    window.open(destination, '_blank');
+  
+    // If it's a Google search, replace the current page instead of opening a new window
+    if (destination.includes("google.com/search")) {
+      window.location.href = destination;
+    } else {
+      window.open(destination, "_blank");
+    }
   };
   // Get stories (posts) for this business
   const businessStories = posts.filter(post => post.businessId === business.id && post.isStory);
