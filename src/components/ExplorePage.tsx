@@ -244,7 +244,7 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                 </div>
 
                 {/* Expanded view */}
-                {expandedPost === post.id && post.author !== 'System' && (
+                {expandedPost === post.id && (
                   <div className="mt-4 pt-4 border-t border-app-gray-light space-y-2">
                     {(() => {
                       // Order comments: post author's comments first
