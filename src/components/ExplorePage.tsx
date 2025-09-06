@@ -116,12 +116,6 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   };
 
   const handlePostClick = (postId: string) => {
-    // Don't expand system posts (default posts)
-    const post = displayPosts.find(p => p.id === postId);
-    if (post?.author === 'System') {
-      return;
-    }
-
     // If clicking the same post, toggle closed
     setExpandedPost(prev => prev === postId ? null : postId);
     onExpandedPostChange?.(expandedPost === postId ? null : postId);
@@ -209,7 +203,7 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                       }`}
                     />
                     <div className="flex-shrink-0 w-8 flex justify-center mt-1 my-0">
-                      {(post.businessId || post.isJobUpdate) && post.author !== 'System' && (
+                      {(post.businessId || post.isJobUpdate) && (
                         <button
                           onClick={e => {
                             e.stopPropagation();
@@ -246,13 +240,12 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                       onVote={voteType => handlePostVote(post.id, voteType)}
                       isOwner={post.author === 'You'}
                       onDelete={() => handlePostDelete(post.id)}
-                      disabled={post.author === 'System'}
                     />
                   </div>
                 </div>
 
                 {/* Expanded view */}
-                {expandedPost === post.id && post.author !== 'System' && (
+                {expandedPost === post.id && (
                   <div className="mt-4 pt-4 border-t border-app-gray-light space-y-2">
                     {(() => {
                       // Order comments: post author's comments first
