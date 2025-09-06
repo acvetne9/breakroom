@@ -59,64 +59,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const layersAddedRef = useRef(false);
   const lastFitKeyRef = useRef<string | null>(null);
 
-  // Fixed business click handler with better error handling and simpler logic
+  // Enhanced business click handler with viewport integration
   const handleBusinessClick = useCallback(async (business: any) => {
-    console.log('Business clicked:', business.name || business.id);
+    console.log('🎯 MapLibreMap handleBusinessClick called:', business.name);
     
-    if (!business) {
-      console.error('No business data provided to click handler');
-      return;
+    // Zoom to business first
+    if (map) {
+      map.easeTo({
+        center: [business.position.lng, business.position.lat],
+        zoom: Math.max(map.getZoom(), 16),
+        duration: 800
+      });
     }
-
-    try {
-      // Always call the parent click handler first, regardless of data completeness
-      if (onBusinessClick) {
-        // If business doesn't have full details, fetch them
-        if (!business.atmosphere?.length && !business.roles?.length && business.id) {
-          console.log('Fetching full business details for:', business.id);
-          
-          // Fetch full details in the background
-          const fullBusinessPromise = fetchFullBusinessDetails(business.id);
-          
-          // Call parent immediately with current data
-          onBusinessClick(business);
-          
-          // Try to update with full details when available
-          try {
-            const fullBusiness = await fullBusinessPromise;
-            if (fullBusiness && onBusinessClick) {
-              console.log('Updated with full business details');
-              onBusinessClick(fullBusiness);
-            }
-          } catch (fetchError) {
-            console.warn('Failed to fetch full business details:', fetchError);
-            // Parent already called with basic data, so this is non-fatal
-          }
-        } else {
-          // Business already has full details
-          onBusinessClick(business);
-        }
+    
+    // Fetch full details if needed
+    if (!business.atmosphere?.length && !business.roles?.length) {
+      const fullBusiness = await fetchFullBusinessDetails(business.id);
+      if (fullBusiness && onBusinessClick) {
+        onBusinessClick(fullBusiness);
       }
-      
-      // Zoom to business after calling parent handler
-      if (map && business.position) {
-        const currentZoom = map.getZoom();
-        const targetZoom = Math.max(currentZoom, 16);
-        
-        map.easeTo({
-          center: [business.position.lng, business.position.lat],
-          zoom: targetZoom,
-          duration: 800
-        });
-      }
-      
-    } catch (error) {
-      console.error('Error in business click handler:', error);
-      
-      // Fallback: still try to call parent with whatever data we have
-      if (onBusinessClick) {
-        onBusinessClick(business);
-      }
+    } else if (onBusinessClick) {
+      onBusinessClick(business);
     }
   }, [fetchFullBusinessDetails, onBusinessClick, map]);
 
@@ -131,7 +94,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const handleViewportChange = useCallback((isInitial: boolean = false) => {
     if (!map || !mapLoaded) return;
 
-    console.log('Viewport change - searchFilters:', searchFilters);
+    console.log('🗺️ handleViewportChange called with searchFilters:', searchFilters);
+    console.log('🗺️ handleViewportChange searchFilters state:', { 
+      hasFilters: !!searchFilters, 
+      isNull: searchFilters === null,
+      isUndefined: searchFilters === undefined,
+      content: searchFilters 
+    });
 
     try {
       const bounds = map.getBounds();
@@ -147,36 +116,44 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       // Load businesses with appropriate limits
       const businessLimit = isMobile ? 12000 : 25000;
+      console.log('🗺️ About to call loadBusinessesInViewport with searchFilters:', searchFilters);
       loadBusinessesInViewport(viewportBounds, businessLimit, isMovingRef.current);
       
       setCurrentZoom(zoom);
       
     } catch (error) {
-      console.error('Error in handleViewportChange:', error);
+      console.error('❌ Error in handleViewportChange:', error);
     }
-  }, [map, mapLoaded, isMobile, searchFilters]);
+  }, [map, mapLoaded, isMobile, searchFilters]); // Include searchFilters in dependencies
 
-  // Reload businesses whenever search filters change
+  // Reload businesses whenever search filters change - expand area significantly for comprehensive search
   useEffect(() => {
     if (!map || !mapLoaded) return;
     
     // Don't trigger on initial render when searchFilters is undefined
     if (searchFilters === undefined) return;
     
-    console.log('Reloading businesses due to filter change:', searchFilters);
+    console.log('🗺️ Map reloading businesses due to filter change:', searchFilters);
+    console.log('🔍 Search filters state:', { 
+      hasFilters: !!searchFilters, 
+      filtersContent: searchFilters,
+      isNull: searchFilters === null,
+      isUndefined: searchFilters === undefined 
+    });
     
     // Handle search filter changes for vector tile visibility
     if (searchFilters && Object.keys(searchFilters).length > 0) {
-      console.log('Active search - hiding vector tile businesses');
+      console.log('🔍 Active search - hiding vector tile businesses');
       setHideVectorBusinesses(true);
     } else {
-      console.log('No active search - showing vector tile businesses');
+      console.log('🔍 No active search - showing vector tile businesses');
       setHideVectorBusinesses(false);
     }
     
     // Stop processing if filters are null (explicitly cleared)
     if (searchFilters === null) {
-      console.log('Search filters cleared - loading normal businesses');
+      console.log('🧹 Search filters cleared - loading normal businesses');
+      // Reload normal businesses when filters are cleared
       try {
         const mapBounds = map.getBounds();
         const viewportBounds = {
@@ -188,16 +165,21 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         const businessLimit = isMobile ? 12000 : 25000;
         loadBusinessesInViewport(viewportBounds, businessLimit, false);
       } catch (e) {
-        console.warn('Failed to reload normal businesses:', e);
+        console.warn('⚠️ Failed to reload normal businesses:', e);
       }
       return;
     }
     
     try {
       const mapBounds = map.getBounds();
+      const center = map.getCenter();
+      const zoom = map.getZoom();
+      
+      let viewportBounds;
+      let businessLimit;
       
       if (searchFilters && Object.keys(searchFilters).length > 0) {
-        // Viewport-only search: use current map bounds
+        // Viewport-only search: use current map bounds with no expansion
         const viewportBounds = {
           north: mapBounds.getNorth(),
           south: mapBounds.getSouth(),
@@ -205,13 +187,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           west: mapBounds.getWest()
         };
         const businessLimit = isMobile ? 12000 : 25000;
-        console.log('Viewport-only search: using current map bounds');
+        console.log('🔍 Viewport-only search: using current map bounds');
         loadBusinessesInViewport(viewportBounds, businessLimit, false);
       }
     } catch (e) {
-      console.warn('Failed to reload businesses on filter change:', e);
+      console.warn('⚠️ Failed to reload businesses on filter change:', e);
     }
-  }, [searchFilters, map, mapLoaded, isMobile, loadBusinessesInViewport]);
+  }, [searchFilters, map, mapLoaded, isMobile]);
+
+  // Disable auto-zoom on search results to respect user preference
+  useEffect(() => {
+    // Intentionally no-op: do not fit/zoom when search results change
+  }, [businesses, searchFilters, map, mapLoaded]);
 
   // Zoom to a specifically selected business (e.g. from search dropdown)
   useEffect(() => {
@@ -227,16 +214,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (!map || !mapLoaded || !neighborhoodCenter) return;
     
-    console.log('Centering map on neighborhood:', neighborhoodCenter);
+    console.log('🏙️ Centering map on neighborhood:', neighborhoodCenter);
     map.easeTo({
       center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
-      zoom: 14,
+      zoom: 14, // Good zoom level for neighborhood view
       duration: 1000
     });
   }, [neighborhoodCenter, map, mapLoaded]);
 
   const processMapFeatures = useCallback(async () => {
-    // Prevent duplicate processing across re-mounts
+    // Prevent duplicate processing across re-mounts (StrictMode/dev or crashes)
     const alreadyGlobalProcessed = (window as any).__MAP_FEATURES_PROCESSED__ === true;
     if (processedRef.current || alreadyGlobalProcessed) {
       return;
@@ -245,13 +232,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return;
     }
     
-    processedRef.current = true;
-    (window as any).__MAP_FEATURES_PROCESSED__ = true;
+    processedRef.current = true; // prevent duplicate runs in this mount
+    (window as any).__MAP_FEATURES_PROCESSED__ = true; // prevent duplicate runs across mounts
     setIsProcessing(true);
     
-    console.log('NYC .pbf vector tiles ready');
+    console.log('🎉 NYC .pbf vector tiles ready');
     setIsProcessing(false);
-  }, []);
+  }, []); // No dependencies to prevent infinite re-renders
 
   // Initialize map
   useEffect(() => {
@@ -263,7 +250,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     let cleanedUp = false;
 
     const absoluteTilesUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-    console.log('Using tiles URL:', absoluteTilesUrl);
+    console.log('🧭 Using tiles URL:', absoluteTilesUrl);
 
     const baseStyle = {
       version: 8 as const,
@@ -273,6 +260,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           tiles: [absoluteTilesUrl],
           minzoom: 10,
           maxzoom: 16,
+          // Add scheme to handle potential encoding issues
           scheme: 'xyz' as const
         }
       },
@@ -281,8 +269,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           {
             id: 'background',
             type: 'background' as const,
-            paint: { 'background-color': '#F5F5DC' }
+            paint: { 'background-color': '#F5F5DC' } // Wheat color for land background
           }
+          // Removed hardcoded layers - will add dynamically based on actual tile content
         ]
     };
 
@@ -302,31 +291,32 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
       
     } catch (error) {
-      console.error('Error creating map instance:', error);
+      console.error('❌ Error creating map instance:', error);
       return;
     }
 
     mapInstance.on('load', () => {
       if (cleanedUp) return;
-      console.log('Map loaded - starting tile debugging');
+      console.log('🗺️ Map loaded - starting tile debugging');
       
       // Immediate tile access test
       fetch('/data/tiles/12/1203/1536.pbf')
         .then(response => {
-          console.log('Tile URL test:', response.status, response.ok ? 'OK' : 'Failed');
+          console.log('🔍 Tile URL test:', response.status, response.ok ? '✅' : '❌');
           if (!response.ok) {
-            console.error('Tiles are not accessible at /data/tiles/');
+            console.error('🚨 Tiles are not accessible at /data/tiles/ - check if files exist');
           }
           return response.arrayBuffer();
         })
         .then(buffer => {
-          console.log('Tile size:', buffer.byteLength, 'bytes');
+          console.log('🔍 Tile size:', buffer.byteLength, 'bytes');
         })
         .catch(error => {
-          console.error('Tile access failed:', error);
+          console.error('🚨 Tile access failed:', error);
         });
       
-      console.log('Waiting for nyc-tiles source to fully load before adding layers');
+      // Defer adding layers until the source reports as fully loaded via `sourcedata`
+      console.log('⏳ Waiting for nyc-tiles source to fully load before adding layers');
       
       setMapLoaded(true);
       
@@ -336,7 +326,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     });
 
-    // Movement tracking
+    // Movement tracking only - business loading will be handled separately
     mapInstance.on('movestart', () => {
       isMovingRef.current = true;
       if (moveTimeoutRef.current) {
@@ -345,46 +335,48 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     });
 
     mapInstance.on('error', e => {
-      console.error('Map error:', e.error);
+      console.error('🚨 Map error:', e.error);
     });
     
-    // Enhanced tile loading with layer addition
+    // Enhanced tile loading debug with comprehensive diagnostics
     mapInstance.on('sourcedata', e => {
       if (e.sourceId === 'nyc-tiles') {
-        console.log('NYC tiles event:', e.isSourceLoaded ? 'LOADED' : 'LOADING', e.dataType);
+        console.log('🔄 NYC tiles event:', e.isSourceLoaded ? 'LOADED' : 'LOADING', e.dataType, e);
         
+        // Log tile-specific events for detailed debugging
         if ((e as any).dataType === 'tile') {
           const coord = (e as any).coord;
-          console.log(`Tile loaded: ${coord ? `${coord.z}/${coord.x}/${coord.y}` : 'unknown'}`);
+          console.log(`📍 Tile loaded: ${coord ? `${coord.z}/${coord.x}/${coord.y}` : 'unknown'}`);
           
-          // Query features after tile load
-          setTimeout(() => {
-            try {
-              if (mapInstance && mapInstance.isSourceLoaded && mapInstance.isSourceLoaded('nyc-tiles')) {
-                const allFeatures = mapInstance.querySourceFeatures('nyc-tiles');
-                const sourceLayers = Array.from(new Set(allFeatures.map((f: any) => f.sourceLayer)));
-                console.log(`After tile load - Features: ${allFeatures.length}, Source-layers: [${sourceLayers.join(', ')}]`);
-                
-                if (allFeatures.length > 0) {
-                  console.log('Sample feature:', JSON.stringify(allFeatures[0], null, 2));
+            // Immediately query this specific tile's features
+            setTimeout(() => {
+              try {
+                if (mapInstance && mapInstance.isSourceLoaded && mapInstance.isSourceLoaded('nyc-tiles')) {
+                  const allFeatures = mapInstance.querySourceFeatures('nyc-tiles');
+                  const sourceLayers = Array.from(new Set(allFeatures.map((f: any) => f.sourceLayer)));
+                  console.log(`🔍 After tile load - Features: ${allFeatures.length}, Source-layers: [${sourceLayers.join(', ')}]`);
+                  
+                  if (allFeatures.length > 0) {
+                    console.log('📋 Sample feature:', JSON.stringify(allFeatures[0], null, 2));
+                  }
                 }
+              } catch (err) {
+                console.warn('⚠️ Error querying features after tile load:', err);
               }
-            } catch (err) {
-              console.warn('Error querying features after tile load:', err);
-            }
-          }, 100);
+            }, 100);
         }
         
-        // Try adding layers
+        // Try adding layers on any significant event
         if ((e as any).dataType === 'tile' || ((e as any).dataType === 'source' && mapInstance.isSourceLoaded('nyc-tiles'))) {
           if (layersAddedRef.current) {
+            console.log('ℹ️ Layers already added, skipping.');
             return;
           }
           
-          console.log('Attempting to add layers...');
+          console.log('🎯 Attempting to add layers...');
           
           try {
-            // Add layers with known source-layer to trigger tile loading
+            // NEW: Immediately try adding layers with known source-layer to trigger tile loading
             if (!layersAddedRef.current) {
               try {
                 mapInstance.addLayer({
@@ -403,8 +395,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                     'line-opacity': 0.9
                   }
                 });
+                console.log('✅ Pre-added examplepoints line layer to initiate tile loads');
               } catch (preLineErr) {
-                console.warn('Pre-add line failed:', preLineErr);
+                console.warn('⚠️ Pre-add line failed (may be fine if layer name differs):', preLineErr);
               }
               
               try {
@@ -424,12 +417,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                     'text-halo-width': 1
                   }
                 });
+                console.log('✅ Pre-added examplepoints labels');
               } catch (preLabelErr) {
-                console.warn('Pre-add labels failed:', preLabelErr);
+                console.warn('⚠️ Pre-add labels failed (may be fine if layer name differs):', preLabelErr);
               }
+              console.log('🧪 Pre-added layers using known layer name to trigger vector tile loading');
             }
             
-            // Multiple query attempts with delays
+            // Multiple query attempts with delays to catch async tile parsing
             const queryAttempts = [0, 200, 500, 1000];
             
             queryAttempts.forEach((delay, index) => {
@@ -439,167 +434,280 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                     const features = mapInstance.querySourceFeatures('nyc-tiles');
                     const sourceLayers = Array.from(new Set(features.map((f: any) => f.sourceLayer)));
                     
-                    console.log(`Query attempt ${index + 1} (${delay}ms delay): ${features.length} features, source-layers: [${sourceLayers.join(', ')}]`);
+                    console.log(`🔍 Query attempt ${index + 1} (${delay}ms delay): ${features.length} features, source-layers: [${sourceLayers.join(', ')}]`);
                     
-                    // Probe known layer name if no layers detected
-                    if (sourceLayers.length === 0 && !layersAddedRef.current) {
-                      try {
-                        const guess = mapInstance.querySourceFeatures('nyc-tiles', { sourceLayer: 'examplepoints' as any });
-                        console.log(`Probe 'examplepoints': ${guess.length} features`);
-                        if (guess.length > 0) {
-                          const detectedLayer = 'examplepoints';
-                          console.log('Using probed layer:', detectedLayer);
-                        
-                          // Add all the map layers
-                          this.addMapLayers(mapInstance, detectedLayer);
-                          layersAddedRef.current = true;
-                          console.log('NYC layers added successfully! (probed)');
-                          return;
+                     // If no source-layers detected yet, proactively probe the known layer name
+                     if (sourceLayers.length === 0 && !layersAddedRef.current) {
+                       try {
+                         const guess = mapInstance.querySourceFeatures('nyc-tiles', { sourceLayer: 'examplepoints' as any });
+                         console.log(`🧪 Probe 'examplepoints': ${guess.length} features`);
+                         if (guess.length > 0) {
+                           const detectedLayer = 'examplepoints';
+                           console.log('🧭 Using probed layer:', detectedLayer);
+                         
+                         // Add land/park polygon layers with proper colors
+                         try {
+                           mapInstance.addLayer({
+                             id: 'nyc-land',
+                             type: 'fill',
+                             source: 'nyc-tiles',
+                             'source-layer': detectedLayer,
+                             paint: {
+                               'fill-color': '#F5F5DC', // Wheat color for land
+                               'fill-opacity': 1.0
+                             },
+                             filter: ['==', ['geometry-type'], 'Polygon']
+                           });
+                           console.log('✅ Added land layer (probed)');
+                         } catch (landErr) {
+                           console.warn('⚠️ Land layer (probed) failed:', landErr);
+                         }
+                         
+                         // Add parks layer
+                         try {
+                           mapInstance.addLayer({
+                            id: 'nyc-green-spaces',
+                            type: 'fill',
+                            source: 'nyc-tiles',
+                            'source-layer': detectedLayer,
+                            paint: {
+                              'fill-color': '#87C17A', // Green for both
+                              'fill-opacity': 1.0
+                            },
+                            filter: [
+                              'all',
+                              ['==', ['geometry-type'], 'Polygon'],
+                              ['any',
+                                ['==', ['get', 'leisure'], 'park'],
+                                ['==', ['get', 'landuse'], 'cemetery']
+                              ]
+                            ]
+                          });
+                           console.log('✅ Added parks layer (probed)');
+                         } catch (parksErr) {
+                           console.warn('⚠️ Parks layer (probed) failed:', parksErr);
+                         }
+                         
+                         // Add water layer
+                         try {
+                           mapInstance.addLayer({
+                             id: 'nyc-water',
+                             type: 'fill',
+                             source: 'nyc-tiles',
+                             'source-layer': detectedLayer,
+                             paint: {
+                               'fill-color': '#6CA4E1', // Blue for water
+                               'fill-opacity': 1.0
+                             },
+                             filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']]
+                           });
+                           console.log('✅ Added water layer (probed)');
+                         } catch (waterErr) {
+                           console.warn('⚠️ Water layer (probed) failed:', waterErr);
+                         }
+                         
+                         // Add roads layer
+                         try {
+                           mapInstance.addLayer({
+                             id: 'nyc-roads',
+                             type: 'line',
+                             source: 'nyc-tiles',
+                             'source-layer': detectedLayer,
+                             paint: {
+                               'line-color': '#666666', // Dark gray for roads
+                               'line-width': 2,
+                               'line-opacity': 1.0
+                             },
+                             filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
+                           });
+                           console.log('✅ Added roads layer (probed)');
+                         } catch (roadsErr) {
+                           console.warn('⚠️ Roads layer (probed) failed:', roadsErr);
+                         }
+                         
+                         // Add waterways layer
+                         try {
+                           mapInstance.addLayer({
+                             id: 'nyc-waterways',
+                             type: 'line',
+                             source: 'nyc-tiles',
+                             'source-layer': detectedLayer,
+                             paint: {
+                               'line-color': '#999999', // Light gray for waterways
+                               'line-width': 1,
+                               'line-opacity': 0.6
+                             },
+                             filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'waterway']]
+                           });
+                           console.log('✅ Added waterways layer (probed)');
+                         } catch (waterwaysErr) {
+                           console.warn('⚠️ Waterways layer (probed) failed:', waterwaysErr);
+                         }
+                         
+                         // Add businesses points layer
+                         try {
+                          mapInstance.addLayer({
+                            id: 'nyc-businesses',
+                            type: 'circle',
+                            source: 'nyc-tiles',
+                            'source-layer': detectedLayer,
+                            paint: {
+                              'circle-color': '#FACC15', // Yellow for businesses - matches DeckGL
+                              'circle-radius': 8, // Same as DeckGL BUSINESS_DOT_STYLE.radius
+                              'circle-opacity': 1.0,
+                              'circle-stroke-width': 2, // Same as DeckGL
+                              'circle-stroke-color': '#FFFFFF', // White border - matches DeckGL
+                              'circle-stroke-opacity': 1.0 // Slightly transparent to match DeckGL
+                            },
+                            filter: ['==', ['geometry-type'], 'Point']
+                          });
+                          console.log('✅ Added businesses layer');
+                        } catch (businessesErr) {
+                          console.warn('⚠️ Businesses layer failed:', businessesErr);
                         }
-                      } catch (probeErr) {
-                        console.warn('Probe failed:', probeErr);
-                      }
-                    }
+                         
+                         layersAddedRef.current = true;
+                         console.log('🎉 NYC layers added successfully! (probed)');
+                         return; // stop further attempts
+                         }
+                       } catch (probeErr) {
+                         console.warn('⚠️ Probe failed (may be fine if layer name differs):', probeErr);
+                       }
+                     }
                   
-                    if (sourceLayers.length > 0 && !layersAddedRef.current) {
-                      const detectedLayer = sourceLayers[0];
-                      console.log('Detected layer:', detectedLayer);
-                      
-                      this.addMapLayers(mapInstance, detectedLayer);
-                      layersAddedRef.current = true;
-                      console.log('NYC layers added successfully!');
+                  if (sourceLayers.length > 0 && !layersAddedRef.current) {
+                    const detectedLayer = sourceLayers[0];
+                    console.log('🧭 Detected layer:', detectedLayer, 'from', sourceLayers);
+                    
+                    // Add land/park polygon layers with proper colors
+                    try {
+                      mapInstance.addLayer({
+                        id: 'nyc-land',
+                        type: 'fill',
+                        source: 'nyc-tiles',
+                        'source-layer': detectedLayer,
+                        paint: {
+                          'fill-color': '#F5F5DC', // Wheat color for land
+                          'fill-opacity': 1.0
+                        },
+                        filter: ['==', ['geometry-type'], 'Polygon']
+                      });
+                      console.log('✅ Added land layer');
+                    } catch (landErr) {
+                      console.warn('⚠️ Land layer failed:', landErr);
                     }
-                  }
-                } catch (queryErr) {
-                  console.warn(`Query attempt ${index + 1} failed:`, queryErr);
-                }
-              }, delay);
-            });
+                    
+                    // Add parks layer
+                    try {
+                      mapInstance.addLayer({
+                        id: 'nyc-parks',
+                        type: 'fill',
+                        source: 'nyc-tiles',
+                        'source-layer': detectedLayer,
+                        paint: {
+                          'fill-color': '#87C17A', // Green for parks
+                          'fill-opacity': 1.0
+                        },
+                        filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'leisure']]
+                      });
+                      console.log('✅ Added parks layer');
+                    } catch (parksErr) {
+                      console.warn('⚠️ Parks layer failed:', parksErr);
+                    }
+                    
+                    // Add water layer
+                    try {
+                      mapInstance.addLayer({
+                        id: 'nyc-water',
+                        type: 'fill',
+                        source: 'nyc-tiles',
+                        'source-layer': detectedLayer,
+                        paint: {
+                          'fill-color': '#6CA4E1', // Blue for water
+                          'fill-opacity': 1.0
+                        },
+                        filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']]
+                      });
+                      console.log('✅ Added water layer');
+                    } catch (waterErr) {
+                      console.warn('⚠️ Water layer failed:', waterErr);
+                    }
+                    
+                    // Add roads layer
+                    try {
+                      mapInstance.addLayer({
+                        id: 'nyc-roads',
+                        type: 'line',
+                        source: 'nyc-tiles',
+                        'source-layer': detectedLayer,
+                        paint: {
+                          'line-color': '#666666', // Dark gray for roads
+                          'line-width': 2,
+                          'line-opacity': 1.0
+                        },
+                        filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
+                      });
+                      console.log('✅ Added roads layer');
+                    } catch (roadsErr) {
+                      console.warn('⚠️ Roads layer failed:', roadsErr);
+                    }
+                    
+                    // Add waterways layer
+                    try {
+                      mapInstance.addLayer({
+                        id: 'nyc-waterways',
+                        type: 'line',
+                        source: 'nyc-tiles',
+                        'source-layer': detectedLayer,
+                        paint: {
+                          'line-color': '#999999', // Light gray for waterways
+                          'line-width': 1,
+                          'line-opacity': 0.6
+                        },
+                        filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'waterway']]
+                      });
+                      console.log('✅ Added waterways layer');
+                    } catch (waterwaysErr) {
+                      console.warn('⚠️ Waterways layer failed:', waterwaysErr);
+                    }
+                    
+                    // Add businesses points layer
+                    try {
+                      mapInstance.addLayer({
+                        id: 'nyc-businesses',
+                        type: 'circle',
+                        source: 'nyc-tiles',
+                        'source-layer': detectedLayer,
+                        paint: {
+                          'circle-color': '#FACC15', // Yellow for businesses
+                          'circle-radius': 8,
+                          'circle-opacity': 1.0,
+                          'circle-stroke-width': 2,
+                          'circle-stroke-color': '#FFFFFF'
+                        },
+                        filter: ['==', ['geometry-type'], 'Point']
+                      });
+                      console.log('✅ Added businesses layer');
+                    } catch (businessesErr) {
+                      console.warn('⚠️ Businesses layer failed:', businessesErr);
+                    }
+                    
+                    layersAddedRef.current = true;
+                    console.log('🎉 NYC layers added successfully!');
+                   }
+                 }
+               } catch (queryErr) {
+                 console.warn(`⚠️ Query attempt ${index + 1} failed:`, queryErr);
+               }
+             }, delay);
+           });
             
           } catch (error) {
-            console.error('Error in layer addition process:', error);
+            console.error('🚨 Error in layer addition process:', error);
           }
         }
       }
     });
-
-    // Helper function to add map layers
-    const addMapLayers = (mapInstance: maplibregl.Map, detectedLayer: string) => {
-      // Add land layer
-      try {
-        mapInstance.addLayer({
-          id: 'nyc-land',
-          type: 'fill',
-          source: 'nyc-tiles',
-          'source-layer': detectedLayer,
-          paint: {
-            'fill-color': '#F5F5DC',
-            'fill-opacity': 1.0
-          },
-          filter: ['==', ['geometry-type'], 'Polygon']
-        });
-      } catch (landErr) {
-        console.warn('Land layer failed:', landErr);
-      }
-      
-      // Add parks layer
-      try {
-        mapInstance.addLayer({
-          id: 'nyc-green-spaces',
-          type: 'fill',
-          source: 'nyc-tiles',
-          'source-layer': detectedLayer,
-          paint: {
-            'fill-color': '#87C17A',
-            'fill-opacity': 1.0
-          },
-          filter: [
-            'all',
-            ['==', ['geometry-type'], 'Polygon'],
-            ['any',
-              ['==', ['get', 'leisure'], 'park'],
-              ['==', ['get', 'landuse'], 'cemetery']
-            ]
-          ]
-        });
-      } catch (parksErr) {
-        console.warn('Parks layer failed:', parksErr);
-      }
-      
-      // Add water layer
-      try {
-        mapInstance.addLayer({
-          id: 'nyc-water',
-          type: 'fill',
-          source: 'nyc-tiles',
-          'source-layer': detectedLayer,
-          paint: {
-            'fill-color': '#6CA4E1',
-            'fill-opacity': 1.0
-          },
-          filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']]
-        });
-      } catch (waterErr) {
-        console.warn('Water layer failed:', waterErr);
-      }
-      
-      // Add roads layer
-      try {
-        mapInstance.addLayer({
-          id: 'nyc-roads',
-          type: 'line',
-          source: 'nyc-tiles',
-          'source-layer': detectedLayer,
-          paint: {
-            'line-color': '#666666',
-            'line-width': 2,
-            'line-opacity': 1.0
-          },
-          filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
-        });
-      } catch (roadsErr) {
-        console.warn('Roads layer failed:', roadsErr);
-      }
-      
-      // Add waterways layer
-      try {
-        mapInstance.addLayer({
-          id: 'nyc-waterways',
-          type: 'line',
-          source: 'nyc-tiles',
-          'source-layer': detectedLayer,
-          paint: {
-            'line-color': '#999999',
-            'line-width': 1,
-            'line-opacity': 0.6
-          },
-          filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'waterway']]
-        });
-      } catch (waterwaysErr) {
-        console.warn('Waterways layer failed:', waterwaysErr);
-      }
-      
-      // Add businesses points layer
-      try {
-        mapInstance.addLayer({
-          id: 'nyc-businesses',
-          type: 'circle',
-          source: 'nyc-tiles',
-          'source-layer': detectedLayer,
-          paint: {
-            'circle-color': '#FACC15',
-            'circle-radius': 8,
-            'circle-opacity': 1.0,
-            'circle-stroke-width': 2,
-            'circle-stroke-color': '#FFFFFF',
-            'circle-stroke-opacity': 1.0
-          },
-          filter: ['==', ['geometry-type'], 'Point']
-        });
-      } catch (businessesErr) {
-        console.warn('Businesses layer failed:', businessesErr);
-      }
-    };
 
     setMap(mapInstance);
 
@@ -619,31 +727,37 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, []);
 
-  // Load map data after initialization
+  // Load map data after initialization (only once)
   useEffect(() => {
     if (mapLoaded && map && !processedRef.current) {
       processMapFeatures();
     }
   }, [mapLoaded, map, processMapFeatures]);
 
-  // Clean business loading setup with proper debouncing
+  // Clean business loading setup - single effect with proper debouncing
   useEffect(() => {
     if (!map || !mapLoaded) return;
 
     let moveTimeout: NodeJS.Timeout | null = null;
     
     const moveEndHandler = () => {
+      // Clear existing timeout
       if (moveTimeout) clearTimeout(moveTimeout);
       
+      console.log('🗺️ Map moveend - current search filters:', searchFilters);
+      
+      // Debounce viewport changes
       moveTimeout = setTimeout(() => {
         isMovingRef.current = false;
+        // Always load on pan/zoom; hook will accumulate with active filters
         handleViewportChange();
       }, 300);
     };
     
+    // Single event listener for smooth performance
     map.on('moveend', moveEndHandler);
     
-    // Initial load
+    // Initial load - only once when map is ready
     handleViewportChange(true);
     
     return () => {
@@ -652,7 +766,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, [map, mapLoaded, handleViewportChange]);
 
-  // Handle business layer cleanup and deck.gl integration
+  // Handle old business layer removal and deck.gl integration
   useEffect(() => {
     if (!mapLoaded || !map) return;
 
@@ -663,7 +777,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (map.getSource('businesses')) {
       map.removeSource('businesses');
     }
-    // Hide debug vector-tile businesses to avoid duplicate points
+    // Hide debug vector-tile businesses to avoid duplicate/unfiltered points
     if (map.getLayer('nyc-businesses')) {
       map.setLayoutProperty('nyc-businesses', 'visibility', 'none');
     }
@@ -675,6 +789,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     
     if (map.getLayer('nyc-businesses')) {
       const visibility = hideVectorBusinesses ? 'none' : 'visible';
+      console.log(`🎯 Setting vector tile businesses visibility to: ${visibility}`);
       map.setLayoutProperty('nyc-businesses', 'visibility', visibility);
     }
   }, [hideVectorBusinesses, map, mapLoaded]);
@@ -685,7 +800,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       onBusinessesLoaded();
     }
   }, [businessesLoading, businesses.length, onBusinessesLoaded]);
-
   // Emoji markers with stable reference to prevent reloading
   const [lastLandmarksHash, setLastLandmarksHash] = useState('');
   
@@ -695,7 +809,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     // Create a hash of landmarks to check if they actually changed
     const landmarksHash = JSON.stringify(landmarks.map(l => `${l.lat}-${l.lng}-${l.emoji}`));
     if (landmarksHash === lastLandmarksHash) {
-      return;
+      return; // No change in landmarks, skip reload
     }
     
     setLastLandmarksHash(landmarksHash);
@@ -728,6 +842,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       };
 
       const newMarkers: maplibregl.Marker[] = landmarks.map((landmark, index) => {
+        console.log(`Creating marker ${index}:`, landmark);
+        
         const zoom = map.getZoom();
         const baseSize = 16;
         const scaleFactor = Math.pow(1.2, zoom - 10);
@@ -772,7 +888,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     } catch (error) {
       console.error('Error adding emoji markers:', error);
     }
-  }, [mapLoaded, landmarks, map, lastLandmarksHash]);
+  }, [mapLoaded, landmarks, map]);
 
   
   return (
@@ -787,9 +903,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         width: '100%',
         height: '100%',
         zIndex: 1,
-        backgroundColor: '#B3E5FC'
+        backgroundColor: '#B3E5FC' // Light blue fallback while map loads
       }}
     >
+      {/* {/* Business loading indicator 
+      <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white text-xs p-2 rounded z-50 pointer-events-none">
+        <div>🏢 Businesses: {businesses.length}</div>
+        <div>⚡ Loading: {businessesLoading ? 'Yes' : 'No'}</div>
+        <div>🗺️ Vector Tiles: Ready</div>
+        {businesses.length === 0 && (
+          <div className="text-yellow-300">⚠️ No businesses loaded</div>
+        )}
+      </div> */}
+      
       {/* Deck.GL Overlay for high-performance business rendering */}
       {map && mapLoaded && (
         <DeckGLOverlay
@@ -800,6 +926,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           zoom={currentZoom}
         />
       )}
+      
+      {/* Fallback message when no businesses are visible 
+      {map && mapLoaded && businesses.length === 0 && !businessesLoading && (
+        <div className="absolute bottom-4 left-4 bg-yellow-500 bg-opacity-90 text-black text-sm p-3 rounded max-w-xs">
+          <div className="font-semibold">No businesses in this area</div>
+          <div className="text-xs">Try moving the map or zooming out to see more businesses</div>
+        </div>
+      )}*/}
     </div>
   );
 };
