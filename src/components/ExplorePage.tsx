@@ -379,4 +379,4 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   );
 });
 
-export default ExplorePage
+export default ExplorePage;
