@@ -184,7 +184,7 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
       const defaultPost: Post = {
         id: `default-${filteredBusinessId}`,
         author: 'System',
-        text: 'Share a thought about this business',
+        text: 'Share a thought about this business 💭',
         businessId: filteredBusinessId,
         isStory: true,
         upvotes: 0,
