@@ -30,7 +30,7 @@ export const createBusinessScatterplotLayer = ({
     });
   }
   
-  new ScatterplotLayer({
+  return new ScatterplotLayer({
     id: layerId,
     data: businesses,
     pickable: true,
