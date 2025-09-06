@@ -4,19 +4,19 @@ export function formatTimeAgo(date: Date): string {
   const now = new Date();
 
   const years = differenceInYears(now, date);
-  if (years >= 1) return `${years}yr`;
+  if (years >= 1) return `${years}yr ago`;
 
   const months = differenceInMonths(now, date);
-  if (months >= 1) return `${months}mo`;
+  if (months >= 1) return `${months}mo ago`;
 
   const days = differenceInDays(now, date);
-  if (days >= 1) return `${days}d`;
+  if (days >= 1) return `${days}d ago`;
 
   const hours = differenceInHours(now, date);
-  if (hours >= 1) return `${hours}hr`;
+  if (hours >= 1) return `${hours}hr ago`;
 
   const minutes = differenceInMinutes(now, date);
-  if (minutes >= 1) return `${minutes}min`;
+  if (minutes >= 1) return `${minutes}min ago`;
 
-  return '1min'; // round down: anything < 1 min shows as 1min
+  return 'less than 1min ago';
 }
