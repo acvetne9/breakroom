@@ -170,6 +170,14 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
       ? posts.filter(post => post.author === 'You' && !post.isJobUpdate)
       : posts;
 
+    console.log('📋 Display posts calculation:', {
+      filteredBusinessId,
+      filteredPostsCount: filtered.length,
+      realPostsCount: realPosts.length,
+      hideSystemPost,
+      willShowDefaultPost: filteredBusinessId && realPosts.length === 0 && !hideSystemPost
+    });
+
     // Add default post if viewing a specific business with no posts and system post is not hidden
     if (filteredBusinessId && realPosts.length === 0 && !hideSystemPost) {
       const defaultPost: Post = {
@@ -183,6 +191,8 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
         userVote: null,
         createdAt: new Date()
       };
+      
+      console.log('➕ Adding default system post');
       
       // If we have real posts but haven't hidden the system post yet, show both during transition
       if (realPosts.length > 0) {
