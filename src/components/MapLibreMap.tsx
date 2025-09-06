@@ -673,10 +673,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (!map || !mapLoaded) return;
     
-    if (map.getLayer('nyc-businesses')) {
-      const visibility = hideVectorBusinesses ? 'none' : 'visible';
+    if (map && map.getLayer('nyc-businesses')) {
       map.setLayoutProperty('nyc-businesses', 'visibility', visibility);
     }
+
   }, [hideVectorBusinesses, map, mapLoaded]);
 
   // Notify parent when businesses are loaded
