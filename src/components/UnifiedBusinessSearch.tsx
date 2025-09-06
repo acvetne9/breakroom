@@ -386,7 +386,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
             ) : (
               <div className="p-3">
                 {searchResults.map((result, index) => (
-                  <React.Fragment key={result.id}>
+                  <div key={result.id}>
                     <div
                       className="cursor-pointer py-1.5 px-0 rounded transition-colors hover:bg-accent/20"
                       onClick={() => handleResultClick(result)}
@@ -420,7 +420,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                     {index < searchResults.length - 1 && (
                       <div className="h-px bg-border/30 my-1.5"></div>
                     )}
-                  </React.Fragment>
+                  </div>
                 ))}
               </div>
             )}
