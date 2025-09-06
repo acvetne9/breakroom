@@ -369,7 +369,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       </div>
 
       {/* Search Results Dropdown */}
-      {showDropdown && (searchResults.length > 0 || isSearching || (value.trim() && !isSearching && searchResults.length === 0)) && (
+      {showDropdown && (searchResults.length > 0 || isSearching) && (
         <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 z-50`}>
           <div 
             className="bg-background shadow-lg border-2 max-h-60 overflow-y-auto"
@@ -382,10 +382,6 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
             {isSearching ? (
               <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
                 Searching...
-              </div>
-            ) : searchResults.length === 0 && value.trim() ? (
-              <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
-                Couldn't find any businesses 😱
               </div>
             ) : (
               <div className="p-3">
