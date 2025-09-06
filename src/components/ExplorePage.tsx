@@ -94,7 +94,7 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
 
     const newComment: Comment = {
       id: crypto.randomUUID(),
-      author: "You", // replace with logged-in user’s name/id
+      author: "You", // replace with logged-in user's name/id
       text: commentText,
       createdAt: new Date(),
     };
@@ -121,7 +121,6 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
     onExpandedPostChange?.(expandedPost === postId ? null : postId);
   };
 
-
   const handleBusinessView = (businessId: string) => {
     onBusinessView?.(businessId);
   };
@@ -135,11 +134,27 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   };
 
   const displayPosts = useMemo(() => {
-    return filteredBusinessId 
+    let filteredPosts = filteredBusinessId 
       ? posts.filter(post => post.businessId === filteredBusinessId && !post.isJobUpdate)
       : filteredUserStories 
       ? posts.filter(post => post.author === 'You' && !post.isJobUpdate)
       : posts;
+
+    // Add default post when viewing a specific business with no posts
+    if (filteredBusinessId && filteredPosts.length === 0) {
+      const defaultPost: Post = {
+        id: `default-${filteredBusinessId}`,
+        author: 'System',
+        text: 'Share a thought about this business',
+        businessId: filteredBusinessId,
+        upvotes: 0,
+        downvotes: 0,
+        createdAt: new Date()
+      };
+      filteredPosts = [defaultPost];
+    }
+
+    return filteredPosts;
   }, [posts, filteredBusinessId, filteredUserStories]);
 
   return (
@@ -154,7 +169,7 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
             <div key={post.id} className="relative">
               {/* Post with background collage if business has 5+ photos */}
               <div
-                className={`app-popup-transparent p-4 cursor-pointer ${post.images && post.images.length >= 5 ? 'relative overflow-hidden' : ''}`}
+                className={`app-popup-transparent p-4 cursor-pointer ${post.images && post.images.length >= 5 ? 'relative overflow-hidden' : ''} ${post.author === 'System' ? 'border-2 border-app-yellow bg-app-yellow/5' : ''}`}
                 onClick={() => handlePostClick(post.id)}
                 style={{
                   backgroundImage: post.images && post.images.length >= 5 ? `url(${post.images[0]})` : undefined,
@@ -181,11 +196,11 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                 <div className={`relative z-10 pb-10 ${post.images && post.images.length >= 5 ? 'post-overlay rounded-lg p-3' : ''}`}>
                   <div className="flex items-start justify-between mb-2">
                     <TranslatedText 
-                      text={post.text}
-                      className="text-app-black flex-1 pr-4 break-words overflow-wrap-break-word"
+                      text={post.author === 'System' ? '💭 Share a thought about this business' : post.text}
+                      className={`flex-1 pr-4 break-words overflow-wrap-break-word ${post.author === 'System' ? 'text-app-black font-medium' : 'text-app-black'}`}
                     />
                     <div className="flex-shrink-0 w-8 flex justify-center mt-1 my-0">
-                      {(post.businessId || post.isJobUpdate) && (
+                      {(post.businessId || post.isJobUpdate) && post.author !== 'System' && (
                         <button
                           onClick={e => {
                             e.stopPropagation();
@@ -208,24 +223,28 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                   
                   {/* Timestamp in bottom left */}
                   <div className="absolute bottom-1 left-1">
-                    <span className="text-xs text-gray-400">{formatTimeAgo(post.createdAt)}</span>
+                    <span className="text-xs text-gray-400">
+                      {post.author === 'System' ? 'Start a conversation' : formatTimeAgo(post.createdAt)}
+                    </span>
                   </div>
                   
-                  {/* Voting component in bottom right */}
-                  <div className="absolute bottom-1 right-1">
-                    <VotingComponent 
-                      upvotes={post.upvotes} 
-                      downvotes={post.downvotes} 
-                      userVote={post.userVote} 
-                      onVote={voteType => handlePostVote(post.id, voteType)}
-                      isOwner={post.author === 'You'}
-                      onDelete={() => handlePostDelete(post.id)}
-                    />
-                  </div>
+                  {/* Voting component in bottom right - hide for system posts */}
+                  {post.author !== 'System' && (
+                    <div className="absolute bottom-1 right-1">
+                      <VotingComponent 
+                        upvotes={post.upvotes} 
+                        downvotes={post.downvotes} 
+                        userVote={post.userVote} 
+                        onVote={voteType => handlePostVote(post.id, voteType)}
+                        isOwner={post.author === 'You'}
+                        onDelete={() => handlePostDelete(post.id)}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Expanded view */}
-                {expandedPost === post.id && (
+                {expandedPost === post.id && post.author !== 'System' && (
                   <div className="mt-4 pt-4 border-t border-app-gray-light space-y-2">
                     {(() => {
                       // Order comments: post author's comments first
