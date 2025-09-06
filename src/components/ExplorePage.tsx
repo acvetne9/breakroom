@@ -1,4 +1,4 @@
-import React, { useState, useMemo, memo, useCallback } from 'react';
+import React, { useState, useMemo, memo, useEffect } from 'react';
 import { Eye } from 'lucide-react';
 import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
@@ -48,7 +48,8 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   onPostDelete
 }) => {
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
-  const [fadingSystemPosts, setFadingSystemPosts] = useState<Set<string>>(new Set());
+  const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
+  const [hideSystemPost, setHideSystemPost] = useState(false);
 
   interface Comment {
     id: string;
@@ -62,18 +63,33 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   const [commentText, setCommentText] = useState('');
   const { toast } = useToast();
 
-  const handleSystemPostInteraction = useCallback((postId: string) => {
-    setFadingSystemPosts(prev => new Set(prev).add(postId));
+  // Check if we need to fade out the system post when real posts are added
+  const realPosts = useMemo(() => {
+    return filteredBusinessId 
+      ? posts.filter(post => post.businessId === filteredBusinessId && !post.isJobUpdate && post.author !== 'System')
+      : filteredUserStories 
+      ? posts.filter(post => post.author === 'You' && !post.isJobUpdate)
+      : posts.filter(post => post.author !== 'System');
+  }, [posts, filteredBusinessId, filteredUserStories]);
+
+  useEffect(() => {
+    if (filteredBusinessId && realPosts.length > 0 && !fadeOutSystemPost && !hideSystemPost) {
+      // Start fade out animation
+      setFadeOutSystemPost(true);
+      
+      // After animation completes, hide the system post
+      setTimeout(() => {
+        setHideSystemPost(true);
+        setFadeOutSystemPost(false);
+      }, 500); // Match the animation duration
+    }
     
-    // Remove the post from DOM after animation completes
-    setTimeout(() => {
-      setFadingSystemPosts(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(postId);
-        return newSet;
-      });
-    }, 500);
-  }, []);
+    // Reset states when switching to different business or no filter
+    if (!filteredBusinessId || realPosts.length === 0) {
+      setFadeOutSystemPost(false);
+      setHideSystemPost(false);
+    }
+  }, [realPosts.length, filteredBusinessId, fadeOutSystemPost, hideSystemPost]);
 
   const handlePostSubmit = () => {
     if (!postText.trim()) return;
@@ -130,14 +146,6 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   };
 
   const handlePostClick = (postId: string) => {
-    const post = displayPosts.find(p => p.id === postId);
-    
-    // If it's a system post, trigger fade out instead of expanding
-    if (post?.author === 'System') {
-      handleSystemPostInteraction(postId);
-      return;
-    }
-
     // If clicking the same post, toggle closed
     setExpandedPost(prev => prev === postId ? null : postId);
     onExpandedPostChange?.(expandedPost === postId ? null : postId);
@@ -162,8 +170,8 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
       ? posts.filter(post => post.author === 'You' && !post.isJobUpdate)
       : posts;
 
-    // Add default post if viewing a specific business with no posts
-    if (filteredBusinessId && filtered.length === 0) {
+    // Add default post if viewing a specific business with no posts and system post is not hidden
+    if (filteredBusinessId && realPosts.length === 0 && !hideSystemPost) {
       const defaultPost: Post = {
         id: `default-${filteredBusinessId}`,
         author: 'System',
@@ -175,147 +183,147 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
         userVote: null,
         createdAt: new Date()
       };
+      
+      // If we have real posts but haven't hidden the system post yet, show both during transition
+      if (realPosts.length > 0) {
+        return [defaultPost, ...filtered.filter(post => post.author !== 'System')];
+      }
+      
       return [defaultPost];
     }
 
     return filtered;
-  }, [posts, filteredBusinessId, filteredUserStories]);
+  }, [posts, filteredBusinessId, filteredUserStories, realPosts.length, hideSystemPost]);
 
   return (
     <div className="relative w-full h-full">
       {/* Posts list */}
       <div className={`h-full overflow-y-auto pb-20 ${filteredBusinessId || filteredUserStories ? 'pt-20' : 'pt-20'}`}>
         <div className="space-y-4 px-4">
-          {displayPosts
-            .filter(post => !fadingSystemPosts.has(post.id) || post.author !== 'System')
-            .map(post => {
-              const isFading = fadingSystemPosts.has(post.id) && post.author === 'System';
-              
-              return (
-                <div key={post.id} className="relative">
-                  {/* Post with background collage if business has 5+ photos */}
-                  <div
-                    className={`app-popup-transparent p-4 cursor-pointer ${post.images && post.images.length >= 5 ? 'relative overflow-hidden' : ''} ${
-                      isFading ? 'animate-fade-out opacity-0 transition-opacity duration-500' : ''
-                    }`}
-                    onClick={() => handlePostClick(post.id)}
-                    style={{
-                      backgroundImage: post.images && post.images.length >= 5 ? `url(${post.images[0]})` : undefined,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center'
-                    }}
-                  >
-                    {/* Background collage overlay */}
-                    {post.images && post.images.length >= 5 && (
-                      <div className="absolute inset-0 opacity-30">
-                        <div className="grid grid-cols-3 h-full">
-                          {post.images.slice(0, 6).map((img, idx) => (
-                            <div
-                              key={idx}
-                              className="bg-cover bg-center"
-                              style={{ backgroundImage: `url(${img})` }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Post content */}
-                    <div className={`relative z-10 pb-10 ${post.images && post.images.length >= 5 ? 'post-overlay rounded-lg p-3' : ''}`}>
-                      <div className="flex items-start justify-between mb-2">
-                        <TranslatedText 
-                          text={post.text}
-                          className={`flex-1 pr-4 break-words overflow-wrap-break-word ${
-                            post.author === 'System' 
-                              ? 'text-app-gray-medium italic' 
-                              : 'text-app-black'
-                          }`}
+          {displayPosts.map(post => (
+            <div key={post.id} className="relative">
+              {/* Post with background collage if business has 5+ photos */}
+              <div
+                className={`app-popup-transparent p-4 cursor-pointer ${post.images && post.images.length >= 5 ? 'relative overflow-hidden' : ''} ${
+                  post.author === 'System' && fadeOutSystemPost ? 'animate-fade-out opacity-0 transition-opacity duration-500' : ''
+                }`}
+                onClick={() => handlePostClick(post.id)}
+                style={{
+                  backgroundImage: post.images && post.images.length >= 5 ? `url(${post.images[0]})` : undefined,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center'
+                }}
+              >
+                {/* Background collage overlay */}
+                {post.images && post.images.length >= 5 && (
+                  <div className="absolute inset-0 opacity-30">
+                    <div className="grid grid-cols-3 h-full">
+                      {post.images.slice(0, 6).map((img, idx) => (
+                        <div
+                          key={idx}
+                          className="bg-cover bg-center"
+                          style={{ backgroundImage: `url(${img})` }}
                         />
-                        <div className="flex-shrink-0 w-8 flex justify-center mt-1 my-0">
-                          {(post.businessId || post.isJobUpdate) && (
-                            <button
-                              onClick={e => {
-                                e.stopPropagation();
-                                if (post.businessId) {
-                                  handleBusinessView(post.businessId);
-                                } else if (post.linkedLocation) {
-                                  toast({
-                                    title: "Location",
-                                    description: post.linkedLocation
-                                  });
-                                }
-                              }}
-                              className="flex items-center space-x-1 text-app-gray-medium hover:text-app-black"
-                            >
-                              <span className="py-0 my-0">👀</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Timestamp in bottom left */}
-                      <div className="absolute bottom-1 left-1">
-                        <span className="text-xs text-gray-400">
-                          {post.author === 'System' ? 'Click to share!' : formatTimeAgo(post.createdAt)}
-                        </span>
-                      </div>
-                      
-                      {/* Voting component in bottom right */}
-                      {post.author !== 'System' && (
-                        <div className="absolute bottom-1 right-1">
-                          <VotingComponent 
-                            upvotes={post.upvotes} 
-                            downvotes={post.downvotes} 
-                            userVote={post.userVote} 
-                            onVote={voteType => handlePostVote(post.id, voteType)}
-                            isOwner={post.author === 'You'}
-                            onDelete={() => handlePostDelete(post.id)}
-                          />
-                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Post content */}
+                <div className={`relative z-10 pb-10 ${post.images && post.images.length >= 5 ? 'post-overlay rounded-lg p-3' : ''}`}>
+                  <div className="flex items-start justify-between mb-2">
+                    <TranslatedText 
+                      text={post.text}
+                      className={`flex-1 pr-4 break-words overflow-wrap-break-word ${
+                        post.author === 'System' 
+                          ? 'text-app-gray-medium italic' 
+                          : 'text-app-black'
+                      }`}
+                    />
+                    <div className="flex-shrink-0 w-8 flex justify-center mt-1 my-0">
+                      {(post.businessId || post.isJobUpdate) && (
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            if (post.businessId) {
+                              handleBusinessView(post.businessId);
+                            } else if (post.linkedLocation) {
+                              toast({
+                                title: "Location",
+                                description: post.linkedLocation
+                              });
+                            }
+                          }}
+                          className="flex items-center space-x-1 text-app-gray-medium hover:text-app-black"
+                        >
+                          <span className="py-0 my-0">👀</span>
+                        </button>
                       )}
                     </div>
-
-                    {/* Expanded view */}
-                    {expandedPost === post.id && (
-                      <div className="mt-4 pt-4 border-t border-app-gray-light space-y-2">
-                        {(() => {
-                          // Order comments: post author's comments first
-                          const orderedComments = (comments[post.id] || []).slice().sort((a, b) => {
-                            if (a.author === post.author && b.author !== post.author) return -1;
-                            if (b.author === post.author && a.author !== post.author) return 1;
-                            return a.createdAt.getTime() - b.createdAt.getTime();
-                          });
-                    
-                          if (orderedComments.length === 0) {
-                            return (
-                              <h4 className="text-sm font-medium mb-2 text-slate-500 text-left">
-                                Be the first to share! 😉
-                              </h4>
-                            );
-                          }
-                    
-                          return orderedComments.map(comment => (
-                            <div key={comment.id} className="flex items-center justify-between py-1">
-                              <TranslatedText text={comment.text} className="text-sm text-app-gray-dark pr-2" />
-                              <div className="flex-shrink-0">
-                                <VotingComponent
-                                  upvotes={0}
-                                  downvotes={0}
-                                  userVote={null}
-                                  onVote={() => {}}
-                                  isOwner={comment.author === 'You'}
-                                  onDelete={() => handleCommentDelete(post.id, comment.id)}
-                                />
-                              </div>
-                            </div>
-                          ));
-                        })()}
-                      </div>
-                    )}
                   </div>
+                  
+                  {/* Timestamp in bottom left */}
+                  <div className="absolute bottom-1 left-1">
+                    <span className="text-xs text-gray-400">
+                      {post.author === 'System' ? 'Click to share!' : formatTimeAgo(post.createdAt)}
+                    </span>
+                  </div>
+                  
+                  {/* Voting component in bottom right */}
+                  {post.author !== 'System' && (
+                    <div className="absolute bottom-1 right-1">
+                      <VotingComponent 
+                        upvotes={post.upvotes} 
+                        downvotes={post.downvotes} 
+                        userVote={post.userVote} 
+                        onVote={voteType => handlePostVote(post.id, voteType)}
+                        isOwner={post.author === 'You'}
+                        onDelete={() => handlePostDelete(post.id)}
+                      />
+                    </div>
+                  )}
                 </div>
-              );
-            })}
+
+                {/* Expanded view */}
+                {expandedPost === post.id && (
+                  <div className="mt-4 pt-4 border-t border-app-gray-light space-y-2">
+                    {(() => {
+                      // Order comments: post author's comments first
+                      const orderedComments = (comments[post.id] || []).slice().sort((a, b) => {
+                        if (a.author === post.author && b.author !== post.author) return -1;
+                        if (b.author === post.author && a.author !== post.author) return 1;
+                        return a.createdAt.getTime() - b.createdAt.getTime();
+                      });
+                
+                      if (orderedComments.length === 0) {
+                        return (
+                          <h4 className="text-sm font-medium mb-2 text-slate-500 text-left">
+                            Be the first to share! 😉
+                          </h4>
+                        );
+                      }
+                
+                      return orderedComments.map(comment => (
+                        <div key={comment.id} className="flex items-center justify-between py-1">
+                          <TranslatedText text={comment.text} className="text-sm text-app-gray-dark pr-2" />
+                          <div className="flex-shrink-0">
+                            <VotingComponent
+                              upvotes={0}
+                              downvotes={0}
+                              userVote={null}
+                              onVote={() => {}}
+                              isOwner={comment.author === 'You'}
+                              onDelete={() => handleCommentDelete(post.id, comment.id)}
+                            />
+                          </div>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -371,4 +379,4 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   );
 });
 
-export default ExplorePage;
+export default ExplorePage
