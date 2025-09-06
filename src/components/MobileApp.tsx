@@ -274,10 +274,20 @@ const MobileApp: React.FC = () => {
 
   const handleRoleVote = async (businessId: string, roleIndex: number, voteType: 'up' | 'down') => {
     // Find the role ID from the business
-    const business = businesses.find(b => b.id === businessId);
+    let business = businesses.find(b => b.id === businessId);
+    
+    // If business doesn't have role IDs, fetch full details first
     if (!business?.roles?.[roleIndex]?.id) {
-      console.error('Role not found for voting');
-      return;
+      console.log('🔄 Role missing ID, fetching full business details...');
+      const fullBusiness = await fetchFullBusinessDetails(businessId);
+      if (fullBusiness?.roles?.[roleIndex]?.id) {
+        // Update the businesses array with full details
+        setBusinesses(prev => prev.map(b => b.id === businessId ? fullBusiness : b));
+        business = fullBusiness;
+      } else {
+        console.error('Role not found for voting after fetching full details');
+        return;
+      }
     }
 
     const roleId = business.roles[roleIndex].id;
