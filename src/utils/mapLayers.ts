@@ -50,7 +50,6 @@ export const addParksAndCemeteriesLayer = (
   }
 };
 
-
 export const addWaterLayer = (map: maplibregl.Map, waterFeatures: any[]) => {
   if (waterFeatures.length === 0) return;
   
@@ -213,25 +212,45 @@ export const ensureLayerOrder = (map: maplibregl.Map) => {
   }
 };
 
+// Enhanced business layer with proper navigation
 export const addBusinessesLayer = (
   map: maplibregl.Map,
   businesses: any[],
   selectedBusiness?: any,
-  onBusinessClick?: (business: any) => void
+  onBusinessClick?: (business: any) => void,
+  onBusinessOpen?: (business: any) => void // New callback for opening/navigating to business details
 ) => {
   try {
-    // Clean up existing
+    console.log(`🏢 Adding ${businesses.length} businesses to MapLibre layer`);
+    
+    // Clean up existing layer and event handlers
+    if (map.getLayer('businesses-layer')) {
+      // Remove existing event handlers
+      map.off('click', 'businesses-layer');
+      map.off('mouseenter', 'businesses-layer');
+      map.off('mouseleave', 'businesses-layer');
+      map.removeLayer('businesses-layer');
+    }
     if (map.getSource('businesses')) {
-      if (map.getLayer('businesses-layer')) {
-        map.removeLayer('businesses-layer');
-      }
       map.removeSource('businesses');
     }
 
     const businessFeatures = businesses.map(business => ({
       type: 'Feature' as const,
-      geometry: { type: 'Point' as const, coordinates: [business.position.lng, business.position.lat] },
-      properties: { id: business.id, name: business.name, businessType: business.businessType || 'unknown' }
+      geometry: { 
+        type: 'Point' as const, 
+        coordinates: [business.position.lng, business.position.lat] 
+      },
+      properties: { 
+        id: business.id, 
+        name: business.name, 
+        businessType: business.businessType || 'unknown',
+        // Include all business data in properties for easy access
+        address: business.address,
+        phone: business.phone,
+        website: business.website,
+        rating: business.rating
+      }
     }));
 
     map.addSource('businesses', {
@@ -248,45 +267,141 @@ export const addBusinessesLayer = (
         'circle-color': selectedBusiness ? [
           'case',
           ['==', ['get', 'id'], selectedBusiness.id],
-          '#EF4444',
-          '#FACC15'
-        ] : '#FACC15',
+          '#EF4444', // Red for selected
+          '#FACC15'  // Yellow for others
+        ] : '#FACC15', // Yellow for all if none selected
         'circle-stroke-width': 2,
-        'circle-stroke-color': '#FFFFFF'
+        'circle-stroke-color': '#FFFFFF',
+        'circle-opacity': 0.9
       }
     });
 
-    // Event handlers
-    if (onBusinessClick) {
-      const clickHandler = (e: any) => {
-        if (e.features?.[0]) {
-          const businessId = e.features[0].properties?.id;
-          const business = businesses.find(b => b.id === businessId);
-          if (business) {
-            map.flyTo({
-              center: [business.position.lng, business.position.lat],
-              zoom: 16,
-              duration: 800,
-              essential: true
-            });
+    // Enhanced click handler with navigation
+    const clickHandler = (e: any) => {
+      console.log('🎯 MapLibre business click detected!', e.features?.[0]?.properties);
+      
+      if (e.features?.[0]) {
+        const businessId = e.features[0].properties?.id;
+        const business = businesses.find(b => b.id === businessId);
+        
+        if (business) {
+          console.log('🎯 Found business for click:', business.name, 'ID:', business.id);
+          
+          // First, handle the map click (selection, flyTo, etc.)
+          if (onBusinessClick) {
             onBusinessClick(business);
           }
+          
+          // Fly to the business location
+          map.flyTo({
+            center: [business.position.lng, business.position.lat],
+            zoom: Math.max(16, map.getZoom() || 12),
+            duration: 800,
+            essential: true
+          });
+          
+          // Then handle opening/navigating to business details
+          if (onBusinessOpen) {
+            console.log('🚀 Opening business details for:', business.name);
+            // Add a small delay to let the map animation start
+            setTimeout(() => {
+              onBusinessOpen(business);
+            }, 100);
+          } else {
+            console.warn('⚠️ No onBusinessOpen handler provided - cannot navigate to business details');
+          }
+        } else {
+          console.error('❌ Business not found for ID:', businessId);
         }
-      };
+      } else {
+        console.warn('⚠️ Click event has no features');
+      }
+    };
 
-      map.on('click', 'businesses-layer', clickHandler);
-      map.on('mouseenter', 'businesses-layer', () => {
-        map.getCanvas().style.cursor = 'pointer';
-      });
-      map.on('mouseleave', 'businesses-layer', () => {
-        map.getCanvas().style.cursor = '';
-      });
+    // Mouse interaction handlers
+    const mouseEnterHandler = () => {
+      map.getCanvas().style.cursor = 'pointer';
+    };
 
-      return () => {
-        map.off('click', 'businesses-layer', clickHandler);
-      };
-    }
+    const mouseLeaveHandler = () => {
+      map.getCanvas().style.cursor = '';
+    };
+
+    // Add event handlers
+    map.on('click', 'businesses-layer', clickHandler);
+    map.on('mouseenter', 'businesses-layer', mouseEnterHandler);
+    map.on('mouseleave', 'businesses-layer', mouseLeaveHandler);
+
+    console.log(`✅ Successfully added ${businesses.length} businesses with click handlers`);
+
+    // Return cleanup function
+    return () => {
+      console.log('🧹 Cleaning up MapLibre business layer event handlers');
+      map.off('click', 'businesses-layer', clickHandler);
+      map.off('mouseenter', 'businesses-layer', mouseEnterHandler);
+      map.off('mouseleave', 'businesses-layer', mouseLeaveHandler);
+    };
+    
   } catch (error) {
-    console.error('Error adding businesses:', error);
+    console.error('❌ Error adding businesses layer:', error);
   }
+};
+
+// Utility function to update business selection
+export const updateSelectedBusiness = (map: maplibregl.Map, selectedBusiness?: any) => {
+  if (!map.getLayer('businesses-layer')) return;
+  
+  map.setPaintProperty('businesses-layer', 'circle-color', selectedBusiness ? [
+    'case',
+    ['==', ['get', 'id'], selectedBusiness.id],
+    '#EF4444', // Red for selected
+    '#FACC15'  // Yellow for others
+  ] : '#FACC15'); // Yellow for all if none selected
+};
+
+// Utility function to add popup on hover (optional enhancement)
+export const addBusinessPopup = (map: maplibregl.Map, businesses: any[]) => {
+  const popup = new maplibregl.Popup({
+    closeButton: false,
+    closeOnClick: false
+  });
+
+  map.on('mouseenter', 'businesses-layer', (e) => {
+    if (e.features?.[0]) {
+      const businessId = e.features[0].properties?.id;
+      const business = businesses.find(b => b.id === businessId);
+      
+      if (business) {
+        popup.setLngLat([business.position.lng, business.position.lat])
+          .setHTML(`
+            <div style="font-family: system-ui; padding: 8px;">
+              <strong>${business.name}</strong><br>
+              <small>${business.businessType || 'Business'}</small>
+              ${business.rating ? `<br>⭐ ${business.rating}` : ''}
+            </div>
+          `)
+          .addTo(map);
+      }
+    }
+  });
+
+  map.on('mouseleave', 'businesses-layer', () => {
+    popup.remove();
+  });
+
+  return () => {
+    popup.remove();
+  };
+};
+
+// Utility function to focus on a specific business
+export const focusOnBusiness = (map: maplibregl.Map, business: any, zoom: number = 16) => {
+  if (!business?.position) return;
+  
+  map.flyTo({
+    center: [business.position.lng, business.position.lat],
+    zoom: Math.max(zoom, map.getZoom() || 12),
+    duration: 1000,
+    essential: true
+  });
 };
