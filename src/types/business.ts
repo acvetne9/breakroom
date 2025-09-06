@@ -1,4 +1,5 @@
 export interface BusinessRole {
+  id?: string;
   role: string;
   salary: string;
   upvotes: number;

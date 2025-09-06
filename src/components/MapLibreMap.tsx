@@ -906,7 +906,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         backgroundColor: '#B3E5FC' // Light blue fallback while map loads
       }}
     >
-      {/* Business loading indicator */}
+      {/* {/* Business loading indicator 
       <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white text-xs p-2 rounded z-50 pointer-events-none">
         <div>🏢 Businesses: {businesses.length}</div>
         <div>⚡ Loading: {businessesLoading ? 'Yes' : 'No'}</div>
@@ -914,7 +914,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         {businesses.length === 0 && (
           <div className="text-yellow-300">⚠️ No businesses loaded</div>
         )}
-      </div>
+      </div> */}
       
       {/* Deck.GL Overlay for high-performance business rendering */}
       {map && mapLoaded && (

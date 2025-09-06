@@ -1,4 +1,3 @@
-
 import React, { memo } from 'react';
 import { formatTimeAgo } from '../utils/timeAgo';
 
@@ -19,6 +18,13 @@ interface BusinessPreviewProps {
     name: string;
     atmosphere: string[];
     salary?: string;
+    roles?: Array<{
+      role: string;
+      salary: string;
+      upvotes?: number;
+      downvotes?: number;
+      userVote?: 'up' | 'down' | null;
+    }>;
     stories?: Array<{ id: string; text: string; author: string }>;
   };
   posts: Post[];
@@ -30,6 +36,37 @@ interface BusinessPreviewProps {
 const BusinessPreview: React.FC<BusinessPreviewProps> = memo(({ business, posts, onClose, onShowDetails, onStoriesClick }) => {
   // Get stories (posts) for this business
   const businessStories = posts.filter(post => post.businessId === business.id && post.isStory).slice(0, 3);
+
+  // Calculate average salary per role type
+  const calculateRoleAverages = () => {
+    if (!business.roles || business.roles.length === 0) {
+      return [];
+    }
+
+    // Group roles by role name
+    const roleGroups: { [key: string]: number[] } = {};
+    
+    business.roles.forEach(role => {
+      const match = role.salary.match(/\$?(\d+(?:\.\d+)?)/);
+      const salary = match ? parseFloat(match[1]) : 0;
+      
+      if (salary > 0) {
+        if (!roleGroups[role.role]) {
+          roleGroups[role.role] = [];
+        }
+        roleGroups[role.role].push(salary);
+      }
+    });
+
+    // Calculate averages for each role
+    return Object.entries(roleGroups).map(([roleName, salaries]) => ({
+      role: roleName,
+      averageSalary: `$${(salaries.reduce((sum, salary) => sum + salary, 0) / salaries.length).toFixed(1)}`,
+      count: salaries.length
+    }));
+  };
+
+  const roleAverages = calculateRoleAverages();
 
   const handleStoryClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -74,16 +111,30 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = memo(({ business, posts,
           </div>
         </div>
 
-        {business.salary && (
+        {/* Show averaged salary per role */}
+        {roleAverages.length > 0 && (
           <div className="mb-4">
-            <p className="text-app-black">
-              <span className="font-medium">
-                {business.salary}
-                {!business.salary.includes('/') && (
-                  <span className="text-xs text-app-gray-medium ml-1">/hr</span>
-                )}
-              </span> Barista
-            </p>
+            <div 
+              className="space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
+              style={{ 
+                maxHeight: roleAverages.length > 3 ? '72px' : 'auto' // 3 rows * 24px per row
+              }}
+            >
+              {roleAverages.map((roleAvg, index) => (
+                <div key={index} className="flex justify-between items-center h-6 flex-shrink-0">
+                  <span className="text-app-black text-sm">{roleAvg.role}</span>
+                  <span className="font-medium text-app-black text-sm">
+                    {roleAvg.averageSalary}
+                    <span className="text-xs text-app-gray-medium ml-1">/hr</span>
+                    {roleAvg.count > 1 && (
+                      <span className="text-xs text-app-gray-medium ml-1">
+                        ({roleAvg.count})
+                      </span>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

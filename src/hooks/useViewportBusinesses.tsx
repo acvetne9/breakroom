@@ -90,7 +90,7 @@ export const useViewportBusinesses = (searchFilters?: any) => {
     }, 1000); // Preload after 1 second of inactivity
   }, [getCachedBusinesses, setCachedBusinesses]);
 
-  const loadBusinessesInViewport = useCallback(async (bounds: MapBounds, limit: number = 10000, isMoving: boolean = false) => {
+  const loadBusinessesInViewport = useCallback(async (bounds: MapBounds, limit: number = 5000, isMoving: boolean = false) => {
     console.log('🗺️ [loadBusinessesInViewport] Called with bounds:', bounds);
     console.log('🗺️ [loadBusinessesInViewport] searchFilters parameter in hook:', searchFilters);
     console.log('🗺️ [loadBusinessesInViewport] searchFilters detailed state:', { 
@@ -102,13 +102,14 @@ export const useViewportBusinesses = (searchFilters?: any) => {
       stringified: JSON.stringify(searchFilters)
     });
     
-    // Prevent duplicate requests if already loading
-    if (loading) {
-      console.log('🗺️ [loadBusinessesInViewport] Already loading, returning early');
+    const isNewSearch = JSON.stringify(searchFilters) !== JSON.stringify(lastSearchFilters);
+    
+    // Only prevent loading for identical requests, allow new searches to interrupt
+    if (loading && !isNewSearch) {
+      console.log('🗺️ [loadBusinessesInViewport] Already loading same request, returning early');
       return;
     }
 
-    const isNewSearch = JSON.stringify(searchFilters) !== JSON.stringify(lastSearchFilters);
     console.log('🔍 [loadBusinessesInViewport] Search state check:', { 
       isNewSearch, 
       hasCurrentFilters: !!searchFilters, 
@@ -142,18 +143,23 @@ export const useViewportBusinesses = (searchFilters?: any) => {
         // Same search - accumulate results when panning to new areas
         console.log('🔄 Same search filters - checking if we need to search new area');
         
-        // Check if we're in a significantly different area
+        // Check if we're in a significantly different area (more permissive for searches)
         if (currentBounds) {
-          const boundsOverlap = !(
-            bounds.north < currentBounds.south ||
-            bounds.south > currentBounds.north ||
-            bounds.east < currentBounds.west ||
-            bounds.west > currentBounds.east
+          // Calculate overlap percentage - search new areas if less than 70% overlap
+          const overlapArea = Math.max(0, 
+            Math.min(bounds.north, currentBounds.north) - Math.max(bounds.south, currentBounds.south)
+          ) * Math.max(0,
+            Math.min(bounds.east, currentBounds.east) - Math.max(bounds.west, currentBounds.west)
           );
           
-          // If there's significant overlap, don't search again
-          if (boundsOverlap) {
-            console.log('🔄 Area overlaps with previous search - keeping existing results');
+          const currentArea = (bounds.north - bounds.south) * (bounds.east - bounds.west);
+          const overlapRatio = overlapArea / currentArea;
+          
+          console.log('🔄 Overlap analysis:', { overlapRatio, threshold: 0.7 });
+          
+          // If there's more than 70% overlap, don't search again
+          if (overlapRatio > 0.7) {
+            console.log('🔄 Area has high overlap with previous search - keeping existing results');
             return;
           }
         }
@@ -162,14 +168,21 @@ export const useViewportBusinesses = (searchFilters?: any) => {
         console.log('🗺️ Searching new area and adding to existing results');
         setLoading(true);
         try {
-          const newBusinesses = await getBusinessesInViewport(bounds, limit, searchFilters);
+          // Use expanded bounds for better search coverage when scrolling
+          const expandedBounds = {
+            north: bounds.north + (bounds.north - bounds.south) * 0.2,
+            south: bounds.south - (bounds.north - bounds.south) * 0.2,
+            east: bounds.east + (bounds.east - bounds.west) * 0.2,
+            west: bounds.west - (bounds.east - bounds.west) * 0.2
+          };
+          const newBusinesses = await getBusinessesInViewport(expandedBounds, limit, searchFilters);
           setBusinesses(prev => {
             const existingIds = new Set(prev.map(b => b.id));
             const uniqueNew = newBusinesses.filter(b => !existingIds.has(b.id));
             console.log(`📍 Adding ${uniqueNew.length} new businesses to existing ${prev.length}`);
             return [...prev, ...uniqueNew];
           });
-          setCurrentBounds(bounds);
+          setCurrentBounds(expandedBounds);
         } catch (error) {
           console.error('❌ New area search error:', error);
         } finally {
@@ -179,16 +192,17 @@ export const useViewportBusinesses = (searchFilters?: any) => {
       }
     }
     
-    // No search filters - clear search state if needed
+    // No search filters - only clear search state flag, keep results visible
     if (isNewSearch && lastSearchFilters) {
-      console.log('🧹 Clearing search state - no filters active');
+      console.log('🧹 Search cleared but keeping results visible');
       setLastSearchFilters(null);
       setIsSearching(false);
-      setBusinesses([]); // Clear search results
+      // Don't clear businesses - let them persist until explicit clear or new search
     }
 
     // Rest of the normal viewport loading logic for no-filter case
-    if (!searchFilters) {
+    // Don't override existing search results with cached data
+    if (!searchFilters && !lastSearchFilters) {
       const cachedBusinesses = getCachedBusinesses(bounds);
       if (cachedBusinesses && cachedBusinesses.length > 200) {
         setBusinesses(cachedBusinesses);
@@ -208,7 +222,7 @@ export const useViewportBusinesses = (searchFilters?: any) => {
       west: bounds.west - (bounds.east - bounds.west) * expansionFactor
     };
 
-    if (!searchFilters) {
+    if (!searchFilters && !lastSearchFilters) {
       const expandedCached = getCachedBusinesses(expandedBounds);
       if (expandedCached && expandedCached.length > 200) {
         setBusinesses(expandedCached);

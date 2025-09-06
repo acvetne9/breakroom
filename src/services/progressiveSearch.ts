@@ -272,6 +272,7 @@ export class ProgressiveBusinessSearch {
       const rolesByBusinessId = (roles || []).reduce((acc: any, role: any) => {
         if (!acc[role.business_id]) acc[role.business_id] = [];
         acc[role.business_id].push({
+          id: role.id,
           role: role.role,
           salary: role.salary,
           upvotes: role.upvotes || 0,

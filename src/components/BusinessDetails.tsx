@@ -1,4 +1,3 @@
-
 import React, { memo } from 'react';
 import { Compass } from 'lucide-react';
 import VotingComponent from './VotingComponent';
@@ -88,6 +87,11 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
     e?.stopPropagation();
     onRoleVote?.(business.id, roleIndex, voteType);
   };
+
+  // Determine if roles section should be scrollable
+  const roles = business.roles || [];
+  const shouldScroll = roles.length > 6;
+  
   return <div className="fixed inset-0 z-40 flex items-start justify-center" style={{ paddingTop: '8vh' }} onClick={handleBackgroundClick}>
       <div className="app-card p-6 overflow-y-auto animate-fade-in" onClick={handleCardClick}>
         <div className="flex justify-between items-start mb-6">
@@ -117,8 +121,11 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
         {/* Job roles and salaries */}
         <div className="mb-8">
           <h3 className="text-lg font-medium text-app-black mb-4">Roles & Salaries</h3>
-          <div className="space-y-3">
-            {business.roles ? business.roles.map((role, index) => <div key={index} className="flex justify-between items-center">
+          <div 
+            className={`space-y-2 ${shouldScroll ? 'max-h-64 overflow-y-auto pr-2' : ''}`}
+            style={shouldScroll ? { scrollbarWidth: 'thin' } : {}}
+          >
+            {business.roles ? business.roles.map((role, index) => <div key={index} className="flex justify-between items-center py-1">
                 <span className="text-app-black">{role.role}</span>
                   <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
                   <span className="font-medium text-app-black">
@@ -134,7 +141,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
                     onVote={(voteType) => handleRoleVote(index, voteType)}
                   />
                 </div>
-              </div>) : <div className="flex justify-between items-center">
+              </div>) : <div className="flex justify-between items-center py-1">
                 <span className="text-app-black">Barista</span>
                 <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
                   <span className="font-medium text-app-black">{business.salary || '$13.6'}</span>

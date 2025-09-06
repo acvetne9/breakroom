@@ -152,7 +152,6 @@ export const searchBusinessesUnified = async (
    // Apply text search on business name/type (filtering out role terms)
    const nonRoleTerms = filters.textTerms.filter(term => term !== filters.roleFilter);
    if (nonRoleTerms.length > 0) {
-     console.log(`🔍 [unifiedSearch] Searching business names and types for terms: ${JSON.stringify(nonRoleTerms)}`);
      for (const term of nonRoleTerms) {
        baseQuery = baseQuery.or(`name.ilike.%${term}%,business_type.ilike.%${term}%`);
      }
@@ -160,58 +159,54 @@ export const searchBusinessesUnified = async (
     
     // Apply business type filter
     if (filters.businessTypeFilter) {
-      console.log(`🔍 [unifiedSearch] Applying business type filter: ${filters.businessTypeFilter}`);
       baseQuery = baseQuery.ilike('business_type', `%${filters.businessTypeFilter}%`);
     }
     
     baseQuery = baseQuery.limit(limit);
     
-    console.log(`🔍 [unifiedSearch] Executing query with filters:`, filters);
     const { data: nameMatches, error: nameError } = await baseQuery;
     if (nameError) {
       console.error('❌ Business search error:', nameError);
     }
-    console.log(`🔍 [unifiedSearch] Raw business query (name/type) returned ${nameMatches?.length || 0} results`);
     
     // Find businesses by matching roles
     let roleMatchedBusinesses: any[] = [];
     if (filters.roleFilter) {
-      console.log('🔍 [unifiedSearch] Searching roles for:', filters.roleFilter);
       const { data: roleRows, error: roleSearchError } = await supabase
         .from('business_roles')
         .select('business_id')
         .ilike('role', `%${filters.roleFilter}%`)
         .limit(5000);
-      if (roleSearchError) {
-        console.warn('⚠️ Role search error:', roleSearchError);
-      }
-      const roleBusinessIds = Array.from(new Set((roleRows || []).map(r => r.business_id)));
-      console.log(`🔍 [unifiedSearch] Role search matched ${roleBusinessIds.length} unique businesses`);
-      if (roleBusinessIds.length > 0) {
-        let roleBizQuery = supabase.from('businesses').select('id, name, lat, lng, atmosphere, business_type, website, salary').in('id', roleBusinessIds);
-        if (bounds) {
-          roleBizQuery = roleBizQuery
-            .gte('lat', bounds.south)
-            .lte('lat', bounds.north)
-            .gte('lng', bounds.west)
-            .lte('lng', bounds.east);
-        }
+      
+      if (!roleSearchError && roleRows?.length) {
+        const roleBusinessIds = Array.from(new Set(roleRows.map(r => r.business_id)));
         
-        // Apply non-role text terms to role-matched businesses
-        const nonRoleTerms = filters.textTerms.filter(term => term !== filters.roleFilter);
-        if (nonRoleTerms.length > 0) {
-          console.log(`🔍 [unifiedSearch] Applying non-role terms to role-matched businesses: ${JSON.stringify(nonRoleTerms)}`);
-          for (const term of nonRoleTerms) {
-            roleBizQuery = roleBizQuery.or(`name.ilike.%${term}%,business_type.ilike.%${term}%`);
+        if (roleBusinessIds.length > 0) {
+          let roleBizQuery = supabase.from('businesses')
+            .select('id, name, lat, lng, atmosphere, business_type, website, salary')
+            .in('id', roleBusinessIds);
+            
+          if (bounds) {
+            roleBizQuery = roleBizQuery
+              .gte('lat', bounds.south)
+              .lte('lat', bounds.north)
+              .gte('lng', bounds.west)
+              .lte('lng', bounds.east);
+          }
+          
+          // Apply non-role text terms to role-matched businesses
+          const nonRoleTerms = filters.textTerms.filter(term => term !== filters.roleFilter);
+          if (nonRoleTerms.length > 0) {
+            for (const term of nonRoleTerms) {
+              roleBizQuery = roleBizQuery.or(`name.ilike.%${term}%,business_type.ilike.%${term}%`);
+            }
+          }
+          
+          const { data: roleBizData, error: roleBizError } = await roleBizQuery.limit(limit);
+          if (!roleBizError) {
+            roleMatchedBusinesses = roleBizData || [];
           }
         }
-        
-        const { data: roleBizData, error: roleBizError } = await roleBizQuery.limit(limit);
-        if (roleBizError) {
-          console.warn('⚠️ Role-matched businesses fetch error:', roleBizError);
-        }
-        roleMatchedBusinesses = roleBizData || [];
-        console.log(`🔍 [unifiedSearch] Role-matched businesses within bounds: ${roleMatchedBusinesses.length}`);
       }
     }
     
@@ -222,36 +217,66 @@ export const searchBusinessesUnified = async (
     const businesses = Array.from(combinedMap.values());
     
     if (!businesses || businesses.length === 0) {
-      console.log('🔍 [unifiedSearch] No businesses found after name/type and role-based matching');
       return [];
     }
     
-    console.log(`🔍 Found ${businesses.length} businesses, now loading roles...`);
+    console.log(`🔍 Found ${businesses.length} businesses, loading all roles...`);
     
-    // Load roles for all businesses efficiently in chunks
+    // Load roles in safe batches to avoid oversized URLs
     const businessIds = businesses.map(b => b.id);
-    const allRoles: any[] = [];
-    
-    // Chunk business IDs to avoid URL length limits
-    const chunkSize = 50; // Conservative chunk size
-    for (let i = 0; i < businessIds.length; i += chunkSize) {
-      const chunk = businessIds.slice(i, i + chunkSize);
-      
-      try {
-        const { data: rolesData, error: rolesError } = await supabase
+    let allRoles: any[] = [];
+
+    if (businessIds.length > 0) {
+      const BATCH_SIZE = 150; // keep URL well under limits
+      const CONCURRENCY = 6;  // fast but safe parallelism
+      const chunks: string[][] = [];
+      for (let i = 0; i < businessIds.length; i += BATCH_SIZE) {
+        chunks.push(businessIds.slice(i, i + BATCH_SIZE));
+      }
+
+      const executeBatch = async (ids: string[]) => {
+        const { data, error } = await supabase
           .from('business_roles')
           .select('business_id, id, role, salary, upvotes, downvotes')
-          .in('business_id', chunk);
-        
-        if (!rolesError && rolesData) {
-          allRoles.push(...rolesData);
+          .in('business_id', ids);
+        if (error) {
+          console.error('❌ Roles batch error:', error);
+          return [] as any[];
         }
-      } catch (chunkError) {
-        console.warn('⚠️ Role chunk failed:', chunkError);
-      }
+        return (data || []) as any[];
+      };
+
+      let active = 0;
+      let pointer = 0;
+      await new Promise<void>((resolve) => {
+        const launch = () => {
+          if (pointer >= chunks.length) {
+            if (active === 0) resolve();
+            return;
+          }
+          const ids = chunks[pointer++];
+          active++;
+          executeBatch(ids)
+            .then((rows) => {
+              allRoles.push(...rows);
+            })
+            .catch((e) => console.error('❌ Roles batch failed:', e))
+            .finally(() => {
+              active--;
+              launch();
+            });
+        };
+        const starters = Math.min(CONCURRENCY, chunks.length);
+        for (let i = 0; i < starters; i++) launch();
+      });
+
+      console.log(`✅ Loaded ${allRoles.length} roles for ${businesses.length} businesses in ${chunks.length} batches`);
     }
     
-    console.log(`🔍 Loaded ${allRoles.length} roles total`);
+    // Only check for empty roles table if no roles loaded and we expected some
+    if (allRoles.length === 0 && businesses.length > 0) {
+      console.warn('⚠️ No roles loaded for businesses - roles table may be empty');
+    }
     
     // Combine businesses with their roles
     const businessesWithRoles: Business[] = businesses.map(business => ({
@@ -265,6 +290,7 @@ export const searchBusinessesUnified = async (
       roles: allRoles
         .filter(role => role.business_id === business.id)
         .map(role => ({
+          id: role.id,
           role: role.role,
           salary: role.salary,
           upvotes: role.upvotes || 0,
@@ -273,25 +299,24 @@ export const searchBusinessesUnified = async (
         }))
     }));
     
-    // Apply filters with AND logic
-    console.log(`🔍 [unifiedSearch] Applying role/salary filters to ${businessesWithRoles.length} businesses`);
-    
-    // Track which businesses came from role search to avoid double-filtering
+    // Apply filters efficiently - minimal logging
     const roleMatchedBusinessIds = new Set(roleMatchedBusinesses.map(b => b.id));
+    let filteredCount = 0;
+    let roleFilteredCount = 0;
+    let salaryFilteredCount = 0;
     
     const filteredBusinesses = businessesWithRoles.filter(business => {
-      // Role filter - must match if specified
+      // Role filter - businesses from role search automatically pass
       if (filters.roleFilter) {
-        // If this business came from role search, it already matches the role filter
         if (roleMatchedBusinessIds.has(business.id)) {
-          console.log(`🔍 [unifiedSearch] Business "${business.name}" auto-passed: found via role search`);
+          // Auto-pass: found via role search
         } else {
-          // Only apply role filter to businesses found via name/type search
+          // Check if name/type-matched business has the role
           const hasMatchingRole = business.roles?.some(role => 
             role.role.toLowerCase().includes(filters.roleFilter!)
           );
           if (!hasMatchingRole) {
-            console.log(`🔍 [unifiedSearch] Business "${business.name}" filtered out: no matching role for "${filters.roleFilter}"`);
+            roleFilteredCount++;
             return false;
           }
         }
@@ -314,11 +339,12 @@ export const searchBusinessesUnified = async (
         });
         
         if (!hasMatchingSalary) {
-          console.log(`🔍 [unifiedSearch] Business "${business.name}" filtered out: no matching salary for query`);
+          salaryFilteredCount++;
           return false;
         }
       }
       
+      filteredCount++;
       return true;
     });
     
@@ -332,7 +358,8 @@ export const searchBusinessesUnified = async (
       timestamp: Date.now()
     });
     
-    console.log(`✅ Search completed: ${businesses.length} -> ${filteredBusinesses.length} businesses`);
+    // Single summary log instead of spam
+    console.log(`✅ Search completed: ${businesses.length} businesses -> ${filteredBusinesses.length} results (filtered out: ${roleFilteredCount} by role, ${salaryFilteredCount} by salary)`);
     return filteredBusinesses;
     
   } catch (error) {
