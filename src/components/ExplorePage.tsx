@@ -233,14 +233,22 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                   
                   {/* Voting component in bottom right */}
                   <div className="absolute bottom-1 right-1">
-                    <VotingComponent 
-                      upvotes={post.upvotes} 
-                      downvotes={post.downvotes} 
-                      userVote={post.userVote} 
-                      onVote={voteType => handlePostVote(post.id, voteType)}
-                      isOwner={post.author === 'You'}
-                      onDelete={() => handlePostDelete(post.id)}
-                    />
+                    {post.author === 'System' ? (
+                      // Show non-interactive voting component for system posts
+                      <div className="flex items-center space-x-2 text-gray-400">
+                        <span className="text-xs">👆 0</span>
+                        <span className="text-xs">👇 0</span>
+                      </div>
+                    ) : (
+                      <VotingComponent 
+                        upvotes={post.upvotes} 
+                        downvotes={post.downvotes} 
+                        userVote={post.userVote} 
+                        onVote={voteType => handlePostVote(post.id, voteType)}
+                        isOwner={post.author === 'You'}
+                        onDelete={() => handlePostDelete(post.id)}
+                      />
+                    )}
                   </div>
                 </div>
 
