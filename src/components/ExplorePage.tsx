@@ -168,7 +168,9 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
             <div key={post.id} className="relative">
               {/* Post with background collage if business has 5+ photos */}
               <div
-                className={`app-popup-transparent p-4 cursor-pointer ${post.images && post.images.length >= 5 ? 'relative overflow-hidden' : ''}`}
+                className={`app-popup-transparent p-4 cursor-pointer ${post.images && post.images.length >= 5 ? 'relative overflow-hidden' : ''} ${
+                  post.author === 'System' && fadeOutSystemPost ? 'animate-fade-out opacity-0 transition-opacity duration-500' : ''
+                }`}
                 onClick={() => handlePostClick(post.id)}
                 style={{
                   backgroundImage: post.images && post.images.length >= 5 ? `url(${post.images[0]})` : undefined,
