@@ -372,8 +372,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       {showDropdown && (searchResults.length > 0 || isSearching) && (
         <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 z-50`}>
           <div 
-            className="bg-background shadow-lg border-2 rounded-md max-h-60 overflow-y-auto"
-            style={{ borderColor: 'hsl(var(--border))' }}
+            className="bg-background shadow-lg border-2 max-h-60 overflow-y-auto"
+            style={{ borderRadius: '6px', borderColor: 'hsl(var(--border))' }}
             onScroll={() => {
               isScrolling.current = true;
               setTimeout(() => { isScrolling.current = false; }, 200);
