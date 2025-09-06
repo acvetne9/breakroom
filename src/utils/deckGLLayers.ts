@@ -30,16 +30,15 @@ export const createBusinessScatterplotLayer = ({
     });
   }
   
-new ScatterplotLayer({
-  id: layerId,
-  data: businesses,
-  pickable: true,
-  stroked: true,
-  filled: true,
-  opacity: 1.0,
-  radiusMinPixels: 8,
-  radiusMaxPixels: 8,
-  lineWidthMinPixels: 2,
+  new ScatterplotLayer({
+    id: layerId,
+    data: businesses,
+    pickable: true,
+    stroked: true,
+    filled: true,
+    opacity: 1.0,
+    radiusMinPixels: 8,
+    radiusMaxPixels: 8,
     lineWidthMinPixels: 2,
     getPosition: (d: Business) => {
       if (!d || !d.position) {
