@@ -12,85 +12,93 @@ export const handleRoleVote = async (
 ): Promise<RoleVoteResult> => {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) {
-      return { success: false, error: 'Authentication required' };
-    }
+    const userId = session?.user?.id;
 
-    const userId = session.user.id;
+    // For authenticated users, check for existing votes to prevent duplicates
+    if (userId) {
+      const { data: existingVote, error: fetchError } = await supabase
+        .from('role_votes')
+        .select('*')
+        .eq('business_role_id', roleId)
+        .eq('user_id', userId)
+        .single();
 
-    // Check if user already voted on this role
-    const { data: existingVote, error: fetchError } = await supabase
-      .from('role_votes')
-      .select('*')
-      .eq('business_role_id', roleId)
-      .eq('user_id', userId)
-      .single();
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        throw fetchError;
+      }
 
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      throw fetchError;
-    }
+      const dbVoteType = voteType === 'up' ? 'upvote' : 'downvote';
 
-    // Determine the new vote value for database ('upvote' or 'downvote')
-    const dbVoteType = voteType === 'up' ? 'upvote' : 'downvote';
+      if (existingVote) {
+        if (existingVote.vote_type === dbVoteType) {
+          // Same vote - remove it (toggle off)
+          const { error: deleteError } = await supabase
+            .from('role_votes')
+            .delete()
+            .eq('id', existingVote.id);
 
-    if (existingVote) {
-      if (existingVote.vote_type === dbVoteType) {
-        // Same vote - remove it (toggle off)
-        const { error: deleteError } = await supabase
+          if (deleteError) throw deleteError;
+
+          // Update business_roles vote counts
+          const { error: updateError } = await supabase
+            .from('business_roles')
+            .update({
+              [voteType === 'up' ? 'upvotes' : 'downvotes']: 
+                Math.max(0, (existingVote.vote_type === 'upvote' ? 
+                  (await getCurrentVoteCount(roleId, 'upvotes')) - 1 :
+                  (await getCurrentVoteCount(roleId, 'downvotes')) - 1))
+            })
+            .eq('id', roleId);
+
+          if (updateError) throw updateError;
+        } else {
+          // Different vote - update it
+          const { error: updateError } = await supabase
+            .from('role_votes')
+            .update({ vote_type: dbVoteType })
+            .eq('id', existingVote.id);
+
+          if (updateError) throw updateError;
+
+          // Update business_roles vote counts (subtract old, add new)
+          const currentUpvotes = await getCurrentVoteCount(roleId, 'upvotes');
+          const currentDownvotes = await getCurrentVoteCount(roleId, 'downvotes');
+
+          const { error: updateRoleError } = await supabase
+            .from('business_roles')
+            .update({
+              upvotes: voteType === 'up' ? currentUpvotes + 1 : Math.max(0, currentUpvotes - 1),
+              downvotes: voteType === 'down' ? currentDownvotes + 1 : Math.max(0, currentDownvotes - 1)
+            })
+            .eq('id', roleId);
+
+          if (updateRoleError) throw updateRoleError;
+        }
+      } else {
+        // New authenticated vote - create it
+        const { error: insertError } = await supabase
           .from('role_votes')
-          .delete()
-          .eq('id', existingVote.id);
+          .insert({
+            business_role_id: roleId,
+            user_id: userId,
+            vote_type: dbVoteType
+          });
 
-        if (deleteError) throw deleteError;
+        if (insertError) throw insertError;
 
         // Update business_roles vote counts
+        const currentCount = await getCurrentVoteCount(roleId, voteType === 'up' ? 'upvotes' : 'downvotes');
         const { error: updateError } = await supabase
           .from('business_roles')
           .update({
-            [voteType === 'up' ? 'upvotes' : 'downvotes']: 
-              Math.max(0, (existingVote.vote_type === 'upvote' ? 
-                (await getCurrentVoteCount(roleId, 'upvotes')) - 1 :
-                (await getCurrentVoteCount(roleId, 'downvotes')) - 1))
+            [voteType === 'up' ? 'upvotes' : 'downvotes']: currentCount + 1
           })
           .eq('id', roleId);
 
         if (updateError) throw updateError;
-      } else {
-        // Different vote - update it
-        const { error: updateError } = await supabase
-          .from('role_votes')
-          .update({ vote_type: dbVoteType })
-          .eq('id', existingVote.id);
-
-        if (updateError) throw updateError;
-
-        // Update business_roles vote counts (subtract old, add new)
-        const currentUpvotes = await getCurrentVoteCount(roleId, 'upvotes');
-        const currentDownvotes = await getCurrentVoteCount(roleId, 'downvotes');
-
-        const { error: updateRoleError } = await supabase
-          .from('business_roles')
-          .update({
-            upvotes: voteType === 'up' ? currentUpvotes + 1 : Math.max(0, currentUpvotes - 1),
-            downvotes: voteType === 'down' ? currentDownvotes + 1 : Math.max(0, currentDownvotes - 1)
-          })
-          .eq('id', roleId);
-
-        if (updateRoleError) throw updateRoleError;
       }
     } else {
-      // New vote - create it
-      const { error: insertError } = await supabase
-        .from('role_votes')
-        .insert({
-          business_role_id: roleId,
-          user_id: userId,
-          vote_type: dbVoteType
-        });
-
-      if (insertError) throw insertError;
-
-      // Update business_roles vote counts
+      // Anonymous voting - just update the vote counts directly
       const currentCount = await getCurrentVoteCount(roleId, voteType === 'up' ? 'upvotes' : 'downvotes');
       const { error: updateError } = await supabase
         .from('business_roles')

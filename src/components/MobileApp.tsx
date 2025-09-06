@@ -10,7 +10,6 @@ const ExplorePage = React.lazy(() => import('./ExplorePage'));
 
 import { useBusinessesData } from '../hooks/useBusinessesData';
 import { handleRoleVote as handleRoleVoteService } from '@/services/roleVoting';
-import { useToast } from '@/hooks/use-toast';
 
 interface UserData {
   salary: string;
@@ -38,7 +37,6 @@ interface Post {
 
 const MobileApp: React.FC = () => {
   const isMobile = useIsMobile();
-  const { toast } = useToast();
   const [currentView, setCurrentView] = useState<'initiation' | 'main'>('initiation');
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -355,13 +353,6 @@ const MobileApp: React.FC = () => {
     
     if (!result.success) {
       console.error('Failed to persist vote:', result.error);
-      if (result.error === 'Authentication required') {
-        toast({
-          title: 'Sign in required',
-          description: 'Please sign in to vote on roles.',
-          variant: 'destructive'
-        });
-      }
       // Revert optimistic update on error
       setBusinesses(prevBusinesses => {
         const updatedBusinesses = prevBusinesses.map(business => {
