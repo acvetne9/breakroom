@@ -152,6 +152,7 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   };
 
   const handleBusinessView = (businessId: string) => {
+    console.log('👀 Eye clicked - navigating to business:', businessId);
     onBusinessView?.(businessId);
   };
 

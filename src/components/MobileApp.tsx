@@ -539,10 +539,15 @@ const MobileApp: React.FC = () => {
               filteredBusinessId={filteredBusinessId || undefined}
               filteredUserStories={filteredUserStories}
               onBusinessView={(businessId) => {
+                console.log('👁️ Business view requested:', businessId);
                 const business = businesses.find(b => b.id === businessId);
+                console.log('📍 Found business:', business?.name);
                 if (business) {
+                  console.log('🏠 Setting selected business and navigating to home');
                   setSelectedBusiness(business);
                   setCurrentSlide(1); // Navigate to home page
+                } else {
+                  console.warn('❌ Business not found in businesses array');
                 }
               }}
               onExpandedPostChange={(postId) => {
