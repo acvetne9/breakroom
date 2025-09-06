@@ -366,7 +366,7 @@ export const addBusinessPopup = (map: maplibregl.Map, businesses: any[]) => {
     closeOnClick: false
   });
 
-  map.on('mouseenter', 'businesses-layer', (e) => {
+  const mouseEnterHandler = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapboxGeoJSONFeature[] }) => {
     if (e.features?.[0]) {
       const businessId = e.features[0].properties?.id;
       const business = businesses.find(b => b.id === businessId);
@@ -383,14 +383,19 @@ export const addBusinessPopup = (map: maplibregl.Map, businesses: any[]) => {
           .addTo(map);
       }
     }
-  });
+  };
 
-  map.on('mouseleave', 'businesses-layer', () => {
+  const mouseLeaveHandler = () => {
     popup.remove();
-  });
+  };
+
+  map.on('mouseenter', 'businesses-layer', mouseEnterHandler as any);
+  map.on('mouseleave', 'businesses-layer', mouseLeaveHandler as any);
 
   return () => {
     popup.remove();
+    map.off('mouseenter', 'businesses-layer', mouseEnterHandler as any);
+    map.off('mouseleave', 'businesses-layer', mouseLeaveHandler as any);
   };
 };
 
