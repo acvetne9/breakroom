@@ -196,7 +196,7 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                 <div className={`relative z-10 pb-10 ${post.images && post.images.length >= 5 ? 'post-overlay rounded-lg p-3' : ''}`}>
                   <div className="flex items-start justify-between mb-2">
                     <TranslatedText 
-                      text={post.author === 'System' ? '💭 Share a thought about this business' : post.text}
+                      text={post.author === 'System' ? 'Share a thought about this business 💭' : post.text}
                       className={`flex-1 pr-4 break-words overflow-wrap-break-word text-app-black`}
                     />
                     <div className="flex-shrink-0 w-8 flex justify-center mt-1 my-0">
