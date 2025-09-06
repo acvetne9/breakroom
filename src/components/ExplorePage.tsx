@@ -197,7 +197,7 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                   <div className="flex items-start justify-between mb-2">
                     <TranslatedText 
                       text={post.author === 'System' ? '💭 Share a thought about this business' : post.text}
-                      className={`flex-1 pr-4 break-words overflow-wrap-break-word ${post.author === 'System' ? 'text-app-black font-medium' : 'text-app-black'}`}
+                      className={`flex-1 pr-4 break-words overflow-wrap-break-word text-app-black`}
                     />
                     <div className="flex-shrink-0 w-8 flex justify-center mt-1 my-0">
                       {(post.businessId || post.isJobUpdate) && post.author !== 'System' && (
