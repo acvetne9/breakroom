@@ -664,19 +664,21 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       map.removeSource('businesses');
     }
     // Hide debug vector-tile businesses to avoid duplicate points
-    if (map.getLayer('nyc-businesses')) {
-      map.setLayoutProperty('nyc-businesses', 'visibility', 'none');
+    const businessLayer = map?.getLayer('nyc-businesses');
+    if (businessLayer) {
+      map.setLayoutProperty('nyc-businesses', 'visibility', hideVectorBusinesses ? 'none' : 'visible');
     }
+
   }, [mapLoaded, map]);
   
   // Control vector tile business visibility during search
   useEffect(() => {
     if (!map || !mapLoaded) return;
     
-    if (map && map.getLayer('nyc-businesses')) {
+    if (map.getLayer('nyc-businesses')) {
+      const visibility = hideVectorBusinesses ? 'none' : 'visible';
       map.setLayoutProperty('nyc-businesses', 'visibility', visibility);
     }
-
   }, [hideVectorBusinesses, map, mapLoaded]);
 
   // Notify parent when businesses are loaded
