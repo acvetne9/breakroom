@@ -465,7 +465,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                       const detectedLayer = sourceLayers[0];
                       console.log('Detected layer:', detectedLayer);
                       
-                      this.addMapLayers(mapInstance, detectedLayer);
+                      addMapLayers(mapInstance, detectedLayer);
                       layersAddedRef.current = true;
                       console.log('NYC layers added successfully!');
                     }
