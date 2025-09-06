@@ -666,7 +666,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     // Hide debug vector-tile businesses to avoid duplicate points
     const businessLayer = map?.getLayer('nyc-businesses');
     if (businessLayer) {
-      map.setLayoutProperty('nyc-businesses', 'visibility', hideVectorBusinesses ? 'none' : 'visible');
+      const visibility: 'visible' | 'none' = hideVectorBusinesses ? 'none' : 'visible';
+      map.setLayoutProperty('nyc-businesses', 'visibility', visibility);
     }
 
   }, [mapLoaded, map]);
