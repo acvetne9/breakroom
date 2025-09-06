@@ -167,9 +167,6 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
 
   return (
     <div className="relative w-full h-full">
-      {/* Header for filtered views */}
-      {filteredBusinessId || filteredUserStories}
-      
       {/* Posts list */}
       <div className={`h-full overflow-y-auto pb-20 ${filteredBusinessId || filteredUserStories ? 'pt-20' : 'pt-20'}`}>
         <div className="space-y-4 px-4">
