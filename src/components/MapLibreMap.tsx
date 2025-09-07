@@ -421,7 +421,7 @@ if (mapInstance) {
               try {
                 if (mapInstance && mapInstance.isSourceLoaded && mapInstance.isSourceLoaded('nyc-tiles')) {
                   const allFeatures = mapInstance.querySourceFeatures('nyc-tiles') as VectorTileFeature[];
-                  const sourceLayers = [...new Set(features.map(f => f.sourceLayer).filter(Boolean))];
+                  const sourceLayers = [...new Set(allReatures.map(f => f.sourceLayer).filter(Boolean))];
                   console.log('Layers in nyc-tiles:', sourceLayers);
                   console.log(`🔍 After tile load - Features: ${allFeatures.length}, Source-layers: [${sourceLayers.join(', ')}]`);
                   
@@ -661,7 +661,7 @@ if (mapInstance) {
                               }
                         
                               const allFeatures = mapInstance.querySourceFeatures('nyc-tiles') as VectorTileFeature[];
-                              const detected = [...new Set(features.map(f => f.sourceLayer).filter(Boolean))];
+                              const detected = [...new Set(allFeatures.map(f => f.sourceLayer).filter(Boolean))];
                               console.log(`🔍 Probe attempt ${probeAttempts}: found source-layers:`, detected);
                         
                               let detectedLayer = detected.length ? detected[0] : null;
@@ -765,7 +765,7 @@ if (mapInstance) {
                                 
                                 // sample features from the vector source
                                 const feats = map.querySourceFeatures('nyc-tiles') as VectorTileFeature[];
-                                const sourceLayers = [...new Set(features.map(f => f.sourceLayer).filter(Boolean))];
+                                const sourceLayers = [...new Set(feats.map(f => f.sourceLayer).filter(Boolean))];
                                 console.log('unique:', sourceLayers);
                                 console.log('sample props (first 5 LineString features):',
                           feats.filter(f => f.geometry && f.geometry.type === 'LineString').slice(0,5).map(f => f.properties));
