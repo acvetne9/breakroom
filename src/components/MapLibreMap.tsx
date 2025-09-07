@@ -386,7 +386,13 @@ if (mapInstance) {
       console.log('nyc-tiles feature count:', feats.length);
       if (feats.length) {
         console.log('First feature properties:', feats[0].properties);
+        interface VectorTileFeature extends maplibregl.MapboxGeoJSONFeature {
+          sourceLayer?: string;
+        }
+        
+        const feats = map.querySourceFeatures('nyc-tiles') as VectorTileFeature[];
         console.log('Unique sourceLayers:', [...new Set(feats.map(f => f.sourceLayer))]);
+
       }
       
       // Notify parent that map is loaded
