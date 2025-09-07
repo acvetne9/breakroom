@@ -277,7 +277,7 @@ export const addBusinessesLayer = (
     });
 
     // Enhanced click handler with navigation
-    const clickHandler = (e: any) => {
+    const clickHandler = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
       console.log('🎯 MapLibre business click detected!', e.features?.[0]?.properties);
       
       if (e.features?.[0]) {
@@ -327,7 +327,7 @@ export const addBusinessesLayer = (
       map.getCanvas().style.cursor = '';
     };
 
-    // Add event handlers
+    // Add event handlers with proper function references
     map.on('click', 'businesses-layer', clickHandler);
     map.on('mouseenter', 'businesses-layer', mouseEnterHandler);
     map.on('mouseleave', 'businesses-layer', mouseLeaveHandler);
@@ -389,13 +389,13 @@ export const addBusinessPopup = (map: maplibregl.Map, businesses: any[]) => {
     popup.remove();
   };
 
-  map.on('mouseenter', 'businesses-layer', mouseEnterHandler as any);
-  map.on('mouseleave', 'businesses-layer', mouseLeaveHandler as any);
+  map.on('mouseenter', 'businesses-layer', mouseEnterHandler);
+  map.on('mouseleave', 'businesses-layer', mouseLeaveHandler);
 
   return () => {
     popup.remove();
-    map.off('mouseenter', 'businesses-layer', mouseEnterHandler as any);
-    map.off('mouseleave', 'businesses-layer', mouseLeaveHandler as any);
+    map.off('mouseenter', 'businesses-layer', mouseEnterHandler);
+    map.off('mouseleave', 'businesses-layer', mouseLeaveHandler);
   };
 };
 
