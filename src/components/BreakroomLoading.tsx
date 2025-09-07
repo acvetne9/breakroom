@@ -63,8 +63,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       alignItems: 'flex-end',
       justifyContent: 'center',
       position: 'relative' as const,
-      overflow: 'visible' as const,
-      marginLeft: '25px'
+      overflow: 'visible' as const
     },
 
     coffeeMug: {
@@ -204,7 +203,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
           100% {
             opacity: 1;
             right: 50%;
-            transform: translateX(100%) translateX(0.05em);
+            transform: translateX(100%) translateX(0.01em);
           }
         }
       `}</style>
