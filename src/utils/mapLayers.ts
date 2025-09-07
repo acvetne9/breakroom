@@ -225,10 +225,7 @@ export const addBusinessesLayer = (
     
     // Clean up existing layer and event handlers
     if (map.getLayer('businesses-layer')) {
-      // Remove existing event handlers
-      map.off('click', 'businesses-layer');
-      map.off('mouseenter', 'businesses-layer');
-      map.off('mouseleave', 'businesses-layer');
+      // Remove layer and let MapLibre clean up event handlers
       map.removeLayer('businesses-layer');
     }
     if (map.getSource('businesses')) {
