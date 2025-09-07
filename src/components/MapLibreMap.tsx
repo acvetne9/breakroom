@@ -540,42 +540,59 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                          }
                           
 
-                        //  try {
-                        //   mapInstance.addLayer({
-                        //     id: 'nyc-road-labels',
-                        //     type: 'symbol',
-                        //     source: 'nyc-tiles',
-                        //     'source-layer': detectedLayer, // make sure this is correct
-                        //     layout: {
-                        //       'text-field': ['coalesce', ['get', 'name'], ''], // fallback safe
-                        //       'text-font': ['sans-serif'],
-                        //       'text-size': [
-                        //         'interpolate',
-                        //         ['linear'],
-                        //         ['zoom'],
-                        //         10, 10,
-                        //         14, 12,
-                        //         16, 14,
-                        //         18, 16
-                        //       ],
-                        //       'symbol-placement': 'line',
-                        //       'text-pitch-alignment': 'viewport'
-                        //     },
-                        //     paint: {
-                        //       'text-color': '#2D3748',
-                        //       'text-halo-color': 'rgba(255,255,255,0.8)',
-                        //       'text-halo-width': 1.5
-                        //     },
-                        //     filter: [
-                        //       'all',
-                        //       ['==', ['geometry-type'], 'LineString'],
-                        //       ['has', 'highway'] // you can remove this if it hides too much
-                        //     ]
-                        //   });
-                        //   console.log('✅ Added road labels layer');
-                        // } catch (err) {
-                        //   console.warn('⚠️ Road labels failed:', err);
-                        // }
+                        // Add road labels layer
+                        try {
+                          mapInstance.addLayer({
+                            id: 'nyc-road-labels',
+                            type: 'symbol',
+                            source: 'nyc-tiles',
+                            'source-layer': detectedLayer, // same one used by nyc-roads
+                            layout: {
+                              'text-field': [
+                                'coalesce',
+                                ['get', 'name'],        // primary: name
+                                ['get', 'ref'],         // fallback: ref (e.g., I-95, US-1)
+                                ['get', 'addr:street'], // fallback: address street
+                                ''
+                              ],
+                              'text-font': ['Open Sans Regular', 'Open Sans Bold'],
+                              'text-size': [
+                                'interpolate', ['linear'], ['zoom'],
+                                10, 10,
+                                14, 12,
+                                16, 14,
+                                18, 16
+                              ],
+                              'symbol-placement': 'line',
+                              'text-rotation-alignment': 'map',
+                              'text-pitch-alignment': 'viewport',
+                              'text-max-angle': 30,
+                              'text-padding': 2,
+                              'text-allow-overlap': false,
+                              'text-ignore-placement': false
+                            },
+                            paint: {
+                              'text-color': '#2D3748',
+                              'text-halo-color': 'rgba(255, 255, 255, 0.85)',
+                              'text-halo-width': 1.5,
+                              'text-opacity': [
+                                'interpolate', ['linear'], ['zoom'],
+                                10, 0.6,
+                                12, 0.8,
+                                14, 1.0
+                              ]
+                            },
+                            filter: ['==', ['geometry-type'], 'LineString']
+                          });
+                        
+                          // Place labels above the road lines
+                          mapInstance.moveLayer('nyc-road-labels', 'nyc-roads');
+                        
+                          console.log('✅ Added nyc-road-labels');
+                        } catch (err) {
+                          console.warn('⚠️ Failed to add road labels:', err);
+                        }
+
 
                          
                          // Add waterways layer
