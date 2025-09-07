@@ -524,43 +524,56 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                          } catch (roadsErr) {
                            console.warn('⚠️ Roads layer (probed) failed:', roadsErr);
                          }
+                           console.log(
+                            mapInstance.getStyle().layers.map(l => l.id)
+                          );
 
+                           
                          try {
-                          mapInstance.addLayer({
-                            id: 'nyc-road-labels',
-                            type: 'symbol',
-                            source: 'nyc-tiles',
-                            'source-layer': detectedLayer, // make sure this is correct
-                            layout: {
-                              'text-field': ['coalesce', ['get', 'name'], ''], // fallback safe
-                              'text-font': ['sans-serif'],
-                              'text-size': [
-                                'interpolate',
-                                ['linear'],
-                                ['zoom'],
-                                10, 10,
-                                14, 12,
-                                16, 14,
-                                18, 16
-                              ],
-                              'symbol-placement': 'line',
-                              'text-pitch-alignment': 'viewport'
-                            },
-                            paint: {
-                              'text-color': '#2D3748',
-                              'text-halo-color': 'rgba(255,255,255,0.8)',
-                              'text-halo-width': 1.5
-                            },
-                            filter: [
-                              'all',
-                              ['==', ['geometry-type'], 'LineString'],
-                              ['has', 'highway'] // you can remove this if it hides too much
-                            ]
-                          });
-                          console.log('✅ Added road labels layer');
-                        } catch (err) {
-                          console.warn('⚠️ Road labels failed:', err);
-                        }
+                           console.log("💭 trying to label...")
+                           mapInstance.setPaintProperty('road_label', 'text-color', '#2D3748');
+                           mapInstance.setPaintProperty('road_label', 'text-halo-color', 'rgba(255,255,255,0.8)');
+                           mapInstance.setPaintProperty('road_label', 'text-halo-width', 1.5);
+                           console.log("💭 labeled")
+                         }
+                          
+
+                        //  try {
+                        //   mapInstance.addLayer({
+                        //     id: 'nyc-road-labels',
+                        //     type: 'symbol',
+                        //     source: 'nyc-tiles',
+                        //     'source-layer': detectedLayer, // make sure this is correct
+                        //     layout: {
+                        //       'text-field': ['coalesce', ['get', 'name'], ''], // fallback safe
+                        //       'text-font': ['sans-serif'],
+                        //       'text-size': [
+                        //         'interpolate',
+                        //         ['linear'],
+                        //         ['zoom'],
+                        //         10, 10,
+                        //         14, 12,
+                        //         16, 14,
+                        //         18, 16
+                        //       ],
+                        //       'symbol-placement': 'line',
+                        //       'text-pitch-alignment': 'viewport'
+                        //     },
+                        //     paint: {
+                        //       'text-color': '#2D3748',
+                        //       'text-halo-color': 'rgba(255,255,255,0.8)',
+                        //       'text-halo-width': 1.5
+                        //     },
+                        //     filter: [
+                        //       'all',
+                        //       ['==', ['geometry-type'], 'LineString'],
+                        //       ['has', 'highway'] // you can remove this if it hides too much
+                        //     ]
+                        //   });
+                        //   console.log('✅ Added road labels layer');
+                        // } catch (err) {
+                        //   console.warn('⚠️ Road labels failed:', err);
+                        // }
 
                          
                          // Add waterways layer
