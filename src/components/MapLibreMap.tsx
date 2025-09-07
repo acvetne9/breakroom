@@ -544,27 +544,60 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                            console.warn('⚠️ Waterways layer (probed) failed:', waterwaysErr);
                          }
                          
-                         // Add businesses points layer
-                         try {
-                          mapInstance.addLayer({
-                            id: 'nyc-businesses',
-                            type: 'circle',
-                            source: 'nyc-tiles',
-                            'source-layer': detectedLayer,
-                            paint: {
-                              'circle-color': '#FACC15', // Yellow for businesses - matches DeckGL
-                              'circle-radius': 8, // Same as DeckGL BUSINESS_DOT_STYLE.radius
-                              'circle-opacity': 1.0,
-                              'circle-stroke-width': 2, // Same as DeckGL
-                              'circle-stroke-color': '#FFFFFF', // White border - matches DeckGL
-                              'circle-stroke-opacity': 1.0 // Slightly transparent to match DeckGL
-                            },
-                            filter: ['==', ['geometry-type'], 'Point']
-                          });
-                          console.log('✅ Added businesses layer');
-                        } catch (businessesErr) {
-                          console.warn('⚠️ Businesses layer failed:', businessesErr);
-                        }
+                          // Add businesses points layer
+                          try {
+                           mapInstance.addLayer({
+                             id: 'nyc-businesses',
+                             type: 'circle',
+                             source: 'nyc-tiles',
+                             'source-layer': detectedLayer,
+                             paint: {
+                               'circle-color': '#FACC15', // Yellow for businesses - matches DeckGL
+                               'circle-radius': 8, // Same as DeckGL BUSINESS_DOT_STYLE.radius
+                               'circle-opacity': 1.0,
+                               'circle-stroke-width': 2, // Same as DeckGL
+                               'circle-stroke-color': '#FFFFFF', // White border - matches DeckGL
+                               'circle-stroke-opacity': 1.0 // Slightly transparent to match DeckGL
+                             },
+                             filter: ['==', ['geometry-type'], 'Point']
+                           });
+                           
+                           // Add click handler for vector tile businesses
+                           mapInstance.on('click', 'nyc-businesses', (e) => {
+                             console.log('🎯 Vector tile business clicked!', e.features?.[0]);
+                             if (e.features && e.features[0]) {
+                               const feature = e.features[0];
+                               const business = {
+                                 id: feature.properties?.id || `vector-${feature.properties?.name}`,
+                                 name: feature.properties?.name || 'Unknown Business',
+                                 position: {
+                                   lat: e.lngLat.lat,
+                                   lng: e.lngLat.lng
+                                 },
+                                 businessType: feature.properties?.amenity || feature.properties?.shop || 'business',
+                                 address: feature.properties?.addr_full || feature.properties?.address,
+                                 atmosphere: []
+                               };
+                               
+                               if (onBusinessClick) {
+                                 onBusinessClick(business);
+                               }
+                             }
+                           });
+                           
+                           // Add cursor pointer on hover
+                           mapInstance.on('mouseenter', 'nyc-businesses', () => {
+                             mapInstance.getCanvas().style.cursor = 'pointer';
+                           });
+                           
+                           mapInstance.on('mouseleave', 'nyc-businesses', () => {
+                             mapInstance.getCanvas().style.cursor = '';
+                           });
+                           
+                           console.log('✅ Added businesses layer with click handlers');
+                         } catch (businessesErr) {
+                           console.warn('⚠️ Businesses layer failed:', businessesErr);
+                         }
                          
                          layersAddedRef.current = true;
                          console.log('🎉 NYC layers added successfully! (probed)');
@@ -671,26 +704,59 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                       console.warn('⚠️ Waterways layer failed:', waterwaysErr);
                     }
                     
-                    // Add businesses points layer
-                    try {
-                      mapInstance.addLayer({
-                        id: 'nyc-businesses',
-                        type: 'circle',
-                        source: 'nyc-tiles',
-                        'source-layer': detectedLayer,
-                        paint: {
-                          'circle-color': '#FACC15', // Yellow for businesses
-                          'circle-radius': 8,
-                          'circle-opacity': 1.0,
-                          'circle-stroke-width': 2,
-                          'circle-stroke-color': '#FFFFFF'
-                        },
-                        filter: ['==', ['geometry-type'], 'Point']
-                      });
-                      console.log('✅ Added businesses layer');
-                    } catch (businessesErr) {
-                      console.warn('⚠️ Businesses layer failed:', businessesErr);
-                    }
+                     // Add businesses points layer
+                     try {
+                       mapInstance.addLayer({
+                         id: 'nyc-businesses',
+                         type: 'circle',
+                         source: 'nyc-tiles',
+                         'source-layer': detectedLayer,
+                         paint: {
+                           'circle-color': '#FACC15', // Yellow for businesses
+                           'circle-radius': 8,
+                           'circle-opacity': 1.0,
+                           'circle-stroke-width': 2,
+                           'circle-stroke-color': '#FFFFFF'
+                         },
+                         filter: ['==', ['geometry-type'], 'Point']
+                       });
+                       
+                       // Add click handler for vector tile businesses
+                       mapInstance.on('click', 'nyc-businesses', (e) => {
+                         console.log('🎯 Vector tile business clicked!', e.features?.[0]);
+                         if (e.features && e.features[0]) {
+                           const feature = e.features[0];
+                           const business = {
+                             id: feature.properties?.id || `vector-${feature.properties?.name}`,
+                             name: feature.properties?.name || 'Unknown Business',
+                             position: {
+                               lat: e.lngLat.lat,
+                               lng: e.lngLat.lng
+                             },
+                             businessType: feature.properties?.amenity || feature.properties?.shop || 'business',
+                             address: feature.properties?.addr_full || feature.properties?.address,
+                             atmosphere: []
+                           };
+                           
+                           if (onBusinessClick) {
+                             onBusinessClick(business);
+                           }
+                         }
+                       });
+                       
+                       // Add cursor pointer on hover
+                       mapInstance.on('mouseenter', 'nyc-businesses', () => {
+                         mapInstance.getCanvas().style.cursor = 'pointer';
+                       });
+                       
+                       mapInstance.on('mouseleave', 'nyc-businesses', () => {
+                         mapInstance.getCanvas().style.cursor = '';
+                       });
+                       
+                       console.log('✅ Added businesses layer with click handlers');
+                     } catch (businessesErr) {
+                       console.warn('⚠️ Businesses layer failed:', businessesErr);
+                     }
                     
                     layersAddedRef.current = true;
                     console.log('🎉 NYC layers added successfully!');
@@ -777,11 +843,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (map.getSource('businesses')) {
       map.removeSource('businesses');
     }
-    // Hide debug vector-tile businesses to avoid duplicate/unfiltered points
+    // Keep vector-tile businesses visible when no DeckGL businesses are loaded
     if (map.getLayer('nyc-businesses')) {
-      map.setLayoutProperty('nyc-businesses', 'visibility', 'none');
+      const shouldShow = businesses.length === 0 && !businessesLoading;
+      map.setLayoutProperty('nyc-businesses', 'visibility', shouldShow ? 'visible' : 'none');
+      console.log(`🎯 Vector tile businesses visibility: ${shouldShow ? 'visible' : 'none'} (DeckGL has ${businesses.length} businesses)`);
     }
-  }, [mapLoaded, map]);
+  }, [mapLoaded, map, businesses.length, businessesLoading]);
   
   // Control vector tile business visibility during search
   useEffect(() => {
