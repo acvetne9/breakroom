@@ -369,6 +369,13 @@ if (mapInstance) {
         .catch(error => {
           console.error('🚨 Tile access failed:', error);
         });
+      
+      
+      // Defer adding layers until the source reports as fully loaded via `sourcedata`
+      console.log('⏳ Waiting for nyc-tiles source to fully load before adding layers');
+      
+      setMapLoaded(true);
+
       console.log('Sources:', map.getStyle().sources);
 
       // List all layers
@@ -381,11 +388,6 @@ if (mapInstance) {
         console.log('First feature properties:', feats[0].properties);
         console.log('Unique sourceLayers:', [...new Set(feats.map(f => f.sourceLayer))]);
       }
-      
-      // Defer adding layers until the source reports as fully loaded via `sourcedata`
-      console.log('⏳ Waiting for nyc-tiles source to fully load before adding layers');
-      
-      setMapLoaded(true);
       
       // Notify parent that map is loaded
       if (onMapLoaded) {
@@ -606,216 +608,216 @@ if (mapInstance) {
                            console.log("💭 failed...")
                          }
                         // --- SAFE: single-run layer add + robust probing (replace the older pre-add & queryAttempts block) ---
-if ((e as any).dataType === 'tile' || ((e as any).dataType === 'source' && mapInstance.isSourceLoaded('nyc-tiles'))) {
-  if (layersAddedRef.current) {
-    console.log('ℹ️ Layers already added, skipping.');
-    return;
-  }
-
-  // Helper: add layer only if it's not already present
-  const addLayerSafe = (layerDef: any, before?: string) => {
-    if (mapInstance.getLayer(layerDef.id)) {
-      console.log(`ℹ️ Layer "${layerDef.id}" already exists — skipping add.`);
-      return;
-    }
-    try {
-      if (before && mapInstance.getLayer(before)) {
-        mapInstance.addLayer(layerDef, before);
-      } else {
-        mapInstance.addLayer(layerDef);
-      }
-      console.log(`✅ Added ${layerDef.id}`);
-    } catch (err) {
-      console.warn(`⚠️ addLayer failed for ${layerDef.id}:`, err);
-    }
-  };
-
-  // Helper: set paint property only if layer exists
-  const setPaintIfExists = (layerId: string, prop: string, value: any) => {
-    if (!mapInstance.getLayer(layerId)) {
-      console.log(`ℹ️ Layer "${layerId}" not found — skipping setPaintProperty(${prop}).`);
-      return;
-    }
-    try {
-      mapInstance.setPaintProperty(layerId, prop, value);
-      console.log(`✅ setPaintProperty for ${layerId} - ${prop}`);
-    } catch (err) {
-      console.warn(`⚠️ setPaintProperty failed for ${layerId}:${prop}`, err);
-    }
-  };
-
-  // Probe function to detect a usable source-layer name (with a few retries)
-  let probeAttempts = 0;
-  const probeAndAdd = () => {
-    probeAttempts += 1;
-    try {
-      if (!mapInstance.isSourceLoaded('nyc-tiles')) {
-        if (probeAttempts <= 4) {
-          setTimeout(probeAndAdd, 200);
-        } else {
-          console.warn('⚠️ nyc-tiles source never loaded (after retries).');
-        }
-        return;
-      }
-
-      const allFeatures = mapInstance.querySourceFeatures('nyc-tiles');
-      const detected = Array.from(new Set(allFeatures.map((f:any) => f.sourceLayer))).filter(Boolean);
-      console.log(`🔍 Probe attempt ${probeAttempts}: found source-layers:`, detected);
-
-      let detectedLayer = detected.length ? detected[0] : null;
-
-      // fallback: explicitly probe a known guess only if nothing found
-      if (!detectedLayer) {
-        const guessed = mapInstance.querySourceFeatures('nyc-tiles', { sourceLayer: 'examplepoints' } as any);
-        if (guessed.length > 0) detectedLayer = 'examplepoints';
-      }
-
-      if (!detectedLayer) {
-        if (probeAttempts <= 4) {
-          setTimeout(probeAndAdd, [200, 400, 800, 1200][probeAttempts - 1] || 400);
-        } else {
-          console.warn('⚠️ Could not detect a source-layer to use after multiple attempts.');
-        }
-        return;
-      }
-
-      // --- Add base layers (only if not already present) ---
-      addLayerSafe({
-        id: 'nyc-land',
-        type: 'fill',
-        source: 'nyc-tiles',
-        'source-layer': detectedLayer,
-        paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
-        filter: ['==', ['geometry-type'], 'Polygon']
-      });
-
-      addLayerSafe({
-        id: 'nyc-green-spaces',
-        type: 'fill',
-        source: 'nyc-tiles',
-        'source-layer': detectedLayer,
-        paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
-        filter: [
-          'all',
-          ['==', ['geometry-type'], 'Polygon'],
-          ['any',
-            ['==', ['get', 'leisure'], 'park'],
-            ['==', ['get', 'landuse'], 'cemetery']
-          ]
-        ]
-      });
-
-      addLayerSafe({
-        id: 'nyc-water',
-        type: 'fill',
-        source: 'nyc-tiles',
-        'source-layer': detectedLayer,
-        paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
-        filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']]
-      });
-
-      addLayerSafe({
-        id: 'nyc-roads',
-        type: 'line',
-        source: 'nyc-tiles',
-        'source-layer': detectedLayer,
-        paint: {
-          'line-color': '#666666',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
-          'line-opacity': 1.0
-        },
-        filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
-      });
-
-      addLayerSafe({
-        id: 'nyc-waterways',
-        type: 'line',
-        source: 'nyc-tiles',
-        'source-layer': detectedLayer,
-        paint: { 'line-color': '#999999', 'line-width': 1, 'line-opacity': 0.6 },
-        filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'waterway']]
-      });
-
-      // businesses layer (point)
-      addLayerSafe({
-        id: 'nyc-businesses',
-        type: 'circle',
-        source: 'nyc-tiles',
-        'source-layer': detectedLayer,
-        paint: {
-          'circle-color': '#FACC15',
-          'circle-radius': 8,
-          'circle-opacity': 1.0,
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#FFFFFF'
-        },
-        filter: ['==', ['geometry-type'], 'Point']
-      });
-
-      // --- LABELS: if a built-in 'road_label' exists, restyle it; otherwise add our safe label layer ---
-      if (mapInstance.getLayer('road_label')) {
-        console.log('ℹ️ Found built-in road_label layer — restyling it.');
-        setPaintIfExists('road_label', 'text-color', '#2D3748');
-        setPaintIfExists('road_label', 'text-halo-color', 'rgba(255,255,255,0.85)');
-        setPaintIfExists('road_label', 'text-halo-width', 1.5);
-        // show layer list
-        console.log(map.getStyle().layers.map(l => l.id));
-        
-        // sample features from the vector source
-        const feats = map.querySourceFeatures('nyc-tiles');
-        console.log('unique sourceLayers:', Array.from(new Set(feats.map(f => f.sourceLayer))));
-        console.log('sample props (first 5 LineString features):',
-  feats.filter(f => f.geometry && f.geometry.type === 'LineString').slice(0,5).map(f => f.properties));
-        
-      } else {
-        console.log('ℹ️ No built-in road_label — adding nyc-road-labels from our tiles.');
-        addLayerSafe({
-          id: 'nyc-road-labels',
-          type: 'symbol',
-          source: 'nyc-tiles',
-          'source-layer': detectedLayer,
-          layout: {
-            'text-field': ['coalesce', ['get', 'name'], ['get', 'ref'], ['get', 'addr:street'], ''],
-            'text-font': ['Open Sans Regular', 'Open Sans Bold'],
-            'text-size': ['interpolate', ['linear'], ['zoom'], 10, 10, 14, 12, 16, 14, 18, 16],
-            'symbol-placement': 'line',
-            'text-rotation-alignment': 'map',
-            'text-pitch-alignment': 'viewport',
-            'text-max-angle': 30,
-            'text-padding': 2,
-            'text-allow-overlap': false,
-            'text-ignore-placement': false
-          },
-          paint: {
-            'text-color': '#2D3748',
-            'text-halo-color': 'rgba(255,255,255,0.85)',
-            'text-halo-width': 1.5,
-            'text-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0.6, 12, 0.8, 14, 1.0]
-          },
-          filter: ['==', ['geometry-type'], 'LineString']
-        }, 'nyc-businesses'); // try to insert labels beneath businesses if businesses exist
-      }
-
-      layersAddedRef.current = true;
-      console.log('🎉 NYC layers added successfully (safe flow).');
-
-      // quick inspection log for debugging - sample a few road features & props
-      try {
-        const sample = mapInstance.querySourceFeatures('nyc-tiles').filter((f:any) => f.geometry?.type === 'LineString').slice(0,5);
-        sample.forEach((f:any, i:number) => console.log(`🔎 sample line ${i} props:`, f.properties));
-      } catch (inspectErr) {
-        console.warn('⚠️ sample inspect failed:', inspectErr);
-      }
-
-    } catch (err) {
-      console.warn('⚠️ probeAndAdd failed (will retry):', err);
-      if (probeAttempts < 4) setTimeout(probeAndAdd, 300);
-    }
-  }; // end probeAndAdd
-
-  // start the probe/adding flow
-  probeAndAdd();
-}
+                        if ((e as any).dataType === 'tile' || ((e as any).dataType === 'source' && mapInstance.isSourceLoaded('nyc-tiles'))) {
+                          if (layersAddedRef.current) {
+                            console.log('ℹ️ Layers already added, skipping.');
+                            return;
+                          }
+                        
+                          // Helper: add layer only if it's not already present
+                          const addLayerSafe = (layerDef: any, before?: string) => {
+                            if (mapInstance.getLayer(layerDef.id)) {
+                              console.log(`ℹ️ Layer "${layerDef.id}" already exists — skipping add.`);
+                              return;
+                            }
+                            try {
+                              if (before && mapInstance.getLayer(before)) {
+                                mapInstance.addLayer(layerDef, before);
+                              } else {
+                                mapInstance.addLayer(layerDef);
+                              }
+                              console.log(`✅ Added ${layerDef.id}`);
+                            } catch (err) {
+                              console.warn(`⚠️ addLayer failed for ${layerDef.id}:`, err);
+                            }
+                          };
+                        
+                          // Helper: set paint property only if layer exists
+                          const setPaintIfExists = (layerId: string, prop: string, value: any) => {
+                            if (!mapInstance.getLayer(layerId)) {
+                              console.log(`ℹ️ Layer "${layerId}" not found — skipping setPaintProperty(${prop}).`);
+                              return;
+                            }
+                            try {
+                              mapInstance.setPaintProperty(layerId, prop, value);
+                              console.log(`✅ setPaintProperty for ${layerId} - ${prop}`);
+                            } catch (err) {
+                              console.warn(`⚠️ setPaintProperty failed for ${layerId}:${prop}`, err);
+                            }
+                          };
+                        
+                          // Probe function to detect a usable source-layer name (with a few retries)
+                          let probeAttempts = 0;
+                          const probeAndAdd = () => {
+                            probeAttempts += 1;
+                            try {
+                              if (!mapInstance.isSourceLoaded('nyc-tiles')) {
+                                if (probeAttempts <= 4) {
+                                  setTimeout(probeAndAdd, 200);
+                                } else {
+                                  console.warn('⚠️ nyc-tiles source never loaded (after retries).');
+                                }
+                                return;
+                              }
+                        
+                              const allFeatures = mapInstance.querySourceFeatures('nyc-tiles');
+                              const detected = Array.from(new Set(allFeatures.map((f:any) => f.sourceLayer))).filter(Boolean);
+                              console.log(`🔍 Probe attempt ${probeAttempts}: found source-layers:`, detected);
+                        
+                              let detectedLayer = detected.length ? detected[0] : null;
+                        
+                              // fallback: explicitly probe a known guess only if nothing found
+                              if (!detectedLayer) {
+                                const guessed = mapInstance.querySourceFeatures('nyc-tiles', { sourceLayer: 'examplepoints' } as any);
+                                if (guessed.length > 0) detectedLayer = 'examplepoints';
+                              }
+                        
+                              if (!detectedLayer) {
+                                if (probeAttempts <= 4) {
+                                  setTimeout(probeAndAdd, [200, 400, 800, 1200][probeAttempts - 1] || 400);
+                                } else {
+                                  console.warn('⚠️ Could not detect a source-layer to use after multiple attempts.');
+                                }
+                                return;
+                              }
+                        
+                              // --- Add base layers (only if not already present) ---
+                              addLayerSafe({
+                                id: 'nyc-land',
+                                type: 'fill',
+                                source: 'nyc-tiles',
+                                'source-layer': detectedLayer,
+                                paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
+                                filter: ['==', ['geometry-type'], 'Polygon']
+                              });
+                        
+                              addLayerSafe({
+                                id: 'nyc-green-spaces',
+                                type: 'fill',
+                                source: 'nyc-tiles',
+                                'source-layer': detectedLayer,
+                                paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
+                                filter: [
+                                  'all',
+                                  ['==', ['geometry-type'], 'Polygon'],
+                                  ['any',
+                                    ['==', ['get', 'leisure'], 'park'],
+                                    ['==', ['get', 'landuse'], 'cemetery']
+                                  ]
+                                ]
+                              });
+                        
+                              addLayerSafe({
+                                id: 'nyc-water',
+                                type: 'fill',
+                                source: 'nyc-tiles',
+                                'source-layer': detectedLayer,
+                                paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
+                                filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']]
+                              });
+                        
+                              addLayerSafe({
+                                id: 'nyc-roads',
+                                type: 'line',
+                                source: 'nyc-tiles',
+                                'source-layer': detectedLayer,
+                                paint: {
+                                  'line-color': '#666666',
+                                  'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
+                                  'line-opacity': 1.0
+                                },
+                                filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
+                              });
+                        
+                              addLayerSafe({
+                                id: 'nyc-waterways',
+                                type: 'line',
+                                source: 'nyc-tiles',
+                                'source-layer': detectedLayer,
+                                paint: { 'line-color': '#999999', 'line-width': 1, 'line-opacity': 0.6 },
+                                filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'waterway']]
+                              });
+                        
+                              // businesses layer (point)
+                              addLayerSafe({
+                                id: 'nyc-businesses',
+                                type: 'circle',
+                                source: 'nyc-tiles',
+                                'source-layer': detectedLayer,
+                                paint: {
+                                  'circle-color': '#FACC15',
+                                  'circle-radius': 8,
+                                  'circle-opacity': 1.0,
+                                  'circle-stroke-width': 2,
+                                  'circle-stroke-color': '#FFFFFF'
+                                },
+                                filter: ['==', ['geometry-type'], 'Point']
+                              });
+                        
+                              // --- LABELS: if a built-in 'road_label' exists, restyle it; otherwise add our safe label layer ---
+                              if (mapInstance.getLayer('road_label')) {
+                                console.log('ℹ️ Found built-in road_label layer — restyling it.');
+                                setPaintIfExists('road_label', 'text-color', '#2D3748');
+                                setPaintIfExists('road_label', 'text-halo-color', 'rgba(255,255,255,0.85)');
+                                setPaintIfExists('road_label', 'text-halo-width', 1.5);
+                                // show layer list
+                                console.log(map.getStyle().layers.map(l => l.id));
+                                
+                                // sample features from the vector source
+                                const feats = map.querySourceFeatures('nyc-tiles');
+                                console.log('unique sourceLayers:', Array.from(new Set(feats.map(f => f.sourceLayer))));
+                                console.log('sample props (first 5 LineString features):',
+                          feats.filter(f => f.geometry && f.geometry.type === 'LineString').slice(0,5).map(f => f.properties));
+                                
+                              } else {
+                                console.log('ℹ️ No built-in road_label — adding nyc-road-labels from our tiles.');
+                                addLayerSafe({
+                                  id: 'nyc-road-labels',
+                                  type: 'symbol',
+                                  source: 'nyc-tiles',
+                                  'source-layer': detectedLayer,
+                                  layout: {
+                                    'text-field': ['coalesce', ['get', 'name'], ['get', 'ref'], ['get', 'addr:street'], ''],
+                                    'text-font': ['Open Sans Regular', 'Open Sans Bold'],
+                                    'text-size': ['interpolate', ['linear'], ['zoom'], 10, 10, 14, 12, 16, 14, 18, 16],
+                                    'symbol-placement': 'line',
+                                    'text-rotation-alignment': 'map',
+                                    'text-pitch-alignment': 'viewport',
+                                    'text-max-angle': 30,
+                                    'text-padding': 2,
+                                    'text-allow-overlap': false,
+                                    'text-ignore-placement': false
+                                  },
+                                  paint: {
+                                    'text-color': '#2D3748',
+                                    'text-halo-color': 'rgba(255,255,255,0.85)',
+                                    'text-halo-width': 1.5,
+                                    'text-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0.6, 12, 0.8, 14, 1.0]
+                                  },
+                                  filter: ['==', ['geometry-type'], 'LineString']
+                                }, 'nyc-businesses'); // try to insert labels beneath businesses if businesses exist
+                              }
+                        
+                              layersAddedRef.current = true;
+                              console.log('🎉 NYC layers added successfully (safe flow).');
+                        
+                              // quick inspection log for debugging - sample a few road features & props
+                              try {
+                                const sample = mapInstance.querySourceFeatures('nyc-tiles').filter((f:any) => f.geometry?.type === 'LineString').slice(0,5);
+                                sample.forEach((f:any, i:number) => console.log(`🔎 sample line ${i} props:`, f.properties));
+                              } catch (inspectErr) {
+                                console.warn('⚠️ sample inspect failed:', inspectErr);
+                              }
+                        
+                            } catch (err) {
+                              console.warn('⚠️ probeAndAdd failed (will retry):', err);
+                              if (probeAttempts < 4) setTimeout(probeAndAdd, 300);
+                            }
+                          }; // end probeAndAdd
+                        
+                          // start the probe/adding flow
+                          probeAndAdd();
+                        }
 
 
 
