@@ -5,6 +5,7 @@ import { useViewportMapData } from '../hooks/useViewportMapData';
 import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
 import { useIsMobile } from '../hooks/use-mobile';
 import { DeckGLOverlay } from './DeckGLOverlay';
+import type { GeoJSONFeature } from 'maplibre-gl';
 import { 
   extractParkFeatures, 
   extractWaterFeatures, 
@@ -20,10 +21,6 @@ import {
   addRoadsLayerChunked,
   ensureLayerOrder
 } from '../utils/mapLayers';
-
-interface VectorTileFeature extends maplibregl.MapboxGeoJSONFeature {
-  sourceLayer?: string;
-}
 
 interface MapLibreMapProps {
   onBusinessClick?: (business: any) => void;
@@ -380,11 +377,23 @@ if (mapInstance) {
       
       setMapLoaded(true);
 
-      interface VectorTileFeature extends maplibregl.MapboxGeoJSONFeature {
-        sourceLayer?: string;
+      console.log('Sources:', map.getStyle().sources);
+
+      // List all layers
+      console.log('Layers:', map.getStyle().layers.map(l => l.id));
+      
+      // Try to sample features
+      const feats = map.querySourceFeatures('nyc-tiles');
+      console.log('nyc-tiles feature count:', feats.length);
+      if (feats.length) {
+        console.log('First feature properties:', feats[0].properties);
+        console.log('Unique sourceLayers:', [...new Set(feats.map(f => f.sourceLayer))]);
       }
       
-      
+      // Notify parent that map is loaded
+      if (onMapLoaded) {
+        onMapLoaded();
+      }
     });
 
     // Movement tracking only - business loading will be handled separately
@@ -420,14 +429,6 @@ if (mapInstance) {
                   if (allFeatures.length > 0) {
                     console.log('📋 Sample feature:', JSON.stringify(allFeatures[0], null, 2));
                   }
-
-                  // Cast features to our new type
-                  const feats = map.querySourceFeatures('nyc-tiles') as VectorTileFeature[];
-                  
-                  // List unique source layers
-                  const sourceLayers = [...new Set(feats.map(f => f.sourceLayer))];
-                  
-                  console.log('Unique sourceLayers in nyc-tiles:', sourceLayers);
                 }
               } catch (err) {
                 console.warn('⚠️ Error querying features after tile load:', err);
