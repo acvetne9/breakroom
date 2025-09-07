@@ -366,7 +366,7 @@ export const addBusinessPopup = (map: maplibregl.Map, businesses: any[]) => {
     closeOnClick: false
   });
 
-  const mouseEnterHandler = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapboxGeoJSONFeature[] }) => {
+  const mouseEnterHandler = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
     if (e.features?.[0]) {
       const businessId = e.features[0].properties?.id;
       const business = businesses.find(b => b.id === businessId);
