@@ -722,24 +722,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                       console.warn('⚠️ Water layer failed:', waterErr);
                     }
                     
-                    // Add roads layer
-                    try {
-                      mapInstance.addLayer({
-                        id: 'nyc-roads',
-                        type: 'line',
-                        source: 'nyc-tiles',
-                        'source-layer': detectedLayer,
-                        paint: {
-                          'line-color': '#666666', // Dark gray for roads
-                          'line-width': 2,
-                          'line-opacity': 1.0
-                        },
-                        filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
-                      });
-                      console.log('✅ Added roads layer');
-                    } catch (roadsErr) {
-                      console.warn('⚠️ Roads layer failed:', roadsErr);
-                    }
+                    // // Add roads layer
+                    // try {
+                    //   mapInstance.addLayer({
+                    //     id: 'nyc-roads',
+                    //     type: 'line',
+                    //     source: 'nyc-tiles',
+                    //     'source-layer': detectedLayer,
+                    //     paint: {
+                    //       'line-color': '#666666', // Dark gray for roads
+                    //       'line-width': 2,
+                    //       'line-opacity': 1.0
+                    //     },
+                    //     filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
+                    //   });
+                    //   console.log('✅ Added roads layer');
+                    // } catch (roadsErr) {
+                    //   console.warn('⚠️ Roads layer failed:', roadsErr);
+                    // }
                     
                     // Add waterways layer
                     try {
