@@ -535,7 +535,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                            mapInstance.setPaintProperty('road_label', 'text-halo-color', 'rgba(255,255,255,0.8)');
                            mapInstance.setPaintProperty('road_label', 'text-halo-width', 1.5);
                            console.log("💭 labeled")
-                         };
+                         } catch {
+                           console.log("💭 failed...")
+                         }
                           
 
                         //  try {
