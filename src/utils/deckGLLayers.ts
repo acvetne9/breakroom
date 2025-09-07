@@ -34,12 +34,11 @@ export const createBusinessScatterplotLayer = ({
     id: layerId,
     data: businesses,
     pickable: true,
-    opacity: 1.0,
     stroked: true,
     filled: true,
-    radiusScale: 1,
-    radiusMinPixels: 10,
-    radiusMaxPixels: 15,
+    opacity: 1.0,
+    radiusMinPixels: 8,
+    radiusMaxPixels: 8,
     lineWidthMinPixels: 2,
     getPosition: (d: Business) => {
       if (!d || !d.position) {
@@ -50,7 +49,7 @@ export const createBusinessScatterplotLayer = ({
     },
     getRadius: (_d: Business) => 8, // Fixed size for all dots
     getFillColor: (_d: Business) => [250, 204, 21, 255], // Consistent yellow for all
-    getLineColor: (_d: Business) => [255, 255, 255, 200], // Consistent white border
+    getLineColor: (_d: Business) => [255, 255, 255, 255], // Consistent white border
     onClick: onBusinessClick ? (info, event) => {
       console.log('🎯 DeckGL click event triggered!', { 
         hasObject: !!info.object, 

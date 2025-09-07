@@ -1,4 +1,4 @@
-import React, { useState, useMemo, memo } from 'react';
+import React, { useState, useMemo, memo, useEffect } from 'react';
 import { Eye } from 'lucide-react';
 import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
@@ -48,6 +48,8 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   onPostDelete
 }) => {
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
+  const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
+  const [hideSystemPost, setHideSystemPost] = useState(false);
 
   interface Comment {
     id: string;
@@ -60,6 +62,34 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   const [postText, setPostText] = useState('');
   const [commentText, setCommentText] = useState('');
   const { toast } = useToast();
+
+  // Check if we need to fade out the system post when real posts are added
+  const realPosts = useMemo(() => {
+    return filteredBusinessId 
+      ? posts.filter(post => post.businessId === filteredBusinessId && !post.isJobUpdate && post.author !== 'System')
+      : filteredUserStories 
+      ? posts.filter(post => post.author === 'You' && !post.isJobUpdate)
+      : posts.filter(post => post.author !== 'System');
+  }, [posts, filteredBusinessId, filteredUserStories]);
+
+  useEffect(() => {
+    if (filteredBusinessId && realPosts.length > 0 && !fadeOutSystemPost && !hideSystemPost) {
+      // Start fade out animation
+      setFadeOutSystemPost(true);
+      
+      // After animation completes, hide the system post
+      setTimeout(() => {
+        setHideSystemPost(true);
+        setFadeOutSystemPost(false);
+      }, 500); // Match the animation duration
+    }
+    
+    // Reset states when switching to different business or no filter
+    if (!filteredBusinessId || realPosts.length === 0) {
+      setFadeOutSystemPost(false);
+      setHideSystemPost(false);
+    }
+  }, [realPosts.length, filteredBusinessId, fadeOutSystemPost, hideSystemPost]);
 
   const handlePostSubmit = () => {
     if (!postText.trim()) return;
@@ -94,7 +124,7 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
 
     const newComment: Comment = {
       id: crypto.randomUUID(),
-      author: "You", // replace with logged-in user’s name/id
+      author: "You", // replace with logged-in user's name/id
       text: commentText,
       createdAt: new Date(),
     };
@@ -121,8 +151,8 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
     onExpandedPostChange?.(expandedPost === postId ? null : postId);
   };
 
-
   const handleBusinessView = (businessId: string) => {
+    console.log('👀 Eye clicked - navigating to business:', businessId);
     onBusinessView?.(businessId);
   };
 
@@ -135,18 +165,49 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   };
 
   const displayPosts = useMemo(() => {
-    return filteredBusinessId 
+    const filtered = filteredBusinessId 
       ? posts.filter(post => post.businessId === filteredBusinessId && !post.isJobUpdate)
       : filteredUserStories 
       ? posts.filter(post => post.author === 'You' && !post.isJobUpdate)
       : posts;
-  }, [posts, filteredBusinessId, filteredUserStories]);
+
+    console.log('📋 Display posts calculation:', {
+      filteredBusinessId,
+      filteredPostsCount: filtered.length,
+      realPostsCount: realPosts.length,
+      hideSystemPost,
+      willShowDefaultPost: filteredBusinessId && realPosts.length === 0 && !hideSystemPost
+    });
+
+    // Add default post if viewing a specific business with no posts and system post is not hidden
+    if (filteredBusinessId && realPosts.length === 0 && !hideSystemPost) {
+      const defaultPost: Post = {
+        id: `default-${filteredBusinessId}`,
+        author: 'System',
+        text: 'Share a thought about this business 💭',
+        businessId: filteredBusinessId,
+        isStory: true,
+        upvotes: 0,
+        downvotes: 0,
+        userVote: null,
+        createdAt: new Date()
+      };
+      
+      console.log('➕ Adding default system post');
+      
+      // If we have real posts but haven't hidden the system post yet, show both during transition
+      if (realPosts.length > 0) {
+        return [defaultPost, ...filtered.filter(post => post.author !== 'System')];
+      }
+      
+      return [defaultPost];
+    }
+
+    return filtered;
+  }, [posts, filteredBusinessId, filteredUserStories, realPosts.length, hideSystemPost]);
 
   return (
     <div className="relative w-full h-full">
-      {/* Header for filtered views */}
-      {filteredBusinessId || filteredUserStories}
-      
       {/* Posts list */}
       <div className={`h-full overflow-y-auto pb-20 ${filteredBusinessId || filteredUserStories ? 'pt-20' : 'pt-20'}`}>
         <div className="space-y-4 px-4">
@@ -154,7 +215,9 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
             <div key={post.id} className="relative">
               {/* Post with background collage if business has 5+ photos */}
               <div
-                className={`app-popup-transparent p-4 cursor-pointer ${post.images && post.images.length >= 5 ? 'relative overflow-hidden' : ''}`}
+                className={`app-popup-transparent p-4 cursor-pointer ${post.images && post.images.length >= 5 ? 'relative overflow-hidden' : ''} ${
+                  post.author === 'System' && fadeOutSystemPost ? 'animate-fade-out opacity-0 transition-opacity duration-500' : ''
+                }`}
                 onClick={() => handlePostClick(post.id)}
                 style={{
                   backgroundImage: post.images && post.images.length >= 5 ? `url(${post.images[0]})` : undefined,
@@ -182,7 +245,11 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                   <div className="flex items-start justify-between mb-2">
                     <TranslatedText 
                       text={post.text}
-                      className="text-app-black flex-1 pr-4 break-words overflow-wrap-break-word"
+                      className={`flex-1 pr-4 break-words overflow-wrap-break-word ${
+                        post.author === 'System' 
+                          ? 'text-app-gray-medium italic' 
+                          : 'text-app-black'
+                      }`}
                     />
                     <div className="flex-shrink-0 w-8 flex justify-center mt-1 my-0">
                       {(post.businessId || post.isJobUpdate) && (
@@ -208,20 +275,24 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                   
                   {/* Timestamp in bottom left */}
                   <div className="absolute bottom-1 left-1">
-                    <span className="text-xs text-gray-400">{formatTimeAgo(post.createdAt)}</span>
+                    <span className="text-xs text-gray-400">
+                      {post.author === 'System' ? 'Click to share!' : formatTimeAgo(post.createdAt)}
+                    </span>
                   </div>
                   
                   {/* Voting component in bottom right */}
-                  <div className="absolute bottom-1 right-1">
-                    <VotingComponent 
-                      upvotes={post.upvotes} 
-                      downvotes={post.downvotes} 
-                      userVote={post.userVote} 
-                      onVote={voteType => handlePostVote(post.id, voteType)}
-                      isOwner={post.author === 'You'}
-                      onDelete={() => handlePostDelete(post.id)}
-                    />
-                  </div>
+                  {post.author !== 'System' && (
+                    <div className="absolute bottom-1 right-1">
+                      <VotingComponent 
+                        upvotes={post.upvotes} 
+                        downvotes={post.downvotes} 
+                        userVote={post.userVote} 
+                        onVote={voteType => handlePostVote(post.id, voteType)}
+                        isOwner={post.author === 'You'}
+                        onDelete={() => handlePostDelete(post.id)}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Expanded view */}
@@ -261,9 +332,6 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                     })()}
                   </div>
                 )}
-
-
-
               </div>
             </div>
           ))}

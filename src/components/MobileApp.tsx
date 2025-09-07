@@ -274,10 +274,20 @@ const MobileApp: React.FC = () => {
 
   const handleRoleVote = async (businessId: string, roleIndex: number, voteType: 'up' | 'down') => {
     // Find the role ID from the business
-    const business = businesses.find(b => b.id === businessId);
+    let business = businesses.find(b => b.id === businessId);
+    
+    // If business doesn't have role IDs, fetch full details first
     if (!business?.roles?.[roleIndex]?.id) {
-      console.error('Role not found for voting');
-      return;
+      console.log('🔄 Role missing ID, fetching full business details...');
+      const fullBusiness = await fetchFullBusinessDetails(businessId);
+      if (fullBusiness?.roles?.[roleIndex]?.id) {
+        // Update the businesses array with full details
+        setBusinesses(prev => prev.map(b => b.id === businessId ? fullBusiness : b));
+        business = fullBusiness;
+      } else {
+        console.error('Role not found for voting after fetching full details');
+        return;
+      }
     }
 
     const roleId = business.roles[roleIndex].id;
@@ -539,10 +549,29 @@ const MobileApp: React.FC = () => {
               filteredBusinessId={filteredBusinessId || undefined}
               filteredUserStories={filteredUserStories}
               onBusinessView={(businessId) => {
+                console.log('👁️ Business view requested:', businessId);
                 const business = businesses.find(b => b.id === businessId);
+                console.log('📍 Found business:', business?.name);
                 if (business) {
+                  console.log('🏠 Setting selected business and navigating to home');
                   setSelectedBusiness(business);
                   setCurrentSlide(1); // Navigate to home page
+                } else {
+                  console.warn('❌ Business not found in businesses array, fetching details...');
+                  (async () => {
+                    try {
+                      const full = await fetchFullBusinessDetails(businessId);
+                      if (full) {
+                        console.log('✅ Loaded business details, navigating to home');
+                        setSelectedBusiness(full);
+                        setCurrentSlide(1);
+                      } else {
+                        console.warn('❌ Could not load business details for id:', businessId);
+                      }
+                    } catch (err) {
+                      console.error('❌ Error fetching business details:', err);
+                    }
+                  })();
                 }
               }}
               onExpandedPostChange={(postId) => {
