@@ -530,15 +530,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                             id: 'nyc-road-labels',
                             type: 'symbol',
                             source: 'nyc-tiles',
-                            'source-layer': detectedLayer, // same layer as nyc-roads
+                            'source-layer': detectedLayer, // make sure this is correct
                             layout: {
-                              'text-field': [
-                                'case',
-                                ['has', 'name'],
-                                ['get', 'name'],
-                                ''
-                              ],
-                              'text-font': ['Open Sans Regular'],
+                              'text-field': ['coalesce', ['get', 'name'], ''], // fallback safe
+                              'text-font': ['sans-serif'],
                               'text-size': [
                                 'interpolate',
                                 ['linear'],
@@ -549,37 +544,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                                 18, 16
                               ],
                               'symbol-placement': 'line',
-                              'text-rotation-alignment': 'map',
-                              'text-pitch-alignment': 'viewport',
-                              'text-max-angle': 30,
-                              'text-padding': 10,
-                              'text-allow-overlap': false,
-                              'text-ignore-placement': false
+                              'text-pitch-alignment': 'viewport'
                             },
                             paint: {
                               'text-color': '#2D3748',
-                              'text-halo-color': 'rgba(255, 255, 255, 0.8)',
-                              'text-halo-width': 1.5,
-                              'text-opacity': [
-                                'interpolate',
-                                ['linear'],
-                                ['zoom'],
-                                10, 0.6,
-                                12, 0.8,
-                                14, 1.0
-                              ]
+                              'text-halo-color': 'rgba(255,255,255,0.8)',
+                              'text-halo-width': 1.5
                             },
                             filter: [
                               'all',
                               ['==', ['geometry-type'], 'LineString'],
-                              ['has', 'highway'],
-                              ['has', 'name']
+                              ['has', 'highway'] // you can remove this if it hides too much
                             ]
                           });
                           console.log('✅ Added road labels layer');
-                        } catch (roadLabelsErr) {
-                          console.warn('⚠️ Road labels layer failed:', roadLabelsErr);
+                        } catch (err) {
+                          console.warn('⚠️ Road labels failed:', err);
                         }
+
                          
                          // Add waterways layer
                          try {
