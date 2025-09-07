@@ -294,6 +294,61 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.error('❌ Error creating map instance:', error);
       return;
     }
+    // --- Safety monkey-patches (add immediately after creating mapInstance) ---
+if (mapInstance) {
+  // 1) Safe addLayer: skip if layer exists, catch errors
+  const _origAddLayer = (mapInstance as any).addLayer.bind(mapInstance);
+  (mapInstance as any).addLayer = function (layerDef: any, before?: string) {
+    try {
+      // If caller passed just an id string (unlikely) handle gracefully
+      const id = typeof layerDef === 'string' ? layerDef : layerDef && layerDef.id;
+      if (id && this.getLayer(id)) {
+        console.log(`ℹ️ addLayer skipped: layer "${id}" already exists.`);
+        return;
+      }
+      return _origAddLayer(layerDef, before);
+    } catch (err) {
+      console.warn('⚠️ addLayer error (ignored):', err);
+      // swallow - don't rethrow so it won't break rest of rendering
+      return;
+    }
+  };
+
+  // 2) Safe setPaintProperty: skip if layer doesn't exist, catch errors
+  const _origSetPaint = (mapInstance as any).setPaintProperty.bind(mapInstance);
+  (mapInstance as any).setPaintProperty = function (layerId: string, prop: string, value: any) {
+    try {
+      if (!this.getLayer(layerId)) {
+        console.log(`ℹ️ setPaintProperty skipped: layer "${layerId}" not found.`);
+        return;
+      }
+      return _origSetPaint(layerId, prop, value);
+    } catch (err) {
+      console.warn('⚠️ setPaintProperty error (ignored):', err);
+      return;
+    }
+  };
+
+  // Optional: safe moveLayer wrapper to avoid errors when target not found
+  const _origMoveLayer = (mapInstance as any).moveLayer.bind(mapInstance);
+  (mapInstance as any).moveLayer = function (id: string, before?: string) {
+    try {
+      if (!this.getLayer(id)) {
+        console.log(`ℹ️ moveLayer skipped: layer "${id}" not found.`);
+        return;
+      }
+      if (before && !this.getLayer(before)) {
+        // If 'before' not found, just call without it
+        return _origMoveLayer(id);
+      }
+      return _origMoveLayer(id, before);
+    } catch (err) {
+      console.warn('⚠️ moveLayer error (ignored):', err);
+      return;
+    }
+  };
+}
+
 
     mapInstance.on('load', () => {
       if (cleanedUp) return;
@@ -691,6 +746,15 @@ if ((e as any).dataType === 'tile' || ((e as any).dataType === 'source' && mapIn
         setPaintIfExists('road_label', 'text-color', '#2D3748');
         setPaintIfExists('road_label', 'text-halo-color', 'rgba(255,255,255,0.85)');
         setPaintIfExists('road_label', 'text-halo-width', 1.5);
+        // show layer list
+        console.log(map.getStyle().layers.map(l => l.id));
+        
+        // sample features from the vector source
+        const feats = map.querySourceFeatures('nyc-tiles');
+        console.log('unique sourceLayers:', Array.from(new Set(feats.map(f => f.sourceLayer))));
+        console.log('sample props (first 5 LineString features):',
+  feats.filter(f => f.geometry && f.geometry.type === 'LineString').slice(0,5).map(f => f.properties));
+        
       } else {
         console.log('ℹ️ No built-in road_label — adding nyc-road-labels from our tiles.');
         addLayerSafe({
