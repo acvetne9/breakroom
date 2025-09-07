@@ -755,49 +755,23 @@ if (mapInstance) {
                               });
                         
                               // --- LABELS: if a built-in 'road_label' exists, restyle it; otherwise add our safe label layer ---
-                              if (mapInstance.getLayer('road_label')) {
-                                console.log('ℹ️ Found built-in road_label layer — restyling it.');
-                                setPaintIfExists('road_label', 'text-color', '#2D3748');
-                                setPaintIfExists('road_label', 'text-halo-color', 'rgba(255,255,255,0.85)');
-                                setPaintIfExists('road_label', 'text-halo-width', 1.5);
-                                // show layer list
-                                console.log(map.getStyle().layers.map(l => l.id));
-                                
-                                // sample features from the vector source
-                                const feats = map.querySourceFeatures('nyc-tiles') as VectorTileFeature[];
-                                const sourceLayers = [...new Set(feats.map(f => f.sourceLayer).filter(Boolean))];
-                                console.log('unique:', sourceLayers);
-                                console.log('sample props (first 5 LineString features):',
-                          feats.filter(f => f.geometry && f.geometry.type === 'LineString').slice(0,5).map(f => f.properties));
-                                
-                              } else {
-                                console.log('ℹ️ No built-in road_label — adding nyc-road-labels from our tiles.');
-                                addLayerSafe({
-                                  id: 'nyc-road-labels',
-                                  type: 'symbol',
-                                  source: 'nyc-tiles',
-                                  'source-layer': detectedLayer,
-                                  layout: {
-                                    'text-field': ['coalesce', ['get', 'name'], ['get', 'ref'], ['get', 'addr:street'], ''],
-                                    'text-font': ['Open Sans Regular', 'Open Sans Bold'],
-                                    'text-size': ['interpolate', ['linear'], ['zoom'], 10, 10, 14, 12, 16, 14, 18, 16],
-                                    'symbol-placement': 'line',
-                                    'text-rotation-alignment': 'map',
-                                    'text-pitch-alignment': 'viewport',
-                                    'text-max-angle': 30,
-                                    'text-padding': 2,
-                                    'text-allow-overlap': false,
-                                    'text-ignore-placement': false
-                                  },
-                                  paint: {
-                                    'text-color': '#2D3748',
-                                    'text-halo-color': 'rgba(255,255,255,0.85)',
-                                    'text-halo-width': 1.5,
-                                    'text-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0.6, 12, 0.8, 14, 1.0]
-                                  },
-                                  filter: ['==', ['geometry-type'], 'LineString']
-                                }, 'nyc-businesses'); // try to insert labels beneath businesses if businesses exist
-                              }
+                              mapInstance.addLayer({
+                                id: 'nyc-road-labels',
+                                type: 'symbol',
+                                source: 'nyc-tiles',
+                                'source-layer': 'transportation_name',
+                                layout: {
+                                  'text-field': ['coalesce', ['get', 'name'], ''],
+                                  'symbol-placement': 'line',
+                                  'text-size': 12
+                                },
+                                paint: {
+                                  'text-color': '#2D3748',
+                                  'text-halo-color': '#fff',
+                                  'text-halo-width': 1.5
+                                }
+                              });
+
                         
                               layersAddedRef.current = true;
                               console.log('🎉 NYC layers added successfully (safe flow).');
@@ -820,9 +794,6 @@ if (mapInstance) {
                           probeAndAdd();
                         }
 
-
-
-                         
                          // Add waterways layer
                          try {
                            mapInstance.addLayer({
