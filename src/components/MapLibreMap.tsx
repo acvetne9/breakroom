@@ -369,6 +369,18 @@ if (mapInstance) {
         .catch(error => {
           console.error('🚨 Tile access failed:', error);
         });
+      console.log('Sources:', map.getStyle().sources);
+
+      // List all layers
+      console.log('Layers:', map.getStyle().layers.map(l => l.id));
+      
+      // Try to sample features
+      const feats = map.querySourceFeatures('nyc-tiles');
+      console.log('nyc-tiles feature count:', feats.length);
+      if (feats.length) {
+        console.log('First feature properties:', feats[0].properties);
+        console.log('Unique sourceLayers:', [...new Set(feats.map(f => f.sourceLayer))]);
+      }
       
       // Defer adding layers until the source reports as fully loaded via `sourcedata`
       console.log('⏳ Waiting for nyc-tiles source to fully load before adding layers');
