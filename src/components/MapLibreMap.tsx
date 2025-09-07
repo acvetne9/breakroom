@@ -420,7 +420,7 @@ if (mapInstance) {
             setTimeout(() => {
               try {
                 if (mapInstance && mapInstance.isSourceLoaded && mapInstance.isSourceLoaded('nyc-tiles')) {
-                  const allFeatures = mapInstance.querySourceFeatures('nyc-tiles');
+                  const allFeatures = mapInstance.querySourceFeatures('nyc-tiles') as VectorTileFeature[];
                   const sourceLayers = [...new Set(features.map(f => f.sourceLayer).filter(Boolean))];
                   console.log('Layers in nyc-tiles:', sourceLayers);
                   console.log(`🔍 After tile load - Features: ${allFeatures.length}, Source-layers: [${sourceLayers.join(', ')}]`);
@@ -500,7 +500,7 @@ if (mapInstance) {
               setTimeout(() => {
                 try {
                   if (mapInstance && mapInstance.isSourceLoaded && mapInstance.isSourceLoaded('nyc-tiles')) {
-                    const features = mapInstance.querySourceFeatures('nyc-tiles');
+                    const features = mapInstance.querySourceFeatures('nyc-tiles') as VectorTileFeature[];
                     const sourceLayers = [...new Set(features.map(f => f.sourceLayer).filter(Boolean))];
                     
                     console.log(`🔍 Query attempt ${index + 1} (${delay}ms delay): ${features.length} features, source-layers: [${sourceLayers.join(', ')}]`);
@@ -508,7 +508,7 @@ if (mapInstance) {
                      // If no source-layers detected yet, proactively probe the known layer name
                      if (sourceLayers.length === 0 && !layersAddedRef.current) {
                        try {
-                         const guess = mapInstance.querySourceFeatures('nyc-tiles', { sourceLayer: 'examplepoints' as any });
+                         const guess = mapInstance.querySourceFeatures('nyc-tiles', { sourceLayer: 'examplepoints' as any }) as VectorTileFeature[];
                          console.log(`🧪 Probe 'examplepoints': ${guess.length} features`);
                          if (guess.length > 0) {
                            const detectedLayer = 'examplepoints';
@@ -660,7 +660,7 @@ if (mapInstance) {
                                 return;
                               }
                         
-                              const allFeatures = mapInstance.querySourceFeatures('nyc-tiles');
+                              const allFeatures = mapInstance.querySourceFeatures('nyc-tiles') as VectorTileFeature[];
                               const detected = [...new Set(features.map(f => f.sourceLayer).filter(Boolean))];
                               console.log(`🔍 Probe attempt ${probeAttempts}: found source-layers:`, detected);
                         
@@ -668,7 +668,7 @@ if (mapInstance) {
                         
                               // fallback: explicitly probe a known guess only if nothing found
                               if (!detectedLayer) {
-                                const guessed = mapInstance.querySourceFeatures('nyc-tiles', { sourceLayer: 'examplepoints' } as any);
+                                const guessed = mapInstance.querySourceFeatures('nyc-tiles', { sourceLayer: 'examplepoints' } as any) as VectorTileFeature[];
                                 if (guessed.length > 0) detectedLayer = 'examplepoints';
                               }
                         
@@ -764,7 +764,7 @@ if (mapInstance) {
                                 console.log(map.getStyle().layers.map(l => l.id));
                                 
                                 // sample features from the vector source
-                                const feats = map.querySourceFeatures('nyc-tiles') as ;
+                                const feats = map.querySourceFeatures('nyc-tiles') as VectorTileFeature[];
                                 console.log('unique sourceLayers:', [...new Set(features.map(f => f.sourceLayer).filter(Boolean)));
                                 console.log('sample props (first 5 LineString features):',
                           feats.filter(f => f.geometry && f.geometry.type === 'LineString').slice(0,5).map(f => f.properties));
