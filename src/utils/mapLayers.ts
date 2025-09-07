@@ -109,11 +109,84 @@ export const addRoadsLayer = (map: maplibregl.Map, roadFeatures: any[]) => {
       source: 'roads',
       paint: {
         'line-color': '#666666',
-        'line-width': 2
+        'line-width': [
+          'interpolate', 
+          ['linear'], 
+          ['zoom'],
+          10, 1,
+          14, 2,
+          16, 3,
+          18, 4
+        ]
       }
     });
+
+    // Add road labels that follow the road geometry
+    map.addLayer({
+      id: 'roads-labels',
+      type: 'symbol',
+      source: 'roads',
+      layout: {
+        'text-field': [
+          'case',
+          ['has', 'name'],
+          ['get', 'name'],
+          '' // Empty string if no name
+        ],
+        'text-font': ['Open Sans Regular'],
+        'text-size': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          10, 10,
+          14, 12,
+          16, 14,
+          18, 16
+        ],
+        'symbol-placement': 'line', // This makes text follow the road
+        'text-rotation-alignment': 'map',
+        'text-pitch-alignment': 'viewport',
+        'text-max-angle': 30, // Maximum angle between adjacent characters
+        'text-padding': 10,
+        'text-allow-overlap': false,
+        'text-ignore-placement': false
+      },
+      paint: {
+        'text-color': '#2D3748', // Dark gray text
+        'text-halo-color': 'rgba(255, 255, 255, 0.8)', // White halo for readability
+        'text-halo-width': 1.5,
+        'text-opacity': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          10, 0.6,
+          12, 0.8,
+          14, 1.0
+        ]
+      },
+      filter: [
+        'all',
+        ['has', 'name'], // Only show labels for roads with names
+        [
+          'in',
+          ['get', 'highway'],
+          ['literal', [
+            'primary', 
+            'secondary', 
+            'tertiary', 
+            'trunk',
+            'primary_link',
+            'secondary_link',
+            'tertiary_link',
+            'trunk_link',
+            'residential',
+            'living_street'
+          ]]
+        ] // Only show labels for major road types
+      ]
+    });
   }
-  console.log(`Added ${roadFeatures.length} road features`);
+  console.log(`Added ${roadFeatures.length} road features with labels`);
 };
 
 export const addRoadsLayerChunked = async (map: maplibregl.Map, roadFeatures: any[], isMobile: boolean = false) => {
@@ -125,10 +198,13 @@ export const addRoadsLayerChunked = async (map: maplibregl.Map, roadFeatures: an
   console.log(`🛣️ Loading ${roadFeatures.length} roads in center-out chunks of ${chunkSize} (mobile: ${isMobile})`);
   
   // Remove existing roads layer if it exists
+  if (map.getLayer('roads-labels')) {
+    map.removeLayer('roads-labels');
+  }
+  if (map.getLayer('roads-layer')) {
+    map.removeLayer('roads-layer');
+  }
   if (map.getSource('roads')) {
-    if (map.getLayer('roads-layer')) {
-      map.removeLayer('roads-layer');
-    }
     map.removeSource('roads');
   }
   
@@ -144,8 +220,81 @@ export const addRoadsLayerChunked = async (map: maplibregl.Map, roadFeatures: an
     source: 'roads',
     paint: {
       'line-color': '#666666',
-      'line-width': 2
+      'line-width': [
+        'interpolate', 
+        ['linear'], 
+        ['zoom'],
+        10, 1,
+        14, 2,
+        16, 3,
+        18, 4
+      ]
     }
+  });
+
+  // Add road labels layer
+  map.addLayer({
+    id: 'roads-labels',
+    type: 'symbol',
+    source: 'roads',
+    layout: {
+      'text-field': [
+        'case',
+        ['has', 'name'],
+        ['get', 'name'],
+        ''
+      ],
+      'text-font': ['Open Sans Regular'],
+      'text-size': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        10, 10,
+        14, 12,
+        16, 14,
+        18, 16
+      ],
+      'symbol-placement': 'line',
+      'text-rotation-alignment': 'map',
+      'text-pitch-alignment': 'viewport',
+      'text-max-angle': 30,
+      'text-padding': 10,
+      'text-allow-overlap': false,
+      'text-ignore-placement': false
+    },
+    paint: {
+      'text-color': '#2D3748',
+      'text-halo-color': 'rgba(255, 255, 255, 0.8)',
+      'text-halo-width': 1.5,
+      'text-opacity': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        10, 0.6,
+        12, 0.8,
+        14, 1.0
+      ]
+    },
+    filter: [
+      'all',
+      ['has', 'name'],
+      [
+        'in',
+        ['get', 'highway'],
+        ['literal', [
+          'primary', 
+          'secondary', 
+          'tertiary', 
+          'trunk',
+          'primary_link',
+          'secondary_link',
+          'tertiary_link',
+          'trunk_link',
+          'residential',
+          'living_street'
+        ]]
+      ]
+    ]
   });
   
   // Get map center to sort roads by distance from center
@@ -199,13 +348,16 @@ export const addRoadsLayerChunked = async (map: maplibregl.Map, roadFeatures: an
     }
   }
   
-  console.log(`✅ All ${sortedRoads.length} road features loaded center-out successfully`);
+  console.log(`✅ All ${sortedRoads.length} road features loaded center-out successfully with labels`);
 };
 
 export const ensureLayerOrder = (map: maplibregl.Map) => {
-  // Ensure proper layer ordering: roads over water/parks, businesses over roads
+  // Ensure proper layer ordering: roads over water/parks, labels over roads, businesses over everything
   if (map.getLayer('roads-layer')) {
     map.moveLayer('roads-layer');
+  }
+  if (map.getLayer('roads-labels')) {
+    map.moveLayer('roads-labels');
   }
   if (map.getLayer('businesses-layer')) {
     map.moveLayer('businesses-layer');
