@@ -7,9 +7,6 @@ interface BreakroomLoadingProps {
 const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
   const [isVisible, setIsVisible] = useState(true);
 
-  // Easy horizontal adjustment - change this value to move the mug left/right
-  const mugHorizontalOffset = -1; // percentage from center (positive = right, negative = left)
-
   useEffect(() => {
     // Auto-hide after animation completes (3 seconds)
     const timer = setTimeout(() => {
@@ -56,9 +53,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       justifyContent: 'center',
       alignItems: 'center',
       marginBottom: '20px',
-      transform: 'scale(1.5)',
-      // Apply horizontal offset here
-      left: `${mugHorizontalOffset}%`
+      transform: 'scale(1.5)'
     },
 
     mugVisualWrapper: {
@@ -123,22 +118,18 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      width: '100vw',
+      width: '100%',
       height: '50px',
       overflow: 'visible'
     },
     textLeft: {
       position: 'absolute' as const,
-      left: '0',
-      transform: 'translateX(0)',
       animation: 'slideToLeft 0.8s ease-out 1.2s forwards',
       opacity: 0,
       zIndex: 1
     },
     textRight: {
       position: 'absolute' as const,
-      right: '0',
-      transform: 'translateX(0)',
       animation: 'slideToRight 0.8s ease-out 1.2s forwards',
       opacity: 0,
       zIndex: 1
