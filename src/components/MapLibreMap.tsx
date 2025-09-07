@@ -526,60 +526,60 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                          }
 
                          try {
-                           mapInstance.addLayer({
-                             id: 'nyc-road-labels',
-                             type: 'symbol',
-                             source: 'nyc-tiles',
-                             'source-layer': detectedLayer,
-                             layout: {
-                               'text-field': [
-                                 'case',
-                                 ['has', 'name'],
-                                 ['get', 'name'],
-                                 ''
-                               ],
-                               'text-font': ['Open Sans Regular'],
-                               'text-size': [
-                                 'interpolate',
-                                 ['linear'],
-                                 ['zoom'],
-                                 10, 10,
-                                 14, 12,
-                                 16, 14,
-                                 18, 16
-                               ],
-                               'symbol-placement': 'line',
-                               'text-rotation-alignment': 'map',
-                               'text-pitch-alignment': 'viewport',
-                               'text-max-angle': 30,
-                               'text-padding': 10,
-                               'text-allow-overlap': false,
-                               'text-ignore-placement': false
-                             },
-                             paint: {
-                               'text-color': '#2D3748',
-                               'text-halo-color': 'rgba(255, 255, 255, 0.8)',
-                               'text-halo-width': 1.5,
-                               'text-opacity': [
-                                 'interpolate',
-                                 ['linear'],
-                                 ['zoom'],
-                                 10, 0.6,
-                                 12, 0.8,
-                                 14, 1.0
-                               ]
-                             },
-                             filter: [
-                               'all',
-                               ['==', ['geometry-type'], 'LineString'],
-                               ['has', 'highway'],
-                               ['has', 'name']
-                             ]
-                           });
-                           console.log('✅ Added road labels layer (probed)');
-                         } catch (roadLabelsErr) {
-                           console.warn('⚠️ Road labels layer (probed) failed:', roadLabelsErr);
-                         }
+                          mapInstance.addLayer({
+                            id: 'nyc-road-labels',
+                            type: 'symbol',
+                            source: 'nyc-tiles',
+                            'source-layer': detectedLayer, // same layer as nyc-roads
+                            layout: {
+                              'text-field': [
+                                'case',
+                                ['has', 'name'],
+                                ['get', 'name'],
+                                ''
+                              ],
+                              'text-font': ['Open Sans Regular'],
+                              'text-size': [
+                                'interpolate',
+                                ['linear'],
+                                ['zoom'],
+                                10, 10,
+                                14, 12,
+                                16, 14,
+                                18, 16
+                              ],
+                              'symbol-placement': 'line',
+                              'text-rotation-alignment': 'map',
+                              'text-pitch-alignment': 'viewport',
+                              'text-max-angle': 30,
+                              'text-padding': 10,
+                              'text-allow-overlap': false,
+                              'text-ignore-placement': false
+                            },
+                            paint: {
+                              'text-color': '#2D3748',
+                              'text-halo-color': 'rgba(255, 255, 255, 0.8)',
+                              'text-halo-width': 1.5,
+                              'text-opacity': [
+                                'interpolate',
+                                ['linear'],
+                                ['zoom'],
+                                10, 0.6,
+                                12, 0.8,
+                                14, 1.0
+                              ]
+                            },
+                            filter: [
+                              'all',
+                              ['==', ['geometry-type'], 'LineString'],
+                              ['has', 'highway'],
+                              ['has', 'name']
+                            ]
+                          });
+                          console.log('✅ Added road labels layer');
+                        } catch (roadLabelsErr) {
+                          console.warn('⚠️ Road labels layer failed:', roadLabelsErr);
+                        }
                          
                          // Add waterways layer
                          try {
@@ -722,24 +722,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                       console.warn('⚠️ Water layer failed:', waterErr);
                     }
                     
-                    // // Add roads layer
-                    // try {
-                    //   mapInstance.addLayer({
-                    //     id: 'nyc-roads',
-                    //     type: 'line',
-                    //     source: 'nyc-tiles',
-                    //     'source-layer': detectedLayer,
-                    //     paint: {
-                    //       'line-color': '#666666', // Dark gray for roads
-                    //       'line-width': 2,
-                    //       'line-opacity': 1.0
-                    //     },
-                    //     filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
-                    //   });
-                    //   console.log('✅ Added roads layer');
-                    // } catch (roadsErr) {
-                    //   console.warn('⚠️ Roads layer failed:', roadsErr);
-                    // }
+                    // Add roads layer
+                    try {
+                      mapInstance.addLayer({
+                        id: 'nyc-roads',
+                        type: 'line',
+                        source: 'nyc-tiles',
+                        'source-layer': detectedLayer,
+                        paint: {
+                          'line-color': '#666666', // Dark gray for roads
+                          'line-width': 2,
+                          'line-opacity': 1.0
+                        },
+                        filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
+                      });
+                      console.log('✅ Added roads layer');
+                    } catch (roadsErr) {
+                      console.warn('⚠️ Roads layer failed:', roadsErr);
+                    }
                     
                     // Add waterways layer
                     try {
@@ -1030,15 +1030,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         backgroundColor: '#B3E5FC' // Light blue fallback while map loads
       }}
     >
-      {/* {/* Business loading indicator 
-      <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white text-xs p-2 rounded z-50 pointer-events-none">
-        <div>🏢 Businesses: {businesses.length}</div>
-        <div>⚡ Loading: {businessesLoading ? 'Yes' : 'No'}</div>
-        <div>🗺️ Vector Tiles: Ready</div>
-        {businesses.length === 0 && (
-          <div className="text-yellow-300">⚠️ No businesses loaded</div>
-        )}
-      </div> */}
       
       {/* Deck.GL Overlay for high-performance business rendering */}
       {map && mapLoaded && (
@@ -1051,13 +1042,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         />
       )}
       
-      {/* Fallback message when no businesses are visible 
-      {map && mapLoaded && businesses.length === 0 && !businessesLoading && (
-        <div className="absolute bottom-4 left-4 bg-yellow-500 bg-opacity-90 text-black text-sm p-3 rounded max-w-xs">
-          <div className="font-semibold">No businesses in this area</div>
-          <div className="text-xs">Try moving the map or zooming out to see more businesses</div>
-        </div>
-      )}*/}
     </div>
   );
 };
