@@ -765,7 +765,8 @@ if (mapInstance) {
                                 
                                 // sample features from the vector source
                                 const feats = map.querySourceFeatures('nyc-tiles') as VectorTileFeature[];
-                                console.log('unique sourceLayers:', [...new Set(features.map(f => f.sourceLayer).filter(Boolean)));
+                                const sourceLayers = [...new Set(features.map(f => f.sourceLayer).filter(Boolean))];
+                                console.log('unique:', sourceLayers);
                                 console.log('sample props (first 5 LineString features):',
                           feats.filter(f => f.geometry && f.geometry.type === 'LineString').slice(0,5).map(f => f.properties));
                                 
