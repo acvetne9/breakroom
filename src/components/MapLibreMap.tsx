@@ -421,7 +421,7 @@ if (mapInstance) {
               try {
                 if (mapInstance && mapInstance.isSourceLoaded && mapInstance.isSourceLoaded('nyc-tiles')) {
                   const allFeatures = mapInstance.querySourceFeatures('nyc-tiles') as VectorTileFeature[];
-                  const sourceLayers = [...new Set(allReatures.map(f => f.sourceLayer).filter(Boolean))];
+                  const sourceLayers = [...new Set(allFeatures.map(f => f.sourceLayer).filter(Boolean))];
                   console.log('Layers in nyc-tiles:', sourceLayers);
                   console.log(`🔍 After tile load - Features: ${allFeatures.length}, Source-layers: [${sourceLayers.join(', ')}]`);
                   
