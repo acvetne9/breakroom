@@ -49,13 +49,14 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
     coffeeMug: {
       display: 'inline-block',
       position: 'relative',
-      transform: 'scale(1)',
+      transform: 'scale(1.5)',          // default scale for desktop
+      transformOrigin: 'bottom center',  // scale from the bottom
       animation: 'mugSmoothEntrance 1.2s ease-out forwards',
       opacity: 0
     },
     mugBody: {
-      width: 'clamp(40px, 6vw, 60px)',
-      height: 'clamp(48px, 7vw, 72px)',
+      width: 'clamp(50px, 6vw, 60px)',   // slightly bigger min to match old size
+      height: 'clamp(60px, 7vw, 72px)',
       backgroundColor: '#B22222',
       borderRadius: '3px',
       position: 'relative',
@@ -64,6 +65,18 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
         inset 0 -6px 0 rgba(0, 0, 0, 0.15),
         0 3px 6px rgba(0, 0, 0, 0.25)
       `
+    },
+    mugHandle: {
+      position: 'absolute',
+      left: '-12px',
+      top: '8px',
+      width: 'clamp(16px, 3vw, 18px)',
+      height: 'clamp(32px, 6vw, 36px)',
+      border: '5px solid #B22222',
+      borderRight: 'none',
+      borderRadius: '12px 0 0 12px',
+      background: 'transparent',
+      boxShadow: 'inset 2px 0 0 rgba(0, 0, 0, 0.1)'
     },
     mugBodyBefore: {
       position: 'absolute',
@@ -74,18 +87,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       backgroundColor: 'rgba(0, 0, 0, 0.15)',
       borderRadius: '1.5px'
     },
-    mugHandle: {
-      position: 'absolute',
-      left: '-12px',
-      top: '8px',
-      width: 'clamp(14px, 3vw, 18px)',
-      height: 'clamp(28px, 6vw, 36px)',
-      border: '5px solid #B22222',
-      borderRight: 'none',
-      borderRadius: '12px 0 0 12px',
-      background: 'transparent',
-      boxShadow: 'inset 2px 0 0 rgba(0, 0, 0, 0.1)'
-    },
+    
     textWrapper: {
       width: '90%',
       maxWidth: '800px',
@@ -93,7 +95,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       justifyContent: 'space-between',
       alignItems: 'center',
       fontFamily: "'Courier New', Courier, monospace",
-      fontSize: 'clamp(24px, 6vw, 36px)',
+      fontSize: '36px',
       fontWeight: 'bold',
       color: '#B22222',
       position: 'relative'
