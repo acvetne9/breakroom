@@ -1,3 +1,4 @@
+// ---------------- NYC neighborhoods ----------------
 export const nycNeighborhoods = {
   Manhattan: [
     { name: "Harlem", lat: 40.8116, lon: -73.9465 },
@@ -19,7 +20,7 @@ export const nycNeighborhoods = {
     { name: "Coney Island", lat: 40.5755, lon: -73.9707 },
     { name: "Brownsville", lat: 40.6629, lon: -73.9133 },
     { name: "Bensonhurst", lat: 40.6113, lon: -73.997 },
-    { name: "Canarsie", lat: 40.638590, lon: -73.897079 }
+    { name: "Canarsie", lat: 40.63859, lon: -73.897079 }
   ],
   Queens: [
     { name: "Astoria", lat: 40.7644, lon: -73.9235 },
@@ -49,6 +50,7 @@ export const nycNeighborhoods = {
   ]
 };
 
+// ---------------- Utilities ----------------
 export function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const toRad = deg => (deg * Math.PI) / 180;
@@ -60,38 +62,106 @@ export function haversine(lat1, lon1, lat2, lon2) {
   return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Given two points, compute geographic midpoint
-function midpoint(lat1, lon1, lat2, lon2) {
-  return {
-    lat: (lat1 + lat2) / 2,
-    lon: (lon1 + lon2) / 2
-  };
+function bearing(lat1, lon1, lat2, lon2) {
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x =
+    Math.cos(φ1) * Math.sin(φ2) -
+    Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 }
 
-// Generate quasi-circle points for a neighborhood
-export function generateNeighborhoodBoundary(neighborhood, neighbors, bufferKm = 0.5, pointsPerArc = 5) {
-  const arcs = [];
+function destinationPoint(lat, lon, bearingDeg, distanceKm) {
+  const R = 6371;
+  const δ = distanceKm / R;
+  const θ = (bearingDeg * Math.PI) / 180;
+  const φ1 = (lat * Math.PI) / 180;
+  const λ1 = (lon * Math.PI) / 180;
+
+  const φ2 = Math.asin(
+    Math.sin(φ1) * Math.cos(δ) +
+    Math.cos(φ1) * Math.sin(δ) * Math.cos(θ)
+  );
+  const λ2 =
+    λ1 +
+    Math.atan2(
+      Math.sin(θ) * Math.sin(δ) * Math.cos(φ1),
+      Math.cos(δ) - Math.sin(φ1) * Math.sin(φ2)
+    );
+
+  return { lat: (φ2 * 180) / Math.PI, lon: (λ2 * 180) / Math.PI };
+}
+
+// ---------------- Core logic ----------------
+export function findNearbyNeighborhoods(allBoroughs, target, maxDistanceKm = 3) {
+  const neighbors = [];
+  for (const borough in allBoroughs) {
+    for (const n of allBoroughs[borough]) {
+      if (n.name !== target.name) {
+        const d = haversine(target.lat, target.lon, n.lat, n.lon);
+        if (d <= maxDistanceKm) neighbors.push(n);
+      }
+    }
+  }
+  return neighbors;
+}
+
+export function generateNeighborhoodBoundary(
+  neighborhood,
+  neighbors,
+  bufferKm = 0.5
+) {
+  const boundary = [];
 
   neighbors.forEach(n => {
-    const mid = midpoint(neighborhood.lat, neighborhood.lon, n.lat, n.lon);
-    const dist = haversine(neighborhood.lat, neighborhood.lon, mid.lat, mid.lon) + bufferKm;
+    const dist = haversine(neighborhood.lat, neighborhood.lon, n.lat, n.lon);
+    const θ = bearing(neighborhood.lat, neighborhood.lon, n.lat, n.lon);
 
-    // Place points along the arc from center to midpoint
-    for (let i = 0; i <= pointsPerArc; i++) {
-      const ratio = i / pointsPerArc;
-      const lat = neighborhood.lat + (mid.lat - neighborhood.lat) * ratio;
-      const lon = neighborhood.lon + (mid.lon - neighborhood.lon) * ratio;
-      arcs.push({ lat, lon });
-    }
+    // 70% toward neighbor + buffer
+    const point = destinationPoint(
+      neighborhood.lat,
+      neighborhood.lon,
+      θ,
+      dist * 0.7 + bufferKm
+    );
+    boundary.push(point);
   });
 
-  // Sort arcs by angle from center for simple polygon ordering
-  arcs.sort((a, b) => {
+  // Order points in circular order
+  boundary.sort((a, b) => {
     const angleA = Math.atan2(a.lat - neighborhood.lat, a.lon - neighborhood.lon);
     const angleB = Math.atan2(b.lat - neighborhood.lat, b.lon - neighborhood.lon);
     return angleA - angleB;
   });
 
-  return arcs; // array of {lat, lon} forming boundary
+  return boundary;
 }
 
+// ---------------- Public helper ----------------
+export function getNeighborhoodBoundary(name, maxNeighborDistanceKm = 3) {
+  // Find neighborhood object
+  let neighborhood = null;
+  for (const borough in nycNeighborhoods) {
+    for (const n of nycNeighborhoods[borough]) {
+      if (n.name.toLowerCase() === name.toLowerCase()) {
+        neighborhood = n;
+        break;
+      }
+    }
+    if (neighborhood) break;
+  }
+  if (!neighborhood) throw new Error(`Neighborhood "${name}" not found.`);
+
+  // Find neighbors across boroughs
+  const neighbors = findNearbyNeighborhoods(
+    nycNeighborhoods,
+    neighborhood,
+    maxNeighborDistanceKm
+  );
+
+  // Generate polygon-like boundary
+  return generateNeighborhoodBoundary(neighborhood, neighbors);
+}
