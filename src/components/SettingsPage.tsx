@@ -357,8 +357,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           )}
         </div>
 
-        {/* Help Button - Now at the bottom */}
-        <div className="mt-8 flex justify-center relative">
+        {/* Help Button - At the bottom left of scrollable content */}
+        <div className="mt-8 flex justify-start relative">
           <button 
             onClick={(e) => {
               e.stopPropagation();
@@ -368,19 +368,19 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           >
             ?
           </button>
-          
-          {/* Help Popup - Positioned relative to the button */}
-          {showHelpPopup && (
-            <div 
-              className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-white border-2 border-app-gray-light rounded-lg p-4 shadow-lg z-10 max-w-sm"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <p className="text-sm text-app-gray-dark">
-                <strong>Disclaimer:</strong> The information presented in this app is based on surveys, user input, and publicly available sources. We do not independently verify all information, and it should not be taken as factual statements about any individual or organization.
-              </p>
-            </div>
-          )}
         </div>
+
+        {/* Help Popup - Styled like other cards */}
+        {showHelpPopup && (
+          <div 
+            className="mt-4 w-full bg-white border-2 border-app-yellow rounded-lg p-4 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm text-app-gray-dark">
+              <strong>Disclaimer:</strong> The information presented in this app is based on surveys, user input, and publicly available sources. We do not independently verify all information, and it should not be taken as factual statements about any individual or organization.
+            </p>
+          </div>
+        )}
 
       </div>
     </div>
