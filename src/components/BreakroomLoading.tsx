@@ -97,15 +97,15 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
 
     mugHandle: {
       position: 'absolute' as const,
-      left: '-12px',
+      right: '-12px',
       top: '8px',
       width: '18px',
       height: '35px',
       border: '5px solid #B22222',
-      borderRight: 'none',
-      borderRadius: '12px 0 0 12px',
+      borderLeft: 'none',
+      borderRadius: '0 12px 12px 0',
       background: 'transparent',
-      boxShadow: 'inset 2px 0 0 rgba(0, 0, 0, 0.1)'
+      boxShadow: 'inset -2px 0 0 rgba(0, 0, 0, 0.1)'
     },
 
     textContainer: {
