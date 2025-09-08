@@ -21,7 +21,6 @@ interface VectorTileFeature extends GeoJSONFeature {
   sourceLayer?: string;
 }
 
-
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
   onBusinessClick,
   selectedBusiness,
