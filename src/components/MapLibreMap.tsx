@@ -12,15 +12,15 @@ import {
   extractRoadFeatures, 
   extractWaterwayFeatures 
 } from '../utils/featureProcessing';
-import {
-  addLandLayer,
-  addParksAndCemeteriesLayer,
-  addWaterLayer,
-  addWaterwaysLayer,
-  addRoadsLayer,
-  addRoadsLayerChunked,
-  ensureLayerOrder
-} from '../utils/mapLayers';
+// import {
+//   addLandLayer,
+//   addParksAndCemeteriesLayer,
+//   addWaterLayer,
+//   addWaterwaysLayer,
+//   addRoadsLayer,
+//   addRoadsLayerChunked,
+//   ensureLayerOrder
+// } from '../utils/mapLayers';
 
 interface MapLibreMapProps {
   onBusinessClick?: (business: any) => void;
