@@ -121,73 +121,73 @@ export const addRoadsLayer = (map: maplibregl.Map, roadFeatures: any[]) => {
       }
     });
 
-//     // Add road labels that follow the road geometry
-//     map.addLayer({
-//       id: 'roads-labels',
-//       type: 'symbol',
-//       source: 'roads',
-//       layout: {
-//         'text-field': [
-//           'case',
-//           ['has', 'name'],
-//           ['get', 'name'],
-//           '' // Empty string if no name
-//         ],
-//         'text-font': ['Open Sans Regular'],
-//         'text-size': [
-//           'interpolate',
-//           ['linear'],
-//           ['zoom'],
-//           10, 10,
-//           14, 12,
-//           16, 14,
-//           18, 16
-//         ],
-//         'symbol-placement': 'line', // This makes text follow the road
-//         'text-rotation-alignment': 'map',
-//         'text-pitch-alignment': 'viewport',
-//         'text-max-angle': 30, // Maximum angle between adjacent characters
-//         'text-padding': 10,
-//         'text-allow-overlap': false,
-//         'text-ignore-placement': false
-//       },
-//       paint: {
-//         'text-color': '#2D3748', // Dark gray text
-//         'text-halo-color': 'rgba(255, 255, 255, 0.8)', // White halo for readability
-//         'text-halo-width': 1.5,
-//         'text-opacity': [
-//           'interpolate',
-//           ['linear'],
-//           ['zoom'],
-//           10, 0.6,
-//           12, 0.8,
-//           14, 1.0
-//         ]
-//       },
-//       filter: [
-//         'all',
-//         ['has', 'name'], // Only show labels for roads with names
-//         [
-//           'in',
-//           ['get', 'highway'],
-//           ['literal', [
-//             'primary', 
-//             'secondary', 
-//             'tertiary', 
-//             'trunk',
-//             'primary_link',
-//             'secondary_link',
-//             'tertiary_link',
-//             'trunk_link',
-//             'residential',
-//             'living_street'
-//           ]]
-//         ] // Only show labels for major road types
-//       ]
-//     });
-//   }
-//   console.log(`Added ${roadFeatures.length} road features with labels`);
-// };
+    // Add road labels that follow the road geometry
+    map.addLayer({
+      id: 'roads-labels',
+      type: 'symbol',
+      source: 'roads',
+      layout: {
+        'text-field': [
+          'case',
+          ['has', 'name'],
+          ['get', 'name'],
+          '' // Empty string if no name
+        ],
+        'text-font': ['Open Sans Regular'],
+        'text-size': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          10, 10,
+          14, 12,
+          16, 14,
+          18, 16
+        ],
+        'symbol-placement': 'line', // This makes text follow the road
+        'text-rotation-alignment': 'map',
+        'text-pitch-alignment': 'viewport',
+        'text-max-angle': 30, // Maximum angle between adjacent characters
+        'text-padding': 10,
+        'text-allow-overlap': false,
+        'text-ignore-placement': false
+      },
+      paint: {
+        'text-color': '#2D3748', // Dark gray text
+        'text-halo-color': 'rgba(255, 255, 255, 0.8)', // White halo for readability
+        'text-halo-width': 1.5,
+        'text-opacity': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          10, 0.6,
+          12, 0.8,
+          14, 1.0
+        ]
+      },
+      filter: [
+        'all',
+        ['has', 'name'], // Only show labels for roads with names
+        [
+          'in',
+          ['get', 'highway'],
+          ['literal', [
+            'primary', 
+            'secondary', 
+            'tertiary', 
+            'trunk',
+            'primary_link',
+            'secondary_link',
+            'tertiary_link',
+            'trunk_link',
+            'residential',
+            'living_street'
+          ]]
+        ] // Only show labels for major road types
+      ]
+    });
+  }
+  console.log(`Added ${roadFeatures.length} road features with labels`);
+};
 
 export const addRoadsLayerChunked = async (map: maplibregl.Map, roadFeatures: any[], isMobile: boolean = false) => {
   if (roadFeatures.length === 0) return;
