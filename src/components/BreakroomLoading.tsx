@@ -53,7 +53,20 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       justifyContent: 'center',
       alignItems: 'center',
       marginBottom: '20px',
-      transform: 'scale(1.5) translateX(-13px)' // 👈 shift left by handle length
+      transform: 'scale(1.5) translateX(13px)' // 👈 shift right since handle is on the left
+    },
+    
+    mugHandle: {
+      position: 'absolute' as const,
+      left: '-12px',           // 👈 move to the left side
+      top: '8px',
+      width: '18px',
+      height: '35px',
+      border: '5px solid #B22222',
+      borderRight: 'none',     // 👈 flip: remove right border instead of left
+      borderRadius: '12px 0 0 12px', // 👈 mirror curve
+      background: 'transparent',
+      boxShadow: 'inset 2px 0 0 rgba(0, 0, 0, 0.1)' // 👈 mirrored shadow
     },
 
     mugVisualWrapper: {
@@ -93,19 +106,6 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       height: '3px',
       backgroundColor: 'rgba(0, 0, 0, 0.15)',
       borderRadius: '1.5px'
-    },
-
-    mugHandle: {
-      position: 'absolute' as const,
-      right: '-12px',
-      top: '8px',
-      width: '18px',
-      height: '35px',
-      border: '5px solid #B22222',
-      borderLeft: 'none',
-      borderRadius: '0 12px 12px 0',
-      background: 'transparent',
-      boxShadow: 'inset -2px 0 0 rgba(0, 0, 0, 0.1)'
     },
 
     textContainer: {
