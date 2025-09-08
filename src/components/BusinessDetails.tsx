@@ -105,26 +105,34 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
               text={business.name}
               className="text-xl font-medium text-app-black"
             />
-            {business.address && business.address.trim() && (
-              <div className="mt-1">
-                <span className="text-sm text-app-gray-medium">
-                  {business.address}
-                </span>
+            
+            {/* Address + Atmosphere */}
+            {(business.address?.trim() || business.atmosphere.length > 0) && (
+              <div className="mt-1 flex flex-col gap-0.5">
+                {business.address && (
+                  <span className="text-sm text-app-gray-medium">
+                    {business.address}
+                  </span>
+                )}
+                {business.atmosphere.length > 0 && (
+                  <span className="text-sm text-app-gray-medium">
+                    {business.atmosphere.join(' • ')}
+                  </span>
+                )}
               </div>
             )}
-            <div className="flex items-center mt-2">
-              <span className="text-app-gray-medium">
-                {business.atmosphere.join(' • ')}
-              </span>
-            </div>
           </div>
-          <button onClick={handleCompassClick} className="compass-button p-2 rounded-lg bg-gray-100/0 py-0">
-            <span className="text-3xl">🧭</span>{/* <Compass className="w-6 h-6 text-app-gray-dark" /> */}
+        
+          <button
+            onClick={handleCompassClick}
+            className="compass-button p-2 rounded-lg bg-gray-100/0 py-0"
+          >
+            <span className="text-3xl">🧭</span>
           </button>
         </div>
 
         {/* Job roles and salaries */}
-        <div className="mb-8">
+        <div className="mb-4">
           <h3 className="text-lg font-medium text-app-black mb-4">Roles & Salaries</h3>
           <div 
             className={`space-y-2 ${shouldScroll ? 'max-h-64 overflow-y-auto pr-2' : ''}`}
