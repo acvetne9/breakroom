@@ -53,7 +53,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       justifyContent: 'center',
       alignItems: 'center',
       marginBottom: '20px',
-      transform: 'scale(1.5)'
+      transform: 'scale(1.5) translateX(-13px)' // 👈 shift left by handle length
     },
 
     mugVisualWrapper: {
