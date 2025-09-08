@@ -6,12 +6,6 @@ import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
 import { useIsMobile } from '../hooks/use-mobile';
 import { DeckGLOverlay } from './DeckGLOverlay';
 import type { GeoJSONFeature } from 'maplibre-gl';
-// import { 
-//   extractParkFeatures, 
-//   extractWaterFeatures, 
-//   extractRoadFeatures, 
-//   extractWaterwayFeatures 
-// } from '../utils/featureProcessing';
 
 interface MapLibreMapProps {
   onBusinessClick?: (business: any) => void;
