@@ -3,6 +3,7 @@ import { Compass } from 'lucide-react';
 import VotingComponent from './VotingComponent';
 import { formatTimeAgo } from '../utils/timeAgo';
 import { TranslatedText } from './TranslatedText';
+
 interface Post {
   id: string;
   author: string;
@@ -43,6 +44,7 @@ interface BusinessDetailsProps {
   onPostClick?: (post: Post) => void;
   onRoleVote?: (businessId: string, roleIndex: number, voteType: 'up' | 'down') => void;
 }
+
 const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
   business,
   posts,
@@ -57,29 +59,25 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
       onClose();
     }
   };
+
   const handleCompassClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-  
-    // Try business website first, then Google Maps page, then fallback to Google search
+
     const destination = business.website ||
                        business.url ||
                        `https://www.google.com/search?q=${encodeURIComponent(business.name)}`;
-  
-    // If it's a Google search, replace the current page instead of opening a new window
+
     if (destination.includes("google.com/search")) {
       window.location.href = destination;
     } else {
       window.open(destination, "_blank");
     }
   };
-  // Get stories (posts) for this business
+
   const businessStories = posts.filter(post => post.businessId === business.id && post.isStory);
 
   const handleCardClick = (e: React.MouseEvent) => {
-    // Stop propagation to prevent the background click handler from firing
     e.stopPropagation();
-    
-    // Go back to preview when clicking on the main card area
     onBackToPreview?.();
   };
 
@@ -93,20 +91,25 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
     onRoleVote?.(business.id, roleIndex, voteType);
   };
 
-  // Determine if roles section should be scrollable
   const roles = business.roles || [];
   const shouldScroll = roles.length > 6;
-  
-  return <div className="fixed inset-0 z-40 flex items-start justify-center" style={{ paddingTop: '8vh' }} onClick={handleBackgroundClick}>
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-start justify-center"
+      style={{ paddingTop: '8vh' }}
+      onClick={handleBackgroundClick}
+    >
       <div className="app-card p-6 overflow-y-auto animate-fade-in" onClick={handleCardClick}>
-        <div className="flex justify-between items-start mb-6">
+        
+        {/* Name + Address + Atmosphere */}
+        <div className="flex justify-between items-start mb-4"> {/* was mb-6 */}
           <div>
             <TranslatedText 
               text={business.name}
               className="text-xl font-medium text-app-black"
             />
-            
-            {/* Address + Atmosphere */}
+
             {(business.address?.trim() || business.atmosphere.length > 0) && (
               <div className="mt-1 flex flex-col gap-0.5">
                 {business.address && (
@@ -122,7 +125,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
               </div>
             )}
           </div>
-        
+
           <button
             onClick={handleCompassClick}
             className="compass-button p-2 rounded-lg bg-gray-100/0 py-0"
@@ -132,15 +135,18 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
         </div>
 
         {/* Job roles and salaries */}
-        <div className="mb-4">
-          <h3 className="text-lg font-medium text-app-black mb-4">Roles & Salaries</h3>
+        <div className="mb-2"> {/* was mb-8 */}
+          <h3 className="text-lg font-medium text-app-black mb-2"> {/* was mb-4 */}
+            Roles & Salaries
+          </h3>
           <div 
             className={`space-y-2 ${shouldScroll ? 'max-h-64 overflow-y-auto pr-2' : ''}`}
             style={shouldScroll ? { scrollbarWidth: 'thin' } : {}}
           >
-            {business.roles ? business.roles.map((role, index) => <div key={index} className="flex justify-between items-center py-1">
+            {business.roles ? business.roles.map((role, index) => (
+              <div key={index} className="flex justify-between items-center py-1">
                 <span className="text-app-black">{role.role}</span>
-                  <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
                   <span className="font-medium text-app-black">
                     {role.salary}
                     {!role.salary.includes('/') && (
@@ -154,7 +160,9 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
                     onVote={(voteType) => handleRoleVote(index, voteType)}
                   />
                 </div>
-              </div>) : <div className="flex justify-between items-center py-1">
+              </div>
+            )) : (
+              <div className="flex justify-between items-center py-1">
                 <span className="text-app-black">Barista</span>
                 <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
                   <span className="font-medium text-app-black">{business.salary || '$13.6'}</span>
@@ -165,26 +173,35 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
                     onVote={() => {}}
                   />
                 </div>
-              </div>}
+              </div>
+            )}
           </div>
-          <div className="flex justify-end mt-3">
+          <div className="flex justify-end mt-2"> {/* was mt-3 */}
             <span className="text-xs text-app-gray-medium">Do these seem right?</span>
           </div>
         </div>
 
         {/* Stories section */}
         <div>
-          <h3 className="text-lg font-medium text-app-black mb-4">More Stories 📖</h3>
+          <h3 className="text-lg font-medium text-app-black mb-3"> {/* was mb-4 */}
+            More Stories 📖
+          </h3>
           <div className="space-y-4">
             {businessStories.length > 0 ? (
               <>
                 {businessStories.slice(0, 5).map(story => (
-                  <div key={story.id} className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded relative" onClick={(e) => handleStoryClick(story, e)}>
+                  <div
+                    key={story.id}
+                    className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded relative"
+                    onClick={(e) => handleStoryClick(story, e)}
+                  >
                     <TranslatedText 
                       text={story.text.length > 100 ? `${story.text.substring(0, 100)}...` : story.text}
                       className="text-app-gray-dark text-sm pb-4"
                     />
-                    <span className="absolute bottom-2 left-4 text-xs text-gray-400">{formatTimeAgo(story.createdAt)}</span>
+                    <span className="absolute bottom-2 left-4 text-xs text-gray-400">
+                      {formatTimeAgo(story.createdAt)}
+                    </span>
                   </div>
                 ))}
                 {businessStories.length > 5 && (
@@ -200,10 +217,13 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
                 )}
               </>
             ) : (
-              <div className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={(e) => {
-                e.stopPropagation();
-                onStoriesClick?.();
-              }}>
+              <div
+                className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStoriesClick?.();
+                }}
+              >
                 <p className="text-app-gray-dark text-sm font-medium">
                   Be the first to post! 🚀
                 </p>
@@ -211,7 +231,10 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
             )}
           </div>
         </div>
+
       </div>
-    </div>;
+    </div>
+  );
 });
+
 export default BusinessDetails;
