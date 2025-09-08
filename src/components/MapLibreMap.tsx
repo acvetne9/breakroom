@@ -51,6 +51,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
+  const [currentZoom, setCurrentZoom] = useState(12);
   const { isProcessing, setIsProcessing, loadAllDataCenterOut } = useViewportMapData();
   const { 
     businesses, 
@@ -59,9 +60,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     fetchFullBusinessDetails,
     clusterBusinesses,
     isSearching
-  } = useViewportBusinesses(searchFilters);
+  } = useViewportBusinesses(searchFilters, currentZoom);
   const processedRef = useRef(false);
-  const [currentZoom, setCurrentZoom] = useState(12);
   const layersAddedRef = useRef(false);
   const lastFitKeyRef = useRef<string | null>(null);
 
