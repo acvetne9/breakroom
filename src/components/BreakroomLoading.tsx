@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, CSSProperties } from 'react';
 
 interface BreakroomLoadingProps {
   onComplete?: () => void;
@@ -17,10 +17,10 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
 
   if (!isVisible) return null;
 
-  const styles = {
+  const styles: { [key: string]: CSSProperties } = {
     container: {
-      position: 'fixed' as const,
-      inset: '0',
+      position: 'fixed',
+      inset: 0,
       zIndex: 20000,
       display: 'flex',
       alignItems: 'center',
@@ -28,49 +28,37 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       overflow: 'hidden'
     },
     background: {
-      position: 'absolute' as const,
-      inset: '0',
+      position: 'absolute',
+      inset: 0,
       background: `
         radial-gradient(ellipse at top left, #FFFACD 0%, #F7DC6F 35%, transparent 70%),
         linear-gradient(135deg, #F1C40F 0%, #B7950B 100%)
       `
     },
     animationContainer: {
-      position: 'relative' as const,
+      position: 'relative',
       display: 'flex',
-      flexDirection: 'column' as const,
+      flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center'
     },
     mugContainer: {
-      position: 'relative' as const,
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: '20px',
-      transform: 'scale(1.5) translateX(-11px)' // shift so mug body is centered
-    },
-    mugVisualWrapper: {
-      width: '50px',
-      height: '60px',
-      display: 'flex',
-      alignItems: 'flex-end',
-      justifyContent: 'center',
-      position: 'relative' as const,
-      overflow: 'visible' as const
+      display: 'inline-block',
+      position: 'relative'
     },
     coffeeMug: {
-      position: 'relative' as const,
-      animation: 'mugSmoothEntrance 1.2s ease-out 0s forwards',
-      opacity: 0,
-      transform: 'translateY(120px) scale(0.3)'
+      display: 'inline-block',
+      position: 'relative',
+      transform: 'scale(1.5)',
+      animation: 'mugSmoothEntrance 1.2s ease-out forwards',
+      opacity: 0
     },
     mugBody: {
       width: '50px',
       height: '60px',
       backgroundColor: '#B22222',
       borderRadius: '3px',
-      position: 'relative' as const,
+      position: 'relative',
       boxShadow: `
         inset -6px 0 0 rgba(0, 0, 0, 0.2),
         inset 0 -6px 0 rgba(0, 0, 0, 0.15),
@@ -78,7 +66,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       `
     },
     mugBodyBefore: {
-      position: 'absolute' as const,
+      position: 'absolute',
       top: '6px',
       left: '6px',
       right: '6px',
@@ -87,7 +75,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       borderRadius: '1.5px'
     },
     mugHandle: {
-      position: 'absolute' as const,
+      position: 'absolute',
       left: '-12px',
       top: '8px',
       width: '18px',
@@ -104,11 +92,11 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      position: 'relative',
       fontFamily: "'Courier New', Courier, monospace",
       fontSize: '36px',
-      fontWeight: 'bold' as const,
-      color: '#B22222'
+      fontWeight: 'bold',
+      color: '#B22222',
+      position: 'relative'
     },
     textSpan: {
       display: 'inline-block',
@@ -122,15 +110,12 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       <div style={styles.background} />
 
       <div style={styles.animationContainer}>
-
         <div style={styles.mugContainer}>
           <div style={styles.coffeeMug}>
-            <div style={styles.mugVisualWrapper}>
-              <div style={styles.mugBody}>
-                <div style={styles.mugBodyBefore}></div>
-              </div>
-              <div style={styles.mugHandle}></div>
+            <div style={styles.mugBody}>
+              <div style={styles.mugBodyBefore}></div>
             </div>
+            <div style={styles.mugHandle}></div>
           </div>
         </div>
 
@@ -138,7 +123,6 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
           <span style={{ ...styles.textSpan, animationDelay: '1.2s' }}>break</span>
           <span style={{ ...styles.textSpan, animationDelay: '1.3s' }}>room</span>
         </div>
-
       </div>
 
       <style>{`
