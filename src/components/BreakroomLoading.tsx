@@ -49,13 +49,13 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
     coffeeMug: {
       display: 'inline-block',
       position: 'relative',
-      transform: 'scale(1.5)',
+      transform: 'scale(1)',
       animation: 'mugSmoothEntrance 1.2s ease-out forwards',
       opacity: 0
     },
     mugBody: {
-      width: '50px',
-      height: '60px',
+      width: 'clamp(40px, 6vw, 60px)',
+      height: 'clamp(48px, 7vw, 72px)',
       backgroundColor: '#B22222',
       borderRadius: '3px',
       position: 'relative',
@@ -78,8 +78,8 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       position: 'absolute',
       left: '-12px',
       top: '8px',
-      width: '18px',
-      height: '35px',
+      width: 'clamp(14px, 3vw, 18px)',
+      height: 'clamp(28px, 6vw, 36px)',
       border: '5px solid #B22222',
       borderRight: 'none',
       borderRadius: '12px 0 0 12px',
@@ -93,7 +93,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       justifyContent: 'space-between',
       alignItems: 'center',
       fontFamily: "'Courier New', Courier, monospace",
-      fontSize: '36px',
+      fontSize: 'clamp(24px, 6vw, 36px)',
       fontWeight: 'bold',
       color: '#B22222',
       position: 'relative'
