@@ -78,6 +78,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       background: 'transparent',
       boxShadow: 'inset 2px 0 0 rgba(0, 0, 0, 0.1)'
     },
+
     mugBodyBefore: {
       position: 'absolute',
       top: '6px',
@@ -87,7 +88,6 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       backgroundColor: 'rgba(0, 0, 0, 0.15)',
       borderRadius: '1.5px'
     },
-    
     textWrapper: {
       width: '90%',
       maxWidth: '800px',
