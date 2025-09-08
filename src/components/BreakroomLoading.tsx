@@ -53,22 +53,22 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       justifyContent: 'center',
       alignItems: 'center',
       marginBottom: '20px',
-      transform: 'scale(1.5) translateX(13px)' // 👈 shift right since handle is on the left
+      // shift left slightly so the mug body (not handle) is centered
+      transform: 'scale(1.5) translateX(-11px)'
     },
     
     mugHandle: {
       position: 'absolute' as const,
-      left: '-12px',           // 👈 move to the left side
+      left: '-12px',           // handle on left
       top: '8px',
       width: '18px',
       height: '35px',
       border: '5px solid #B22222',
-      borderRight: 'none',     // 👈 flip: remove right border instead of left
-      borderRadius: '12px 0 0 12px', // 👈 mirror curve
+      borderRight: 'none',     // open side toward mug
+      borderRadius: '12px 0 0 12px',
       background: 'transparent',
-      boxShadow: 'inset 2px 0 0 rgba(0, 0, 0, 0.1)' // 👈 mirrored shadow
+      boxShadow: 'inset 2px 0 0 rgba(0, 0, 0, 0.1)'
     },
-
     mugVisualWrapper: {
       width: '50px',
       height: '60px',
