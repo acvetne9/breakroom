@@ -36,69 +36,61 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       `
     },
     animationContainer: {
-      position: 'relative',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: 'center'
-    },
-    mugContainer: {
-      display: 'inline-block',
+      justifyContent: 'center',
       position: 'relative'
     },
-    coffeeMug: {
-      display: 'inline-block',
+    mugWrapper: {
       position: 'relative',
-      transform: 'scale(1.5)',          // default scale for desktop
-      transformOrigin: 'bottom center',  // scale from the bottom
-      animation: 'mugSmoothEntrance 1.2s ease-out forwards',
-      opacity: 0
+      display: 'inline-block',
+      transform: 'scale(1.7)', // slightly bigger
+      transformOrigin: 'bottom center',
+      marginBottom: '20px'
     },
     mugBody: {
-      width: 'clamp(50px, 6vw, 60px)',   // slightly bigger min to match old size
-      height: 'clamp(60px, 7vw, 72px)',
+      width: 'clamp(50px, 8vw, 70px)',
+      height: 'clamp(60px, 10vw, 84px)',
       backgroundColor: '#B22222',
       borderRadius: '3px',
       position: 'relative',
       boxShadow: `
-        inset -6px 0 0 rgba(0, 0, 0, 0.2),
-        inset 0 -6px 0 rgba(0, 0, 0, 0.15),
-        0 3px 6px rgba(0, 0, 0, 0.25)
+        inset -6px 0 0 rgba(0,0,0,0.2),
+        inset 0 -6px 0 rgba(0,0,0,0.15),
+        0 3px 6px rgba(0,0,0,0.25)
       `
     },
-    mugHandle: {
-      position: 'absolute',
-      left: '-12px',
-      top: '8px',
-      width: 'clamp(16px, 3vw, 18px)',
-      height: 'clamp(32px, 6vw, 36px)',
-      border: '5px solid #B22222',
-      borderRight: 'none',
-      borderRadius: '12px 0 0 12px',
-      background: 'transparent',
-      boxShadow: 'inset 2px 0 0 rgba(0, 0, 0, 0.1)'
-    },
-
     mugBodyBefore: {
       position: 'absolute',
       top: '6px',
       left: '6px',
       right: '6px',
       height: '3px',
-      backgroundColor: 'rgba(0, 0, 0, 0.15)',
+      backgroundColor: 'rgba(0,0,0,0.15)',
       borderRadius: '1.5px'
     },
+    mugHandle: {
+      position: 'absolute',
+      left: '-14px',
+      top: '8px',
+      width: 'clamp(18px, 4vw, 22px)',
+      height: 'clamp(36px, 8vw, 42px)',
+      border: '5px solid #B22222',
+      borderRight: 'none',
+      borderRadius: '12px 0 0 12px',
+      background: 'transparent',
+      boxShadow: 'inset 2px 0 0 rgba(0,0,0,0.1)'
+    },
     textWrapper: {
-      width: '90%',
-      maxWidth: '800px',
       display: 'flex',
-      justifyContent: 'space-between',
+      justifyContent: 'center',
       alignItems: 'center',
+      gap: '1.5em',
       fontFamily: "'Courier New', Courier, monospace",
-      fontSize: '36px',
+      fontSize: 'clamp(28px, 7vw, 42px)',
       fontWeight: 'bold',
-      color: '#B22222',
-      position: 'relative'
+      color: '#B22222'
     },
     textSpan: {
       display: 'inline-block',
@@ -112,13 +104,11 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       <div style={styles.background} />
 
       <div style={styles.animationContainer}>
-        <div style={styles.mugContainer}>
-          <div style={styles.coffeeMug}>
-            <div style={styles.mugBody}>
-              <div style={styles.mugBodyBefore}></div>
-            </div>
-            <div style={styles.mugHandle}></div>
+        <div style={styles.mugWrapper}>
+          <div style={styles.mugBody}>
+            <div style={styles.mugBodyBefore}></div>
           </div>
+          <div style={styles.mugHandle}></div>
         </div>
 
         <div style={styles.textWrapper}>
@@ -132,7 +122,6 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
           0% { opacity: 0; transform: translateY(120px) scale(0.3); }
           100% { opacity: 1; transform: translateY(0) scale(1); }
         }
-
         @keyframes fadeInUp {
           0% { opacity: 0; transform: translateY(20px); }
           100% { opacity: 1; transform: translateY(0); }
