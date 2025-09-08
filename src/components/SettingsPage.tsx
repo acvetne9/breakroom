@@ -236,8 +236,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
               role={currentJob.role}
               timePeriod={currentTimePeriod}
             />
-            <p className="text-app-black mb-4 text-lg text-center">Find Work That Works For You 👷‍♀️</p>
-
+            
             {/* Role */}
             <JobSearchDropdown
               value={currentJob.role}
@@ -246,8 +245,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
               placeholder="Search or select a job role..."
               className="app-input w-full"
             />
-            <p className="text-app-black mb-4 text-lg text-center font-normal">3 Easy Questions. Kept Anonymous 🤐</p>
-
+            
             {/* Salary + Time Period */}
             <div className="flex items-center space-x-3">
               <input type="text" inputMode="numeric" value={currentJob.salary} onChange={e => handleSalaryChange(e.target.value)} className="app-input flex-1" placeholder="$14" />
@@ -283,8 +281,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   role={job.role}
                   timePeriod={pastJobTimePeriods[job.id]}
                 />
-                <p className="text-app-black mb-4 text-lg text-center">Find Work That Works For You 👷‍♀️</p>
-        
+                
                 {/* Role */}
                 <JobSearchDropdown
                   value={job.role}
@@ -293,8 +290,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   placeholder="Search or select a job role..."
                   className="app-input w-full"
                 />
-                <p className="text-app-black mb-4 text-lg text-center font-normal">3 Easy Questions. Kept Anonymous 🤐</p>
-        
+                
                 {/* Salary + Time Period + Remove Button */}
                 <div className="flex items-center space-x-3">
                   <input
