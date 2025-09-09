@@ -255,9 +255,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (!map || !mapLoaded || !loadBusinessesInViewport) return;
     
-    // Don't trigger on initial render when searchFilters is undefined
-    if (searchFilters === undefined) return;
-    
     console.log('🗺️ Map reloading businesses due to filter change:', searchFilters);
     
     // Stop processing if filters are null (explicitly cleared)
@@ -279,10 +276,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return;
     }
     
-    try {
-      const mapBounds = map.getBounds();
-      
-      if (searchFilters && Object.keys(searchFilters).length > 0) {
+    if (searchFilters && Object.keys(searchFilters).length > 0) {
+      try {
+        const mapBounds = map.getBounds();
+        
         // Viewport-only search: use current map bounds
         const viewportBounds = {
           north: mapBounds.getNorth(),
@@ -293,9 +290,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         const businessLimit = isMobile ? 12000 : 25000;
         console.log('🔍 Viewport-only search: using current map bounds');
         loadBusinessesInViewport(viewportBounds, businessLimit, false);
+      } catch (e) {
+        console.warn('⚠️ Failed to reload businesses on filter change:', e);
       }
-    } catch (e) {
-      console.warn('⚠️ Failed to reload businesses on filter change:', e);
     }
   }, [searchFilters, map, mapLoaded, isMobile, loadBusinessesInViewport]);
 
