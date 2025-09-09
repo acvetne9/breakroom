@@ -44,6 +44,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [isMapInitializing, setIsMapInitializing] = useState(true); // Added loading state
   const [deckOverlay, setDeckOverlay] = useState<MapboxOverlay | null>(null);
   const [overlayReady, setOverlayReady] = useState(false);
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
@@ -377,6 +378,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const absoluteTilesUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
     console.log('🧭 Using tiles URL:', absoluteTilesUrl);
 
+    // Enhanced base style with pre-loaded default land layer to prevent flashing
     const baseStyle = {
       version: 8 as const,
       sources: {
@@ -394,6 +396,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           id: 'background',
           type: 'background' as const,
           paint: { 'background-color': '#F5F5DC' }
+        },
+        // Pre-add a basic land layer to prevent flashing
+        {
+          id: 'default-land',
+          type: 'fill' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'examplepoints',
+          paint: {
+            'fill-color': '#F5F5DC',
+            'fill-opacity': 1.0
+          },
+          filter: ['==', ['geometry-type'], 'Polygon']
         }
       ]
     };
@@ -449,6 +463,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       };
     }
 
+    // Debug events to track flashing
+    mapInstance.on('styledata', (e) => {
+      console.log('🎨 Style data event:', e.dataType);
+    });
+
+    mapInstance.on('render', () => {
+      if (mapInstance) {
+        console.log('🖼️ Map render event - zoom:', mapInstance.getZoom());
+      }
+    });
+
     mapInstance.on('load', () => {
       if (cleanedUp) return;
       console.log('🗺️ Map loaded - starting tile debugging');
@@ -459,6 +484,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
       
       setMapLoaded(true);
+      setIsMapInitializing(false); // Hide loading overlay
       
       try {
         const style = mapInstance.getStyle();
@@ -485,7 +511,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.error('🚨 Map error:', e.error);
     });
     
-    // Add layers when tiles are ready
+    // Enhanced sourcedata handler - add layers in correct order to prevent flashing
     mapInstance.on('sourcedata', e => {
       if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current && mapInstance) {
         console.log('🔄 NYC tiles loaded, adding layers...');
@@ -493,8 +519,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         try {
           const sourceLayer = 'examplepoints';
           
-          // Add all layers with proper error handling
-          const layersToAdd = [
+          // Add base layers first to prevent flashing
+          const baseLayers = [
             {
               id: 'nyc-land',
               type: 'fill' as const,
@@ -505,7 +531,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 'fill-opacity': 1.0
               },
               filter: ['==', ['geometry-type'], 'Polygon']
-            },
+            }
+          ];
+
+          // Add base layers immediately
+          baseLayers.forEach(layer => {
+            try {
+              // Remove default-land layer first to avoid conflicts
+              if (mapInstance!.getLayer('default-land')) {
+                mapInstance!.removeLayer('default-land');
+              }
+              mapInstance!.addLayer(layer as any);
+              console.log(`✅ Added base layer: ${layer.id}`);
+            } catch (error) {
+              console.warn(`Failed to add base layer ${layer.id}:`, error);
+            }
+          });
+
+          // Then add other layers in order
+          const otherLayers = [
             {
               id: 'nyc-green-spaces',
               type: 'fill' as const,
@@ -595,7 +639,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             }
           ];
 
-          layersToAdd.forEach(layer => {
+          otherLayers.forEach(layer => {
             try {
               mapInstance!.addLayer(layer as any);
             } catch (error) {
@@ -672,6 +716,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
       setMap(null);
       setMapLoaded(false);
+      setIsMapInitializing(true); // Reset loading state
     };
   }, [handleBusinessClick]);
 
@@ -839,22 +884,43 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, []);
 
-  
+  // Enhanced return with loading overlay and consistent background colors
   return (
-    <div
-      ref={mapRef}
-      style={{ 
-        position: 'absolute', 
-        top: 0, 
-        bottom: 0, 
-        left: 0, 
-        right: 0,
-        width: '100%',
-        height: '100%',
-        zIndex: 1,
-        backgroundColor: '#B3E5FC'
-      }}
-    />
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div
+        ref={mapRef}
+        style={{ 
+          position: 'absolute', 
+          top: 0, 
+          bottom: 0, 
+          left: 0, 
+          right: 0,
+          width: '100%',
+          height: '100%',
+          zIndex: 1,
+          backgroundColor: '#F5F5DC' // Changed from blue to match map background
+        }}
+      />
+      {isMapInitializing && (
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: '#F5F5DC',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2,
+          fontSize: '14px',
+          color: '#666',
+          fontFamily: 'system-ui, -apple-system, sans-serif'
+        }}>
+          Loading map...
+        </div>
+      )}
+    </div>
   );
 };
 
