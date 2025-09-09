@@ -57,6 +57,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const { deviceId } = useDevice();
   const { toast } = useToast();
 
+  // Add ref for the scrollable container
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
   const [currentJob, setCurrentJob] = useState<UserInfo>({
     salary: initialData.salary,
     role: initialData.role,
@@ -77,6 +80,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   }]);
   const [pastJobTimePeriods, setPastJobTimePeriods] = useState<{[id: string]: string}>({ '1': 'HR' });
   const [isStoriesExpanded, setIsStoriesExpanded] = useState(false);
+  const [showHelpPopup, setShowHelpPopup] = useState(false);
 
   const [initialCurrentJob] = useState(currentJob);
   const [initialTimePeriod] = useState(currentTimePeriod);
@@ -99,6 +103,23 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   useEffect(() => { pastJobTimePeriodsRef.current = pastJobTimePeriods; }, [pastJobTimePeriods]);
   useEffect(() => { changedJobsRef.current = changedJobs; }, [changedJobs]);
   useEffect(() => { currentJobChangedRef.current = currentJobChanged; }, [currentJobChanged]);
+
+  // Close help popup when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showHelpPopup) {
+        setShowHelpPopup(false);
+      }
+    };
+
+    if (showHelpPopup) {
+      document.addEventListener('click', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [showHelpPopup]);
 
   const validateProfanity = (text: string, fieldName: string): boolean => {
     if (isProfane(text)) {
@@ -188,9 +209,25 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const handleCurrentTimePeriodChange = (value: string) => { setCurrentTimePeriod(value); setCurrentJobChanged(true); };
   const handlePastJobBlur = (id: string, field: 'role' | 'location', value: string) => { if (value && !validateProfanity(value, field)) updatePastJob(id, field, ''); };
 
+  // Handle help button click with scroll to bottom
+  const handleHelpButtonClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowHelpPopup(!showHelpPopup);
+    
+    // Scroll to bottom after a short delay to allow popup to render
+    setTimeout(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTo({
+          top: scrollContainerRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
+    }, 100);
+  };
+
   return (
     <div className="relative w-full h-full flex items-center justify-center">
-      <div className="app-card p-6 overflow-y-auto">
+      <div ref={scrollContainerRef} className="app-card p-6 overflow-y-auto relative">
         <h1 className="text-xl font-medium text-app-black mb-8">Your Page! 😊</h1>
 
         {/* Neighborhoods */}
@@ -218,8 +255,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
               role={currentJob.role}
               timePeriod={currentTimePeriod}
             />
-            <p className="text-app-black mb-4 text-lg text-center">Find Work That Works For You 👷‍♀️</p>
-
+            
             {/* Role */}
             <JobSearchDropdown
               value={currentJob.role}
@@ -228,8 +264,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
               placeholder="Search or select a job role..."
               className="app-input w-full"
             />
-            <p className="text-app-black mb-4 text-lg text-center font-normal">3 Easy Questions. Kept Anonymous 🤐</p>
-
+            
             {/* Salary + Time Period */}
             <div className="flex items-center space-x-3">
               <input type="text" inputMode="numeric" value={currentJob.salary} onChange={e => handleSalaryChange(e.target.value)} className="app-input flex-1" placeholder="$14" />
@@ -265,8 +300,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   role={job.role}
                   timePeriod={pastJobTimePeriods[job.id]}
                 />
-                <p className="text-app-black mb-4 text-lg text-center">Find Work That Works For You 👷‍♀️</p>
-        
+                
                 {/* Role */}
                 <JobSearchDropdown
                   value={job.role}
@@ -275,8 +309,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   placeholder="Search or select a job role..."
                   className="app-input w-full"
                 />
-                <p className="text-app-black mb-4 text-lg text-center font-normal">3 Easy Questions. Kept Anonymous 🤐</p>
-        
+                
                 {/* Salary + Time Period + Remove Button */}
                 <div className="flex items-center space-x-3">
                   <input
@@ -312,7 +345,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           </div>
         </div>
 
-
         {/* Your Stories */}
         <div className="mt-8">
           <button onClick={() => setIsStoriesExpanded(!isStoriesExpanded)} className="flex items-center justify-between w-full text-left">
@@ -340,9 +372,31 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           )}
         </div>
 
+        {/* Help Button - At the bottom left of scrollable content */}
+        <div className="mt-8 flex justify-start relative">
+          <button 
+            onClick={handleHelpButtonClick}
+            className="w-6 h-6 bg-app-gray-light rounded-full flex items-center justify-center hover:bg-app-gray-medium transition-colors text-app-black font-bold text-sm"
+          >
+            ?
+          </button>
+        </div>
+
+        {/* Help Popup - Styled like other cards with rounded edges */}
+        {showHelpPopup && (
+          <div 
+            className="mt-4 w-full bg-white border-2 border-app-yellow rounded-xl p-4 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm text-app-gray-dark">
+              <strong>Disclaimer:</strong> The information presented in this app is based on surveys, user input, and publicly available sources. We do not independently verify all information, and it should not be taken as factual statements about any individual or organization.
+            </p>
+          </div>
+        )}
+
       </div>
     </div>
   );
 };
 
-export default SettingsPage;
+export default SettingsPage

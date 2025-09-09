@@ -20,8 +20,8 @@ interface CachedTileData {
 }
 
 // Cache configuration
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
-const MAX_CACHE_SIZE = 500; // tiles
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+const MAX_CACHE_SIZE = 2000; // tiles
 const TILE_ZOOM_LEVEL = 14; // Fixed zoom for tiling (higher = smaller tiles)
 
 // Global tile cache (persists across component unmounts)

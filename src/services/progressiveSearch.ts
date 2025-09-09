@@ -2,6 +2,22 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Business } from '@/types/business';
 import { parseSearchFilters, applyBusinessFilters } from './businessFiltering';
 
+// Extended business interface for internal completeness scoring
+interface EnhancedBusiness extends Business {
+  city?: string;
+  state?: string;
+  comments?: Array<{
+    id: string;
+    comment: string;
+    author: string;
+    timestamp: Date;
+    upvotes: number;
+    downvotes: number;
+    userVote: 'up' | 'down' | null;
+  }>;
+  completenessScore?: number;
+}
+
 interface MapBounds {
   north: number;
   south: number;
@@ -17,7 +33,8 @@ export class ProgressiveBusinessSearch {
     initialBounds: MapBounds, 
     searchFilters: any,
     onProgress: (businesses: Business[], isComplete: boolean) => void,
-    maxResults: number = 1000
+    maxResults: number = 1000,
+    zoom: number = 12
   ): Promise<Business[]> {
     
     // Cancel any existing search
@@ -29,13 +46,14 @@ export class ProgressiveBusinessSearch {
       : searchFilters;
       
     if (!parsedFilters) {
-      return this.loadBasicBusinesses(initialBounds, onProgress, maxResults);
+      return this.loadBasicBusinesses(initialBounds, onProgress, maxResults, zoom);
     }
     
     console.log('🔍 Starting viewport-based search with filters:', parsedFilters);
     
     // Always search within viewport bounds - no more global searches
-    return this.searchInViewport(initialBounds, parsedFilters, onProgress, maxResults);
+    const derivedMaxResults = this.getMaxResultsForZoom(zoom);
+    return this.searchInViewport(initialBounds, parsedFilters, onProgress, derivedMaxResults, zoom);
   }
   
   // Fast client-side text filtering for name/type searches
@@ -43,7 +61,8 @@ export class ProgressiveBusinessSearch {
     bounds: MapBounds,
     filters: any,
     onProgress: (businesses: Business[], isComplete: boolean) => void,
-    maxResults: number
+    maxResults: number,
+    zoom: number = 12
   ): Promise<Business[]> {
     
     const allBusinesses = await this.loadBasicBusinesses(bounds, 
@@ -52,33 +71,104 @@ export class ProgressiveBusinessSearch {
         const filtered = applyBusinessFilters(businesses, filters);
         onProgress(filtered.slice(0, maxResults), isComplete);
       }, 
-      maxResults * 3 // Load more to account for filtering
+      maxResults * 3, // Load more to account for filtering
+      zoom
     );
     
     const filtered = applyBusinessFilters(allBusinesses, filters);
     return filtered.slice(0, maxResults);
   }
   
-  // Load basic business data without roles (fast)
+  // Calculate business completeness score (0-100)
+  private calculateCompletenessScore(business: any): number {
+    let score = 0;
+    
+    // Basic data (30 points max)
+    if (business.name) score += 10;
+    if (business.business_type) score += 5;
+    if (business.website) score += 5;
+    if (business.atmosphere && business.atmosphere.length > 0) score += 5;
+    if (business.salary) score += 5;
+    
+    // Address data (20 points max)
+    if (business.address) score += 10;
+    if (business.city) score += 5;
+    if (business.state) score += 5;
+    
+    // Role data (30 points max)
+    if (business.business_roles && business.business_roles.length > 0) {
+      score += Math.min(business.business_roles.length * 10, 30);
+    }
+    
+    // Comment data (20 points max)
+    if (business.comments && business.comments.length > 0) {
+      score += Math.min(business.comments.length * 5, 20);
+    }
+    
+    return Math.min(score, 100);
+  }
+
+  // Spatially distribute businesses to avoid clustering
+  private spatiallyDistribute(businesses: EnhancedBusiness[], gridSize: number = 0.001): EnhancedBusiness[] {
+    const grid = new Map<string, EnhancedBusiness[]>();
+    
+    // Group businesses by grid cells
+    businesses.forEach(business => {
+      const gridLat = Math.floor(business.position.lat / gridSize);
+      const gridLng = Math.floor(business.position.lng / gridSize);
+      const key = `${gridLat},${gridLng}`;
+      
+      if (!grid.has(key)) {
+        grid.set(key, []);
+      }
+      grid.get(key)!.push(business);
+    });
+    
+    // Select best business from each grid cell
+    const distributed: EnhancedBusiness[] = [];
+    grid.forEach(cellBusinesses => {
+      // Sort by completeness score and take the best one
+      const sorted = cellBusinesses.sort((a, b) => {
+        const scoreA = a.completenessScore || 0;
+        const scoreB = b.completenessScore || 0;
+        return scoreB - scoreA;
+      });
+      distributed.push(sorted[0]);
+    });
+    
+    return distributed;
+  }
+
+  // Load businesses with completeness prioritization and spatial distribution
   private async loadBasicBusinesses(
     bounds: MapBounds,
     onProgress: (businesses: Business[], isComplete: boolean) => void,
-    maxResults: number
+    maxResults: number,
+    zoom: number = 12
   ): Promise<Business[]> {
     
+    // Determine grid size based on zoom level - higher zoom = smaller grid for more density
+    const gridSize = Math.max(0.001, 0.01 / Math.pow(2, Math.max(0, zoom - 10)));
+    
     const rings = this.generateSearchRings(bounds, 3);
-    const allBusinesses: Business[] = [];
+    const allBusinesses: EnhancedBusiness[] = [];
     
     for (let i = 0; i < rings.length && allBusinesses.length < maxResults; i++) {
       if (this.abortController?.signal.aborted) break;
       
       const ring = rings[i];
-      const batchSize = Math.min(500, maxResults - allBusinesses.length);
+      const batchSize = Math.min(1000, maxResults * 2); // Load more to filter from
       
       try {
+        // Load comprehensive business data for completeness scoring
         const { data, error } = await supabase
           .from('businesses')
-          .select('id, name, lat, lng, atmosphere, salary, business_type, website')
+          .select(`
+            id, name, lat, lng, atmosphere, salary, business_type, website,
+            address, city, state,
+            business_roles (id, role, salary),
+            comments (id, comment)
+          `)
           .gte('lat', ring.south)
           .lte('lat', ring.north)
           .gte('lng', ring.west)
@@ -87,21 +177,76 @@ export class ProgressiveBusinessSearch {
         
         if (error) throw error;
         
-        const businesses: Business[] = (data || []).map((b: any) => ({
+        let businesses: EnhancedBusiness[] = (data || []).map((b: any) => {
+          const completenessScore = this.calculateCompletenessScore(b);
+          return {
+            id: b.id,
+            name: b.name,
+            position: { lat: b.lat, lng: b.lng },
+            atmosphere: b.atmosphere || [],
+            salary: b.salary,
+            businessType: b.business_type,
+            website: b.website,
+            address: b.address,
+            city: b.city,
+            state: b.state,
+            roles: Array.isArray(b.business_roles) 
+              ? b.business_roles.map((r: any) => ({
+                  id: r.id,
+                  role: r.role,
+                  salary: r.salary,
+                  upvotes: 0,
+                  downvotes: 0,
+                  userVote: null,
+                }))
+              : [],
+            comments: Array.isArray(b.comments) 
+              ? b.comments.map((c: any) => ({
+                  id: c.id,
+                  comment: c.comment,
+                  author: 'Anonymous',
+                  timestamp: new Date(),
+                  upvotes: 0,
+                  downvotes: 0,
+                  userVote: null,
+                }))
+              : [],
+            completenessScore,
+          };
+        });
+        
+        // Filter by completeness based on zoom level
+        const minScore = this.getMinScoreForZoom(zoom);
+        businesses = businesses.filter(b => (b.completenessScore || 0) >= minScore);
+        
+        // Apply spatial distribution
+        businesses = this.spatiallyDistribute(businesses, gridSize);
+        
+        // Sort by completeness score (best first)
+        businesses.sort((a, b) => (b.completenessScore || 0) - (a.completenessScore || 0));
+        
+        // Take only what we need
+        const needed = maxResults - allBusinesses.length;
+        const selected = businesses.slice(0, needed);
+        
+        allBusinesses.push(...selected);
+        
+        // Convert back to standard Business interface for callback
+        const standardBusinesses: Business[] = allBusinesses.map(b => ({
           id: b.id,
           name: b.name,
-          position: { lat: b.lat, lng: b.lng },
-          atmosphere: b.atmosphere || [],
+          position: b.position,
+          atmosphere: b.atmosphere,
           salary: b.salary,
-          businessType: b.business_type,
+          businessType: b.businessType,
           website: b.website,
-          roles: [], // Load roles later if needed
+          address: b.address,
+          roles: b.roles,
         }));
         
-        allBusinesses.push(...businesses);
-        onProgress([...allBusinesses], i === rings.length - 1);
+        onProgress(standardBusinesses, i === rings.length - 1);
         
-        console.log(`📍 Ring ${i + 1}: +${businesses.length} businesses (total: ${allBusinesses.length})`);
+        console.log(`📍 Ring ${i + 1}: ${data?.length || 0} -> ${selected.length} distributed (total: ${allBusinesses.length}, min score: ${minScore})`);
         
       } catch (error) {
         console.warn(`Ring ${i + 1} failed:`, error);
@@ -109,7 +254,36 @@ export class ProgressiveBusinessSearch {
       }
     }
     
-    return allBusinesses;
+    // Convert final result back to standard Business interface
+    return allBusinesses.map(b => ({
+      id: b.id,
+      name: b.name,
+      position: b.position,
+      atmosphere: b.atmosphere,
+      salary: b.salary,
+      businessType: b.businessType,
+      website: b.website,
+      address: b.address,
+      roles: b.roles,
+    }));
+  }
+
+  // Determine minimum completeness score based on zoom level
+  private getMinScoreForZoom(zoom: number): number {
+    if (zoom <= 10) return 80; // Very zoomed out - only show most complete businesses
+    if (zoom <= 12) return 60; // Medium zoom - show well-documented businesses
+    if (zoom <= 14) return 40; // Closer zoom - show moderately complete businesses
+    if (zoom <= 16) return 20; // Close zoom - show businesses with basic info
+    return 0; // Very close - show all businesses
+  }
+
+  // Determine how many businesses to load based on zoom level
+  private getMaxResultsForZoom(zoom: number): number {
+    if (zoom <= 10) return 500;    // Far out - fewer dots but still present
+    if (zoom <= 12) return 1200;   // City level
+    if (zoom <= 14) return 2500;   // District level
+    if (zoom <= 16) return 4000;   // Neighborhood level
+    return 6000;                   // Very close - many dots
   }
   
   // Progressive search with role data (slower, for role/salary filters)
@@ -209,7 +383,8 @@ export class ProgressiveBusinessSearch {
     bounds: MapBounds,
     filters: any,
     onProgress: (businesses: Business[], isComplete: boolean) => void,
-    maxResults: number
+    maxResults: number,
+    zoom: number
   ): Promise<Business[]> {
     console.log('🗺️ Starting viewport search:', filters, bounds);
     
@@ -228,8 +403,8 @@ export class ProgressiveBusinessSearch {
         return [];
       }
       
-      // Convert to Business objects
-      let businesses: Business[] = data.map((b: any) => ({
+      // Start with base results
+      let base: EnhancedBusiness[] = (data || []).map((b: any) => ({
         id: b.id,
         name: b.name,
         position: { lat: b.lat, lng: b.lng },
@@ -237,14 +412,93 @@ export class ProgressiveBusinessSearch {
         salary: b.salary,
         businessType: b.business_type,
         website: b.website,
-        roles: [], // Will be loaded if needed
+        address: undefined,
+        roles: [],
+        comments: [],
+        completenessScore: 0,
       }));
-      
-      // Apply client-side filtering
-      businesses = applyBusinessFilters(businesses, filters);
-      
-      console.log(`🗺️ Viewport search: ${data.length} -> ${businesses.length} after filtering`);
-      
+
+      // Try to enrich with address, roles, comments for better completeness scoring
+      try {
+        const ids = base.map(b => b.id);
+        if (ids.length > 0) {
+          const { data: more, error: moreError } = await supabase
+            .from('businesses')
+            .select(`
+              id, address,
+              business_roles (id, role, salary),
+              comments (id)
+            `)
+            .in('id', ids);
+
+          if (moreError) throw moreError;
+
+          const byId = new Map<string, any>();
+          (more || []).forEach((m: any) => byId.set(m.id, m));
+
+          base = base.map(b => {
+            const m = byId.get(b.id);
+            const roles = Array.isArray(m?.business_roles)
+              ? m.business_roles.map((r: any) => ({
+                  id: r.id,
+                  role: r.role,
+                  salary: r.salary,
+                  upvotes: 0,
+                  downvotes: 0,
+                  userVote: null,
+                }))
+              : [];
+            const comments = Array.isArray(m?.comments)
+              ? m.comments.map((c: any) => ({
+                  id: c.id,
+                  comment: '',
+                  author: 'Anonymous',
+                  timestamp: new Date(),
+                  upvotes: 0,
+                  downvotes: 0,
+                  userVote: null,
+                }))
+              : [];
+            const completenessScore = this.calculateCompletenessScore({
+              ...b,
+              address: m?.address,
+              business_roles: roles,
+              comments,
+            });
+            return { ...b, address: m?.address, roles, comments, completenessScore };
+          });
+        }
+      } catch (e) {
+        // Fallback: compute basic completeness from available fields
+        base = base.map(b => ({ ...b, completenessScore: this.calculateCompletenessScore(b) }));
+      }
+
+      // Apply zoom-based completeness threshold and spatial distribution for consistency
+      const minScore = this.getMinScoreForZoom(zoom);
+      let enhanced = base.filter(b => (b.completenessScore || 0) >= minScore);
+
+      const gridSize = Math.max(0.001, 0.01 / Math.pow(2, Math.max(0, zoom - 10)));
+      enhanced = this.spatiallyDistribute(enhanced, gridSize);
+
+      // Sort by completeness (best first) and convert to standard Business
+      enhanced.sort((a, b) => (b.completenessScore || 0) - (a.completenessScore || 0));
+
+      let businesses: Business[] = enhanced.map(b => ({
+        id: b.id,
+        name: b.name,
+        position: b.position,
+        atmosphere: b.atmosphere,
+        salary: b.salary,
+        businessType: b.businessType,
+        website: b.website,
+        address: b.address,
+        roles: b.roles || [],
+      }));
+
+      // Apply client-side filtering and cap results
+      businesses = applyBusinessFilters(businesses, filters).slice(0, maxResults);
+
+      console.log(`🗺️ Viewport search (zoom ${zoom}): ${data.length} -> ${businesses.length} after scoring/distribution`);
       onProgress(businesses, true);
       return businesses;
       

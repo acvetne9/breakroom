@@ -17,7 +17,7 @@ interface MapBounds {
   west: number;
 }
 
-export const useViewportBusinesses = (searchFilters?: any) => {
+export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) => {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentBounds, setCurrentBounds] = useState<MapBounds | null>(null);
@@ -79,7 +79,7 @@ export const useViewportBusinesses = (searchFilters?: any) => {
       for (const area of adjacentAreas) {
         if (!getCachedBusinesses(area)) {
           try {
-            const businesses = await getBusinessesInViewport(area, 2000);
+            const businesses = await getBusinessesInViewport(area, 2000, undefined, undefined, zoom);
             setCachedBusinesses(area, businesses);
             console.log(`🔮 Preloaded ${businesses.length} businesses for adjacent area`);
           } catch (error) {
@@ -128,7 +128,7 @@ export const useViewportBusinesses = (searchFilters?: any) => {
         
         setLoading(true);
         try {
-          const viewportBusinesses = await getBusinessesInViewport(bounds, limit, searchFilters);
+          const viewportBusinesses = await getBusinessesInViewport(bounds, limit, searchFilters, undefined, zoom);
           setBusinesses(viewportBusinesses);
           setCurrentBounds(bounds);
           console.log(`✅ Viewport search completed with ${viewportBusinesses.length} businesses`);
@@ -175,7 +175,7 @@ export const useViewportBusinesses = (searchFilters?: any) => {
             east: bounds.east + (bounds.east - bounds.west) * 0.2,
             west: bounds.west - (bounds.east - bounds.west) * 0.2
           };
-          const newBusinesses = await getBusinessesInViewport(expandedBounds, limit, searchFilters);
+          const newBusinesses = await getBusinessesInViewport(expandedBounds, limit, searchFilters, undefined, zoom);
           setBusinesses(prev => {
             const existingIds = new Set(prev.map(b => b.id));
             const uniqueNew = newBusinesses.filter(b => !existingIds.has(b.id));
@@ -263,7 +263,7 @@ export const useViewportBusinesses = (searchFilters?: any) => {
 
       setLoading(true);
       
-      const requestPromise = getBusinessesInViewport(expandedBounds, limit, searchFilters);
+      const requestPromise = getBusinessesInViewport(expandedBounds, limit, searchFilters, undefined, zoom);
       inflightRequests.set(requestKey, requestPromise);
       
       try {
@@ -293,7 +293,7 @@ export const useViewportBusinesses = (searchFilters?: any) => {
         inflightRequests.delete(requestKey);
       }
     }, delay);
-  }, [loading, getCachedBusinesses, setCachedBusinesses, searchFilters, lastSearchFilters, isSearching, schedulePreload, currentBounds, businesses.length]);
+  }, [loading, getCachedBusinesses, setCachedBusinesses, searchFilters, lastSearchFilters, isSearching, schedulePreload, currentBounds, businesses.length, zoom]);
 
   // Cleanup progressive search and pending timeouts on filter changes
   useEffect(() => {

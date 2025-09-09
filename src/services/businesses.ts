@@ -54,7 +54,8 @@ export const getBusinessesInViewport = async (
   bounds: { north: number; south: number; east: number; west: number },
   limit: number = 2000,
   searchFilters?: any,
-  onProgress?: (businesses: Business[], isComplete: boolean) => void
+  onProgress?: (businesses: Business[], isComplete: boolean) => void,
+  zoom: number = 12
 ): Promise<Business[]> => {
   console.log(`🗺️ [getBusinessesInViewport] Called with bounds:`, bounds);
   console.log(`🗺️ [getBusinessesInViewport] Search filters:`, searchFilters);
@@ -87,50 +88,23 @@ export const getBusinessesInViewport = async (
       return results;
     }
 
-    // Regular viewport load without search
-    const { data, error } = await supabase
-      .from('businesses')
-      .select(`
-        id,
-        name,
-        lat,
-        lng,
-        atmosphere,
-        business_type,
-        website,
-        address,
-        salary
-      `)
-      .gte('lat', bounds.south)
-      .lte('lat', bounds.north)
-      .gte('lng', bounds.west)
-      .lte('lng', bounds.east)
-      .limit(limit)
-      .returns<any[]>();
-
-    if (error) {
-      console.error('❌ Error fetching businesses in viewport:', error);
-      throw error;
-    }
-
-    const businesses: Business[] = data?.map(business => ({
-      id: business.id,
-      name: business.name,
-      address: business.address,
-      position: { lat: business.lat, lng: business.lng },
-      atmosphere: business.atmosphere || [],
-      salary: business.salary,
-      businessType: business.business_type,
-      website: business.website,
-      roles: []
-    })) || [];
-
-    console.log(`✅ Regular viewport load completed with ${businesses.length} businesses`);
+    // Regular viewport load without search - use enhanced progressive search
+    const { progressiveSearch } = await import('./progressiveSearch');
     
-    if (onProgress) {
-      onProgress(businesses, true);
-    }
+    const onProgressWrapper = onProgress ? (businesses: Business[], isComplete: boolean) => {
+      console.log(`📍 Progressive load progress: ${businesses.length} businesses loaded`);
+      onProgress(businesses, isComplete);
+    } : undefined;
     
+    const businesses = await progressiveSearch.searchBusinesses(
+      bounds,
+      null, // No search filters
+      onProgressWrapper || (() => {}),
+      limit,
+      zoom
+    );
+
+    console.log(`✅ Enhanced viewport load completed with ${businesses.length} businesses`);
     return businesses;
 
   } catch (error) {

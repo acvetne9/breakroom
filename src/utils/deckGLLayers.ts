@@ -135,7 +135,6 @@ export const createBusinessClusterLayer = (data: any[], onBusinessClick?: (busin
       getRadius: [data],
       getFillColor: [data]
     }
-    // REMOVED: transitions - clusters won't animate between positions
   });
 };
 
