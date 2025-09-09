@@ -65,8 +65,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     // Fetch full details if needed
     if (!business.atmosphere?.length && !business.roles?.length) {
       const fullBusiness = await fetchFullBusinessDetails(business.id);
-      if (fullBusiness && onBusinessClick) {
-        onBusinessClick(fullBusiness);
+      if (onBusinessClick) {
+        onBusinessClick(fullBusiness ?? business);
       }
     } else if (onBusinessClick) {
       onBusinessClick(business);
