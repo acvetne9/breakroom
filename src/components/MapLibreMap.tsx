@@ -42,6 +42,21 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [deckOverlay, setDeckOverlay] = useState<MapboxOverlay | null>(null);
   const [overlayReady, setOverlayReady] = useState(false);
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
+  
+  // Global cache of all businesses we’ve loaded so far
+  const [businessCache, setBusinessCache] = useState<Record<string, Business>>({});
+
+  const mergeBusinessesIntoCache = useCallback((newBusinesses: Business[]) => {
+    setBusinessCache(prev => {
+      const updated = { ...prev };
+      newBusinesses.forEach(b => {
+        if (b && b.id) {
+          updated[b.id] = b;
+        }
+      });
+      return updated;
+    });
+  }, []);
 
   // Stable callback refs
   const onBusinessClickRef = useRef(onBusinessClick);
@@ -89,8 +104,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const lastSearchFiltersRef = useRef(searchFilters);
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const moveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const lastViewportRef = useRef<{ bounds: any; timestamp: number } | null>(null);
 
   // Calculate business limit based on zoom and viewport area for even distribution
   const getBusinessLimitForViewport = useCallback((zoom: number, bounds: any): number => {
@@ -171,7 +184,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
       
       isLoadingBusinessesRef.current = true;
-      loadBusinessesInViewport(expandedBounds, businessLimit);
+      const result = await loadBusinessesInViewport(expandedBounds, businessLimit);
+      
+      // If loadBusinessesInViewport returns businesses directly:
+      if (Array.isArray(result)) {
+        mergeBusinessesIntoCache(result);
+      }
       
       // Background refresh of previous area for new businesses
       if (shouldRefreshPrevious && lastViewportRef.current) {
@@ -219,8 +237,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         });
       }
       
+      const allBusinesses = Object.values(businessCache);
+
       return [createBusinessScatterplotLayer({
-        businesses: businessesToRender as Business[],
+        businesses: allBusinesses,
         selectedBusinessId: selectedBusiness?.id,
         onBusinessClick: handleBusinessClick,
       })];
@@ -573,10 +593,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Notify when businesses are loaded
   useEffect(() => {
-    if (!businessesLoading && businesses && businesses.length > 0 && onBusinessesLoadedRef.current) {
-      onBusinessesLoadedRef.current();
+    if (businesses && businesses.length > 0) {
+      mergeBusinessesIntoCache(businesses);
     }
-  }, [businessesLoading, businesses]);
+  }, [businesses, mergeBusinessesIntoCache]);
+
 
   // Handle emoji landmarks
   useEffect(() => {
