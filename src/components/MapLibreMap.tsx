@@ -963,12 +963,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded, landmarks, map]);
 
-  // NEW: Periodic cache cleanup
+  // NEW: Less aggressive cache cleanup
   useEffect(() => {
-    // Clear region cache every 3 minutes to prevent memory buildup
+    // Clear region cache every 10 minutes (increased from 3) and only if large
     regionCacheTimeoutRef.current = setInterval(() => {
-      clearRegionCache();
-    }, 3 * 60 * 1000);
+      if (loadedRegionsRef.current.size > 30) {
+        clearRegionCache();
+      }
+    }, 10 * 60 * 1000);
 
     return () => {
       if (regionCacheTimeoutRef.current) {
