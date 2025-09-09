@@ -966,6 +966,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       if (regionCacheTimeoutRef.current) {
         clearInterval(regionCacheTimeoutRef.current);
       }
+      if (viewportCheckTimeoutRef.current) {
+        clearTimeout(viewportCheckTimeoutRef.current);
+      }
     };
   }, []);
 
