@@ -50,6 +50,93 @@ export const nycNeighborhoods = {
   ]
 };
 
+export function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const toRad = deg => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function bearing(lat1, lon1, lat2, lon2) {
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x =
+    Math.cos(φ1) * Math.sin(φ2) -
+    Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
+function destinationPoint(lat, lon, bearingDeg, distanceKm) {
+  const R = 6371;
+  const δ = distanceKm / R;
+  const θ = (bearingDeg * Math.PI) / 180;
+  const φ1 = (lat * Math.PI) / 180;
+  const λ1 = (lon * Math.PI) / 180;
+
+  const φ2 = Math.asin(
+    Math.sin(φ1) * Math.cos(δ) +
+    Math.cos(φ1) * Math.sin(δ) * Math.cos(θ)
+  );
+  const λ2 =
+    λ1 +
+    Math.atan2(
+      Math.sin(θ) * Math.sin(δ) * Math.cos(φ1),
+      Math.cos(δ) - Math.sin(φ1) * Math.sin(φ2)
+    );
+
+  return { lat: (φ2 * 180) / Math.PI, lon: (λ2 * 180) / Math.PI };
+}
+
+// ---------------- Improved boundary generation ----------------
+function convexHull(points) {
+  // Graham scan
+  points.sort((a, b) => (a.lon === b.lon ? a.lat - b.lat : a.lon - b.lon));
+  const cross = (o, a, b) =>
+    (a.lon - o.lon) * (b.lat - o.lat) - (a.lat - o.lat) * (b.lon - o.lon);
+
+  const lower = [];
+  for (const p of points) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+      lower.pop();
+    }
+    lower.push(p);
+  }
+
+  const upper = [];
+  for (let i = points.length - 1; i >= 0; i--) {
+    const p = points[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+      upper.pop();
+    }
+    upper.push(p);
+  }
+
+  upper.pop();
+  lower.pop();
+  return lower.concat(upper);
+}
+
+// ---------------- Core logic ----------------
+export function findNearbyNeighborhoods(allBoroughs, target, maxDistanceKm = 3) {
+  const neighbors = [];
+  for (const borough in allBoroughs) {
+    for (const n of allBoroughs[borough]) {
+      if (n.name !== target.name) {
+        const d = haversine(target.lat, target.lon, n.lat, n.lon);
+        if (d <= maxDistanceKm) neighbors.push(n);
+      }
+    }
+  }
+  return neighbors;
+}
+
 // ---------------- Improved boundary generation ----------------
 function radialBuffer(lat, lon, radiusKm, radialCount = 16) {
   const points = [];
