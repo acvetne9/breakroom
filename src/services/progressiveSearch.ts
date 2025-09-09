@@ -6,15 +6,6 @@ import { parseSearchFilters, applyBusinessFilters } from './businessFiltering';
 interface EnhancedBusiness extends Business {
   city?: string;
   state?: string;
-  comments?: Array<{
-    id: string;
-    comment: string;
-    author: string;
-    timestamp: Date;
-    upvotes: number;
-    downvotes: number;
-    userVote: 'up' | 'down' | null;
-  }>;
   completenessScore?: number;
 }
 
@@ -100,10 +91,6 @@ export class ProgressiveBusinessSearch {
       score += Math.min(business.business_roles.length * 10, 30);
     }
     
-    // Comment data (20 points max)
-    if (business.comments && business.comments.length > 0) {
-      score += Math.min(business.comments.length * 5, 20);
-    }
     
     return Math.min(score, 100);
   }
@@ -166,8 +153,7 @@ export class ProgressiveBusinessSearch {
           .select(`
             id, name, lat, lng, atmosphere, salary, business_type, website,
             address, city, state,
-            business_roles (id, role, salary),
-            comments (id, comment)
+            business_roles (id, role, salary)
           `)
           .gte('lat', ring.south)
           .lte('lat', ring.north)
@@ -195,17 +181,6 @@ export class ProgressiveBusinessSearch {
                   id: r.id,
                   role: r.role,
                   salary: r.salary,
-                  upvotes: 0,
-                  downvotes: 0,
-                  userVote: null,
-                }))
-              : [],
-            comments: Array.isArray(b.comments) 
-              ? b.comments.map((c: any) => ({
-                  id: c.id,
-                  comment: c.comment,
-                  author: 'Anonymous',
-                  timestamp: new Date(),
                   upvotes: 0,
                   downvotes: 0,
                   userVote: null,
@@ -426,8 +401,7 @@ export class ProgressiveBusinessSearch {
             .from('businesses')
             .select(`
               id, address,
-              business_roles (id, role, salary),
-              comments (id)
+              business_roles (id, role, salary)
             `)
             .in('id', ids);
 
@@ -448,24 +422,12 @@ export class ProgressiveBusinessSearch {
                   userVote: null,
                 }))
               : [];
-            const comments = Array.isArray(m?.comments)
-              ? m.comments.map((c: any) => ({
-                  id: c.id,
-                  comment: '',
-                  author: 'Anonymous',
-                  timestamp: new Date(),
-                  upvotes: 0,
-                  downvotes: 0,
-                  userVote: null,
-                }))
-              : [];
             const completenessScore = this.calculateCompletenessScore({
               ...b,
               address: m?.address,
               business_roles: roles,
-              comments,
             });
-            return { ...b, address: m?.address, roles, comments, completenessScore };
+            return { ...b, address: m?.address, roles, completenessScore };
           });
         }
       } catch (e) {
