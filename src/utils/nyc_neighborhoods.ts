@@ -111,7 +111,7 @@ export function findNearbyNeighborhoods(allBoroughs, target, maxDistanceKm = 3) 
 
 // ---------------- Improved boundary generation ----------------
 function convexHull(points) {
-  // Graham scan (lat/lon as Cartesian for small area)
+  // Graham scan
   points.sort((a, b) => (a.lon === b.lon ? a.lat - b.lat : a.lon - b.lon));
   const cross = (o, a, b) =>
     (a.lon - o.lon) * (b.lat - o.lat) - (a.lat - o.lat) * (b.lon - o.lon);
@@ -144,9 +144,9 @@ export function generateNeighborhoodBoundary(
   bufferKm = 0.5,
   radialCount = 8
 ) {
-  const boundaryCandidates = [];
+  let points = [];
 
-  // Points toward real neighbors
+  // 1. Neighbor-driven points
   neighbors.forEach(n => {
     const dist = haversine(neighborhood.lat, neighborhood.lon, n.lat, n.lon);
     const θ = bearing(neighborhood.lat, neighborhood.lon, n.lat, n.lon);
@@ -157,22 +157,23 @@ export function generateNeighborhoodBoundary(
       θ,
       dist * 0.7 + bufferKm
     );
-    boundaryCandidates.push(point);
+    points.push(point);
   });
 
-  // Add evenly spaced radial buffer points
-  for (let i = 0; i < radialCount; i++) {
-    const θ = (360 / radialCount) * i;
-    const point = destinationPoint(neighborhood.lat, neighborhood.lon, θ, bufferKm * 2);
-    boundaryCandidates.push(point);
+  // 2. Optional radials if neighbors are sparse
+  if (points.length < 3) {
+    for (let i = 0; i < radialCount; i++) {
+      const θ = (360 / radialCount) * i;
+      const point = destinationPoint(neighborhood.lat, neighborhood.lon, θ, bufferKm * 2);
+      points.push(point);
+    }
   }
 
-  // Use convex hull for consistent polygon
-  const hull = convexHull(boundaryCandidates);
+  // 3. Apply convex hull
+  const hull = convexHull(points);
 
   return hull;
 }
-
 
 // ---------------- Public helper ----------------
 export function getNeighborhoodBoundary(name, maxNeighborDistanceKm = 3) {
