@@ -443,8 +443,26 @@ if (mapInstance) {
               'all',
               ['==', ['geometry-type'], 'Polygon'],
               ['any',
+                // Parks
                 ['==', ['get', 'leisure'], 'park'],
-                ['==', ['get', 'landuse'], 'cemetery']
+                ['==', ['get', 'leisure'], 'garden'],
+                ['==', ['get', 'leisure'], 'recreation_ground'],
+                ['==', ['get', 'landuse'], 'recreation_ground'],
+                ['==', ['get', 'landuse'], 'village_green'],
+                // Cemeteries - multiple common tagging patterns
+                ['==', ['get', 'landuse'], 'cemetery'],
+                ['==', ['get', 'amenity'], 'grave_yard'],
+                ['==', ['get', 'amenity'], 'cemetery'],
+                ['==', ['get', 'leisure'], 'cemetery'],
+                // Sometimes cemeteries are tagged with religion
+                ['all', 
+                  ['has', 'religion'], 
+                  ['any',
+                    ['in', 'cemetery', ['get', 'name']],
+                    ['in', 'Cemetery', ['get', 'name']],
+                    ['in', 'memorial', ['get', 'amenity']]
+                  ]
+                ]
               ]
             ]
           });
