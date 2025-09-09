@@ -94,34 +94,7 @@ function destinationPoint(lat, lon, bearingDeg, distanceKm) {
   return { lat: (φ2 * 180) / Math.PI, lon: (λ2 * 180) / Math.PI };
 }
 
-// ---------------- Improved boundary generation ----------------
-function convexHull(points) {
-  // Graham scan
-  points.sort((a, b) => (a.lon === b.lon ? a.lat - b.lat : a.lon - b.lon));
-  const cross = (o, a, b) =>
-    (a.lon - o.lon) * (b.lat - o.lat) - (a.lat - o.lat) * (b.lon - o.lon);
 
-  const lower = [];
-  for (const p of points) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
-      lower.pop();
-    }
-    lower.push(p);
-  }
-
-  const upper = [];
-  for (let i = points.length - 1; i >= 0; i--) {
-    const p = points[i];
-    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
-      upper.pop();
-    }
-    upper.push(p);
-  }
-
-  upper.pop();
-  lower.pop();
-  return lower.concat(upper);
-}
 
 // ---------------- Core logic ----------------
 export function findNearbyNeighborhoods(allBoroughs, target, maxDistanceKm = 3) {
@@ -137,8 +110,42 @@ export function findNearbyNeighborhoods(allBoroughs, target, maxDistanceKm = 3) 
   return neighbors;
 }
 
+
+function convexHull(points: { lat: number; lon: number }[]) {
+  if (points.length <= 1) return points;
+
+  const sorted = [...points].sort(
+    (a, b) => a.lon - b.lon || a.lat - b.lat
+  );
+
+  const cross = (o, a, b) =>
+    (a.lon - o.lon) * (b.lat - o.lat) - (a.lat - o.lat) * (b.lon - o.lon);
+
+  const lower: typeof points = [];
+  for (const p of sorted) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+      lower.pop();
+    }
+    lower.push(p);
+  }
+
+  const upper: typeof points = [];
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const p = sorted[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+      upper.pop();
+    }
+    upper.push(p);
+  }
+
+  upper.pop();
+  lower.pop();
+  return lower.concat(upper);
+}
+
+
 // ---------------- Improved boundary generation ----------------
-function radialBuffer(lat, lon, radiusKm, radialCount = 16) {
+function radialBuffer(lat: number, lon: number, radiusKm: number, radialCount = 16) {
   const points = [];
   for (let i = 0; i < radialCount; i++) {
     const θ = (360 / radialCount) * i;
@@ -153,27 +160,38 @@ export function generateNeighborhoodBoundary(
   bufferKm = 0.6,
   radialCount = 16
 ) {
-  let points: { lat: number; lon: number }[] = [];
+  const points: { lat: number; lon: number }[] = [];
 
-  // 1. Neighbor-driven points with weighting
+  // Include the neighborhood center itself
+  points.push({ lat: neighborhood.lat, lon: neighborhood.lon });
+
+  // Neighbor-driven points (weighted)
   neighbors.forEach(n => {
     const dist = haversine(neighborhood.lat, neighborhood.lon, n.lat, n.lon);
     const θ = bearing(neighborhood.lat, neighborhood.lon, n.lat, n.lon);
 
-    // closer neighbors "pull" more strongly
     const weight = Math.min(1, 3 / Math.max(dist, 0.01));
     const adjustedDist = dist * weight + bufferKm;
 
-    const point = destinationPoint(neighborhood.lat, neighborhood.lon, θ, adjustedDist);
-    points.push(point);
+    points.push(destinationPoint(neighborhood.lat, neighborhood.lon, θ, adjustedDist));
   });
 
-  // 2. Always include a radial buffer ring for minimum footprint
+  // Radial buffer ring
   points.push(...radialBuffer(neighborhood.lat, neighborhood.lon, bufferKm, radialCount));
 
-  // 3. Apply convex hull for final outline
-  return convexHull(points);
+  // Deduplicate points (optional but safer)
+  const seen = new Set();
+  const unique = points.filter(p => {
+    const key = `${p.lat.toFixed(6)},${p.lon.toFixed(6)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  // Convex hull
+  return convexHull(unique);
 }
+
 
 // ---------------- Public helper ----------------
 export function getNeighborhoodBoundary(name, maxNeighborDistanceKm = 3) {
