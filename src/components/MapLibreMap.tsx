@@ -514,7 +514,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             },
             {
               id: 'nyc-green-spaces',
-              type: 'fill' as const,
+              type: 'fill',
               source: 'nyc-tiles',
               'source-layer': sourceLayer,
               paint: {
@@ -528,7 +528,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                   ['==', ['get', 'leisure'], 'park'],
                   ['==', ['get', 'landuse'], 'cemetery'],
                   ['==', ['get', 'amenity'], 'cemetery'],
-                  ['==', ['get', 'amenity'], 'grave_yard']
+                  ['==', ['get', 'amenity'], 'grave_yard'],
+                  ['in', 'Cemetery', ['get', 'name']],
+                  ['in', 'cemetery', ['get', 'name']]
                 ]
               ]
             },
