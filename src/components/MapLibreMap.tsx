@@ -105,6 +105,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const moveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Track last viewport to support refreshes
+  const lastViewportRef = useRef<{ bounds: { north: number; south: number; east: number; west: number }; timestamp: number } | null>(null);
+
+
   // Calculate business limit based on zoom and viewport area for even distribution
   const getBusinessLimitForViewport = useCallback((zoom: number, bounds: any): number => {
     // Calculate viewport area
@@ -150,66 +154,54 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [fetchFullBusinessDetails]);
 
-  // Simplified viewport change handler with background refresh
-  const handleViewportChange = useCallback(() => {
+  const handleViewportChange = useCallback(async () => {
     if (!map || !mapLoaded || !loadBusinessesInViewport || isLoadingBusinessesRef.current) return;
-
+  
     try {
       const bounds = map.getBounds();
       const zoom = map.getZoom();
       const now = Date.now();
-      
-      // Check if we should also refresh a previous area
-      const shouldRefreshPrevious = lastViewportRef.current && 
-        (now - lastViewportRef.current.timestamp > 5000); // 5 seconds since last load
-      
-      // Expand bounds slightly to ensure smooth panning
+  
+      const shouldRefreshPrevious =
+        lastViewportRef.current &&
+        (now - lastViewportRef.current.timestamp > 5000);
+  
       const latDiff = bounds.getNorth() - bounds.getSouth();
       const lngDiff = bounds.getEast() - bounds.getWest();
-      const expansion = 0.1; // 10% expansion
-      
+      const expansion = 0.1;
+  
       const expandedBounds = {
         north: bounds.getNorth() + latDiff * expansion,
         south: bounds.getSouth() - latDiff * expansion,
         east: bounds.getEast() + lngDiff * expansion,
-        west: bounds.getWest() - lngDiff * expansion
+        west: bounds.getWest() - lngDiff * expansion,
       };
-
+  
       const businessLimit = getBusinessLimitForViewport(zoom, expandedBounds);
-
+  
       console.log('🗺️ Loading businesses for viewport:', {
         zoom: zoom.toFixed(2),
         businessLimit,
-        refreshingPrevious: shouldRefreshPrevious
+        refreshingPrevious: shouldRefreshPrevious,
       });
-      
+  
       isLoadingBusinessesRef.current = true;
-      const result = await loadBusinessesInViewport(expandedBounds, businessLimit);
-      
-      // If loadBusinessesInViewport returns businesses directly:
-      if (Array.isArray(result)) {
-        mergeBusinessesIntoCache(result);
-      }
-      
-      // Background refresh of previous area for new businesses
+  
+      // ✅ await is valid now
+      await loadBusinessesInViewport(expandedBounds, businessLimit);
+  
       if (shouldRefreshPrevious && lastViewportRef.current) {
         setTimeout(() => {
           console.log('🔄 Background refresh of previous area');
           loadBusinessesInViewport(lastViewportRef.current!.bounds, businessLimit * 0.5);
         }, 1000);
       }
-      
-      // Update last viewport
-      lastViewportRef.current = {
-        bounds: expandedBounds,
-        timestamp: now
-      };
-      
-      // Reset loading flag after delay
+  
+      lastViewportRef.current = { bounds: expandedBounds, timestamp: now };
+  
       setTimeout(() => {
         isLoadingBusinessesRef.current = false;
       }, 1000);
-      
     } catch (error) {
       console.error('Error in handleViewportChange:', error);
       isLoadingBusinessesRef.current = false;
