@@ -445,24 +445,13 @@ if (mapInstance) {
               ['any',
                 // Parks
                 ['==', ['get', 'leisure'], 'park'],
-                ['==', ['get', 'leisure'], 'garden'],
-                ['==', ['get', 'leisure'], 'recreation_ground'],
-                ['==', ['get', 'landuse'], 'recreation_ground'],
-                ['==', ['get', 'landuse'], 'village_green'],
-                // Cemeteries - multiple common tagging patterns
+                // Cemeteries - try multiple common properties
                 ['==', ['get', 'landuse'], 'cemetery'],
-                ['==', ['get', 'amenity'], 'grave_yard'],
                 ['==', ['get', 'amenity'], 'cemetery'],
-                ['==', ['get', 'leisure'], 'cemetery'],
-                // Sometimes cemeteries are tagged with religion
-                ['all', 
-                  ['has', 'religion'], 
-                  ['any',
-                    ['in', 'cemetery', ['get', 'name']],
-                    ['in', 'Cemetery', ['get', 'name']],
-                    ['in', 'memorial', ['get', 'amenity']]
-                  ]
-                ]
+                ['==', ['get', 'amenity'], 'grave_yard'],
+                // Also try checking if name contains cemetery
+                ['in', 'Cemetery', ['get', 'name']],
+                ['in', 'cemetery', ['get', 'name']]
               ]
             ]
           });
