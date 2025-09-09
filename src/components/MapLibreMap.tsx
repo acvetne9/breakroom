@@ -402,33 +402,35 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, []);
 
-  // Initialize DeckGL overlay once
+  // Initialize DeckGL overlay with error handling
   useEffect(() => {
     if (!map || !mapLoaded || deckOverlay) return;
     
     console.log('🎯 Initializing DeckGL overlay');
     
-    let overlay = overlayInstance;
-    if (!overlay) {
-      try {
+    try {
+      let overlay = overlayInstance;
+      if (!overlay) {
+        // Check if MapboxOverlay is available
+        if (typeof MapboxOverlay !== 'function') {
+          console.error('MapboxOverlay is not available');
+          return;
+        }
+        
         overlay = new MapboxOverlay({
           interleaved: true,
           layers: []
         });
         overlayInstance = overlay;
-      } catch (error) {
-        console.error('Error creating MapboxOverlay:', error);
-        return;
       }
-    }
-    
-    try {
+      
       map.addControl(overlay as any);
       setDeckOverlay(overlay);
       setOverlayReady(true);
-    } catch (e) {
-      console.log('DeckGL overlay already added or error:', e);
-      setOverlayReady(true);
+    } catch (error) {
+      console.error('Error initializing DeckGL overlay:', error);
+      // Try to continue without DeckGL if it fails
+      setOverlayReady(false);
     }
   }, [map, mapLoaded, deckOverlay]);
 
