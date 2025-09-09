@@ -476,24 +476,31 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     });
 
-    // NEW: Detect movement direction for predictive loading
+    // NEW: Detect movement direction for predictive loading (with safety checks)
     mapInstance.on('move', () => {
-      if (!lastCenter || !isMovingRef.current) return;
+      if (!lastCenter || !isMovingRef.current || !mapInstance) return;
       
-      const currentCenter = mapInstance!.getCenter();
-      const latDiff = currentCenter.lat - lastCenter.lat;
-      const lngDiff = currentCenter.lng - lastCenter.lng;
-      
-      // Determine primary movement direction
-      if (Math.abs(latDiff) > Math.abs(lngDiff)) {
-        if (latDiff > 0.001) handlePredictiveLoad('north');
-        else if (latDiff < -0.001) handlePredictiveLoad('south');
-      } else {
-        if (lngDiff > 0.001) handlePredictiveLoad('east');
-        else if (lngDiff < -0.001) handlePredictiveLoad('west');
+      try {
+        const currentCenter = mapInstance.getCenter();
+        const latDiff = currentCenter.lat - lastCenter.lat;
+        const lngDiff = currentCenter.lng - lastCenter.lng;
+        
+        // Only trigger predictive loading if we have the required functions
+        if (typeof handlePredictiveLoad === 'function') {
+          // Determine primary movement direction
+          if (Math.abs(latDiff) > Math.abs(lngDiff)) {
+            if (latDiff > 0.001) handlePredictiveLoad('north');
+            else if (latDiff < -0.001) handlePredictiveLoad('south');
+          } else {
+            if (lngDiff > 0.001) handlePredictiveLoad('east');
+            else if (lngDiff < -0.001) handlePredictiveLoad('west');
+          }
+        }
+        
+        lastCenter = currentCenter;
+      } catch (error) {
+        console.warn('Error in move handler:', error);
       }
-      
-      lastCenter = currentCenter;
     });
 
     mapInstance.on('error', e => {
@@ -630,7 +637,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       setMap(null);
       setMapLoaded(false);
     };
-  }, [handlePredictiveLoad]);
+  }, []); // Removed handlePredictiveLoad dependency
 
   // Initialize DeckGL overlay once
   useEffect(() => {
