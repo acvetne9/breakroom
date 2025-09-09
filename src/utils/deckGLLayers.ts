@@ -165,7 +165,7 @@ function fallbackClusterBusinesses(businesses: Business[], gridSize: number = 0.
       cluster.lng = business.position.lng;
     } else {
       cluster.lat = (cluster.lat * (cluster.count - 1) + business.position.lat) / cluster.count;
-      cluster.lng = (cluxster.lng * (cluster.count - 1) + business.position.lng) / cluster.count;
+      cluster.lng = (cluster.lng * (cluster.count - 1) + business.position.lng) / cluster.count;
     }
   });
 
