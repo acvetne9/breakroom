@@ -135,13 +135,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [fetchFullBusinessDetails]);
 
-  // Simplified viewport change handler
+  // Simplified viewport change handler with background refresh
   const handleViewportChange = useCallback(() => {
     if (!map || !mapLoaded || !loadBusinessesInViewport || isLoadingBusinessesRef.current) return;
 
     try {
       const bounds = map.getBounds();
       const zoom = map.getZoom();
+      const now = Date.now();
+      
+      // Check if we should also refresh a previous area
+      const shouldRefreshPrevious = lastViewportRef.current && 
+        (now - lastViewportRef.current.timestamp > 5000); // 5 seconds since last load
       
       // Expand bounds slightly to ensure smooth panning
       const latDiff = bounds.getNorth() - bounds.getSouth();
@@ -159,11 +164,26 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       console.log('🗺️ Loading businesses for viewport:', {
         zoom: zoom.toFixed(2),
-        businessLimit
+        businessLimit,
+        refreshingPrevious: shouldRefreshPrevious
       });
       
       isLoadingBusinessesRef.current = true;
       loadBusinessesInViewport(expandedBounds, businessLimit);
+      
+      // Background refresh of previous area for new businesses
+      if (shouldRefreshPrevious && lastViewportRef.current) {
+        setTimeout(() => {
+          console.log('🔄 Background refresh of previous area');
+          loadBusinessesInViewport(lastViewportRef.current!.bounds, businessLimit * 0.5);
+        }, 1000);
+      }
+      
+      // Update last viewport
+      lastViewportRef.current = {
+        bounds: expandedBounds,
+        timestamp: now
+      };
       
       // Reset loading flag after delay
       setTimeout(() => {
