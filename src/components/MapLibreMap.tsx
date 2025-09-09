@@ -447,30 +447,28 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       // ✅ Click handler for vector-tile businesses
       try {
         mapInstance.on('click', 'nyc-businesses', (e) => {
-          if (!e.features || e.features.length === 0) return;
-    
+          if (!e.features?.length) return;
+        
           const feature = e.features[0];
+          const coords = (feature.geometry as any).coordinates;
+        
           const business = {
-            id: `vector_${feature.id}`,
+            id: feature.properties?.id || `vector_${feature.id}`,
             name: feature.properties?.name || 'Unknown',
-            position: {
-              lat: (feature.geometry as any).coordinates[1],
-              lng: (feature.geometry as any).coordinates[0],
-            },
+            position: { lng: coords[0], lat: coords[1] },
             properties: feature.properties,
           };
-    
-          console.log('🖱️ Vector business clicked:', business);
+        
           handleBusinessClick(business);
         });
-    
-        // Optional: cursor pointer on hover
+        
         mapInstance.on('mouseenter', 'nyc-businesses', () => {
           mapInstance.getCanvas().style.cursor = 'pointer';
         });
         mapInstance.on('mouseleave', 'nyc-businesses', () => {
           mapInstance.getCanvas().style.cursor = '';
         });
+
       } catch (err) {
         console.error('❌ Error wiring vector business clicks:', err);
       }
