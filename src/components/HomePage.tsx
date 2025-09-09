@@ -91,7 +91,7 @@ const HomePage: React.FC<HomePageProps> = ({
         setShowWelcome(true);
         const timer2 = setTimeout(() => setShowWelcome(false), 6000);
         return () => clearTimeout(timer2);
-      }, [500); // small delay to avoid overlap
+      }, 500); // small delay to avoid overlap
       return () => clearTimeout(timer1);
     }
   }, [showLoading, currentView]);
