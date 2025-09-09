@@ -90,6 +90,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const moveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const lastViewportRef = useRef<{ bounds: any; timestamp: number } | null>(null);
+
   // Calculate business limit based on zoom and viewport area for even distribution
   const getBusinessLimitForViewport = useCallback((zoom: number, bounds: any): number => {
     // Calculate viewport area
