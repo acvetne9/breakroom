@@ -91,7 +91,7 @@ const HomePage: React.FC<HomePageProps> = ({
         setShowWelcome(true);
         const timer2 = setTimeout(() => setShowWelcome(false), 6000);
         return () => clearTimeout(timer2);
-      }, 500); // small delay to avoid overlap
+      }, [500); // small delay to avoid overlap
       return () => clearTimeout(timer1);
     }
   }, [showLoading, currentView]);
@@ -179,6 +179,19 @@ const HomePage: React.FC<HomePageProps> = ({
     setShowBusinessDetails(false);
   };
 
+  // 👇 New function to clear search
+  const handleClearSearch = () => {
+    console.log('🧹 Clearing search from X button');
+    setSearchValue('');
+    setSearchFilters(null);
+    setNeighborhoodCenter(null);
+    // Also trigger the onChange to ensure UnifiedBusinessSearch is updated
+    handleSearchChange('', undefined, null, undefined);
+  };
+
+  // Check if we have an active search (either value or filters)
+  const hasActiveSearch = searchValue.trim() !== '' || searchFilters !== null;
+
   return (
     <div className="relative w-full h-full">
       {showLoading && (
@@ -231,16 +244,30 @@ const HomePage: React.FC<HomePageProps> = ({
 
         {/* Search input bar at bottom */}
         {currentSlide === 1 && currentView === 'main' && (
-          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
+          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 flex items-center gap-3">
             <UnifiedBusinessSearch
               value={searchValue}
               onChange={handleSearchChange}
               onBusinessSelect={handleSearchBusinessSelect}
               placeholder="Search roles, pay, places, and neighborhoods!"
               variant="search-bar"
-              showIcon={true}
+              showIcon={!hasActiveSearch} // Hide search icon when there's an active search
               onLocationSave={onLocationSave}
             />
+            
+            {/* Clear search button (X made of two lines) */}
+            {hasActiveSearch && (
+              <button
+                onClick={handleClearSearch}
+                className="w-10 h-10 bg-white rounded-full shadow-md border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
+                aria-label="Clear search"
+              >
+                <div className="relative w-4 h-4">
+                  <div className="absolute top-1/2 left-0 w-full h-0.5 bg-gray-600 transform -translate-y-1/2 rotate-45"></div>
+                  <div className="absolute top-1/2 left-0 w-full h-0.5 bg-gray-600 transform -translate-y-1/2 -rotate-45"></div>
+                </div>
+              </button>
+            )}
           </div>
         )}
       </div>
