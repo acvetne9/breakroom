@@ -558,6 +558,36 @@ if (mapInstance) {
             }
           });
           
+          // Fallback: global click handler querying rendered features so MapLibre businesses remain clickable
+          mapInstance.on('click', (e) => {
+            try {
+              const features = mapInstance!.queryRenderedFeatures(e.point, { layers: ['nyc-businesses'] }) as any[];
+              if (features && features.length > 0) {
+                const f: any = features[0];
+                const coords = (f.geometry?.type === 'Point' && Array.isArray((f.geometry as any).coordinates))
+                  ? (f.geometry as any).coordinates as [number, number]
+                  : [e.lngLat.lng, e.lngLat.lat] as [number, number];
+                const [lng, lat] = coords;
+                const vectorId = `vector_${f.properties?.name || 'unknown'}_${lat.toFixed(6)}_${lng.toFixed(6)}`.replace(/\s+/g, '_');
+                const business = {
+                  id: vectorId,
+                  name: f.properties?.name || 'Unknown Business',
+                  position: { lat, lng },
+                  businessType: f.properties?.amenity || f.properties?.shop || 'business',
+                  address: f.properties?.addr_full || f.properties?.address,
+                  atmosphere: [],
+                  salary: null,
+                  website: null,
+                  roles: []
+                };
+                console.log('🎯 Vector tile business clicked (fallback):', business.name, 'ID:', business.id);
+                onBusinessClick?.(business);
+              }
+            } catch (err) {
+              console.warn('⚠️ queryRenderedFeatures fallback failed:', err);
+            }
+          });
+
           // Add cursor pointer on hover
           mapInstance.on('mouseenter', 'nyc-businesses', () => {
             mapInstance.getCanvas().style.cursor = 'pointer';
