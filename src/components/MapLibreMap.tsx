@@ -89,26 +89,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     
     console.log('🎯 MapLibreMap handleBusinessClick called:', business.name, business.id);
     
-    // Zoom to business first
-    if (map) {
-      try {
-        map.easeTo({
-          center: [business.position?.lng || 0, business.position?.lat || 0],
-          zoom: Math.max(map.getZoom(), 16),
-          duration: 800
-        });
-      } catch (error) {
-        console.error('Error zooming to business:', error);
-      }
-    }
-    
     // Always call onBusinessClick with the business we have
     if (onBusinessClick) {
       if (business.id && business.id.startsWith('vector_')) {
         // Vector tile business - use as-is
         console.log('🎯 Vector tile business - using directly');
         onBusinessClick(business);
-      } else {
+      } else if (fetchFullBusinessDetails) {
         // Database business - try to fetch full details, fallback to original
         try {
           const fullBusiness = await fetchFullBusinessDetails(business.id);
@@ -117,9 +104,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           console.warn('Failed to fetch full business details, using basic info:', error);
           onBusinessClick(business);
         }
+      } else {
+        onBusinessClick(business);
       }
     }
-  }, [fetchFullBusinessDetails, onBusinessClick, map]);
+  }, [onBusinessClick, fetchFullBusinessDetails]); // Stable dependencies only
 
   // Movement state tracking for better debouncing
   const isMovingRef = useRef(false);
@@ -365,10 +354,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [map, mapLoaded, setIsProcessing]);
 
-  // Initialize map
+  // Initialize map only once
   useEffect(() => {
-    if (!mapRef.current) {
-      return;
+    if (!mapRef.current || map) {
+      return; // Don't reinitialize if map already exists
     }
 
     let mapInstance: maplibregl.Map | null = null;
@@ -603,50 +592,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             }
           });
           
-          // Click handlers for vector tile businesses
-          try {
-            mapInstance.on('click', 'nyc-businesses', e => {
-              const feature = e.features?.[0];
-              if (feature && handleBusinessClick) {
-                const vectorId = `vector_${feature.properties?.name || 'unknown'}_${e.lngLat.lat.toFixed(6)}_${e.lngLat.lng.toFixed(6)}`.replace(/\s+/g, '_');
-                
-                const business = {
-                  id: vectorId,
-                  name: feature.properties?.name || 'Unknown Business',
-                  position: {
-                    lat: e.lngLat.lat,
-                    lng: e.lngLat.lng
-                  },
-                  businessType: feature.properties?.amenity || feature.properties?.shop || 'business',
-                  address: feature.properties?.addr_full || feature.properties?.address,
-                  atmosphere: [],
-                  salary: null,
-                  website: null,
-                  roles: []
-                };
-                
-                console.log('🎯 Vector tile business clicked:', business.name, 'ID:', business.id);
-                handleBusinessClick(business);
-              }
-            });
-
-            // Hover effects
-            mapInstance.on('mouseenter', 'nyc-businesses', () => {
-              const canvas = mapInstance!.getCanvas();
-              if (canvas) {
-                canvas.style.cursor = 'pointer';
-              }
-            });
-            
-            mapInstance.on('mouseleave', 'nyc-businesses', () => {
-              const canvas = mapInstance!.getCanvas();
-              if (canvas) {
-                canvas.style.cursor = '';
-              }
-            });
-          } catch (error) {
-            console.warn('Error adding click handlers:', error);
-          }
           
           layersAddedRef.current = true;
           console.log('✅ All NYC layers added successfully!');
@@ -673,7 +618,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       setMap(null);
       setMapLoaded(false);
     };
-  }, [handleBusinessClick]);
+  }, []); // Empty dependency array to prevent infinite loops
 
   // Load map data after initialization
   useEffect(() => {
@@ -681,6 +626,81 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       processMapFeatures();
     }
   }, [mapLoaded, map, processMapFeatures]);
+
+  // Set up click handlers after map and layers are ready
+  useEffect(() => {
+    if (!map || !mapLoaded || !layersAddedRef.current) return;
+
+    const clickHandler = (e: any) => {
+      const feature = e.features?.[0];
+      if (feature && handleBusinessClick) {
+        // Zoom to business first using the map instance from this scope
+        if (map) {
+          try {
+            map.easeTo({
+              center: [e.lngLat.lng, e.lngLat.lat],
+              zoom: Math.max(map.getZoom(), 16),
+              duration: 800
+            });
+          } catch (error) {
+            console.error('Error zooming to business:', error);
+          }
+        }
+
+        const vectorId = `vector_${feature.properties?.name || 'unknown'}_${e.lngLat.lat.toFixed(6)}_${e.lngLat.lng.toFixed(6)}`.replace(/\s+/g, '_');
+        
+        const business = {
+          id: vectorId,
+          name: feature.properties?.name || 'Unknown Business',
+          position: {
+            lat: e.lngLat.lat,
+            lng: e.lngLat.lng
+          },
+          businessType: feature.properties?.amenity || feature.properties?.shop || 'business',
+          address: feature.properties?.addr_full || feature.properties?.address,
+          atmosphere: [],
+          salary: null,
+          website: null,
+          roles: []
+        };
+        
+        console.log('🎯 Vector tile business clicked:', business.name, 'ID:', business.id);
+        handleBusinessClick(business);
+      }
+    };
+
+    const mouseEnterHandler = () => {
+      const canvas = map.getCanvas();
+      if (canvas) {
+        canvas.style.cursor = 'pointer';
+      }
+    };
+    
+    const mouseLeaveHandler = () => {
+      const canvas = map.getCanvas();
+      if (canvas) {
+        canvas.style.cursor = '';
+      }
+    };
+
+    try {
+      map.on('click', 'nyc-businesses', clickHandler);
+      map.on('mouseenter', 'nyc-businesses', mouseEnterHandler);
+      map.on('mouseleave', 'nyc-businesses', mouseLeaveHandler);
+    } catch (error) {
+      console.warn('Error adding click handlers:', error);
+    }
+
+    return () => {
+      try {
+        map.off('click', 'nyc-businesses', clickHandler);
+        map.off('mouseenter', 'nyc-businesses', mouseEnterHandler);
+        map.off('mouseleave', 'nyc-businesses', mouseLeaveHandler);
+      } catch (error) {
+        console.warn('Error removing click handlers:', error);
+      }
+    };
+  }, [map, mapLoaded, handleBusinessClick]);
 
   // Clean business loading setup
   useEffect(() => {
