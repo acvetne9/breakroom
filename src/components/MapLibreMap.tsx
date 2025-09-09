@@ -5,7 +5,7 @@ import { MapboxOverlay } from '@deck.gl/mapbox';
 import { createBusinessScatterplotLayer } from '@/utils/deckGLLayers';
 import { useViewportMapData } from '../hooks/useViewportMapData';
 import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
-import { useIsMobile } from '../hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-mobile';
 import type { GeoJSONFeature } from 'maplibre-gl';
 import type { Business } from '@/types/business';
 
@@ -50,7 +50,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   let mapDataHook;
   let businessesHook;
-  
+
   try {
     mapDataHook = useViewportMapData();
     businessesHook = useViewportBusinesses(searchFilters, currentZoom);
@@ -283,7 +283,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current && mapInstance) {
         layersAddedRef.current = true;
         const sourceLayer = 'examplepoints';
-        const layersToAdd = [
+        const layersToAdd: any[] = [
           {
             id: 'nyc-land',
             type: 'fill' as const,
@@ -334,8 +334,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         ];
         layersToAdd.forEach(layerDef => {
           try {
-            if (!mapInstance.getLayer(layerDef.id)) {
-              mapInstance.addLayer(layerDef);
+            if (!mapInstance.getLayer((layerDef as any).id)) {
+              mapInstance.addLayer(layerDef as any);
             }
           } catch (err) {
             console.warn('Layer add error (ignored):', err);
