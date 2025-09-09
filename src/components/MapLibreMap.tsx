@@ -715,18 +715,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [businessesLoading, businesses, onBusinessesLoaded]);
 
-  // Emoji markers with stable reference
-  const [lastLandmarksHash, setLastLandmarksHash] = useState('');
+  // Emoji markers with stable reference using ref to prevent infinite loops
+  const lastLandmarksHashRef = useRef('');
   
   useEffect(() => {
     if (!mapLoaded || !landmarks || !Array.isArray(landmarks) || !map) return;
 
     const landmarksHash = JSON.stringify(landmarks.map(l => `${l.lat}-${l.lng}-${l.emoji}`));
-    if (landmarksHash === lastLandmarksHash) {
+    if (landmarksHash === lastLandmarksHashRef.current) {
       return;
     }
     
-    setLastLandmarksHash(landmarksHash);
+    lastLandmarksHashRef.current = landmarksHash;
     console.log('Adding emoji landmarks:', landmarks);
 
     // Remove any previous markers
@@ -827,7 +827,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     } catch (error) {
       console.error('Error adding emoji markers:', error);
     }
-  }, [mapLoaded, landmarks, map, lastLandmarksHash]);
+  }, [mapLoaded, landmarks, map]);
 
   // Integrated cleanup from DeckGLOverlay
   useEffect(() => {
