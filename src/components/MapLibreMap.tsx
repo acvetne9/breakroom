@@ -99,6 +99,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const moveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSearchFiltersRef = useRef(searchFilters);
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const viewportCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Fix: Added missing ref
   
   // IMPROVED: Better viewport tracking with adaptive thresholds
   const lastViewportRef = useRef<{
@@ -132,6 +133,43 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     console.log('🧹 Cleared region cache');
   }, []);
 
+  // IMPROVED: Calculate consistent business limit based on zoom level and viewport area
+  const getBusinessLimitForZoom = useCallback((zoom: number, bounds: any): number => {
+    // Calculate viewport area in approximate square kilometers
+    const latDiff = bounds.north - bounds.south;
+    const lngDiff = bounds.east - bounds.west;
+    const avgLat = (bounds.north + bounds.south) / 2;
+    const latKm = latDiff * 111; // degrees to km
+    const lngKm = lngDiff * 111 * Math.cos(avgLat * Math.PI / 180); // adjusted for latitude
+    const areaKm2 = latKm * lngKm;
+    
+    // Define business density per square km based on zoom level
+    let targetDensity: number;
+    if (zoom >= 16) {
+      targetDensity = 800; // High detail - many businesses per km²
+    } else if (zoom >= 14) {
+      targetDensity = 400; // Medium detail
+    } else if (zoom >= 12) {
+      targetDensity = 150; // Lower detail
+    } else {
+      targetDensity = 50; // Very low detail for far out views
+    }
+    
+    // Calculate target number of businesses based on area and density
+    let targetBusinesses = Math.ceil(areaKm2 * targetDensity);
+    
+    // Apply platform-specific limits
+    const maxLimit = isMobile ? 8000 : 15000;
+    const minLimit = isMobile ? 500 : 800;
+    
+    // Clamp to reasonable bounds
+    targetBusinesses = Math.max(minLimit, Math.min(maxLimit, targetBusinesses));
+    
+    console.log(`📊 Zoom ${zoom.toFixed(1)}: Area ${areaKm2.toFixed(2)}km², Density ${targetDensity}/km², Target ${targetBusinesses} businesses`);
+    
+    return targetBusinesses;
+  }, [isMobile]);
+
   // Stable business click handler
   const handleBusinessClick = useCallback(async (business: any) => {
     if (!business || !onBusinessClickRef.current) return;
@@ -153,7 +191,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [fetchFullBusinessDetails]);
 
-  // IMPROVED: Smarter viewport change detection with adaptive loading
+  // IMPROVED: Smarter viewport change detection with consistent business loading
   const handleViewportChange = useCallback(() => {
     if (!map || !mapLoaded || !loadBusinessesInViewport || isLoadingBusinessesRef.current) return;
 
@@ -191,24 +229,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         const minOverlapRatio = zoom > 15 ? 0.6 : zoom > 13 ? 0.7 : 0.8;
         const minTimeDiff = isMovingRef.current ? 200 : 500;
         
-        // Skip loading if:
-        // 1. Not much movement AND good overlap AND recent load
-        // 2. OR very recent load (< 200ms) regardless of movement
+        // Skip loading if change is too small and recent
         if (
           (centerDistance < minDistance && overlapRatio > minOverlapRatio && timeDiff < 2000) ||
-          (timeDiff < minTimeDiff)
+          (timeDiff < minTimeDiff && zoomDiff < 0.5)
         ) {
           console.log('🔄 Skipping viewport update - insufficient change', {
             distance: Math.round(centerDistance),
             overlap: Math.round(overlapRatio * 100),
-            timeDiff
+            timeDiff,
+            zoomDiff: zoomDiff.toFixed(2)
           });
           return;
         }
       }
       
-      // IMPROVED: Expand viewport bounds for preloading
-      const expandFactor = isMovingRef.current ? 1.5 : 1.2; // Load more when moving
+      // IMPROVED: Smaller expansion for predictable loading
+      const expandFactor = zoom > 14 ? 1.2 : 1.1; // Less expansion at high zoom
       const latDiff = bounds.getNorth() - bounds.getSouth();
       const lngDiff = bounds.getEast() - bounds.getWest();
       const expansion = {
@@ -226,7 +263,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       // Check if this region was recently loaded
       const regionKey = getRegionKey(expandedBounds, zoom);
       if (loadedRegionsRef.current.has(regionKey) && lastViewportRef.current && 
-          now - lastViewportRef.current.timestamp < 5000) {
+          now - lastViewportRef.current.timestamp < 3000) {
         console.log('🔄 Skipping - region recently loaded:', regionKey);
         return;
       }
@@ -247,28 +284,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       // Mark region as loaded
       loadedRegionsRef.current.add(regionKey);
 
-      console.log('🗺️ Loading businesses for expanded viewport:', {
-        original: {
-          north: bounds.getNorth(),
-          south: bounds.getSouth(),
-          east: bounds.getEast(),
-          west: bounds.getWest()
-        },
-        expanded: expandedBounds,
+      // NEW: Use consistent business limit calculation
+      const businessLimit = getBusinessLimitForZoom(zoom, expandedBounds);
+
+      console.log('🗺️ Loading businesses for viewport:', {
+        zoom: zoom.toFixed(2),
+        bounds: expandedBounds,
+        businessLimit,
         expansion: expandFactor
       });
-      
-      // IMPROVED: Dynamic business limits based on zoom and movement
-      const baseLimitMobile = 15000;
-      const baseLimitDesktop = 30000;
-      const zoomMultiplier = zoom > 15 ? 1.5 : zoom > 13 ? 1.2 : 1.0;
-      const movementMultiplier = isMovingRef.current ? 1.3 : 1.0;
-      
-      const businessLimit = Math.floor(
-        (isMobile ? baseLimitMobile : baseLimitDesktop) * 
-        zoomMultiplier * 
-        movementMultiplier
-      );
       
       // Set loading flag to prevent concurrent calls
       isLoadingBusinessesRef.current = true;
@@ -290,9 +314,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.error('Error in handleViewportChange:', error);
       isLoadingBusinessesRef.current = false;
     }
-  }, [map, mapLoaded, isMobile, loadBusinessesInViewport, getRegionKey]);
+  }, [map, mapLoaded, loadBusinessesInViewport, getRegionKey, getBusinessLimitForZoom]);
 
-  // NEW: Predictive loading for smooth panning
+  // NEW: Predictive loading with consistent limits
   const handlePredictiveLoad = useCallback((direction: 'north' | 'south' | 'east' | 'west') => {
     if (!map || !mapLoaded || !loadBusinessesInViewport || isLoadingBusinessesRef.current) return;
     
@@ -307,7 +331,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       switch (direction) {
         case 'north':
           predictiveBounds = {
-            north: bounds.getNorth() + latDiff * 0.8,
+            north: bounds.getNorth() + latDiff * 0.6,
             south: bounds.getNorth() - latDiff * 0.2,
             east: bounds.getEast(),
             west: bounds.getWest()
@@ -316,7 +340,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         case 'south':
           predictiveBounds = {
             north: bounds.getSouth() + latDiff * 0.2,
-            south: bounds.getSouth() - latDiff * 0.8,
+            south: bounds.getSouth() - latDiff * 0.6,
             east: bounds.getEast(),
             west: bounds.getWest()
           };
@@ -325,7 +349,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           predictiveBounds = {
             north: bounds.getNorth(),
             south: bounds.getSouth(),
-            east: bounds.getEast() + lngDiff * 0.8,
+            east: bounds.getEast() + lngDiff * 0.6,
             west: bounds.getEast() - lngDiff * 0.2
           };
           break;
@@ -334,7 +358,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             north: bounds.getNorth(),
             south: bounds.getSouth(),
             east: bounds.getWest() + lngDiff * 0.2,
-            west: bounds.getWest() - lngDiff * 0.8
+            west: bounds.getWest() - lngDiff * 0.6
           };
           break;
         default:
@@ -343,15 +367,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       
       const regionKey = getRegionKey(predictiveBounds, zoom);
       if (!loadedRegionsRef.current.has(regionKey)) {
-        console.log(`🔮 Predictive loading ${direction}:`, predictiveBounds);
-        const businessLimit = isMobile ? 8000 : 15000; // Smaller limit for predictive loading
-        loadBusinessesInViewport(predictiveBounds, businessLimit, true);
+        // Use consistent business limit for predictive loading (50% of main load)
+        const mainLimit = getBusinessLimitForZoom(zoom, predictiveBounds);
+        const predictiveLimit = Math.ceil(mainLimit * 0.5);
+        
+        console.log(`🔮 Predictive loading ${direction}: ${predictiveLimit} businesses`);
+        loadBusinessesInViewport(predictiveBounds, predictiveLimit, true);
         loadedRegionsRef.current.add(regionKey);
       }
     } catch (error) {
       console.error('Error in predictive loading:', error);
     }
-  }, [map, mapLoaded, isMobile, loadBusinessesInViewport, getRegionKey]);
+  }, [map, mapLoaded, loadBusinessesInViewport, getRegionKey, getBusinessLimitForZoom]);
 
   // Create DeckGL layers with stable dependencies
   const deckGLLayers = useMemo(() => {
@@ -719,12 +746,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         east: mapBounds.getEast(),
         west: mapBounds.getWest()
       };
-      const businessLimit = isMobile ? 15000 : 30000;
+      const businessLimit = getBusinessLimitForZoom(map.getZoom(), viewportBounds);
       loadBusinessesInViewport(viewportBounds, businessLimit, false);
     } catch (e) {
       console.warn('⚠️ Failed to reload businesses on filter change:', e);
     }
-  }, [searchFilters, map, mapLoaded, isMobile, loadBusinessesInViewport, clearRegionCache]);
+  }, [searchFilters, map, mapLoaded, loadBusinessesInViewport, clearRegionCache, getBusinessLimitForZoom]);
 
   // Zoom to selected business
   useEffect(() => {
@@ -938,10 +965,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // NEW: Periodic cache cleanup
   useEffect(() => {
-    // Clear region cache every 5 minutes to prevent memory buildup
+    // Clear region cache every 3 minutes to prevent memory buildup
     regionCacheTimeoutRef.current = setInterval(() => {
       clearRegionCache();
-    }, 5 * 60 * 1000);
+    }, 3 * 60 * 1000);
 
     return () => {
       if (regionCacheTimeoutRef.current) {
