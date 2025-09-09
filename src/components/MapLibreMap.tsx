@@ -21,10 +21,6 @@ interface MapLibreMapProps {
   isClusteredData?: boolean;
 }
 
-interface VectorTileFeature extends GeoJSONFeature {
-  sourceLayer?: string;
-}
-
 // Singleton overlay for performance
 let overlayInstance: MapboxOverlay | null = null;
 
