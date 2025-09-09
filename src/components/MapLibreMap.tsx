@@ -637,26 +637,14 @@ if (mapInstance) {
     if (map.getSource('businesses')) {
       map.removeSource('businesses');
     }
-    // Keep vector-tile businesses visible when no DeckGL businesses are loaded
+    
+    // Always keep vector-tile businesses visible so they remain clickable
+    // They serve as a base layer with DeckGL businesses rendered on top
     if (map.getLayer('nyc-businesses')) {
-      const shouldShow = businesses.length === 0 && !businessesLoading;
-      map.setLayoutProperty('nyc-businesses', 'visibility', shouldShow ? 'visible' : 'none');
-      console.log(`🎯 Vector tile businesses visibility: ${shouldShow ? 'visible' : 'none'} (DeckGL has ${businesses.length} businesses)`);
+      map.setLayoutProperty('nyc-businesses', 'visibility', 'visible');
+      console.log(`🎯 Vector tile businesses always visible for clicking (DeckGL has ${businesses.length} businesses on top)`);
     }
   }, [mapLoaded, map, businesses.length, businessesLoading]);
-  
-  // Control vector tile business visibility during search
-  useEffect(() => {
-    if (!map || !mapLoaded) return;
-    
-    if (map.getLayer('nyc-businesses')) {
-      // Always show vector tile businesses as fallback when no database businesses are available
-      const shouldShowVector = businesses.length === 0 || hideVectorBusinesses === false;
-      const visibility = shouldShowVector ? 'visible' : 'none';
-      console.log(`🎯 Setting vector tile businesses visibility to: ${visibility} (${businesses.length} DB businesses)`);
-      map.setLayoutProperty('nyc-businesses', 'visibility', visibility);
-    }
-  }, [hideVectorBusinesses, map, mapLoaded, businesses.length]);
 
   // Notify parent when businesses are loaded
   useEffect(() => {
