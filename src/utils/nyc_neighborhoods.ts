@@ -50,129 +50,42 @@ export const nycNeighborhoods = {
   ]
 };
 
-// ---------------- Utilities ----------------
-export function haversine(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const toRad = deg => (deg * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function bearing(lat1, lon1, lat2, lon2) {
-  const φ1 = (lat1 * Math.PI) / 180;
-  const φ2 = (lat2 * Math.PI) / 180;
-  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
-
-  const y = Math.sin(Δλ) * Math.cos(φ2);
-  const x =
-    Math.cos(φ1) * Math.sin(φ2) -
-    Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
-  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
-}
-
-function destinationPoint(lat, lon, bearingDeg, distanceKm) {
-  const R = 6371;
-  const δ = distanceKm / R;
-  const θ = (bearingDeg * Math.PI) / 180;
-  const φ1 = (lat * Math.PI) / 180;
-  const λ1 = (lon * Math.PI) / 180;
-
-  const φ2 = Math.asin(
-    Math.sin(φ1) * Math.cos(δ) +
-    Math.cos(φ1) * Math.sin(δ) * Math.cos(θ)
-  );
-  const λ2 =
-    λ1 +
-    Math.atan2(
-      Math.sin(θ) * Math.sin(δ) * Math.cos(φ1),
-      Math.cos(δ) - Math.sin(φ1) * Math.sin(φ2)
-    );
-
-  return { lat: (φ2 * 180) / Math.PI, lon: (λ2 * 180) / Math.PI };
-}
-
-// ---------------- Core logic ----------------
-export function findNearbyNeighborhoods(allBoroughs, target, maxDistanceKm = 3) {
-  const neighbors = [];
-  for (const borough in allBoroughs) {
-    for (const n of allBoroughs[borough]) {
-      if (n.name !== target.name) {
-        const d = haversine(target.lat, target.lon, n.lat, n.lon);
-        if (d <= maxDistanceKm) neighbors.push(n);
-      }
-    }
-  }
-  return neighbors;
-}
-
 // ---------------- Improved boundary generation ----------------
-function convexHull(points) {
-  // Graham scan
-  points.sort((a, b) => (a.lon === b.lon ? a.lat - b.lat : a.lon - b.lon));
-  const cross = (o, a, b) =>
-    (a.lon - o.lon) * (b.lat - o.lat) - (a.lat - o.lat) * (b.lon - o.lon);
-
-  const lower = [];
-  for (const p of points) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
-      lower.pop();
-    }
-    lower.push(p);
+function radialBuffer(lat, lon, radiusKm, radialCount = 16) {
+  const points = [];
+  for (let i = 0; i < radialCount; i++) {
+    const θ = (360 / radialCount) * i;
+    points.push(destinationPoint(lat, lon, θ, radiusKm));
   }
-
-  const upper = [];
-  for (let i = points.length - 1; i >= 0; i--) {
-    const p = points[i];
-    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
-      upper.pop();
-    }
-    upper.push(p);
-  }
-
-  upper.pop();
-  lower.pop();
-  return lower.concat(upper);
+  return points;
 }
 
 export function generateNeighborhoodBoundary(
   neighborhood,
   neighbors,
-  bufferKm = 0.5,
-  radialCount = 8
+  bufferKm = 0.6,
+  radialCount = 16
 ) {
-  let points = [];
+  let points: { lat: number; lon: number }[] = [];
 
-  // 1. Neighbor-driven points
+  // 1. Neighbor-driven points with weighting
   neighbors.forEach(n => {
     const dist = haversine(neighborhood.lat, neighborhood.lon, n.lat, n.lon);
     const θ = bearing(neighborhood.lat, neighborhood.lon, n.lat, n.lon);
 
-    const point = destinationPoint(
-      neighborhood.lat,
-      neighborhood.lon,
-      θ,
-      dist * 0.7 + bufferKm
-    );
+    // closer neighbors "pull" more strongly
+    const weight = Math.min(1, 3 / Math.max(dist, 0.01));
+    const adjustedDist = dist * weight + bufferKm;
+
+    const point = destinationPoint(neighborhood.lat, neighborhood.lon, θ, adjustedDist);
     points.push(point);
   });
 
-  // 2. Optional radials if neighbors are sparse
-  if (points.length < 3) {
-    for (let i = 0; i < radialCount; i++) {
-      const θ = (360 / radialCount) * i;
-      const point = destinationPoint(neighborhood.lat, neighborhood.lon, θ, bufferKm * 2);
-      points.push(point);
-    }
-  }
+  // 2. Always include a radial buffer ring for minimum footprint
+  points.push(...radialBuffer(neighborhood.lat, neighborhood.lon, bufferKm, radialCount));
 
-  // 3. Apply convex hull
-  const hull = convexHull(points);
-
-  return hull;
+  // 3. Apply convex hull for final outline
+  return convexHull(points);
 }
 
 // ---------------- Public helper ----------------
