@@ -189,8 +189,8 @@ const HomePage: React.FC<HomePageProps> = ({
     handleSearchChange('', undefined, null, undefined);
   };
 
-  // Check if we have a completed search
-  const showClearInsteadOfSearch = searchCompleted;
+  // Check if we have an active search (either value or filters)
+  const hasActiveSearch = searchValue.trim() !== '' || searchFilters !== null;
 
   return (
     <div className="relative w-full h-full">
