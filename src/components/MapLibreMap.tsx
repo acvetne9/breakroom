@@ -444,40 +444,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     
       setMapLoaded(true);
     
-      // ✅ Click handler for vector-tile businesses
-      try {
-        mapInstance.on('click', 'nyc-businesses', (e) => {
-          if (!e.features?.length) return;
-        
-          const feature = e.features[0];
-          const coords = (feature.geometry as any).coordinates;
-        
-          const business = {
-            id: feature.properties?.id || `vector_${feature.id}`,
-            name: feature.properties?.name || 'Unknown',
-            position: { lng: coords[0], lat: coords[1] },
-            properties: feature.properties,
-          };
-        
-          handleBusinessClick(business);
-        });
-        
-        mapInstance.on('mouseenter', 'nyc-businesses', () => {
-          mapInstance.getCanvas().style.cursor = 'pointer';
-        });
-        mapInstance.on('mouseleave', 'nyc-businesses', () => {
-          mapInstance.getCanvas().style.cursor = '';
-        });
-
-      } catch (err) {
-        console.error('❌ Error wiring vector business clicks:', err);
-      }
-    
       if (onMapLoaded) {
         onMapLoaded();
       }
     });
-
 
     // Movement tracking
     mapInstance.on('movestart', () => {
@@ -491,7 +461,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.error('🚨 Map error:', e.error);
     });
     
-    // Add layers when tiles are ready
+    // Add layers when tiles are ready - REMOVED nyc-businesses circle layer
     mapInstance.on('sourcedata', e => {
       if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current && mapInstance) {
         console.log('🔄 NYC tiles loaded, adding layers...');
@@ -499,7 +469,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         try {
           const sourceLayer = 'examplepoints';
           
-          // Add all layers with proper error handling
+          // Add all layers EXCEPT nyc-businesses (we'll use DeckGL instead)
           const layersToAdd = [
             {
               id: 'nyc-land',
@@ -569,20 +539,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               },
               filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
             },
-            {
-              id: 'nyc-businesses',
-              type: 'circle' as const,
-              source: 'nyc-tiles',
-              'source-layer': sourceLayer,
-              paint: {
-                'circle-color': '#FACC15',
-                'circle-radius': 8,
-                'circle-opacity': 1.0,
-                'circle-stroke-width': 2,
-                'circle-stroke-color': '#FFFFFF'
-              },
-              filter: ['==', ['geometry-type'], 'Point']
-            },
+            // REMOVED: nyc-businesses layer - using DeckGL scatterplot instead
             {
               id: 'nyc-road-labels',
               type: 'symbol' as const,
@@ -611,9 +568,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             }
           });
           
-          
           layersAddedRef.current = true;
-          console.log('✅ All NYC layers added successfully!');
+          console.log('✅ All NYC layers added successfully (excluding businesses - using DeckGL)!');
           
         } catch (error) {
           console.error('❌ Error adding layers:', error);
@@ -646,80 +602,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded, map, processMapFeatures]);
 
-  // Set up click handlers after map and layers are ready
-  useEffect(() => {
-    if (!map || !mapLoaded || !layersAddedRef.current) return;
-
-    const clickHandler = (e: any) => {
-      const feature = e.features?.[0];
-      if (feature && handleBusinessClick) {
-        // Zoom to business first using the map instance from this scope
-        if (map) {
-          try {
-            map.easeTo({
-              center: [e.lngLat.lng, e.lngLat.lat],
-              zoom: Math.max(map.getZoom(), 16),
-              duration: 800
-            });
-          } catch (error) {
-            console.error('Error zooming to business:', error);
-          }
-        }
-
-        const vectorId = `vector_${feature.properties?.name || 'unknown'}_${e.lngLat.lat.toFixed(6)}_${e.lngLat.lng.toFixed(6)}`.replace(/\s+/g, '_');
-        
-        const business = {
-          id: vectorId,
-          name: feature.properties?.name || 'Unknown Business',
-          position: {
-            lat: e.lngLat.lat,
-            lng: e.lngLat.lng
-          },
-          businessType: feature.properties?.amenity || feature.properties?.shop || 'business',
-          address: feature.properties?.addr_full || feature.properties?.address,
-          atmosphere: [],
-          salary: null,
-          website: null,
-          roles: []
-        };
-        
-        console.log('🎯 Vector tile business clicked:', business.name, 'ID:', business.id);
-        handleBusinessClick(business);
-      }
-    };
-
-    const mouseEnterHandler = () => {
-      const canvas = map.getCanvas();
-      if (canvas) {
-        canvas.style.cursor = 'pointer';
-      }
-    };
-    
-    const mouseLeaveHandler = () => {
-      const canvas = map.getCanvas();
-      if (canvas) {
-        canvas.style.cursor = '';
-      }
-    };
-
-    try {
-      map.on('click', 'nyc-businesses', clickHandler);
-      map.on('mouseenter', 'nyc-businesses', mouseEnterHandler);
-      map.on('mouseleave', 'nyc-businesses', mouseLeaveHandler);
-    } catch (error) {
-      console.warn('Error adding click handlers:', error);
-    }
-
-    return () => {
-      try {
-        map.off('click', 'nyc-businesses', clickHandler);
-        map.off('mouseenter', 'nyc-businesses', mouseEnterHandler);
-        map.off('mouseleave', 'nyc-businesses', mouseLeaveHandler);
-      } catch (error) {
-        console.warn('Error removing click handlers:', error);
-      }
-    };
-  }, [map, mapLoaded, handleBusinessClick]);
+  // REMOVED: Vector tile click handlers since we're not using nyc-businesses layer anymore
+  // All business clicks will now go through DeckGL scatterplot layer
 
   // Clean business loading setup
   useEffect(() => {
