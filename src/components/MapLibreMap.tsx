@@ -441,26 +441,45 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     mapInstance.on('load', () => {
       if (cleanedUp) return;
       console.log('🗺️ Map loaded - starting tile debugging');
-      
-      if (!mapInstance) {
-        console.warn('⚠️ Map instance invalid during load event');
-        return;
-      }
-      
+    
       setMapLoaded(true);
-      
+    
+      // ✅ Click handler for vector-tile businesses
       try {
-        const style = mapInstance.getStyle();
-        console.log('Sources:', style?.sources);
-        console.log('Layers:', style?.layers?.map(l => l.id));
-      } catch (error) {
-        console.error('Error getting map style:', error);
+        mapInstance.on('click', 'nyc-businesses', (e) => {
+          if (!e.features || e.features.length === 0) return;
+    
+          const feature = e.features[0];
+          const business = {
+            id: `vector_${feature.id}`,
+            name: feature.properties?.name || 'Unknown',
+            position: {
+              lat: (feature.geometry as any).coordinates[1],
+              lng: (feature.geometry as any).coordinates[0],
+            },
+            properties: feature.properties,
+          };
+    
+          console.log('🖱️ Vector business clicked:', business);
+          handleBusinessClick(business);
+        });
+    
+        // Optional: cursor pointer on hover
+        mapInstance.on('mouseenter', 'nyc-businesses', () => {
+          mapInstance.getCanvas().style.cursor = 'pointer';
+        });
+        mapInstance.on('mouseleave', 'nyc-businesses', () => {
+          mapInstance.getCanvas().style.cursor = '';
+        });
+      } catch (err) {
+        console.error('❌ Error wiring vector business clicks:', err);
       }
-      
+    
       if (onMapLoaded) {
         onMapLoaded();
       }
     });
+
 
     // Movement tracking
     mapInstance.on('movestart', () => {
