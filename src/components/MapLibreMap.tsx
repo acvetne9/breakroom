@@ -100,16 +100,37 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const lastSearchFiltersRef = useRef(searchFilters);
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // NEW: Track last viewport to prevent unnecessary calls
+  // IMPROVED: Better viewport tracking with adaptive thresholds
   const lastViewportRef = useRef<{
     bounds: any;
     zoom: number;
     timestamp: number;
+    center: { lng: number; lat: number };
   } | null>(null);
   
-  // NEW: Debounced loading flag
+  // IMPROVED: More sophisticated loading management
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isLoadingBusinessesRef = useRef(false);
+  const pendingLoadRef = useRef(false);
+
+  // NEW: Cached regions to avoid redundant loading
+  const loadedRegionsRef = useRef<Set<string>>(new Set());
+  const regionCacheTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // NEW: Generate region key for caching
+  const getRegionKey = useCallback((bounds: any, zoom: number): string => {
+    // Create grid-based regions for better caching
+    const gridSize = zoom > 14 ? 0.005 : zoom > 12 ? 0.01 : 0.02;
+    const gridLat = Math.floor(bounds.north / gridSize) * gridSize;
+    const gridLng = Math.floor(bounds.east / gridSize) * gridSize;
+    return `${gridLat.toFixed(4)}-${gridLng.toFixed(4)}-${Math.floor(zoom)}`;
+  }, []);
+
+  // NEW: Clear region cache periodically
+  const clearRegionCache = useCallback(() => {
+    loadedRegionsRef.current.clear();
+    console.log('🧹 Cleared region cache');
+  }, []);
 
   // Stable business click handler
   const handleBusinessClick = useCallback(async (business: any) => {
@@ -132,49 +153,122 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [fetchFullBusinessDetails]);
 
-  // NEW: Improved viewport change handler with deduplication
+  // IMPROVED: Smarter viewport change detection with adaptive loading
   const handleViewportChange = useCallback(() => {
     if (!map || !mapLoaded || !loadBusinessesInViewport || isLoadingBusinessesRef.current) return;
 
     try {
       const bounds = map.getBounds();
       const zoom = map.getZoom();
+      const center = map.getCenter();
       const now = Date.now();
       
-      // Check if this viewport is significantly different from the last one
+      // IMPROVED: More sophisticated change detection
       if (lastViewportRef.current) {
         const timeDiff = now - lastViewportRef.current.timestamp;
         const zoomDiff = Math.abs(zoom - lastViewportRef.current.zoom);
         
         const lastBounds = lastViewportRef.current.bounds;
-        const boundsChanged = 
-          Math.abs(bounds.getNorth() - lastBounds.north) > 0.001 ||
-          Math.abs(bounds.getSouth() - lastBounds.south) > 0.001 ||
-          Math.abs(bounds.getEast() - lastBounds.east) > 0.001 ||
-          Math.abs(bounds.getWest() - lastBounds.west) > 0.001;
+        const lastCenter = lastViewportRef.current.center;
         
-        // Skip if viewport hasn't changed significantly and it's been less than 1 second
-        if (!boundsChanged && zoomDiff < 0.5 && timeDiff < 1000) {
-          console.log('🔄 Skipping viewport update - no significant change');
+        // Calculate movement distance and bounds overlap
+        const centerDistance = Math.sqrt(
+          Math.pow((center.lng - lastCenter.lng) * 111320 * Math.cos(center.lat * Math.PI / 180), 2) +
+          Math.pow((center.lat - lastCenter.lat) * 111320, 2)
+        );
+        
+        const boundsOverlap = Math.max(0, 
+          Math.min(bounds.getNorth(), lastBounds.north) - Math.max(bounds.getSouth(), lastBounds.south)
+        ) * Math.max(0,
+          Math.min(bounds.getEast(), lastBounds.east) - Math.max(bounds.getWest(), lastBounds.west)
+        );
+        
+        const totalArea = (bounds.getNorth() - bounds.getSouth()) * (bounds.getEast() - bounds.getWest());
+        const overlapRatio = boundsOverlap / totalArea;
+        
+        // IMPROVED: Adaptive thresholds based on zoom level and movement type
+        const minDistance = zoom > 15 ? 50 : zoom > 13 ? 100 : 200; // meters
+        const minOverlapRatio = zoom > 15 ? 0.6 : zoom > 13 ? 0.7 : 0.8;
+        const minTimeDiff = isMovingRef.current ? 200 : 500;
+        
+        // Skip loading if:
+        // 1. Not much movement AND good overlap AND recent load
+        // 2. OR very recent load (< 200ms) regardless of movement
+        if (
+          (centerDistance < minDistance && overlapRatio > minOverlapRatio && timeDiff < 2000) ||
+          (timeDiff < minTimeDiff)
+        ) {
+          console.log('🔄 Skipping viewport update - insufficient change', {
+            distance: Math.round(centerDistance),
+            overlap: Math.round(overlapRatio * 100),
+            timeDiff
+          });
           return;
         }
       }
       
-      const viewportBounds = {
-        north: bounds.getNorth(),
-        south: bounds.getSouth(),
-        east: bounds.getEast(),
-        west: bounds.getWest()
+      // IMPROVED: Expand viewport bounds for preloading
+      const expandFactor = isMovingRef.current ? 1.5 : 1.2; // Load more when moving
+      const latDiff = bounds.getNorth() - bounds.getSouth();
+      const lngDiff = bounds.getEast() - bounds.getWest();
+      const expansion = {
+        lat: latDiff * (expandFactor - 1) / 2,
+        lng: lngDiff * (expandFactor - 1) / 2
+      };
+      
+      const expandedBounds = {
+        north: bounds.getNorth() + expansion.lat,
+        south: bounds.getSouth() - expansion.lat,
+        east: bounds.getEast() + expansion.lng,
+        west: bounds.getWest() - expansion.lng
       };
 
-      // Update last viewport
+      // Check if this region was recently loaded
+      const regionKey = getRegionKey(expandedBounds, zoom);
+      if (loadedRegionsRef.current.has(regionKey) && lastViewportRef.current && 
+          now - lastViewportRef.current.timestamp < 5000) {
+        console.log('🔄 Skipping - region recently loaded:', regionKey);
+        return;
+      }
+
+      // Update tracking
       lastViewportRef.current = {
-        bounds: viewportBounds,
+        bounds: {
+          north: bounds.getNorth(),
+          south: bounds.getSouth(),
+          east: bounds.getEast(),
+          west: bounds.getWest()
+        },
         zoom,
-        timestamp: now
+        timestamp: now,
+        center: { lng: center.lng, lat: center.lat }
       };
 
-      console.log('🗺️ Loading businesses for viewport:', viewportBounds);
+      // Mark region as loaded
+      loadedRegionsRef.current.add(regionKey);
+
+      console.log('🗺️ Loading businesses for expanded viewport:', {
+        original: {
+          north: bounds.getNorth(),
+          south: bounds.getSouth(),
+          east: bounds.getEast(),
+          west: bounds.getWest()
+        },
+        expanded: expandedBounds,
+        expansion: expandFactor
+      });
+      
+      // IMPROVED: Dynamic business limits based on zoom and movement
+      const baseLimitMobile = 15000;
+      const baseLimitDesktop = 30000;
+      const zoomMultiplier = zoom > 15 ? 1.5 : zoom > 13 ? 1.2 : 1.0;
+      const movementMultiplier = isMovingRef.current ? 1.3 : 1.0;
+      
+      const businessLimit = Math.floor(
+        (isMobile ? baseLimitMobile : baseLimitDesktop) * 
+        zoomMultiplier * 
+        movementMultiplier
+      );
       
       // Set loading flag to prevent concurrent calls
       isLoadingBusinessesRef.current = true;
@@ -184,20 +278,80 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         clearTimeout(loadingTimeoutRef.current);
       }
       
-      const businessLimit = isMobile ? 12000 : 25000;
-      loadBusinessesInViewport(viewportBounds, businessLimit, isMovingRef.current);
+      loadBusinessesInViewport(expandedBounds, businessLimit, isMovingRef.current);
       
       // Reset loading flag after a delay
       loadingTimeoutRef.current = setTimeout(() => {
         isLoadingBusinessesRef.current = false;
-      }, 1000);
+      }, 800);
       
       setCurrentZoom(zoom);
     } catch (error) {
       console.error('Error in handleViewportChange:', error);
       isLoadingBusinessesRef.current = false;
     }
-  }, [map, mapLoaded, isMobile, loadBusinessesInViewport]);
+  }, [map, mapLoaded, isMobile, loadBusinessesInViewport, getRegionKey]);
+
+  // NEW: Predictive loading for smooth panning
+  const handlePredictiveLoad = useCallback((direction: 'north' | 'south' | 'east' | 'west') => {
+    if (!map || !mapLoaded || !loadBusinessesInViewport || isLoadingBusinessesRef.current) return;
+    
+    try {
+      const bounds = map.getBounds();
+      const zoom = map.getZoom();
+      const latDiff = bounds.getNorth() - bounds.getSouth();
+      const lngDiff = bounds.getEast() - bounds.getWest();
+      
+      // Create bounds for the adjacent area in the movement direction
+      let predictiveBounds;
+      switch (direction) {
+        case 'north':
+          predictiveBounds = {
+            north: bounds.getNorth() + latDiff * 0.8,
+            south: bounds.getNorth() - latDiff * 0.2,
+            east: bounds.getEast(),
+            west: bounds.getWest()
+          };
+          break;
+        case 'south':
+          predictiveBounds = {
+            north: bounds.getSouth() + latDiff * 0.2,
+            south: bounds.getSouth() - latDiff * 0.8,
+            east: bounds.getEast(),
+            west: bounds.getWest()
+          };
+          break;
+        case 'east':
+          predictiveBounds = {
+            north: bounds.getNorth(),
+            south: bounds.getSouth(),
+            east: bounds.getEast() + lngDiff * 0.8,
+            west: bounds.getEast() - lngDiff * 0.2
+          };
+          break;
+        case 'west':
+          predictiveBounds = {
+            north: bounds.getNorth(),
+            south: bounds.getSouth(),
+            east: bounds.getWest() + lngDiff * 0.2,
+            west: bounds.getWest() - lngDiff * 0.8
+          };
+          break;
+        default:
+          return;
+      }
+      
+      const regionKey = getRegionKey(predictiveBounds, zoom);
+      if (!loadedRegionsRef.current.has(regionKey)) {
+        console.log(`🔮 Predictive loading ${direction}:`, predictiveBounds);
+        const businessLimit = isMobile ? 8000 : 15000; // Smaller limit for predictive loading
+        loadBusinessesInViewport(predictiveBounds, businessLimit, true);
+        loadedRegionsRef.current.add(regionKey);
+      }
+    } catch (error) {
+      console.error('Error in predictive loading:', error);
+    }
+  }, [map, mapLoaded, isMobile, loadBusinessesInViewport, getRegionKey]);
 
   // Create DeckGL layers with stable dependencies
   const deckGLLayers = useMemo(() => {
@@ -308,12 +462,38 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     });
 
-    // Movement tracking
+    // IMPROVED: Enhanced movement tracking with direction detection
+    let lastCenter: { lng: number; lat: number } | null = null;
+    let moveStartTime = 0;
+    
     mapInstance.on('movestart', () => {
       isMovingRef.current = true;
+      moveStartTime = Date.now();
+      lastCenter = mapInstance!.getCenter();
+      
       if (moveTimeoutRef.current) {
         clearTimeout(moveTimeoutRef.current);
       }
+    });
+
+    // NEW: Detect movement direction for predictive loading
+    mapInstance.on('move', () => {
+      if (!lastCenter || !isMovingRef.current) return;
+      
+      const currentCenter = mapInstance!.getCenter();
+      const latDiff = currentCenter.lat - lastCenter.lat;
+      const lngDiff = currentCenter.lng - lastCenter.lng;
+      
+      // Determine primary movement direction
+      if (Math.abs(latDiff) > Math.abs(lngDiff)) {
+        if (latDiff > 0.001) handlePredictiveLoad('north');
+        else if (latDiff < -0.001) handlePredictiveLoad('south');
+      } else {
+        if (lngDiff > 0.001) handlePredictiveLoad('east');
+        else if (lngDiff < -0.001) handlePredictiveLoad('west');
+      }
+      
+      lastCenter = currentCenter;
     });
 
     mapInstance.on('error', e => {
@@ -450,7 +630,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       setMap(null);
       setMapLoaded(false);
     };
-  }, []);
+  }, [handlePredictiveLoad]);
 
   // Initialize DeckGL overlay once
   useEffect(() => {
@@ -508,7 +688,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, [deckOverlay, overlayReady, deckGLLayers]);
 
-  // NEW: Improved search filter handling with deep comparison
+  // IMPROVED: Search filter handling with cache invalidation
   useEffect(() => {
     if (!map || !mapLoaded || !loadBusinessesInViewport) return;
     
@@ -519,7 +699,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     console.log('🔍 Search filters changed:', searchFilters);
     lastSearchFiltersRef.current = searchFilters;
     
-    // Reset viewport tracking to force reload
+    // Clear all caches when filters change
+    clearRegionCache();
     lastViewportRef.current = null;
     isLoadingBusinessesRef.current = false;
     
@@ -531,12 +712,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         east: mapBounds.getEast(),
         west: mapBounds.getWest()
       };
-      const businessLimit = isMobile ? 12000 : 25000;
+      const businessLimit = isMobile ? 15000 : 30000;
       loadBusinessesInViewport(viewportBounds, businessLimit, false);
     } catch (e) {
       console.warn('⚠️ Failed to reload businesses on filter change:', e);
     }
-  }, [searchFilters, map, mapLoaded, isMobile, loadBusinessesInViewport]);
+  }, [searchFilters, map, mapLoaded, isMobile, loadBusinessesInViewport, clearRegionCache]);
 
   // Zoom to selected business
   useEffect(() => {
@@ -559,6 +740,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     
     console.log('🏙️ Centering map on neighborhood:', neighborhoodCenter);
     try {
+      // Clear region cache when jumping to new neighborhood
+      clearRegionCache();
+      
       map.easeTo({
         center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
         zoom: 14,
@@ -567,7 +751,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     } catch (error) {
       console.error('Error centering on neighborhood:', error);
     }
-  }, [neighborhoodCenter, map, mapLoaded]);
+  }, [neighborhoodCenter, map, mapLoaded, clearRegionCache]);
 
   // Process map features
   const processMapFeatures = useCallback(async () => {
@@ -594,7 +778,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded, map, processMapFeatures]);
 
-  // NEW: Improved movement handlers with better debouncing
+  // IMPROVED: More responsive movement handlers
   useEffect(() => {
     if (!map || !mapLoaded) return;
 
@@ -603,14 +787,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         clearTimeout(moveTimeoutRef.current);
       }
       
-      // Longer debounce to prevent excessive calls
+      // Shorter debounce for more responsive loading
       moveTimeoutRef.current = setTimeout(() => {
         isMovingRef.current = false;
         handleViewportChange();
-      }, 500); // Increased from 300ms to 500ms
+      }, 300); // Reduced from 500ms for faster response
+    };
+    
+    // NEW: Also handle zoom changes immediately
+    const zoomEndHandler = () => {
+      if (!isMovingRef.current) {
+        // Clear region cache on significant zoom changes
+        const currentZoom = map.getZoom();
+        if (lastViewportRef.current && Math.abs(currentZoom - lastViewportRef.current.zoom) > 1) {
+          clearRegionCache();
+        }
+        handleViewportChange();
+      }
     };
     
     map.on('moveend', moveEndHandler);
+    map.on('zoomend', zoomEndHandler);
     
     // Initial load with delay to prevent immediate double calls
     setTimeout(() => {
@@ -621,11 +818,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     
     return () => {
       map.off('moveend', moveEndHandler);
+      map.off('zoomend', zoomEndHandler);
       if (moveTimeoutRef.current) {
         clearTimeout(moveTimeoutRef.current);
       }
     };
-  }, [map, mapLoaded, handleViewportChange]);
+  }, [map, mapLoaded, handleViewportChange, clearRegionCache]);
 
   // Notify when businesses are loaded
   useEffect(() => {
@@ -731,6 +929,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded, landmarks, map]);
 
+  // NEW: Periodic cache cleanup
+  useEffect(() => {
+    // Clear region cache every 5 minutes to prevent memory buildup
+    regionCacheTimeoutRef.current = setInterval(() => {
+      clearRegionCache();
+    }, 5 * 60 * 1000);
+
+    return () => {
+      if (regionCacheTimeoutRef.current) {
+        clearInterval(regionCacheTimeoutRef.current);
+      }
+    };
+  }, [clearRegionCache]);
+
   // Cleanup
   useEffect(() => {
     return () => {
@@ -743,6 +955,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current);
+      }
+      if (regionCacheTimeoutRef.current) {
+        clearInterval(regionCacheTimeoutRef.current);
       }
     };
   }, []);
