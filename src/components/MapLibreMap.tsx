@@ -541,6 +541,8 @@ if (mapInstance) {
                 businessType: feature.properties?.amenity || feature.properties?.shop || 'business',
                 address: feature.properties?.addr_full || feature.properties?.address,
                 atmosphere: [],
+                salary: null,
+                website: null,
                 roles: []
               };
               
