@@ -251,14 +251,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, [deckOverlay, overlayReady, deckGLLayers]);
 
-  // Reload businesses whenever search filters change
+  // Reload businesses when search filters change - prevent loops
+  const searchFiltersRef = useRef(searchFilters);
+  useEffect(() => {
+    searchFiltersRef.current = searchFilters;
+  }, [searchFilters]);
+
   useEffect(() => {
     if (!map || !mapLoaded || !loadBusinessesInViewport) return;
     
-    console.log('🗺️ Map reloading businesses due to filter change:', searchFilters);
+    const currentFilters = searchFiltersRef.current;
     
     // Stop processing if filters are null (explicitly cleared)
-    if (searchFilters === null) {
+    if (currentFilters === null) {
       console.log('🧹 Search filters cleared - loading normal businesses');
       try {
         const mapBounds = map.getBounds();
@@ -276,7 +281,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return;
     }
     
-    if (searchFilters && Object.keys(searchFilters).length > 0) {
+    if (currentFilters && Object.keys(currentFilters).length > 0) {
       try {
         const mapBounds = map.getBounds();
         
@@ -294,7 +299,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         console.warn('⚠️ Failed to reload businesses on filter change:', e);
       }
     }
-  }, [searchFilters, map, mapLoaded, isMobile, loadBusinessesInViewport]);
+  }, [map, mapLoaded, isMobile, loadBusinessesInViewport]);
 
   // Zoom to a specifically selected business
   useEffect(() => {
