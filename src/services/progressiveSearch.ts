@@ -4,8 +4,6 @@ import { parseSearchFilters, applyBusinessFilters } from './businessFiltering';
 
 // Extended business interface for internal completeness scoring
 interface EnhancedBusiness extends Business {
-  city?: string;
-  state?: string;
   completenessScore?: number;
 }
 
@@ -81,10 +79,8 @@ export class ProgressiveBusinessSearch {
     if (business.atmosphere && business.atmosphere.length > 0) score += 5;
     if (business.salary) score += 5;
     
-    // Address data (20 points max)
+    // Address data (10 points max)
     if (business.address) score += 10;
-    if (business.city) score += 5;
-    if (business.state) score += 5;
     
     // Role data (30 points max)
     if (business.business_roles && business.business_roles.length > 0) {
@@ -151,8 +147,7 @@ export class ProgressiveBusinessSearch {
         const { data, error } = await supabase
           .from('businesses')
           .select(`
-            id, name, lat, lng, atmosphere, salary, business_type, website,
-            address, city, state,
+            id, name, lat, lng, atmosphere, salary, business_type, website, address,
             business_roles (id, role, salary)
           `)
           .gte('lat', ring.south)
@@ -174,8 +169,6 @@ export class ProgressiveBusinessSearch {
             businessType: b.business_type,
             website: b.website,
             address: b.address,
-            city: b.city,
-            state: b.state,
             roles: Array.isArray(b.business_roles) 
               ? b.business_roles.map((r: any) => ({
                   id: r.id,

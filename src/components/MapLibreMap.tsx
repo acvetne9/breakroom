@@ -49,9 +49,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const layersAddedRef = useRef(false);
   const lastFitKeyRef = useRef<string | null>(null);
 
-  // Enhanced business click handler with viewport integration
+  // Enhanced business click handler with better fallback for failed database lookups
   const handleBusinessClick = useCallback(async (business: any) => {
-    console.log('🎯 MapLibreMap handleBusinessClick called:', business.name);
+    console.log('🎯 MapLibreMap handleBusinessClick called:', business.name, business.id);
     
     // Zoom to business first
     if (map) {
@@ -62,14 +62,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
     }
     
-    // Fetch full details if needed
-    if (!business.atmosphere?.length && !business.roles?.length) {
-      const fullBusiness = await fetchFullBusinessDetails(business.id);
-      if (onBusinessClick) {
-        onBusinessClick(fullBusiness ?? business);
+    // Always call onBusinessClick with the business we have
+    // Don't try to fetch full details for vector tile businesses (non-UUID IDs)
+    if (onBusinessClick) {
+      if (business.id && business.id.startsWith('vector_')) {
+        // Vector tile business - use as-is
+        console.log('🎯 Vector tile business - using directly');
+        onBusinessClick(business);
+      } else {
+        // Database business - try to fetch full details, fallback to original
+        try {
+          const fullBusiness = await fetchFullBusinessDetails(business.id);
+          onBusinessClick(fullBusiness || business);
+        } catch (error) {
+          console.warn('Failed to fetch full business details, using basic info:', error);
+          onBusinessClick(business);
+        }
       }
-    } else if (onBusinessClick) {
-      onBusinessClick(business);
     }
   }, [fetchFullBusinessDetails, onBusinessClick, map]);
 
@@ -131,12 +140,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       isUndefined: searchFilters === undefined 
     });
     
-    // Handle search filter changes for vector tile visibility
+    // Only hide vector businesses if we have active search filters AND we get results
     if (searchFilters && Object.keys(searchFilters).length > 0) {
-      console.log('🔍 Active search - hiding vector tile businesses');
-      setHideVectorBusinesses(true);
+      console.log('🔍 Active search - will hide vector tile businesses if DB search succeeds');
+      // Don't immediately hide - wait for search results
     } else {
-      console.log('🔍 No active search - showing vector tile businesses');
+      console.log('🔍 No active search - ensuring vector tile businesses are visible');
       setHideVectorBusinesses(false);
     }
     
@@ -165,9 +174,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const center = map.getCenter();
       const zoom = map.getZoom();
       
-      let viewportBounds;
-      let businessLimit;
-      
       if (searchFilters && Object.keys(searchFilters).length > 0) {
         // Viewport-only search: use current map bounds with no expansion
         const viewportBounds = {
@@ -183,7 +189,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     } catch (e) {
       console.warn('⚠️ Failed to reload businesses on filter change:', e);
     }
-  }, [searchFilters, map, mapLoaded, isMobile]);
+  }, [searchFilters, map, mapLoaded, isMobile, loadBusinessesInViewport]);
 
   // Disable auto-zoom on search results to respect user preference
   useEffect(() => {
@@ -344,6 +350,12 @@ if (mapInstance) {
       if (cleanedUp) return;
       console.log('🗺️ Map loaded - starting tile debugging');
       
+      // Check if map is still valid before accessing its methods
+      if (!mapInstance) {
+        console.warn('⚠️ Map instance invalid during load event');
+        return;
+      }
+      
       // Immediate tile access test
       fetch('/data/tiles/12/1203/1536.pbf')
         .then(response => {
@@ -366,10 +378,16 @@ if (mapInstance) {
       
       setMapLoaded(true);
 
-      console.log('Sources:', map.getStyle().sources);
+      // Check if map is still valid before accessing style
+      if (!mapInstance) {
+        console.warn('⚠️ Map instance invalid when trying to access style');
+        return;
+      }
+
+      console.log('Sources:', mapInstance.getStyle().sources);
 
       // List all layers
-      console.log('Layers:', map.getStyle().layers.map(l => l.id));
+      console.log('Layers:', mapInstance.getStyle().layers.map(l => l.id));
       
       
       // Notify parent that map is loaded
@@ -506,12 +524,15 @@ if (mapInstance) {
             filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'name'], ['has', 'highway']]
           });
           
-          // Add click handler for businesses
+          // Add click handler for businesses with better error handling
           mapInstance.on('click', 'nyc-businesses', e => {
             const feature = e.features?.[0];
-            if (feature) {
+            if (feature && onBusinessClick) {
+              // Generate a consistent ID from coordinates and name for vector tile businesses
+              const vectorId = `vector_${feature.properties?.name || 'unknown'}_${e.lngLat.lat.toFixed(6)}_${e.lngLat.lng.toFixed(6)}`.replace(/\s+/g, '_');
+              
               const business = {
-                id: feature.properties?.id || Math.random().toString(36).substr(2, 9),
+                id: vectorId, // Use consistent vector ID instead of random
                 name: feature.properties?.name || 'Unknown Business',
                 position: {
                   lat: e.lngLat.lat,
@@ -519,12 +540,12 @@ if (mapInstance) {
                 },
                 businessType: feature.properties?.amenity || feature.properties?.shop || 'business',
                 address: feature.properties?.addr_full || feature.properties?.address,
-                atmosphere: []
+                atmosphere: [],
+                roles: []
               };
               
-              if (onBusinessClick) {
-                onBusinessClick(business);
-              }
+              console.log('🎯 Vector tile business clicked:', business.name, 'ID:', business.id);
+              onBusinessClick(business);
             }
           });
           
@@ -627,11 +648,13 @@ if (mapInstance) {
     if (!map || !mapLoaded) return;
     
     if (map.getLayer('nyc-businesses')) {
-      const visibility = hideVectorBusinesses ? 'none' : 'visible';
-      console.log(`🎯 Setting vector tile businesses visibility to: ${visibility}`);
+      // Always show vector tile businesses as fallback when no database businesses are available
+      const shouldShowVector = businesses.length === 0 || hideVectorBusinesses === false;
+      const visibility = shouldShowVector ? 'visible' : 'none';
+      console.log(`🎯 Setting vector tile businesses visibility to: ${visibility} (${businesses.length} DB businesses)`);
       map.setLayoutProperty('nyc-businesses', 'visibility', visibility);
     }
-  }, [hideVectorBusinesses, map, mapLoaded]);
+  }, [hideVectorBusinesses, map, mapLoaded, businesses.length]);
 
   // Notify parent when businesses are loaded
   useEffect(() => {
