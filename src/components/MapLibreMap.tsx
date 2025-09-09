@@ -25,9 +25,8 @@ interface VectorTileFeature extends GeoJSONFeature {
   sourceLayer?: string;
 }
 
-// Singleton overlay for performance - integrated from DeckGLOverlay
+// Singleton overlay for performance
 let overlayInstance: MapboxOverlay | null = null;
-let overlayUpdateTimeout: NodeJS.Timeout | null = null;
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
   onBusinessClick,
@@ -48,6 +47,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [overlayReady, setOverlayReady] = useState(false);
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
   const [currentZoom, setCurrentZoom] = useState(12);
+
+  // Store callback refs to prevent recreation
+  const onBusinessClickRef = useRef(onBusinessClick);
+  const onMapLoadedRef = useRef(onMapLoaded);
+  const onBusinessesLoadedRef = useRef(onBusinessesLoaded);
+  
+  // Update refs when props change
+  useEffect(() => {
+    onBusinessClickRef.current = onBusinessClick;
+  }, [onBusinessClick]);
+  
+  useEffect(() => {
+    onMapLoadedRef.current = onMapLoaded;
+  }, [onMapLoaded]);
+  
+  useEffect(() => {
+    onBusinessesLoadedRef.current = onBusinessesLoaded;
+  }, [onBusinessesLoaded]);
 
   // Safely initialize hooks with error boundaries
   let mapDataHook;
@@ -79,50 +96,41 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     isSearching
   } = businessesHook;
 
+  // Refs to prevent loops
   const processedRef = useRef(false);
   const layersAddedRef = useRef(false);
-  const lastFitKeyRef = useRef<string | null>(null);
-
-  // Enhanced business click handler that works for both vector tile and database businesses
-  const handleBusinessClick = useCallback(async (business: any) => {
-    if (!business) return;
-    
-    console.log('🎯 MapLibreMap handleBusinessClick called:', business.name, business.id);
-    
-    // Always call onBusinessClick with the business we have
-    if (onBusinessClick) {
-      if (business.id && business.id.startsWith('vector_')) {
-        // Vector tile business - use as-is
-        console.log('🎯 Vector tile business - using directly');
-        onBusinessClick(business);
-      } else if (fetchFullBusinessDetails) {
-        // Database business - try to fetch full details, fallback to original
-        try {
-          const fullBusiness = await fetchFullBusinessDetails(business.id);
-          onBusinessClick(fullBusiness || business);
-        } catch (error) {
-          console.warn('Failed to fetch full business details, using basic info:', error);
-          onBusinessClick(business);
-        }
-      } else {
-        onBusinessClick(business);
-      }
-    }
-  }, [onBusinessClick, fetchFullBusinessDetails]); // Stable dependencies only
-
-  // Movement state tracking for better debouncing
   const isMovingRef = useRef(false);
   const moveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSearchFiltersRef = useRef(searchFilters);
+  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Stable viewport change handler to prevent infinite re-renders
-  const handleViewportChange = useCallback((isInitial: boolean = false) => {
-    if (!map || !mapLoaded) return;
+  // Stable business click handler
+  const handleBusinessClick = useCallback(async (business: any) => {
+    if (!business || !onBusinessClickRef.current) return;
+    
+    console.log('🎯 Business clicked:', business.name, business.id);
+    
+    try {
+      if (business.id && business.id.startsWith('vector_')) {
+        onBusinessClickRef.current(business);
+      } else if (fetchFullBusinessDetails) {
+        const fullBusiness = await fetchFullBusinessDetails(business.id);
+        onBusinessClickRef.current(fullBusiness || business);
+      } else {
+        onBusinessClickRef.current(business);
+      }
+    } catch (error) {
+      console.warn('Error in handleBusinessClick:', error);
+      onBusinessClickRef.current(business);
+    }
+  }, [fetchFullBusinessDetails]);
 
-    console.log('🗺️ handleViewportChange called with searchFilters:', searchFilters);
+  // Stable viewport change handler
+  const handleViewportChange = useCallback(() => {
+    if (!map || !mapLoaded || !loadBusinessesInViewport) return;
 
     try {
       const bounds = map.getBounds();
-      const center = map.getCenter();
       const zoom = map.getZoom();
       
       const viewportBounds = {
@@ -132,30 +140,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         west: bounds.getWest()
       };
 
-      // Load businesses with appropriate limits
       const businessLimit = isMobile ? 12000 : 25000;
-      console.log('🗺️ About to call loadBusinessesInViewport with searchFilters:', searchFilters);
-      
-      if (loadBusinessesInViewport) {
-        loadBusinessesInViewport(viewportBounds, businessLimit, isMovingRef.current);
-      }
+      loadBusinessesInViewport(viewportBounds, businessLimit, isMovingRef.current);
       
       setCurrentZoom(zoom);
-      
     } catch (error) {
-      console.error('❌ Error in handleViewportChange:', error);
+      console.error('Error in handleViewportChange:', error);
     }
-  }, [map, mapLoaded, isMobile, searchFilters, loadBusinessesInViewport]);
+  }, [map, mapLoaded, isMobile, loadBusinessesInViewport]);
 
-  // Integrated DeckGL layers setup - extracted from DeckGLOverlay
+  // Create DeckGL layers with stable dependencies
   const deckGLLayers = useMemo(() => {
-    if (!businesses || !Array.isArray(businesses) || businesses.length === 0) return [];
+    if (!businesses || !Array.isArray(businesses) || businesses.length === 0) {
+      return [];
+    }
     
     try {
-      // If data is pre-clustered from worker, extract individual businesses
+      let businessesToRender = businesses;
+      
+      // Handle clustered data
       if (isClusteredData) {
-        console.log(`🎯 Extracting individual businesses from clustered data: ${businesses.length} items`);
-        const individualBusinesses = businesses.flatMap((item: any) => {
+        businessesToRender = businesses.flatMap((item: any) => {
           if (item && item.type === 'cluster' && item.businesses) {
             return item.businesses;
           } else if (item && item.type !== 'cluster') {
@@ -163,18 +168,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
           return [];
         });
-        
-        return [createBusinessScatterplotLayer({
-          businesses: individualBusinesses as Business[],
-          selectedBusinessId: selectedBusiness?.id,
-          onBusinessClick: handleBusinessClick,
-        })];
       }
       
-      console.log(`🎯 Creating scatter layer with ${businesses.length} individual clickable businesses`);
-      
       return [createBusinessScatterplotLayer({
-        businesses: businesses as Business[],
+        businesses: businessesToRender as Business[],
         selectedBusinessId: selectedBusiness?.id,
         onBusinessClick: handleBusinessClick,
       })];
@@ -182,185 +179,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.error('Error creating DeckGL layers:', error);
       return [];
     }
-  }, [businesses, selectedBusiness?.id, handleBusinessClick, enableClustering, isClusteredData, currentZoom]);
-
-  // Initialize DeckGL overlay once map is loaded - integrated singleton logic
-  const initializeDeckOverlay = useMemo(() => {
-    if (!map || !mapLoaded) return null;
-    
-    console.log('🎯 Initializing DeckGL overlay');
-    
-    // Use singleton or create new overlay
-    let overlay = overlayInstance;
-    if (!overlay) {
-      try {
-        overlay = new MapboxOverlay({
-          interleaved: true,
-          layers: []
-        });
-        overlayInstance = overlay;
-      } catch (error) {
-        console.error('Error creating MapboxOverlay:', error);
-        return null;
-      }
-    }
-    
-    // Add to map if not already added
-    try {
-      map.addControl(overlay as any);
-      setOverlayReady(true);
-    } catch (e) {
-      // Control might already be added
-      console.log('DeckGL overlay already added or error:', e);
-      setOverlayReady(true);
-    }
-    
-    return overlay;
-  }, [map, mapLoaded]);
-
-  // Update overlay reference when initialized
-  useEffect(() => {
-    if (initializeDeckOverlay) {
-      setDeckOverlay(initializeDeckOverlay);
-    }
-  }, [initializeDeckOverlay]);
-
-  // Update DeckGL layers when businesses change - integrated smooth layer updates
-  useEffect(() => {
-    if (!deckOverlay || !overlayReady) return;
-    
-    try {
-      // Clear existing timeout
-      if (overlayUpdateTimeout) {
-        clearTimeout(overlayUpdateTimeout);
-      }
-      
-      // Direct update without timeout to prevent loops
-      deckOverlay.setProps({ 
-        layers: deckGLLayers
-      });
-      console.log(`🎯 Updated deck.gl with ${deckGLLayers.length} layers`);
-    } catch (error) {
-      console.error('Error updating DeckGL layers:', error);
-    }
-    
-    return () => {
-      if (overlayUpdateTimeout) {
-        clearTimeout(overlayUpdateTimeout);
-      }
-    };
-  }, [deckOverlay, overlayReady, deckGLLayers]);
-
-  // Reload businesses when search filters change - prevent loops
-  const searchFiltersRef = useRef(searchFilters);
-  useEffect(() => {
-    searchFiltersRef.current = searchFilters;
-  }, [searchFilters]);
-
-  useEffect(() => {
-    if (!map || !mapLoaded || !loadBusinessesInViewport) return;
-    
-    const currentFilters = searchFiltersRef.current;
-    
-    // Stop processing if filters are null (explicitly cleared)
-    if (currentFilters === null) {
-      console.log('🧹 Search filters cleared - loading normal businesses');
-      try {
-        const mapBounds = map.getBounds();
-        const viewportBounds = {
-          north: mapBounds.getNorth(),
-          south: mapBounds.getSouth(),
-          east: mapBounds.getEast(),
-          west: mapBounds.getWest()
-        };
-        const businessLimit = isMobile ? 12000 : 25000;
-        loadBusinessesInViewport(viewportBounds, businessLimit, false);
-      } catch (e) {
-        console.warn('⚠️ Failed to reload normal businesses:', e);
-      }
-      return;
-    }
-    
-    if (currentFilters && Object.keys(currentFilters).length > 0) {
-      try {
-        const mapBounds = map.getBounds();
-        
-        // Viewport-only search: use current map bounds
-        const viewportBounds = {
-          north: mapBounds.getNorth(),
-          south: mapBounds.getSouth(),
-          east: mapBounds.getEast(),
-          west: mapBounds.getWest()
-        };
-        const businessLimit = isMobile ? 12000 : 25000;
-        console.log('🔍 Viewport-only search: using current map bounds');
-        loadBusinessesInViewport(viewportBounds, businessLimit, false);
-      } catch (e) {
-        console.warn('⚠️ Failed to reload businesses on filter change:', e);
-      }
-    }
-  }, [map, mapLoaded, isMobile, loadBusinessesInViewport]);
-
-  // Zoom to a specifically selected business
-  useEffect(() => {
-    if (!map || !mapLoaded || !selectedBusiness?.position) return;
-    
-    try {
-      map.easeTo({
-        center: [selectedBusiness.position.lng, selectedBusiness.position.lat],
-        zoom: Math.max(map.getZoom(), 16),
-        duration: 800
-      });
-    } catch (error) {
-      console.error('Error zooming to selected business:', error);
-    }
-  }, [selectedBusiness?.id, map, mapLoaded]);
-
-  // Center map on neighborhood when neighborhood is selected
-  useEffect(() => {
-    if (!map || !mapLoaded || !neighborhoodCenter) return;
-    
-    console.log('🏙️ Centering map on neighborhood:', neighborhoodCenter);
-    try {
-      map.easeTo({
-        center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
-        zoom: 14,
-        duration: 1000
-      });
-    } catch (error) {
-      console.error('Error centering on neighborhood:', error);
-    }
-  }, [neighborhoodCenter, map, mapLoaded]);
-
-  const processMapFeatures = useCallback(async () => {
-    // Prevent duplicate processing
-    const alreadyGlobalProcessed = (window as any).__MAP_FEATURES_PROCESSED__ === true;
-    if (processedRef.current || alreadyGlobalProcessed) {
-      return;
-    }
-    if (!map || !mapLoaded) {
-      return;
-    }
-    
-    processedRef.current = true;
-    (window as any).__MAP_FEATURES_PROCESSED__ = true;
-    
-    if (setIsProcessing) {
-      setIsProcessing(true);
-    }
-    
-    console.log('🎉 NYC .pbf vector tiles ready');
-    
-    if (setIsProcessing) {
-      setIsProcessing(false);
-    }
-  }, [map, mapLoaded, setIsProcessing]);
+  }, [businesses, selectedBusiness?.id, isClusteredData, handleBusinessClick]);
 
   // Initialize map only once
   useEffect(() => {
-    if (!mapRef.current || map) {
-      return; // Don't reinitialize if map already exists
-    }
+    if (!mapRef.current || map) return;
 
     let mapInstance: maplibregl.Map | null = null;
     let cleanedUp = false;
@@ -424,30 +247,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           return;
         }
       };
-
-      const _origSetPaint = (mapInstance as any).setPaintProperty.bind(mapInstance);
-      (mapInstance as any).setPaintProperty = function (layerId: string, prop: string, value: any) {
-        try {
-          if (!this.getLayer || !this.getLayer(layerId)) {
-            console.log(`ℹ️ setPaintProperty skipped: layer "${layerId}" not found.`);
-            return;
-          }
-          return _origSetPaint(layerId, prop, value);
-        } catch (err) {
-          console.warn('⚠️ setPaintProperty error (ignored):', err);
-          return;
-        }
-      };
     }
 
     mapInstance.on('load', () => {
       if (cleanedUp) return;
-      console.log('🗺️ Map loaded - starting tile debugging');
-    
+      console.log('🗺️ Map loaded');
       setMapLoaded(true);
-    
-      if (onMapLoaded) {
-        onMapLoaded();
+      if (onMapLoadedRef.current) {
+        onMapLoadedRef.current();
       }
     });
 
@@ -463,7 +270,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.error('🚨 Map error:', e.error);
     });
     
-    // Add layers when tiles are ready - REMOVED nyc-businesses circle layer
+    // Add layers when tiles are ready (excluding business dots - using DeckGL instead)
     mapInstance.on('sourcedata', e => {
       if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current && mapInstance) {
         console.log('🔄 NYC tiles loaded, adding layers...');
@@ -471,7 +278,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         try {
           const sourceLayer = 'examplepoints';
           
-          // Add all layers EXCEPT nyc-businesses (we'll use DeckGL instead)
           const layersToAdd = [
             {
               id: 'nyc-land',
@@ -541,7 +347,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               },
               filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
             },
-            // REMOVED: nyc-businesses layer - using DeckGL scatterplot instead
             {
               id: 'nyc-road-labels',
               type: 'symbol' as const,
@@ -571,7 +376,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           });
           
           layersAddedRef.current = true;
-          console.log('✅ All NYC layers added successfully (excluding businesses - using DeckGL)!');
+          console.log('✅ All NYC layers added (excluding businesses - using DeckGL)!');
           
         } catch (error) {
           console.error('❌ Error adding layers:', error);
@@ -595,7 +400,137 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       setMap(null);
       setMapLoaded(false);
     };
-  }, []); // Empty dependency array to prevent infinite loops
+  }, []);
+
+  // Initialize DeckGL overlay once
+  useEffect(() => {
+    if (!map || !mapLoaded || deckOverlay) return;
+    
+    console.log('🎯 Initializing DeckGL overlay');
+    
+    let overlay = overlayInstance;
+    if (!overlay) {
+      try {
+        overlay = new MapboxOverlay({
+          interleaved: true,
+          layers: []
+        });
+        overlayInstance = overlay;
+      } catch (error) {
+        console.error('Error creating MapboxOverlay:', error);
+        return;
+      }
+    }
+    
+    try {
+      map.addControl(overlay as any);
+      setDeckOverlay(overlay);
+      setOverlayReady(true);
+    } catch (e) {
+      console.log('DeckGL overlay already added or error:', e);
+      setOverlayReady(true);
+    }
+  }, [map, mapLoaded, deckOverlay]);
+
+  // Update DeckGL layers with debouncing
+  useEffect(() => {
+    if (!deckOverlay || !overlayReady) return;
+    
+    // Clear existing timeout
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+    
+    // Debounce updates
+    updateTimeoutRef.current = setTimeout(() => {
+      try {
+        deckOverlay.setProps({ layers: deckGLLayers });
+        console.log(`🎯 Updated DeckGL with ${deckGLLayers.length} layers`);
+      } catch (error) {
+        console.error('Error updating DeckGL layers:', error);
+      }
+    }, 100);
+    
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, [deckOverlay, overlayReady, deckGLLayers]);
+
+  // Handle search filter changes
+  useEffect(() => {
+    if (!map || !mapLoaded || !loadBusinessesInViewport) return;
+    
+    // Only trigger if filters actually changed
+    if (lastSearchFiltersRef.current === searchFilters) return;
+    lastSearchFiltersRef.current = searchFilters;
+    
+    console.log('🔍 Search filters changed:', searchFilters);
+    
+    try {
+      const mapBounds = map.getBounds();
+      const viewportBounds = {
+        north: mapBounds.getNorth(),
+        south: mapBounds.getSouth(),
+        east: mapBounds.getEast(),
+        west: mapBounds.getWest()
+      };
+      const businessLimit = isMobile ? 12000 : 25000;
+      loadBusinessesInViewport(viewportBounds, businessLimit, false);
+    } catch (e) {
+      console.warn('⚠️ Failed to reload businesses on filter change:', e);
+    }
+  }, [searchFilters, map, mapLoaded, isMobile, loadBusinessesInViewport]);
+
+  // Zoom to selected business
+  useEffect(() => {
+    if (!map || !mapLoaded || !selectedBusiness?.position) return;
+    
+    try {
+      map.easeTo({
+        center: [selectedBusiness.position.lng, selectedBusiness.position.lat],
+        zoom: Math.max(map.getZoom(), 16),
+        duration: 800
+      });
+    } catch (error) {
+      console.error('Error zooming to selected business:', error);
+    }
+  }, [selectedBusiness?.id, map, mapLoaded]);
+
+  // Center on neighborhood
+  useEffect(() => {
+    if (!map || !mapLoaded || !neighborhoodCenter) return;
+    
+    console.log('🏙️ Centering map on neighborhood:', neighborhoodCenter);
+    try {
+      map.easeTo({
+        center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
+        zoom: 14,
+        duration: 1000
+      });
+    } catch (error) {
+      console.error('Error centering on neighborhood:', error);
+    }
+  }, [neighborhoodCenter, map, mapLoaded]);
+
+  // Process map features
+  const processMapFeatures = useCallback(async () => {
+    if (processedRef.current || !map || !mapLoaded) return;
+    
+    processedRef.current = true;
+    (window as any).__MAP_FEATURES_PROCESSED__ = true;
+    
+    if (setIsProcessing) {
+      setIsProcessing(true);
+    }
+    
+    console.log('🎉 NYC vector tiles ready');
+    
+    if (setIsProcessing) {
+      setIsProcessing(false);
+    }
+  }, [map, mapLoaded, setIsProcessing]);
 
   // Load map data after initialization
   useEffect(() => {
@@ -604,57 +539,46 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded, map, processMapFeatures]);
 
-  // REMOVED: Vector tile click handlers since we're not using nyc-businesses layer anymore
-  // All business clicks will now go through DeckGL scatterplot layer
-
-  // Clean business loading setup
+  // Set up movement handlers
   useEffect(() => {
     if (!map || !mapLoaded) return;
 
-    let moveTimeout: NodeJS.Timeout | null = null;
-    
     const moveEndHandler = () => {
-      if (moveTimeout) clearTimeout(moveTimeout);
+      if (moveTimeoutRef.current) {
+        clearTimeout(moveTimeoutRef.current);
+      }
       
-      console.log('🗺️ Map moveend - current search filters:', searchFilters);
-      
-      moveTimeout = setTimeout(() => {
+      moveTimeoutRef.current = setTimeout(() => {
         isMovingRef.current = false;
         handleViewportChange();
       }, 300);
     };
     
     map.on('moveend', moveEndHandler);
-    handleViewportChange(true);
+    
+    // Initial load
+    handleViewportChange();
     
     return () => {
       map.off('moveend', moveEndHandler);
-      if (moveTimeout) clearTimeout(moveTimeout);
+      if (moveTimeoutRef.current) {
+        clearTimeout(moveTimeoutRef.current);
+      }
     };
   }, [map, mapLoaded, handleViewportChange]);
 
-  // Notify parent when businesses are loaded
+  // Notify when businesses are loaded
   useEffect(() => {
-    if (!businessesLoading && businesses && businesses.length > 0 && onBusinessesLoaded) {
-      onBusinessesLoaded();
+    if (!businessesLoading && businesses && businesses.length > 0 && onBusinessesLoadedRef.current) {
+      onBusinessesLoadedRef.current();
     }
-  }, [businessesLoading, businesses, onBusinessesLoaded]);
+  }, [businessesLoading, businesses]);
 
-  // Emoji markers with stable reference using ref to prevent infinite loops
-  const lastLandmarksHashRef = useRef('');
-  
+  // Handle emoji landmarks
   useEffect(() => {
     if (!mapLoaded || !landmarks || !Array.isArray(landmarks) || !map) return;
 
-    const landmarksHash = JSON.stringify(landmarks.map(l => `${l.lat}-${l.lng}-${l.emoji}`));
-    if (landmarksHash === lastLandmarksHashRef.current) {
-      return;
-    }
-    
-    lastLandmarksHashRef.current = landmarksHash;
-    console.log('Adding emoji landmarks:', landmarks);
-
-    // Remove any previous markers
+    // Remove previous markers
     landmarkMarkersRef.current.forEach(m => {
       try {
         m.remove();
@@ -667,8 +591,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (landmarks.length === 0) return;
 
     try {
-      let updateEmojiSize: (() => void) | null = null;
-      updateEmojiSize = () => {
+      const updateEmojiSize = () => {
         const zoom = map.getZoom();
         const baseSize = 16;
         const scaleFactor = Math.pow(1.2, zoom - 10);
@@ -690,8 +613,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       };
 
       const newMarkers: maplibregl.Marker[] = landmarks.map((landmark, index) => {
-        console.log(`Creating marker ${index}:`, landmark);
-        
         const zoom = map.getZoom();
         const baseSize = 16;
         const scaleFactor = Math.pow(1.2, zoom - 10);
@@ -727,9 +648,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       landmarkMarkersRef.current = newMarkers;
       
-      if (updateEmojiSize) {
-        map.on('zoom', updateEmojiSize);
-      }
+      map.on('zoom', updateEmojiSize);
       console.log(`Successfully added ${newMarkers.length} emoji markers`);
 
       return () => {
@@ -741,12 +660,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         });
         landmarkMarkersRef.current = [];
-        if (updateEmojiSize && map) {
-          try {
-            map.off('zoom', updateEmojiSize);
-          } catch (error) {
-            console.warn('Error removing zoom listener:', error);
-          }
+        try {
+          map.off('zoom', updateEmojiSize);
+        } catch (error) {
+          console.warn('Error removing zoom listener:', error);
         }
       };
     } catch (error) {
@@ -754,17 +671,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded, landmarks, map]);
 
-  // Integrated cleanup from DeckGLOverlay
+  // Cleanup
   useEffect(() => {
     return () => {
-      console.log('🔧 MapLibreMap cleanup (including DeckGL)');
-      if (overlayUpdateTimeout) {
-        clearTimeout(overlayUpdateTimeout);
+      console.log('🔧 MapLibreMap cleanup');
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+      if (moveTimeoutRef.current) {
+        clearTimeout(moveTimeoutRef.current);
       }
     };
   }, []);
 
-  
   return (
     <div
       ref={mapRef}
