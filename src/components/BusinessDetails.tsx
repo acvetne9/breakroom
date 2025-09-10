@@ -110,14 +110,16 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
               className="text-xl font-medium text-app-black"
             />
 
-            {(business.address?.trim() || business.atmosphere.length > 0) && (
+            {(
+              business.address?.trim() || (Array.isArray(business.atmosphere) && business.atmosphere.length > 0)
+            ) && (
               <div className="mt-1 flex flex-col gap-0.5">
                 {business.address && (
                   <span className="text-sm text-app-gray-medium">
                     {business.address}
                   </span>
                 )}
-                {business.atmosphere.length > 0 && (
+                {Array.isArray(business.atmosphere) && business.atmosphere.length > 0 && (
                   <span className="text-sm text-app-gray-medium">
                     {business.atmosphere.join(' • ')}
                   </span>

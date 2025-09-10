@@ -103,11 +103,13 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = memo(({ business, posts,
         <div className="flex justify-between items-start mb-4">
           <div>
             <h3 className="text-lg font-medium text-app-black">{business.name}</h3>
-            <div className="flex items-center mt-1">
-              <span className="text-app-gray-medium text-sm">
-                {business.atmosphere.join(' • ')}
-              </span>
-            </div>
+            {Array.isArray(business.atmosphere) && business.atmosphere.length > 0 && (
+              <div className="flex items-center mt-1">
+                <span className="text-app-gray-medium text-sm">
+                  {business.atmosphere.join(' • ')}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
