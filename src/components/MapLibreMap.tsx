@@ -24,6 +24,120 @@ interface MapLibreMapProps {
 // Singleton overlay for performance
 let overlayInstance: MapboxOverlay | null = null;
 
+// Add this helper function BEFORE the MapLibreMap component definition
+const createGridSampling = (bounds: any, businesses: Business[], maxBusinesses: number) => {
+  if (!businesses || businesses.length <= maxBusinesses) return businesses;
+  
+  // Create a grid to ensure even distribution
+  const gridSize = Math.ceil(Math.sqrt(maxBusinesses / 4)); // Adjust divisor to control density
+  const latStep = (bounds.north - bounds.south) / gridSize;
+  const lngStep = (bounds.east - bounds.west) / gridSize;
+  
+  const grid: Business[][] = Array(gridSize).fill(null).map(() => Array(gridSize).fill(null).map(() => []));
+  
+  // Distribute businesses into grid cells
+  businesses.forEach(business => {
+    if (!business?.position?.lat || !business?.position?.lng) return;
+    
+    const latIndex = Math.min(
+      gridSize - 1,
+      Math.max(0, Math.floor((business.position.lat - bounds.south) / latStep))
+    );
+    const lngIndex = Math.min(
+      gridSize - 1,
+      Math.max(0, Math.floor((business.position.lng - bounds.west) / lngStep))
+    );
+    
+    grid[latIndex][lngIndex].push(business);
+  });
+  
+  // Sample evenly from each cell
+  const businessesPerCell = Math.ceil(maxBusinesses / (gridSize * gridSize));
+  const result: Business[] = [];
+  
+  grid.forEach(row => {
+    row.forEach(cell => {
+      if (cell.length > 0) {
+        const sampled = cell
+          .sort(() => Math.random() - 0.5) // Randomize
+          .slice(0, businessesPerCell);
+        result.push(...sampled);
+      }
+    });
+  });
+  
+  return result.slice(0, maxBusinesses);
+};
+
+// In the handleViewportChange function, replace the loadBusinessesInViewport call:
+const handleViewportChange = useCallback(async () => {
+  if (!map || !mapLoaded || !loadBusinessesInViewport || isLoadingBusinessesRef.current) return;
+
+  try {
+    const bounds = map.getBounds();
+    const zoom = map.getZoom();
+    const now = Date.now();
+
+    const shouldRefreshPrevious =
+      lastViewportRef.current &&
+      (now - lastViewportRef.current.timestamp > 5000);
+
+    const latDiff = bounds.getNorth() - bounds.getSouth();
+    const lngDiff = bounds.getEast() - bounds.getWest();
+    const expansion = 0.1;
+
+    const expandedBounds = {
+      north: bounds.getNorth() + latDiff * expansion,
+      south: bounds.getSouth() - latDiff * expansion,
+      east: bounds.getEast() + lngDiff * expansion,
+      west: bounds.getWest() - lngDiff * expansion,
+    };
+
+    const businessLimit = getBusinessLimitForViewport(zoom, expandedBounds);
+
+    console.log('🗺️ Loading businesses for viewport:', {
+      zoom: zoom.toFixed(2),
+      businessLimit,
+      refreshingPrevious: shouldRefreshPrevious,
+    });
+
+    isLoadingBusinessesRef.current = true;
+
+    // Load more businesses than needed for better distribution
+    const rawBusinesses = await loadBusinessesInViewport(expandedBounds, businessLimit * 1.5);
+    
+    // Apply grid sampling for even distribution
+    const distributedBusinesses = createGridSampling(expandedBounds, rawBusinesses || [], businessLimit);
+    
+    // Update the businesses state with evenly distributed results
+    setBusinessCache(prev => {
+      const updated = { ...prev };
+      distributedBusinesses.forEach(b => {
+        if (b && b.id) {
+          updated[b.id] = b;
+        }
+      });
+      return updated;
+    });
+
+    if (shouldRefreshPrevious && lastViewportRef.current) {
+      setTimeout(() => {
+        console.log('🔄 Background refresh of previous area');
+        loadBusinessesInViewport(lastViewportRef.current!.bounds, businessLimit * 0.5);
+      }, 1000);
+    }
+
+    lastViewportRef.current = { bounds: expandedBounds, timestamp: now };
+
+    setTimeout(() => {
+      isLoadingBusinessesRef.current = false;
+    }, 1000);
+  } catch (error) {
+    console.error('Error in handleViewportChange:', error);
+    isLoadingBusinessesRef.current = false;
+  }
+}, [map, mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport]);
+
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
   onBusinessClick,
   selectedBusiness,
@@ -153,60 +267,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       onBusinessClickRef.current(business);
     }
   }, [fetchFullBusinessDetails]);
-
-  const handleViewportChange = useCallback(async () => {
-    if (!map || !mapLoaded || !loadBusinessesInViewport || isLoadingBusinessesRef.current) return;
-  
-    try {
-      const bounds = map.getBounds();
-      const zoom = map.getZoom();
-      const now = Date.now();
-  
-      const shouldRefreshPrevious =
-        lastViewportRef.current &&
-        (now - lastViewportRef.current.timestamp > 5000);
-  
-      const latDiff = bounds.getNorth() - bounds.getSouth();
-      const lngDiff = bounds.getEast() - bounds.getWest();
-      const expansion = 0.1;
-  
-      const expandedBounds = {
-        north: bounds.getNorth() + latDiff * expansion,
-        south: bounds.getSouth() - latDiff * expansion,
-        east: bounds.getEast() + lngDiff * expansion,
-        west: bounds.getWest() - lngDiff * expansion,
-      };
-  
-      const businessLimit = getBusinessLimitForViewport(zoom, expandedBounds);
-  
-      console.log('🗺️ Loading businesses for viewport:', {
-        zoom: zoom.toFixed(2),
-        businessLimit,
-        refreshingPrevious: shouldRefreshPrevious,
-      });
-  
-      isLoadingBusinessesRef.current = true;
-  
-      // ✅ await is valid now
-      await loadBusinessesInViewport(expandedBounds, businessLimit);
-  
-      if (shouldRefreshPrevious && lastViewportRef.current) {
-        setTimeout(() => {
-          console.log('🔄 Background refresh of previous area');
-          loadBusinessesInViewport(lastViewportRef.current!.bounds, businessLimit * 0.5);
-        }, 1000);
-      }
-  
-      lastViewportRef.current = { bounds: expandedBounds, timestamp: now };
-  
-      setTimeout(() => {
-        isLoadingBusinessesRef.current = false;
-      }, 1000);
-    } catch (error) {
-      console.error('Error in handleViewportChange:', error);
-      isLoadingBusinessesRef.current = false;
-    }
-  }, [map, mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport]);
 
   // Create DeckGL layers
   const deckGLLayers = useMemo(() => {
