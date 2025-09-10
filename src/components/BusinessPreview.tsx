@@ -35,11 +35,11 @@ interface BusinessPreviewProps {
 
 const BusinessPreview: React.FC<BusinessPreviewProps> = memo(({ business, posts, onClose, onShowDetails, onStoriesClick }) => {
   // Get stories (posts) for this business
-  const businessStories = posts.filter(post => post.businessId === business.id && post.isStory).slice(0, 3);
+  const businessStories = Array.isArray(posts) ? posts.filter(post => post.businessId === business.id && post.isStory).slice(0, 3) : [];
 
   // Calculate average salary per role type
   const calculateRoleAverages = () => {
-    if (!business.roles || business.roles.length === 0) {
+    if (!Array.isArray(business.roles) || business.roles.length === 0) {
       return [];
     }
 
@@ -114,12 +114,12 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = memo(({ business, posts,
         </div>
 
         {/* Show averaged salary per role */}
-        {roleAverages.length > 0 && (
+        {Array.isArray(roleAverages) && roleAverages.length > 0 && (
           <div className="mb-4">
             <div 
               className="space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
               style={{ 
-                maxHeight: roleAverages.length > 3 ? '72px' : 'auto' // 3 rows * 24px per row
+                maxHeight: Array.isArray(roleAverages) && roleAverages.length > 3 ? '72px' : 'auto' // 3 rows * 24px per row
               }}
             >
               {roleAverages.map((roleAvg, index) => (
@@ -145,7 +145,7 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = memo(({ business, posts,
             <h4 className="text-sm font-medium text-app-black">Stories 📖</h4>
           </div>
           <div className="space-y-2">
-            {businessStories.length > 0 ? (
+            {Array.isArray(businessStories) && businessStories.length > 0 ? (
               businessStories.map(story => (
                 <div 
                   key={story.id}

@@ -129,7 +129,7 @@ export const useViewportMapData = () => {
           index.set(`${x}-${y}`, []);
         }
       }
-      for (const feature of mainDataRef.current.features) {
+      for (const feature of (mainDataRef.current?.features || [])) {
         try {
           if (feature.geometry?.type === 'Point') {
             const [lng, lat] = feature.geometry.coordinates as [number, number];
@@ -153,7 +153,7 @@ export const useViewportMapData = () => {
     console.log(`🗺️ Loading chunk ${chunkId} (from cache)`);
     await ensureDataLoaded();
     const features = chunkIndexRef.current.get(chunkId) || [];
-    console.log(`✅ Chunk ${chunkId} loaded with ${features.length} features (cached, no refetch)`);
+    console.log(`✅ Chunk ${chunkId} loaded with ${Array.isArray(features) ? features.length : 0} features (cached, no refetch)`);
     return features;
   }, [ensureDataLoaded]);
 
@@ -161,12 +161,12 @@ export const useViewportMapData = () => {
     // Global guard to ensure we load only once per session
     if (startedRef.current) {
       await ensureDataLoaded();
-      const cached = currentFeatures.length ? currentFeatures : (mainDataRef.current?.features as Feature[] | undefined) || [];
+      const cached = Array.isArray(currentFeatures) && currentFeatures.length > 0 ? currentFeatures : (mainDataRef.current?.features as Feature[] | undefined) || [];
       return { features: cached, landData: landDataRef.current };
     }
     if (allDataLoaded || isProcessing) {
       await ensureDataLoaded();
-      const cached = currentFeatures.length ? currentFeatures : (mainDataRef.current?.features as Feature[] | undefined) || [];
+      const cached = Array.isArray(currentFeatures) && currentFeatures.length > 0 ? currentFeatures : (mainDataRef.current?.features as Feature[] | undefined) || [];
       return { features: cached, landData: landDataRef.current };
     }
     
@@ -179,7 +179,7 @@ export const useViewportMapData = () => {
       const features = (mainDataRef.current?.features as Feature[]) || [];
       setCurrentFeatures(features);
       setAllDataLoaded(true);
-      console.log(`Loaded full dataset once: ${features.length} features`);
+      console.log(`Loaded full dataset once: ${Array.isArray(features) ? features.length : 0} features`);
       return { features, landData: landDataRef.current };
       
     } catch (error) {

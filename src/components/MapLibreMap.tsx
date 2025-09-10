@@ -201,6 +201,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Optimized business limit calculation
   const getBusinessLimitForViewport = useCallback((zoom: number, bounds: Bounds): number => {
+    if (!bounds) return 200; // fallback if bounds is undefined
+    
     const latDiff = bounds.north - bounds.south;
     const lngDiff = bounds.east - bounds.west;
     const avgLat = (bounds.north + bounds.south) / 2;
@@ -300,7 +302,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         // Load businesses with buffer
         const rawBusinesses = await loadBusinessesInViewport(expandedBounds, Math.floor(businessLimit * 1.3));
 
-        if (!rawBusinesses || !Array.isArray(rawBusinesses) || rawBusinesses.length === 0) {
+        if (!Array.isArray(rawBusinesses) || rawBusinesses.length === 0) {
           console.log('No businesses loaded for viewport');
           return;
         }
@@ -373,10 +375,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       let businessesToRender = cachedBusinesses;
       
       // Handle clustered data efficiently
-      if (isClusteredData && businesses && businesses.length > 0) {
+      if (isClusteredData && Array.isArray(businesses) && businesses.length > 0) {
         const flattenedBusinesses: Business[] = [];
         businesses.forEach((item: any) => {
-          if (item?.type === 'cluster' && item.businesses) {
+          if (item?.type === 'cluster' && Array.isArray(item.businesses)) {
             item.businesses.forEach((b: Business) => {
               if (b?.position) flattenedBusinesses.push(b);
             });
@@ -611,7 +613,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Handle business updates
   useEffect(() => {
-    if (businesses && businesses.length > 0) {
+    if (businesses && Array.isArray(businesses) && businesses.length > 0) {
       businessCacheRef.current.addMultiple(businesses);
       callbackRefs.current.onBusinessesLoaded?.();
     }
@@ -641,7 +643,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Handle landmarks with performance optimization
   useEffect(() => {
-    if (!mapLoaded || !landmarks?.length || !map) return;
+    if (!mapLoaded || !Array.isArray(landmarks) || landmarks.length === 0 || !map) return;
 
     // Clear existing markers
     landmarkMarkersRef.current.forEach(marker => {

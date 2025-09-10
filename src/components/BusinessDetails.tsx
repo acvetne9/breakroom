@@ -74,7 +74,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
     }
   };
 
-  const businessStories = posts.filter(post => post.businessId === business.id && post.isStory);
+  const businessStories = Array.isArray(posts) ? posts.filter(post => post.businessId === business.id && post.isStory) : [];
 
   const handleCardClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -91,7 +91,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
     onRoleVote?.(business.id, roleIndex, voteType);
   };
 
-  const roles = business.roles || [];
+  const roles = Array.isArray(business.roles) ? business.roles : [];
   const shouldScroll = roles.length > 6;
 
   return (
@@ -189,7 +189,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
             More Stories 📖
           </h3>
           <div className="space-y-4">
-            {businessStories.length > 0 ? (
+            {Array.isArray(businessStories) && businessStories.length > 0 ? (
               <>
                 {businessStories.slice(0, 5).map(story => (
                   <div
@@ -206,7 +206,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
                     </span>
                   </div>
                 ))}
-                {businessStories.length > 5 && (
+                {Array.isArray(businessStories) && businessStories.length > 5 && (
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
