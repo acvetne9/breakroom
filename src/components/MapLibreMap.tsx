@@ -24,27 +24,27 @@ interface MapLibreMapProps {
 // Singleton overlay for performance
 let overlayInstance: MapboxOverlay | null = null;
 
-const createGridSampling = (bounds: any, businesses: Business[], maxBusinesses: number) => {
+const createGridSampling = (bounds: any, businesses: Business[], maxBusinesses: number): Business[] => {
   if (!businesses || businesses.length <= maxBusinesses) return businesses;
-  
+
   // Create a grid to ensure even distribution
   const gridSize = Math.ceil(Math.sqrt(maxBusinesses / 4)); // Adjust divisor to control density
   const latStep = (bounds.north - bounds.south) / gridSize;
   const lngStep = (bounds.east - bounds.west) / gridSize;
-  
-  // Fix: Properly initialize the grid as Business[][]
-  const grid: Business[][] = [];
+
+  // ✅ Fix: grid is a 2D array of Business[]
+  const grid: Business[][][] = [];
   for (let i = 0; i < gridSize; i++) {
     grid[i] = [];
     for (let j = 0; j < gridSize; j++) {
       grid[i][j] = [];
     }
   }
-  
+
   // Distribute businesses into grid cells
   businesses.forEach(business => {
     if (!business?.position?.lat || !business?.position?.lng) return;
-    
+
     const latIndex = Math.min(
       gridSize - 1,
       Math.max(0, Math.floor((business.position.lat - bounds.south) / latStep))
@@ -53,14 +53,14 @@ const createGridSampling = (bounds: any, businesses: Business[], maxBusinesses: 
       gridSize - 1,
       Math.max(0, Math.floor((business.position.lng - bounds.west) / lngStep))
     );
-    
+
     grid[latIndex][lngIndex].push(business);
   });
-  
+
   // Sample evenly from each cell
   const businessesPerCell = Math.ceil(maxBusinesses / (gridSize * gridSize));
   const result: Business[] = [];
-  
+
   grid.forEach(row => {
     row.forEach(cell => {
       if (cell.length > 0) {
@@ -71,7 +71,7 @@ const createGridSampling = (bounds: any, businesses: Business[], maxBusinesses: 
       }
     });
   });
-  
+
   return result.slice(0, maxBusinesses);
 };
 
