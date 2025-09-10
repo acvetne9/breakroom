@@ -256,7 +256,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         west: bounds.getWest(),
       };
   
-      const [inside, outside] = (rawBusinesses || []).reduce<[Business[], Business[]]>(
+      const [inside, outside] = (rawBusinesses || []).reduce(
         (acc, b) => {
           if (!b?.position) return acc;
           if (
@@ -271,9 +271,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
           return acc;
         },
-        [[], []]
+        [[], []] as [Business[], Business[]] // ✅ cast the initial value
       );
-  
+
       const insideSampled = createGridSampling(visibleBounds, inside, businessLimit);
       const outsideSampled = createGridSampling(expandedBounds, outside, Math.floor(businessLimit * 0.3));
   
