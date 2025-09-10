@@ -165,39 +165,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     callbackRefs.current = { onBusinessClick, onMapLoaded, onBusinessesLoaded };
   }, [onBusinessClick, onMapLoaded, onBusinessesLoaded]);
 
-  // Initialize hooks with error handling
-  const hooks = useMemo(() => {
-    try {
-      const mapDataHook = useViewportMapData();
-      const businessesHook = useViewportBusinesses(searchFilters);
-      return { mapDataHook, businessesHook };
-    } catch (error) {
-      console.error('Error initializing hooks:', error);
-      return {
-        mapDataHook: { 
-          isProcessing: false, 
-          setIsProcessing: () => {},
-          loadAllDataCenterOut: () => {} 
-        },
-        businessesHook: {
-          businesses: [],
-          loading: false,
-          loadBusinessesInViewport: () => Promise.resolve([]),
-          fetchFullBusinessDetails: () => Promise.resolve(null),
-          isSearching: false
-        }
-      };
-    }
-  }, [searchFilters]);
+  // Initialize hooks (must be called unconditionally at top level)
+  const mapDataHook = useViewportMapData();
+  const businessesHook = useViewportBusinesses(searchFilters);
 
-  const { isProcessing, setIsProcessing } = hooks.mapDataHook;
+  const { isProcessing, setIsProcessing } = mapDataHook;
   const { 
     businesses, 
     loading: businessesLoading, 
     loadBusinessesInViewport, 
     fetchFullBusinessDetails,
     isSearching
-  } = hooks.businessesHook;
+  } = businessesHook;
 
   // Optimized business limit calculation
   const getBusinessLimitForViewport = useCallback((zoom: number, bounds: Bounds): number => {
