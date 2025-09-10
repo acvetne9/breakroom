@@ -652,20 +652,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Handle map movement
   useEffect(() => {
-    if (!map || !mapLoaded) return;
-
-    const moveEndHandler = () => {
-      if (moveTimeoutRef.current) {
-        clearTimeout(moveTimeoutRef.current);
-      }
-      
-      moveTimeoutRef.current = setTimeout(() => {
-        handleViewportChange();
-      }, 300);
+    if (!map) return;   // <-- guard
+    if (!mapLoaded) return;
+  
+    const handler = () => handleViewportChange();
+    map.on('moveend', handler);
+    map.on('zoomend', handler);
+  
+    return () => {
+      map.off('moveend', handler);
+      map.off('zoomend', handler);
     };
+  }, [map, mapLoaded, handleViewportChange]);
+
     
-    map.on('moveend', moveEndHandler);
-    map.on('zoomend', moveEndHandler);
+    if (map) {
+      map.on('moveend', handleViewportChange);
+      map.on('zoomend', handleViewportChange);
+    }
+
     
     // Initial load
     setTimeout(() => {
