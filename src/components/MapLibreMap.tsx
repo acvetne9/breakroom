@@ -24,7 +24,7 @@ interface MapLibreMapProps {
 // Singleton overlay for performance
 let overlayInstance: MapboxOverlay | null = null;
 
-/ Add this helper function BEFORE the MapLibreMap component definition
+// Add this helper function BEFORE the MapLibreMap component definition
 const createGridSampling = (bounds: any, businesses: Business[], maxBusinesses: number) => {
   if (!businesses || businesses.length <= maxBusinesses) return businesses;
   
