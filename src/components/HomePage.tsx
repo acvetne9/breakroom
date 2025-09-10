@@ -48,6 +48,7 @@ const HomePage: React.FC<HomePageProps> = ({
   const [neighborhoodCenter, setNeighborhoodCenter] = useState<{ lat: number; lon: number } | null>(null);
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
   const [showLoading, setShowLoading] = useState(true);
+  const [searchCompleted, setSearchCompleted] = useState(false); // Track if a search has been completed
 
   // 👇 state for welcome banner
   const [showWelcome, setShowWelcome] = useState(false);
@@ -73,6 +74,7 @@ const HomePage: React.FC<HomePageProps> = ({
         setNeighborhoodCenter(null);
       }
       setSearchFilters(filters);
+      setSearchCompleted(true); // Mark search as completed
     };
 
     window.addEventListener('triggerSearch', handleSearchTrigger as EventListener);
@@ -128,6 +130,11 @@ const HomePage: React.FC<HomePageProps> = ({
     setSearchValue(value);
     setSearchFilters(filters);
     
+    // Mark search as completed when there's a meaningful search
+    if (value.trim() !== '' || filters !== null) {
+      setSearchCompleted(true);
+    }
+    
     if (neighborhoodCoords) {
       console.log('🏙️ Setting neighborhood center:', neighborhoodCoords);
       setNeighborhoodCenter(neighborhoodCoords);
@@ -139,6 +146,7 @@ const HomePage: React.FC<HomePageProps> = ({
       console.log('🧹 Search explicitly cleared - removing filters');
       setSearchFilters(null);
       setNeighborhoodCenter(null);
+      setSearchCompleted(false); // Reset search completed state when cleared
     }
   };
 
@@ -178,6 +186,21 @@ const HomePage: React.FC<HomePageProps> = ({
   const handleBackToPreview = () => {
     setShowBusinessDetails(false);
   };
+
+  // 👇 New function to clear search
+  const handleClearSearch = () => {
+    console.log('🧹 Clearing search from X button');
+    setSearchValue('');
+    setSearchFilters(null);
+    setNeighborhoodCenter(null);
+    setSearchCompleted(false); // Reset search completed state
+    // Also trigger the onChange to ensure UnifiedBusinessSearch is updated
+    handleSearchChange('', undefined, null, undefined);
+  };
+
+  // Check if we have an active search (either value or filters) AND search has been completed
+  const hasActiveSearch = searchValue.trim() !== '' || searchFilters !== null;
+  const showClearButton = searchCompleted && hasActiveSearch;
 
   return (
     <div className="relative w-full h-full">
@@ -232,15 +255,31 @@ const HomePage: React.FC<HomePageProps> = ({
         {/* Search input bar at bottom */}
         {currentSlide === 1 && currentView === 'main' && (
           <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
-            <UnifiedBusinessSearch
-              value={searchValue}
-              onChange={handleSearchChange}
-              onBusinessSelect={handleSearchBusinessSelect}
-              placeholder="Search roles, pay, places, and neighborhoods!"
-              variant="search-bar"
-              showIcon={true}
-              onLocationSave={onLocationSave}
-            />
+            <div className="relative">
+              <UnifiedBusinessSearch
+                value={searchValue}
+                onChange={handleSearchChange}
+                onBusinessSelect={handleSearchBusinessSelect}
+                placeholder="Search roles, pay, places, and neighborhoods!"
+                variant="search-bar"
+                showIcon={!showClearButton} // Hide search icon when clear button should show
+                onLocationSave={onLocationSave}
+              />
+              
+              {/* Clear search button (X) that replaces the search icon */}
+              {showClearButton && (
+                <button
+                  onClick={handleClearSearch}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                  aria-label="Clear search"
+                >
+                  <div className="relative w-3 h-3">
+                    <div className="absolute top-1/2 left-0 w-full h-0.5 bg-gray-600 transform -translate-y-1/2 rotate-45"></div>
+                    <div className="absolute top-1/2 left-0 w-full h-0.5 bg-gray-600 transform -translate-y-1/2 -rotate-45"></div>
+                  </div>
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>

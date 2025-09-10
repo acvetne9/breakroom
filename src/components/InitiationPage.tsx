@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 // framer-motion removed to prevent dynamic import parse issue
 import JobSearchDropdown from './JobSearchDropdown';
 import BusinessSearchDropdown from './BusinessSearchDropdown';
-import { isProfane } from '../utils/profanityFilter';
+import { isProfane } from '@/utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 
 // Import the predefined job options to check against
