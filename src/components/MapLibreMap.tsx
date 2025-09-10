@@ -65,7 +65,7 @@ const createOptimizedGridSampling = (bounds: Bounds, businesses: Business[], max
     grid[latIndex][lngIndex].push(business);
   });
 
-  // Sample evenly from each cell with priority scoring
+  // Sample evenly from each cell with simple randomization
   const businessesPerCell = Math.ceil(maxBusinesses / (gridSize * gridSize));
   const result: Business[] = [];
 
@@ -73,31 +73,25 @@ const createOptimizedGridSampling = (bounds: Bounds, businesses: Business[], max
     row.forEach(cell => {
       if (cell.length === 0) return;
 
-      // Sort by priority (if available) or randomize
-      const sortedCell = cell.sort((a, b) => {
-        // Prioritize businesses with ratings or reviews
-        const aScore = (a.rating || 0) * (a.reviewCount || 1);
-        const bScore = (b.rating || 0) * (b.reviewCount || 1);
-        return bScore - aScore || Math.random() - 0.5;
-      });
-
-      result.push(...sortedCell.slice(0, businessesPerCell));
+      // Simple randomization to avoid complex sorting
+      const shuffled = cell.sort(() => Math.random() - 0.5);
+      result.push(...shuffled.slice(0, businessesPerCell));
     });
   });
 
   return result.slice(0, maxBusinesses);
 };
 
-// Memoized business cache with LRU-like behavior
+// Simple business cache with LRU-like behavior
 class BusinessCache {
-  private cache = new Map<string, Business>();
+  private cache = new Map<string, Business & { detailsLoaded?: boolean }>();
   private maxSize: number;
 
   constructor(maxSize = 10000) {
     this.maxSize = maxSize;
   }
 
-  set(id: string, business: Business) {
+  set(id: string, business: Business & { detailsLoaded?: boolean }) {
     if (this.cache.size >= this.maxSize) {
       // Remove oldest entries
       const keysToDelete = Array.from(this.cache.keys()).slice(0, Math.floor(this.maxSize * 0.1));
@@ -106,7 +100,7 @@ class BusinessCache {
     this.cache.set(id, business);
   }
 
-  get(id: string): Business | undefined {
+  get(id: string): (Business & { detailsLoaded?: boolean }) | undefined {
     const business = this.cache.get(id);
     if (business) {
       // Move to end (most recently used)
@@ -116,7 +110,7 @@ class BusinessCache {
     return business;
   }
 
-  getAll(): Business[] {
+  getAll(): (Business & { detailsLoaded?: boolean })[] {
     return Array.from(this.cache.values());
   }
 
@@ -188,7 +182,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         businessesHook: {
           businesses: [],
           loading: false,
-          loadBusinessesInViewport: () => {},
+          loadBusinessesInViewport: () => Promise.resolve([]),
           fetchFullBusinessDetails: () => Promise.resolve(null),
           isSearching: false
         }
@@ -218,16 +212,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     
     // Adaptive density based on zoom level
     let baseDensity: number;
-    if (zoom >= 16) baseDensity = 400;
-    else if (zoom >= 14) baseDensity = 200;
-    else if (zoom >= 12) baseDensity = 100;
-    else baseDensity = 50;
+    if (zoom >= 16) baseDensity = 300;
+    else if (zoom >= 14) baseDensity = 150;
+    else if (zoom >= 12) baseDensity = 80;
+    else baseDensity = 40;
     
     // Adjust for mobile performance
     const mobileFactor = isMobile ? 0.7 : 1.0;
     const targetBusinesses = Math.ceil(areaKm2 * baseDensity * mobileFactor);
     
-    const maxLimit = isMobile ? 3000 : 8000;
+    const maxLimit = isMobile ? 3000 : 6000;
     const minLimit = 200;
     
     return Math.max(minLimit, Math.min(maxLimit, targetBusinesses));
@@ -247,8 +241,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         } else {
           const fullBusiness = await fetchFullBusinessDetails(business.id);
           if (fullBusiness) {
-            businessCacheRef.current.set(business.id, { ...fullBusiness, detailsLoaded: true });
-            businessToReturn = fullBusiness;
+            const extendedBusiness = { ...fullBusiness, detailsLoaded: true };
+            businessCacheRef.current.set(business.id, extendedBusiness);
+            businessToReturn = extendedBusiness;
           }
         }
       }
@@ -305,7 +300,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         // Load businesses with buffer
         const rawBusinesses = await loadBusinessesInViewport(expandedBounds, Math.floor(businessLimit * 1.3));
 
-        if (!rawBusinesses || rawBusinesses.length === 0) {
+        if (!rawBusinesses || !Array.isArray(rawBusinesses) || rawBusinesses.length === 0) {
           console.log('No businesses loaded for viewport');
           return;
         }
@@ -318,20 +313,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           west: bounds.getWest(),
         };
 
-        const [visible, buffer] = rawBusinesses.reduce(
-          (acc, b) => {
-            if (!b?.position) return acc;
-            
-            const isVisible = b.position.lat <= visibleBounds.north &&
-              b.position.lat >= visibleBounds.south &&
-              b.position.lng <= visibleBounds.east &&
-              b.position.lng >= visibleBounds.west;
-            
-            acc[isVisible ? 0 : 1].push(b);
-            return acc;
-          },
-          [[], []] as [Business[], Business[]]
-        );
+        const visible: Business[] = [];
+        const buffer: Business[] = [];
+
+        rawBusinesses.forEach((b: Business) => {
+          if (!b?.position) return;
+          
+          const isVisible = b.position.lat <= visibleBounds.north &&
+            b.position.lat >= visibleBounds.south &&
+            b.position.lng <= visibleBounds.east &&
+            b.position.lng >= visibleBounds.west;
+          
+          if (isVisible) {
+            visible.push(b);
+          } else {
+            buffer.push(b);
+          }
+        });
 
         // Apply optimized sampling
         const visibleSampled = createOptimizedGridSampling(visibleBounds, visible, Math.floor(businessLimit * 0.8));
@@ -346,7 +344,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         lastViewportRef.current = { bounds: expandedBounds, zoom, timestamp: now };
 
         // Background refresh of previous area if needed
-        if (shouldRefreshPrevious && lastViewportRef.current) {
+        if (shouldRefreshPrevious && lastViewportRef.current && loadBusinessesInViewport) {
           setTimeout(() => {
             if (lastViewportRef.current && loadBusinessesInViewport) {
               loadBusinessesInViewport(lastViewportRef.current.bounds, Math.floor(businessLimit * 0.3));
@@ -376,12 +374,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       
       // Handle clustered data efficiently
       if (isClusteredData && businesses.length > 0) {
-        businessesToRender = businesses.flatMap((item: any) => {
+        const flattenedBusinesses: Business[] = [];
+        businesses.forEach((item: any) => {
           if (item?.type === 'cluster' && item.businesses) {
-            return item.businesses.filter(b => b?.position);
+            item.businesses.forEach((b: Business) => {
+              if (b?.position) flattenedBusinesses.push(b);
+            });
+          } else if (item?.type !== 'cluster' && item?.position) {
+            flattenedBusinesses.push(item);
           }
-          return item?.type !== 'cluster' && item?.position ? [item] : [];
         });
+        businessesToRender = flattenedBusinesses;
       }
 
       return [createBusinessScatterplotLayer({
@@ -430,9 +433,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       maxZoom: 18,
       minZoom: 9,
       renderWorldCopies: false,
-      attributionControl: false,
-      preserveDrawingBuffer: isMobile, // Optimize for mobile
-      antialias: !isMobile // Disable antialiasing on mobile for performance
+      attributionControl: false
     });
     
     mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
@@ -554,7 +555,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       setMapLoaded(false);
       setMap(null);
     };
-  }, [handleViewportChange, isMobile]);
+  }, [handleViewportChange]);
 
   // Initialize DeckGL overlay
   useEffect(() => {
