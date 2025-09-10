@@ -212,7 +212,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [fetchFullBusinessDetails]);
 
   
-  // In the handleViewportChange function, replace the loadBusinessesInViewport call:
   const handleViewportChange = useCallback(async () => {
     if (!map || !mapLoaded || !loadBusinessesInViewport || isLoadingBusinessesRef.current) return;
   
@@ -229,13 +228,34 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const lngDiff = bounds.getEast() - bounds.getWest();
       const expansion = 0.05;
   
+      const expandedBounds = {
+        north: bounds.getNorth() + latDiff * expansion,
+        south: bounds.getSouth() - latDiff * expansion,
+        east: bounds.getEast() + lngDiff * expansion,
+        west: bounds.getWest() - lngDiff * expansion,
+      };
+  
+      const businessLimit = getBusinessLimitForViewport(zoom, expandedBounds);
+  
+      console.log('🗺️ Loading businesses for viewport:', {
+        zoom: zoom.toFixed(2),
+        businessLimit,
+        refreshingPrevious: shouldRefreshPrevious,
+      });
+  
+      isLoadingBusinessesRef.current = true;
+  
+      // Load more businesses than needed for better distribution
+      const rawBusinesses = await loadBusinessesInViewport(expandedBounds, businessLimit * 1.5);
+  
+      // ✅ Prioritize businesses inside the viewport first
       const visibleBounds = {
         north: bounds.getNorth(),
         south: bounds.getSouth(),
         east: bounds.getEast(),
         west: bounds.getWest(),
       };
-      
+  
       const [inside, outside] = (rawBusinesses || []).reduce<[Business[], Business[]]>(
         (acc, b) => {
           if (!b?.position) return acc;
@@ -253,13 +273,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         },
         [[], []]
       );
-
+  
       const insideSampled = createGridSampling(visibleBounds, inside, businessLimit);
-      const outsideSampled = createGridSampling(expandedBounds, outside, businessLimit * 0.3);
-      
+      const outsideSampled = createGridSampling(expandedBounds, outside, Math.floor(businessLimit * 0.3));
+  
       const distributedBusinesses = [...insideSampled, ...outsideSampled].slice(0, businessLimit);
-
-      // Update the businesses state with evenly distributed results
+  
+      // Update the businesses state
       setBusinessCache(prev => {
         const updated = { ...prev };
         distributedBusinesses.forEach(b => {
