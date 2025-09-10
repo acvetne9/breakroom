@@ -520,6 +520,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return () => {
       if (mapInstance) {
         try {
+          // Remove event listeners before removing map
+          mapInstance.off('move');
+          mapInstance.off('load');
+          mapInstance.off('error');
+          mapInstance.off('sourcedata');
           mapInstance.remove();
         } catch (error) {
           console.error('Error removing map:', error);
@@ -530,7 +535,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         }
       }
     };
-  }, [handleViewportChange]);
+  }, []);
 
   // Initialize DeckGL overlay
   useEffect(() => {
