@@ -32,7 +32,10 @@ const createGridSampling = (bounds: any, businesses: Business[], maxBusinesses: 
   const latStep = (bounds.north - bounds.south) / gridSize;
   const lngStep = (bounds.east - bounds.west) / gridSize;
   
-  const grid: Business[][] = Array(gridSize).fill(null).map(() => Array(gridSize).fill(null).map(() => []));
+  // Fix: Properly initialize the grid as Business[][]
+  const grid: Business[][] = Array(gridSize).fill(null).map(() => 
+    Array(gridSize).fill(null).map(() => [] as Business[])
+  );
   
   // Distribute businesses into grid cells
   businesses.forEach(business => {
