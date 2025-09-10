@@ -199,6 +199,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [fetchFullBusinessDetails]);
 
+  
   // In the handleViewportChange function, replace the loadBusinessesInViewport call:
   const handleViewportChange = useCallback(async () => {
     if (!map || !mapLoaded || !loadBusinessesInViewport || isLoadingBusinessesRef.current) return;
