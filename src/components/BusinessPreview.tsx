@@ -47,7 +47,8 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = memo(({ business, posts,
     const roleGroups: { [key: string]: number[] } = {};
     
     business.roles.forEach(role => {
-      const match = role.salary.match(/\$?(\d+(?:\.\d+)?)/);
+      const salaryStr = typeof role.salary === 'string' ? role.salary : '';
+      const match = salaryStr.match(/\$?(\d+(?:\.\d+)?)/);
       const salary = match ? parseFloat(match[1]) : 0;
       
       if (salary > 0) {
@@ -153,7 +154,7 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = memo(({ business, posts,
                   onClick={handleStoryClick}
                 >
                   <p className="line-clamp-2">
-                    {story.text.length > 60 ? `${story.text.substring(0, 60)}...` : story.text}
+                    {story.text && story.text.length > 60 ? `${story.text.substring(0, 60)}...` : (story.text || '')}
                   </p>
                   <span className="absolute bottom-0 left-0 text-xs text-gray-400">{formatTimeAgo(story.createdAt)}</span>
                 </div>

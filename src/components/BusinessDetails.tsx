@@ -150,8 +150,8 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
                 <span className="text-app-black">{role.role}</span>
                 <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
                   <span className="font-medium text-app-black">
-                    {role.salary}
-                    {!role.salary.includes('/') && (
+                    {typeof role.salary === 'string' ? role.salary : (business.salary || '$13.6')}
+                    {!(typeof role.salary === 'string' && role.salary.includes('/')) && (
                       <span className="text-xs text-app-gray-medium ml-1">/hr</span>
                     )}
                   </span>
@@ -198,7 +198,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
                     onClick={(e) => handleStoryClick(story, e)}
                   >
                     <TranslatedText 
-                      text={story.text.length > 100 ? `${story.text.substring(0, 100)}...` : story.text}
+                      text={(story.text && story.text.length > 100) ? `${story.text.substring(0, 100)}...` : (story.text || '')}
                       className="text-app-gray-dark text-sm pb-4"
                     />
                     <span className="absolute bottom-2 left-4 text-xs text-gray-400">
