@@ -220,7 +220,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const bounds = map.getBounds();
       const zoom = map.getZoom();
       const now = Date.now();
-
+  
+      const shouldRefreshPrevious =
+        lastViewportRef.current &&
+        (now - lastViewportRef.current.timestamp > 5000);
+  
+      const latDiff = bounds.getNorth() - bounds.getSouth();
+      const lngDiff = bounds.getEast() - bounds.getWest();
+      const expansion = 0.05;
+  
       const visibleBounds = {
         north: bounds.getNorth(),
         south: bounds.getSouth(),
@@ -246,43 +254,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         [[], []]
       );
 
-const insideSampled = createGridSampling(visibleBounds, inside, businessLimit);
-const outsideSampled = createGridSampling(expandedBounds, outside, businessLimit * 0.3);
-
-const distributedBusinesses = [...insideSampled, ...outsideSampled].slice(0, businessLimit);
-
-  
-      const shouldRefreshPrevious =
-        lastViewportRef.current &&
-        (now - lastViewportRef.current.timestamp > 5000);
-  
-      const latDiff = bounds.getNorth() - bounds.getSouth();
-      const lngDiff = bounds.getEast() - bounds.getWest();
-      const expansion = 0.05;
-  
-      const expandedBounds = {
-        north: bounds.getNorth() + latDiff * expansion,
-        south: bounds.getSouth() - latDiff * expansion,
-        east: bounds.getEast() + lngDiff * expansion,
-        west: bounds.getWest() - lngDiff * expansion,
-      };
-  
-      const businessLimit = getBusinessLimitForViewport(zoom, expandedBounds);
-  
-      console.log('🗺️ Loading businesses for viewport:', {
-        zoom: zoom.toFixed(2),
-        businessLimit,
-        refreshingPrevious: shouldRefreshPrevious,
-      });
-  
-      isLoadingBusinessesRef.current = true;
-  
-      // Load more businesses than needed for better distribution
-      const rawBusinesses = await loadBusinessesInViewport(expandedBounds, businessLimit * 1.5);
+      const insideSampled = createGridSampling(visibleBounds, inside, businessLimit);
+      const outsideSampled = createGridSampling(expandedBounds, outside, businessLimit * 0.3);
       
-      // Apply grid sampling for even distribution
-      const distributedBusinesses = createGridSampling(expandedBounds, rawBusinesses || [], businessLimit);
-      
+      const distributedBusinesses = [...insideSampled, ...outsideSampled].slice(0, businessLimit);
+
       // Update the businesses state with evenly distributed results
       setBusinessCache(prev => {
         const updated = { ...prev };
