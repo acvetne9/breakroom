@@ -144,7 +144,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [overlayReady, setOverlayReady] = useState(false);
   
   // Refs for stable references and state tracking
-  const businessCacheRef = useRef(new BusinessCache(isMobile ? 5000 : 10000));
+  const businessCacheRef = useRef(new BusinessCache(isMobile ? 10000 : 20000));
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
   const layersAddedRef = useRef(false);
   const isLoadingRef = useRef(false);
