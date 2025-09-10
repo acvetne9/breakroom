@@ -294,7 +294,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         console.log('🗺️ Loading businesses:', {
           zoom: zoom.toFixed(2),
           businessLimit,
-          cacheSize: businessCacheRef.current.getAll().length
+          cacheSize: businessCacheRef.current.getAll()?.length || 0
         });
 
         // Load businesses with buffer
@@ -589,7 +589,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     updateTimeoutRef.current = setTimeout(() => {
       try {
         deckOverlay.setProps({ layers: deckGLLayers });
-        console.log(`🎯 Updated DeckGL with ${deckGLLayers.length} layers`);
+        console.log(`🎯 Updated DeckGL with ${deckGLLayers?.length || 0} layers`);
       } catch (error) {
         console.error('Error updating DeckGL:', error);
       }
