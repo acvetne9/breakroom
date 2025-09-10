@@ -367,13 +367,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const deckGLLayers = useMemo(() => {
     const cachedBusinesses = businessCacheRef.current.getAll();
     
-    if (cachedBusinesses.length === 0) return [];
+    if (!cachedBusinesses || cachedBusinesses.length === 0) return [];
 
     try {
       let businessesToRender = cachedBusinesses;
       
       // Handle clustered data efficiently
-      if (isClusteredData && businesses.length > 0) {
+      if (isClusteredData && businesses && businesses.length > 0) {
         const flattenedBusinesses: Business[] = [];
         businesses.forEach((item: any) => {
           if (item?.type === 'cluster' && item.businesses) {
