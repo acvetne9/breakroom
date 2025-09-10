@@ -161,6 +161,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     onBusinessesLoaded
   });
 
+  // Ref to always call the latest viewport handler without re-binding listeners
+  const handleViewportChangeRef = useRef<() => void>(() => {});
+
   useEffect(() => {
     callbackRefs.current = { onBusinessClick, onMapLoaded, onBusinessesLoaded };
   }, [onBusinessClick, onMapLoaded, onBusinessesLoaded]);
@@ -357,6 +360,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   }, [map, mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport]);
 
+  // Keep a ref to latest handler for stable listeners
+  useEffect(() => {
+    handleViewportChangeRef.current = handleViewportChange;
+  }, [handleViewportChange]);
+
   // Memoized DeckGL layers with better caching
   const deckGLLayers = useMemo(() => {
     const cachedBusinesses = businessCacheRef.current.getAll();
@@ -444,16 +452,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     });
 
     // Optimized move handlers
+    const callViewportChange = () => handleViewportChangeRef.current();
     const debouncedMoveHandler = (() => {
       let timeout: NodeJS.Timeout;
       return () => {
         clearTimeout(timeout);
-        timeout = setTimeout(handleViewportChange, 150);
+        timeout = setTimeout(callViewportChange, 150);
       };
     })();
 
-    mapInstance.on('moveend', handleViewportChange);
-    mapInstance.on('zoomend', handleViewportChange);
+    mapInstance.on('moveend', callViewportChange);
+    mapInstance.on('zoomend', callViewportChange);
     mapInstance.on('move', debouncedMoveHandler);
 
     // Add map layers when ready
@@ -549,7 +558,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       setMapLoaded(false);
       setMap(null);
     };
-  }, [handleViewportChange]);
+  }, []);
 
   // Initialize DeckGL overlay
   useEffect(() => {
@@ -600,8 +609,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     businessCacheRef.current.clear();
     isLoadingRef.current = false;
     
-    setTimeout(handleViewportChange, 100);
-  }, [searchFilters, map, mapLoaded, handleViewportChange]);
+    setTimeout(() => handleViewportChangeRef.current(), 100);
+  }, [searchFilters, map, mapLoaded]);
 
   // Handle business updates
   useEffect(() => {
@@ -701,9 +710,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // Initial viewport load
   useEffect(() => {
     if (mapLoaded && map) {
-      setTimeout(handleViewportChange, 800);
+      setTimeout(() => handleViewportChangeRef.current(), 800);
     }
-  }, [mapLoaded, map, handleViewportChange]);
+  }, [mapLoaded, map]);
 
   return (
     <div
