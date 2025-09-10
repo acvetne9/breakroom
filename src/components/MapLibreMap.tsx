@@ -21,25 +21,33 @@ interface MapLibreMapProps {
   isClusteredData?: boolean;
 }
 
+interface Bounds {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+}
+
+interface ViewportState {
+  bounds: Bounds;
+  zoom: number;
+  timestamp: number;
+}
+
 // Singleton overlay for performance
 let overlayInstance: MapboxOverlay | null = null;
 
-const createGridSampling = (bounds: any, businesses: Business[], maxBusinesses: number): Business[] => {
+// Optimized grid sampling with better distribution
+const createOptimizedGridSampling = (bounds: Bounds, businesses: Business[], maxBusinesses: number): Business[] => {
   if (!businesses || businesses.length <= maxBusinesses) return businesses;
 
-  // Create a grid to ensure even distribution
-  const gridSize = Math.ceil(Math.sqrt(maxBusinesses / 4)); // Adjust divisor to control density
+  const gridSize = Math.ceil(Math.sqrt(maxBusinesses / 2));
   const latStep = (bounds.north - bounds.south) / gridSize;
   const lngStep = (bounds.east - bounds.west) / gridSize;
 
-  // ✅ Fix: grid is a 2D array of Business[]
-  const grid: Business[][][] = [];
-  for (let i = 0; i < gridSize; i++) {
-    grid[i] = [];
-    for (let j = 0; j < gridSize; j++) {
-      grid[i][j] = [];
-    }
-  }
+  const grid = Array.from({ length: gridSize }, () => 
+    Array.from({ length: gridSize }, () => [] as Business[])
+  );
 
   // Distribute businesses into grid cells
   businesses.forEach(business => {
@@ -57,23 +65,71 @@ const createGridSampling = (bounds: any, businesses: Business[], maxBusinesses: 
     grid[latIndex][lngIndex].push(business);
   });
 
-  // Sample evenly from each cell
+  // Sample evenly from each cell with priority scoring
   const businessesPerCell = Math.ceil(maxBusinesses / (gridSize * gridSize));
   const result: Business[] = [];
 
   grid.forEach(row => {
     row.forEach(cell => {
-      if (cell.length > 0) {
-        const sampled = cell
-          .sort(() => Math.random() - 0.5) // Randomize
-          .slice(0, businessesPerCell);
-        result.push(...sampled);
-      }
+      if (cell.length === 0) return;
+
+      // Sort by priority (if available) or randomize
+      const sortedCell = cell.sort((a, b) => {
+        // Prioritize businesses with ratings or reviews
+        const aScore = (a.rating || 0) * (a.reviewCount || 1);
+        const bScore = (b.rating || 0) * (b.reviewCount || 1);
+        return bScore - aScore || Math.random() - 0.5;
+      });
+
+      result.push(...sortedCell.slice(0, businessesPerCell));
     });
   });
 
   return result.slice(0, maxBusinesses);
 };
+
+// Memoized business cache with LRU-like behavior
+class BusinessCache {
+  private cache = new Map<string, Business>();
+  private maxSize: number;
+
+  constructor(maxSize = 10000) {
+    this.maxSize = maxSize;
+  }
+
+  set(id: string, business: Business) {
+    if (this.cache.size >= this.maxSize) {
+      // Remove oldest entries
+      const keysToDelete = Array.from(this.cache.keys()).slice(0, Math.floor(this.maxSize * 0.1));
+      keysToDelete.forEach(key => this.cache.delete(key));
+    }
+    this.cache.set(id, business);
+  }
+
+  get(id: string): Business | undefined {
+    const business = this.cache.get(id);
+    if (business) {
+      // Move to end (most recently used)
+      this.cache.delete(id);
+      this.cache.set(id, business);
+    }
+    return business;
+  }
+
+  getAll(): Business[] {
+    return Array.from(this.cache.values());
+  }
+
+  addMultiple(businesses: Business[]) {
+    businesses.forEach(b => {
+      if (b?.id) this.set(b.id, b);
+    });
+  }
+
+  clear() {
+    this.cache.clear();
+  }
+}
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
   onBusinessClick,
@@ -92,240 +148,244 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [deckOverlay, setDeckOverlay] = useState<MapboxOverlay | null>(null);
   const [overlayReady, setOverlayReady] = useState(false);
-  const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
   
-  // Global cache of all businesses we've loaded so far
-  const [businessCache, setBusinessCache] = useState<Record<string, Business>>({});
-
-  const mergeBusinessesIntoCache = useCallback((newBusinesses: Business[]) => {
-    setBusinessCache(prev => {
-      const updated = { ...prev };
-      newBusinesses.forEach(b => {
-        if (b && b.id) {
-          updated[b.id] = b;
-        }
-      });
-      return updated;
-    });
-  }, []);
+  // Refs for stable references and state tracking
+  const businessCacheRef = useRef(new BusinessCache(isMobile ? 5000 : 10000));
+  const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
+  const layersAddedRef = useRef(false);
+  const isLoadingRef = useRef(false);
+  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const moveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastViewportRef = useRef<ViewportState | null>(null);
+  const lastSearchFiltersRef = useRef(searchFilters);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Stable callback refs
-  const onBusinessClickRef = useRef(onBusinessClick);
-  const onMapLoadedRef = useRef(onMapLoaded);
-  const onBusinessesLoadedRef = useRef(onBusinessesLoaded);
-  
+  const callbackRefs = useRef({
+    onBusinessClick,
+    onMapLoaded,
+    onBusinessesLoaded
+  });
+
   useEffect(() => {
-    onBusinessClickRef.current = onBusinessClick;
-    onMapLoadedRef.current = onMapLoaded;
-    onBusinessesLoadedRef.current = onBusinessesLoaded;
+    callbackRefs.current = { onBusinessClick, onMapLoaded, onBusinessesLoaded };
   }, [onBusinessClick, onMapLoaded, onBusinessesLoaded]);
 
   // Initialize hooks with error handling
-  let mapDataHook;
-  let businessesHook;
-  
-  try {
-    mapDataHook = useViewportMapData();
-    businessesHook = useViewportBusinesses(searchFilters);
-  } catch (error) {
-    console.error('Error initializing hooks:', error);
-    mapDataHook = { isProcessing: false, setIsProcessing: () => {}, loadAllDataCenterOut: () => {} };
-    businessesHook = {
-      businesses: [],
-      loading: false,
-      loadBusinessesInViewport: () => {},
-      fetchFullBusinessDetails: () => Promise.resolve(null),
-      isSearching: false
-    };
-  }
+  const hooks = useMemo(() => {
+    try {
+      const mapDataHook = useViewportMapData();
+      const businessesHook = useViewportBusinesses(searchFilters);
+      return { mapDataHook, businessesHook };
+    } catch (error) {
+      console.error('Error initializing hooks:', error);
+      return {
+        mapDataHook: { 
+          isProcessing: false, 
+          setIsProcessing: () => {},
+          loadAllDataCenterOut: () => {} 
+        },
+        businessesHook: {
+          businesses: [],
+          loading: false,
+          loadBusinessesInViewport: () => {},
+          fetchFullBusinessDetails: () => Promise.resolve(null),
+          isSearching: false
+        }
+      };
+    }
+  }, [searchFilters]);
 
-  const { isProcessing, setIsProcessing } = mapDataHook;
+  const { isProcessing, setIsProcessing } = hooks.mapDataHook;
   const { 
     businesses, 
     loading: businessesLoading, 
     loadBusinessesInViewport, 
     fetchFullBusinessDetails,
     isSearching
-  } = businessesHook;
+  } = hooks.businessesHook;
 
-  // Refs to prevent loops and track state
-  const processedRef = useRef(false);
-  const layersAddedRef = useRef(false);
-  const isLoadingBusinessesRef = useRef(false);
-  const lastSearchFiltersRef = useRef(searchFilters);
-  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const moveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Track last viewport to support refreshes
-  const lastViewportRef = useRef<{ bounds: { north: number; south: number; east: number; west: number }; timestamp: number } | null>(null);
-
-  // Calculate business limit based on zoom and viewport area for even distribution
-  const getBusinessLimitForViewport = useCallback((zoom: number, bounds: any): number => {
-    // Calculate viewport area
+  // Optimized business limit calculation
+  const getBusinessLimitForViewport = useCallback((zoom: number, bounds: Bounds): number => {
     const latDiff = bounds.north - bounds.south;
     const lngDiff = bounds.east - bounds.west;
     const avgLat = (bounds.north + bounds.south) / 2;
+    
+    // Calculate viewport area in km²
     const latKm = latDiff * 111;
     const lngKm = lngDiff * 111 * Math.cos(avgLat * Math.PI / 180);
     const areaKm2 = latKm * lngKm;
     
-    // Target density based on zoom level for even distribution
-    let targetDensity: number;
-    if (zoom >= 16) targetDensity = 500;      // High zoom: many businesses
-    else if (zoom >= 14) targetDensity = 250; // Medium zoom: moderate businesses
-    else if (zoom >= 12) targetDensity = 100; // Lower zoom: fewer businesses
-    else targetDensity = 50;                  // Far zoom: minimal businesses
+    // Adaptive density based on zoom level
+    let baseDensity: number;
+    if (zoom >= 16) baseDensity = 400;
+    else if (zoom >= 14) baseDensity = 200;
+    else if (zoom >= 12) baseDensity = 100;
+    else baseDensity = 50;
     
-    const targetBusinesses = Math.ceil(areaKm2 * targetDensity);
-    const maxLimit = isMobile ? 5000 : 10000;
-    const minLimit = 300;
+    // Adjust for mobile performance
+    const mobileFactor = isMobile ? 0.7 : 1.0;
+    const targetBusinesses = Math.ceil(areaKm2 * baseDensity * mobileFactor);
+    
+    const maxLimit = isMobile ? 3000 : 8000;
+    const minLimit = 200;
     
     return Math.max(minLimit, Math.min(maxLimit, targetBusinesses));
   }, [isMobile]);
 
-  // Business click handler
+  // Optimized business click handler
   const handleBusinessClick = useCallback(async (business: any) => {
-    if (!business || !onBusinessClickRef.current) return;
-    
-    console.log('🎯 Business clicked:', business.name, business.id);
+    if (!business || !callbackRefs.current.onBusinessClick) return;
     
     try {
-      if (business.id && business.id.startsWith('vector_')) {
-        onBusinessClickRef.current(business);
-      } else if (fetchFullBusinessDetails) {
-        const fullBusiness = await fetchFullBusinessDetails(business.id);
-        onBusinessClickRef.current(fullBusiness || business);
-      } else {
-        onBusinessClickRef.current(business);
+      let businessToReturn = business;
+      
+      if (business.id && !business.id.startsWith('vector_') && fetchFullBusinessDetails) {
+        const cached = businessCacheRef.current.get(business.id);
+        if (cached && cached.detailsLoaded) {
+          businessToReturn = cached;
+        } else {
+          const fullBusiness = await fetchFullBusinessDetails(business.id);
+          if (fullBusiness) {
+            businessCacheRef.current.set(business.id, { ...fullBusiness, detailsLoaded: true });
+            businessToReturn = fullBusiness;
+          }
+        }
       }
+      
+      callbackRefs.current.onBusinessClick(businessToReturn);
     } catch (error) {
       console.warn('Error in handleBusinessClick:', error);
-      onBusinessClickRef.current(business);
+      callbackRefs.current.onBusinessClick(business);
     }
   }, [fetchFullBusinessDetails]);
 
-  
+  // Debounced viewport change handler
   const handleViewportChange = useCallback(async () => {
-    if (!map || !mapLoaded || !loadBusinessesInViewport || isLoadingBusinessesRef.current) return;
-  
-    try {
-      const bounds = map.getBounds();
-      const zoom = map.getZoom();
-      const now = Date.now();
-  
-      const shouldRefreshPrevious =
-        lastViewportRef.current &&
-        (now - lastViewportRef.current.timestamp > 5000);
-  
-      const latDiff = bounds.getNorth() - bounds.getSouth();
-      const lngDiff = bounds.getEast() - bounds.getWest();
-      const expansion = 0.05;
-  
-      const expandedBounds = {
-        north: bounds.getNorth() + latDiff * expansion,
-        south: bounds.getSouth() - latDiff * expansion,
-        east: bounds.getEast() + lngDiff * expansion,
-        west: bounds.getWest() - lngDiff * expansion,
-      };
-  
-      const businessLimit = getBusinessLimitForViewport(zoom, expandedBounds);
-  
-      console.log('🗺️ Loading businesses for viewport:', {
-        zoom: zoom.toFixed(2),
-        businessLimit,
-        refreshingPrevious: shouldRefreshPrevious,
-      });
-  
-      isLoadingBusinessesRef.current = true;
-  
-      // Load more businesses than needed for better distribution
-      const rawBusinesses = await loadBusinessesInViewport(expandedBounds, businessLimit * 1.5);
-  
-      // ✅ Prioritize businesses inside the viewport first
-      const visibleBounds = {
-        north: bounds.getNorth(),
-        south: bounds.getSouth(),
-        east: bounds.getEast(),
-        west: bounds.getWest(),
-      };
-  
-      const [inside, outside] = (rawBusinesses || []).reduce(
-        (acc, b) => {
-          if (!b?.position) return acc;
-          if (
-            b.position.lat <= visibleBounds.north &&
-            b.position.lat >= visibleBounds.south &&
-            b.position.lng <= visibleBounds.east &&
-            b.position.lng >= visibleBounds.west
-          ) {
-            acc[0].push(b); // inside
-          } else {
-            acc[1].push(b); // outside buffer
-          }
-          return acc;
-        },
-        [[], []] as [Business[], Business[]] // ✅ cast the initial value
-      );
+    if (!map || !mapLoaded || !loadBusinessesInViewport || isLoadingRef.current) return;
 
-      const insideSampled = createGridSampling(visibleBounds, inside, businessLimit);
-      const outsideSampled = createGridSampling(expandedBounds, outside, Math.floor(businessLimit * 0.3));
-  
-      const distributedBusinesses = [...insideSampled, ...outsideSampled].slice(0, businessLimit);
-  
-      // Update the businesses state
-      setBusinessCache(prev => {
-        const updated = { ...prev };
-        distributedBusinesses.forEach(b => {
-          if (b && b.id) {
-            updated[b.id] = b;
-          }
-        });
-        return updated;
-      });
-  
-      if (shouldRefreshPrevious && lastViewportRef.current) {
-        setTimeout(() => {
-          console.log('🔄 Background refresh of previous area');
-          loadBusinessesInViewport(lastViewportRef.current!.bounds, businessLimit * 0.5);
-        }, 1000);
-      }
-  
-      lastViewportRef.current = { bounds: expandedBounds, timestamp: now };
-  
-      setTimeout(() => {
-        isLoadingBusinessesRef.current = false;
-      }, 1000);
-    } catch (error) {
-      console.error('Error in handleViewportChange:', error);
-      isLoadingBusinessesRef.current = false;
+    // Debounce rapid viewport changes
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
     }
+
+    debounceTimeoutRef.current = setTimeout(async () => {
+      try {
+        isLoadingRef.current = true;
+        
+        const bounds = map.getBounds();
+        const zoom = map.getZoom();
+        const now = Date.now();
+
+        // Check if we need to refresh previous viewport
+        const shouldRefreshPrevious = lastViewportRef.current && 
+          (now - lastViewportRef.current.timestamp > 8000) &&
+          Math.abs(zoom - lastViewportRef.current.zoom) < 2;
+
+        // Create expanded bounds for buffer loading
+        const latDiff = bounds.getNorth() - bounds.getSouth();
+        const lngDiff = bounds.getEast() - bounds.getWest();
+        const expansion = Math.min(0.1, Math.max(0.03, 1 / zoom)); // Adaptive expansion
+
+        const expandedBounds: Bounds = {
+          north: bounds.getNorth() + latDiff * expansion,
+          south: bounds.getSouth() - latDiff * expansion,
+          east: bounds.getEast() + lngDiff * expansion,
+          west: bounds.getWest() - lngDiff * expansion,
+        };
+
+        const businessLimit = getBusinessLimitForViewport(zoom, expandedBounds);
+        
+        console.log('🗺️ Loading businesses:', {
+          zoom: zoom.toFixed(2),
+          businessLimit,
+          cacheSize: businessCacheRef.current.getAll().length
+        });
+
+        // Load businesses with buffer
+        const rawBusinesses = await loadBusinessesInViewport(expandedBounds, Math.floor(businessLimit * 1.3));
+
+        if (!rawBusinesses || rawBusinesses.length === 0) {
+          console.log('No businesses loaded for viewport');
+          return;
+        }
+
+        // Separate visible and buffer businesses
+        const visibleBounds: Bounds = {
+          north: bounds.getNorth(),
+          south: bounds.getSouth(),
+          east: bounds.getEast(),
+          west: bounds.getWest(),
+        };
+
+        const [visible, buffer] = rawBusinesses.reduce(
+          (acc, b) => {
+            if (!b?.position) return acc;
+            
+            const isVisible = b.position.lat <= visibleBounds.north &&
+              b.position.lat >= visibleBounds.south &&
+              b.position.lng <= visibleBounds.east &&
+              b.position.lng >= visibleBounds.west;
+            
+            acc[isVisible ? 0 : 1].push(b);
+            return acc;
+          },
+          [[], []] as [Business[], Business[]]
+        );
+
+        // Apply optimized sampling
+        const visibleSampled = createOptimizedGridSampling(visibleBounds, visible, Math.floor(businessLimit * 0.8));
+        const bufferSampled = createOptimizedGridSampling(expandedBounds, buffer, Math.floor(businessLimit * 0.2));
+
+        const finalBusinesses = [...visibleSampled, ...bufferSampled];
+
+        // Update cache
+        businessCacheRef.current.addMultiple(finalBusinesses);
+
+        // Store current viewport state
+        lastViewportRef.current = { bounds: expandedBounds, zoom, timestamp: now };
+
+        // Background refresh of previous area if needed
+        if (shouldRefreshPrevious && lastViewportRef.current) {
+          setTimeout(() => {
+            if (lastViewportRef.current && loadBusinessesInViewport) {
+              loadBusinessesInViewport(lastViewportRef.current.bounds, Math.floor(businessLimit * 0.3));
+            }
+          }, 2000);
+        }
+
+      } catch (error) {
+        console.error('Error in handleViewportChange:', error);
+      } finally {
+        setTimeout(() => {
+          isLoadingRef.current = false;
+        }, 500);
+      }
+    }, 300); // Debounce delay
+
   }, [map, mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport]);
 
-  // Create DeckGL layers
+  // Memoized DeckGL layers with better caching
   const deckGLLayers = useMemo(() => {
-    if (!businesses || !Array.isArray(businesses) || businesses.length === 0) {
-      return [];
-    }
+    const cachedBusinesses = businessCacheRef.current.getAll();
     
+    if (cachedBusinesses.length === 0) return [];
+
     try {
-      let businessesToRender = businesses;
+      let businessesToRender = cachedBusinesses;
       
-      // Handle clustered data
-      if (isClusteredData) {
+      // Handle clustered data efficiently
+      if (isClusteredData && businesses.length > 0) {
         businessesToRender = businesses.flatMap((item: any) => {
-          if (item && item.type === 'cluster' && item.businesses) {
-            return item.businesses;
-          } else if (item && item.type !== 'cluster') {
-            return [item];
+          if (item?.type === 'cluster' && item.businesses) {
+            return item.businesses.filter(b => b?.position);
           }
-          return [];
+          return item?.type !== 'cluster' && item?.position ? [item] : [];
         });
       }
-      
-      const allBusinesses = Object.values(businessCache);
 
       return [createBusinessScatterplotLayer({
-        businesses: allBusinesses,
+        businesses: businessesToRender,
         selectedBusinessId: selectedBusiness?.id,
         onBusinessClick: handleBusinessClick,
       })];
@@ -333,16 +393,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.error('Error creating DeckGL layers:', error);
       return [];
     }
-  }, [businesses, selectedBusiness?.id, isClusteredData, handleBusinessClick, businessCache]);
+  }, [selectedBusiness?.id, isClusteredData, businesses, handleBusinessClick]);
 
-  // Initialize map
+  // Initialize map with optimized configuration
   useEffect(() => {
     if (!mapRef.current || map) return;
 
     const absoluteTilesUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-    console.log('🧭 Using tiles URL:', absoluteTilesUrl);
-
-    const baseStyle = {
+    
+    const mapStyle = {
       version: 8 as const,
       sources: {
         'nyc-tiles': {
@@ -363,193 +422,151 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       ]
     };
 
-    let mapInstance: maplibregl.Map;
-    try {
-      mapInstance = new maplibregl.Map({
-        container: mapRef.current!,
-        style: baseStyle,
-        center: [-73.986104, 40.715245],
-        zoom: 12.77,
-        maxZoom: 18,
-        minZoom: 9,
-        renderWorldCopies: false,
-        attributionControl: false
-      });
-      
-      mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
-    } catch (error) {
-      console.error('❌ Error creating map instance:', error);
-      return;
-    }
+    const mapInstance = new maplibregl.Map({
+      container: mapRef.current!,
+      style: mapStyle,
+      center: [-73.986104, 40.715245],
+      zoom: 12.77,
+      maxZoom: 18,
+      minZoom: 9,
+      renderWorldCopies: false,
+      attributionControl: false,
+      preserveDrawingBuffer: isMobile, // Optimize for mobile
+      antialias: !isMobile // Disable antialiasing on mobile for performance
+    });
+    
+    mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
 
-    // Add safety wrapper for addLayer
-    const originalAddLayer = mapInstance.addLayer.bind(mapInstance);
-    mapInstance.addLayer = function (layerDef: any, before?: string) {
-      try {
-        const id = typeof layerDef === 'string' ? layerDef : layerDef?.id;
-        if (id && this.getLayer && this.getLayer(id)) {
-          console.log(`ℹ️ Layer "${id}" already exists, skipping.`);
-          return;
-        }
-        return originalAddLayer(layerDef, before);
-      } catch (err) {
-        console.warn('⚠️ addLayer error:', err);
-      }
-    };
+    // Enhanced error handling
+    mapInstance.on('error', (e) => {
+      console.error('🚨 Map error:', e.error);
+    });
 
     mapInstance.on('load', () => {
       console.log('🗺️ Map loaded');
       setMapLoaded(true);
-      if (onMapLoadedRef.current) {
-        onMapLoadedRef.current();
-      }
+      callbackRefs.current.onMapLoaded?.();
     });
 
-    mapInstance.on('error', e => {
-      console.error('🚨 Map error:', e.error);
-    });
+    // Optimized move handlers
+    const debouncedMoveHandler = (() => {
+      let timeout: NodeJS.Timeout;
+      return () => {
+        clearTimeout(timeout);
+        timeout = setTimeout(handleViewportChange, 150);
+      };
+    })();
 
-    // Add move event handler with timeout
-    mapInstance.on('move', () => {
-      if (moveTimeoutRef.current) clearTimeout(moveTimeoutRef.current);
-      moveTimeoutRef.current = setTimeout(() => {
-        handleViewportChange();
-      }, 200); // faster refresh while dragging
-    });
-    
-    // Add map layers when tiles are ready
-    mapInstance.on('sourcedata', e => {
+    mapInstance.on('moveend', handleViewportChange);
+    mapInstance.on('zoomend', handleViewportChange);
+    mapInstance.on('move', debouncedMoveHandler);
+
+    // Add map layers when ready
+    mapInstance.on('sourcedata', (e) => {
       if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
-        console.log('🔄 NYC tiles loaded, adding layers...');
+        console.log('🔄 Adding NYC layers...');
         
-        try {
-          const layersToAdd = [
-            {
-              id: 'nyc-land',
-              type: 'fill' as const,
-              source: 'nyc-tiles',
-              'source-layer': 'examplepoints',
-              paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
-              filter: ['==', ['geometry-type'], 'Polygon']
-            },
-            {
-              id: 'nyc-green-spaces',
-              type: 'fill',
-              source: 'nyc-tiles',
-              'source-layer': 'examplepoints',
-              paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
-              filter: [
-                'all',
-                ['==', ['geometry-type'], 'Polygon'],
-                ['any',
-                  ['==', ['get', 'leisure'], 'park'],
-                  ['==', ['get', 'landuse'], 'cemetery'],
-                  ['==', ['get', 'amenity'], 'cemetery'],
-                  ['==', ['get', 'amenity'], 'grave_yard'],
-                  ['in', 'Cemetery', ['get', 'name']],
-                  ['in', 'cemetery', ['get', 'name']]
-                ]
+        const layers = [
+          {
+            id: 'nyc-land',
+            type: 'fill' as const,
+            source: 'nyc-tiles',
+            'source-layer': 'examplepoints',
+            paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
+            filter: ['==', ['geometry-type'], 'Polygon']
+          },
+          {
+            id: 'nyc-green-spaces',
+            type: 'fill' as const,
+            source: 'nyc-tiles',
+            'source-layer': 'examplepoints',
+            paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
+            filter: [
+              'all',
+              ['==', ['geometry-type'], 'Polygon'],
+              ['any',
+                ['==', ['get', 'leisure'], 'park'],
+                ['==', ['get', 'landuse'], 'cemetery'],
+                ['==', ['get', 'amenity'], 'cemetery'],
+                ['==', ['get', 'amenity'], 'grave_yard'],
+                ['in', 'Cemetery', ['get', 'name']],
+                ['in', 'cemetery', ['get', 'name']]
               ]
+            ]
+          },
+          {
+            id: 'nyc-water',
+            type: 'fill' as const,
+            source: 'nyc-tiles',
+            'source-layer': 'examplepoints',
+            paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
+            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']]
+          },
+          {
+            id: 'nyc-roads',
+            type: 'line' as const,
+            source: 'nyc-tiles',
+            'source-layer': 'examplepoints',
+            paint: {
+              'line-color': '#666666',
+              'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
+              'line-opacity': 0.8
             },
-            {
-              id: 'nyc-water',
-              type: 'fill' as const,
-              source: 'nyc-tiles',
-              'source-layer': 'examplepoints',
-              paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
-              filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']]
-            },
-            {
-              id: 'nyc-waterways',
-              type: 'line' as const,
-              source: 'nyc-tiles',
-              'source-layer': 'examplepoints',
-              paint: { 'line-color': '#999999', 'line-width': 1, 'line-opacity': 0.6 },
-              filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'waterway']]
-            },
-            {
-              id: 'nyc-roads',
-              type: 'line' as const,
-              source: 'nyc-tiles',
-              'source-layer': 'examplepoints',
-              paint: {
-                'line-color': '#666666',
-                'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
-                'line-opacity': 1.0
-              },
-              filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
-            },
-            {
-              id: 'nyc-road-labels',
-              type: 'symbol' as const,
-              source: 'nyc-tiles',
-              'source-layer': 'examplepoints',
-              layout: {
-                'text-field': ['coalesce', ['get', 'name'], ''],
-                'symbol-placement': 'line',
-                'text-size': 12,
-                'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular']
-              },
-              paint: {
-                'text-color': '#2D3748',
-                'text-halo-color': '#FFFFFF',
-                'text-halo-width': 1.5
-              },
-              filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'name'], ['has', 'highway']]
-            }
-          ];
+            filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
+          }
+        ];
 
-          layersToAdd.forEach(layer => {
-            try {
-              mapInstance.addLayer(layer as any);
-            } catch (error) {
-              console.warn(`Failed to add layer ${layer.id}:`, error);
+        layers.forEach(layer => {
+          try {
+            if (!mapInstance.getLayer(layer.id)) {
+              mapInstance.addLayer(layer);
             }
-          });
-          
-          layersAddedRef.current = true;
-          console.log('✅ All NYC layers added!');
-        } catch (error) {
-          console.error('❌ Error adding layers:', error);
-        }
+          } catch (error) {
+            console.warn(`Failed to add layer ${layer.id}:`, error);
+          }
+        });
+        
+        layersAddedRef.current = true;
+        console.log('✅ NYC layers added');
       }
     });
 
     setMap(mapInstance);
 
     return () => {
-      if (mapInstance) {
-        try {
-          mapInstance.remove();
-        } catch (error) {
-          console.error('Error removing map:', error);
-        } finally {
-          layersAddedRef.current = false;
-          setMapLoaded(false);
-          setMap(null);
-        }
+      // Cleanup
+      [updateTimeoutRef, moveTimeoutRef, debounceTimeoutRef].forEach(ref => {
+        if (ref.current) clearTimeout(ref.current);
+      });
+      
+      landmarkMarkersRef.current.forEach(marker => {
+        try { marker.remove(); } catch {}
+      });
+      
+      try {
+        mapInstance.remove();
+      } catch (error) {
+        console.error('Error removing map:', error);
       }
+      
+      businessCacheRef.current.clear();
+      layersAddedRef.current = false;
+      setMapLoaded(false);
+      setMap(null);
     };
-  }, []);
+  }, [handleViewportChange, isMobile]);
 
   // Initialize DeckGL overlay
   useEffect(() => {
     if (!map || !mapLoaded || deckOverlay) return;
     
-    console.log('🎯 Initializing DeckGL overlay');
-    
     let overlay = overlayInstance;
     if (!overlay) {
-      try {
-        overlay = new MapboxOverlay({
-          interleaved: true,
-          layers: []
-        });
-        overlayInstance = overlay;
-      } catch (error) {
-        console.error('Error creating MapboxOverlay:', error);
-        return;
-      }
+      overlay = new MapboxOverlay({
+        interleaved: true,
+        layers: []
+      });
+      overlayInstance = overlay;
     }
     
     try {
@@ -557,238 +574,150 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       setDeckOverlay(overlay);
       setOverlayReady(true);
     } catch (e) {
-      console.log('DeckGL overlay already added or error:', e);
+      console.log('DeckGL overlay already added:', e);
       setOverlayReady(true);
     }
-  }, [map, mapLoaded, deckOverlay]);
+  }, [map, mapLoaded]);
 
-  // Update DeckGL layers
+  // Update DeckGL layers with throttling
   useEffect(() => {
     if (!deckOverlay || !overlayReady) return;
     
-    if (updateTimeoutRef.current) {
-      clearTimeout(updateTimeoutRef.current);
-    }
+    if (updateTimeoutRef.current) clearTimeout(updateTimeoutRef.current);
     
     updateTimeoutRef.current = setTimeout(() => {
       try {
         deckOverlay.setProps({ layers: deckGLLayers });
         console.log(`🎯 Updated DeckGL with ${deckGLLayers.length} layers`);
       } catch (error) {
-        console.error('Error updating DeckGL layers:', error);
+        console.error('Error updating DeckGL:', error);
       }
-    }, 100);
+    }, 50);
   }, [deckOverlay, overlayReady, deckGLLayers]);
 
   // Handle search filter changes
   useEffect(() => {
-    if (!map || !mapLoaded || !loadBusinessesInViewport) return;
-    
     const filtersChanged = JSON.stringify(lastSearchFiltersRef.current) !== JSON.stringify(searchFilters);
-    if (!filtersChanged) return;
+    if (!filtersChanged || !map || !mapLoaded) return;
     
-    console.log('🔍 Search filters changed:', searchFilters);
+    console.log('🔍 Search filters changed, clearing cache');
     lastSearchFiltersRef.current = searchFilters;
-    isLoadingBusinessesRef.current = false;
+    businessCacheRef.current.clear();
+    isLoadingRef.current = false;
     
-    // Reload businesses with new filters
-    setTimeout(() => handleViewportChange(), 100);
-  }, [searchFilters, map, mapLoaded, loadBusinessesInViewport, handleViewportChange]);
+    setTimeout(handleViewportChange, 100);
+  }, [searchFilters, map, mapLoaded, handleViewportChange]);
+
+  // Handle business updates
+  useEffect(() => {
+    if (businesses && businesses.length > 0) {
+      businessCacheRef.current.addMultiple(businesses);
+      callbackRefs.current.onBusinessesLoaded?.();
+    }
+  }, [businesses]);
 
   // Zoom to selected business
   useEffect(() => {
     if (!map || !mapLoaded || !selectedBusiness?.position) return;
     
-    try {
-      map.easeTo({
-        center: [selectedBusiness.position.lng, selectedBusiness.position.lat],
-        zoom: Math.max(map.getZoom(), 16),
-        duration: 800
-      });
-    } catch (error) {
-      console.error('Error zooming to selected business:', error);
-    }
+    map.easeTo({
+      center: [selectedBusiness.position.lng, selectedBusiness.position.lat],
+      zoom: Math.max(map.getZoom(), 16),
+      duration: 600
+    });
   }, [selectedBusiness?.id, map, mapLoaded]);
 
   // Center on neighborhood
   useEffect(() => {
     if (!map || !mapLoaded || !neighborhoodCenter) return;
     
-    console.log('🏙️ Centering map on neighborhood:', neighborhoodCenter);
-    try {
-      map.easeTo({
-        center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
-        zoom: 14,
-        duration: 1000
-      });
-    } catch (error) {
-      console.error('Error centering on neighborhood:', error);
-    }
+    map.easeTo({
+      center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
+      zoom: 14,
+      duration: 800
+    });
   }, [neighborhoodCenter, map, mapLoaded]);
 
-  // Process map features
-  const processMapFeatures = useCallback(async () => {
-    if (processedRef.current || !map || !mapLoaded) return;
-    
-    processedRef.current = true;
-    (window as any).__MAP_FEATURES_PROCESSED__ = true;
-    
-    if (setIsProcessing) {
-      setIsProcessing(true);
-    }
-    
-    console.log('🎉 NYC vector tiles ready');
-    
-    if (setIsProcessing) {
-      setIsProcessing(false);
-    }
-  }, [map, mapLoaded, setIsProcessing]);
-
-  // Load map data after initialization
+  // Handle landmarks with performance optimization
   useEffect(() => {
-    if (mapLoaded && map && !processedRef.current) {
-      processMapFeatures();
-    }
-  }, [mapLoaded, map, processMapFeatures]);
+    if (!mapLoaded || !landmarks?.length || !map) return;
 
-  // Handle map movement
-  useEffect(() => {
-    if (!map || !mapLoaded) return;
-  
-    const moveEndHandler = () => handleViewportChange();
-    
-    map.on('moveend', moveEndHandler);
-    map.on('zoomend', moveEndHandler);
-    
-    // Initial load
-    setTimeout(() => {
-      if (map && mapLoaded) {
-        handleViewportChange();
-      }
-    }, 500);
-    
-    return () => {
-      map.off('moveend', moveEndHandler);
-      map.off('zoomend', moveEndHandler);
-      if (moveTimeoutRef.current) {
-        clearTimeout(moveTimeoutRef.current);
-      }
-    };
-  }, [map, mapLoaded, handleViewportChange]);
-
-  // Notify when businesses are loaded
-  useEffect(() => {
-    if (businesses && businesses.length > 0) {
-      mergeBusinessesIntoCache(businesses);
-    }
-  }, [businesses, mergeBusinessesIntoCache]);
-
-  // Handle emoji landmarks
-  useEffect(() => {
-    if (!mapLoaded || !landmarks || !Array.isArray(landmarks) || !map) return;
-
-    // Remove previous markers
+    // Clear existing markers
     landmarkMarkersRef.current.forEach(marker => {
-      try {
-        marker.remove();
-      } catch (error) {
-        console.warn('Error removing marker:', error);
-      }
+      try { marker.remove(); } catch {}
     });
     landmarkMarkersRef.current = [];
 
-    if (landmarks.length === 0) return;
+    const zoom = map.getZoom();
+    const size = Math.max(12, Math.min(32, 16 * Math.pow(1.15, zoom - 10)));
 
-    try {
-      const updateEmojiSize = () => {
-        const zoom = map.getZoom();
-        const size = Math.max(12, Math.min(32, 16 * Math.pow(1.2, zoom - 10)));
-        
-        landmarkMarkersRef.current.forEach(marker => {
-          try {
-            const element = marker.getElement();
-            if (element) {
-              element.style.fontSize = `${size}px`;
-              element.style.lineHeight = `${size}px`;
-              element.style.width = `${size}px`;
-              element.style.height = `${size}px`;
-            }
-          } catch (error) {
-            console.warn('Error updating marker size:', error);
-          }
-        });
-      };
+    const markers = landmarks.map(landmark => {
+      const el = document.createElement('div');
+      el.textContent = landmark.emoji;
+      el.style.cssText = `
+        font-size: ${size}px;
+        line-height: ${size}px;
+        width: ${size}px;
+        height: ${size}px;
+        user-select: none;
+        pointer-events: none;
+        text-shadow: 0 0 3px rgba(255,255,255,0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 0;
+      `;
 
-      const newMarkers: maplibregl.Marker[] = landmarks.map(landmark => {
-        const zoom = map.getZoom();
-        const size = Math.max(12, Math.min(32, 16 * Math.pow(1.2, zoom - 10)));
-        
-        const el = document.createElement('div');
-        el.textContent = landmark.emoji;
-        Object.assign(el.style, {
-          fontSize: `${size}px`,
-          lineHeight: `${size}px`,
-          width: `${size}px`,
-          height: `${size}px`,
-          userSelect: 'none',
-          pointerEvents: 'none',
-          textShadow: '0 0 3px rgba(255,255,255,0.9), 0 0 6px rgba(255,255,255,0.7)',
-          zIndex: '0',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        } as CSSStyleDeclaration);
+      try {
+        return new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([landmark.lng, landmark.lat])
+          .addTo(map);
+      } catch (error) {
+        console.error('Error creating marker:', error);
+        return null;
+      }
+    }).filter(Boolean) as maplibregl.Marker[];
 
-        try {
-          return new maplibregl.Marker({ element: el, anchor: 'center' })
-            .setLngLat([landmark.lng, landmark.lat])
-            .addTo(map);
-        } catch (error) {
-          console.error('Error creating marker:', error);
-          return null;
+    landmarkMarkersRef.current = markers;
+
+    // Optimized zoom handler for emoji sizing
+    const handleZoomChange = () => {
+      const newZoom = map.getZoom();
+      const newSize = Math.max(12, Math.min(32, 16 * Math.pow(1.15, newZoom - 10)));
+      
+      markers.forEach(marker => {
+        const element = marker.getElement();
+        if (element) {
+          element.style.fontSize = `${newSize}px`;
+          element.style.lineHeight = `${newSize}px`;
+          element.style.width = `${newSize}px`;
+          element.style.height = `${newSize}px`;
         }
-      }).filter(Boolean) as maplibregl.Marker[];
+      });
+    };
 
-      landmarkMarkersRef.current = newMarkers;
-      map.on('zoom', updateEmojiSize);
-      console.log(`Successfully added ${newMarkers.length} emoji markers`);
+    map.on('zoom', handleZoomChange);
 
-      return () => {
-        landmarkMarkersRef.current.forEach(marker => {
-          try {
-            marker.remove();
-          } catch (error) {
-            console.warn('Error removing marker:', error);
-          }
-        });
-        landmarkMarkersRef.current = [];
-        try {
-          map.off('zoom', updateEmojiSize);
-        } catch (error) {
-          console.warn('Error removing zoom listener:', error);
-        }
-      };
-    } catch (error) {
-      console.error('Error adding emoji markers:', error);
-    }
+    return () => {
+      try { map.off('zoom', handleZoomChange); } catch {}
+    };
   }, [mapLoaded, landmarks, map]);
 
-  // Cleanup timeouts
+  // Initial viewport load
   useEffect(() => {
-    return () => {
-      if (updateTimeoutRef.current) clearTimeout(updateTimeoutRef.current);
-      if (moveTimeoutRef.current) clearTimeout(moveTimeoutRef.current);
-    };
-  }, []);
+    if (mapLoaded && map) {
+      setTimeout(handleViewportChange, 800);
+    }
+  }, [mapLoaded, map, handleViewportChange]);
 
   return (
     <div
       ref={mapRef}
-      style={{ 
-        position: 'absolute', 
-        top: 0, 
-        bottom: 0, 
-        left: 0, 
+      style={{
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: 0,
         right: 0,
         width: '100%',
         height: '100%',
