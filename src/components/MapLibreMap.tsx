@@ -94,7 +94,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [overlayReady, setOverlayReady] = useState(false);
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
   
-  // Global cache of all businesses we’ve loaded so far
+  // Global cache of all businesses we've loaded so far
   const [businessCache, setBusinessCache] = useState<Record<string, Business>>({});
 
   const mergeBusinessesIntoCache = useCallback((newBusinesses: Business[]) => {
@@ -158,13 +158,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Track last viewport to support refreshes
   const lastViewportRef = useRef<{ bounds: { north: number; south: number; east: number; west: number }; timestamp: number } | null>(null);
-
-  map.on('move', () => {
-    if (moveTimeoutRef.current) clearTimeout(moveTimeoutRef.current);
-    moveTimeoutRef.current = setTimeout(() => {
-      handleViewportChange();
-    }, 200); // faster refresh while dragging
-  });
 
   // Calculate business limit based on zoom and viewport area for even distribution
   const getBusinessLimitForViewport = useCallback((zoom: number, bounds: any): number => {
@@ -340,7 +333,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.error('Error creating DeckGL layers:', error);
       return [];
     }
-  }, [businesses, selectedBusiness?.id, isClusteredData, handleBusinessClick]);
+  }, [businesses, selectedBusiness?.id, isClusteredData, handleBusinessClick, businessCache]);
 
   // Initialize map
   useEffect(() => {
@@ -414,6 +407,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     mapInstance.on('error', e => {
       console.error('🚨 Map error:', e.error);
+    });
+
+    // Add move event handler with timeout
+    mapInstance.on('move', () => {
+      if (moveTimeoutRef.current) clearTimeout(moveTimeoutRef.current);
+      moveTimeoutRef.current = setTimeout(() => {
+        handleViewportChange();
+      }, 200); // faster refresh while dragging
     });
     
     // Add map layers when tiles are ready
@@ -529,7 +530,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         }
       }
     };
-  }, []);
+  }, [handleViewportChange]);
 
   // Initialize DeckGL overlay
   useEffect(() => {
@@ -653,16 +654,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // Handle map movement
   useEffect(() => {
     if (!map || !mapLoaded) return;
-
-    const moveEndHandler = () => {
-      if (moveTimeoutRef.current) {
-        clearTimeout(moveTimeoutRef.current);
-      }
-      
-      moveTimeoutRef.current = setTimeout(() => {
-        handleViewportChange();
-      }, 300);
-    };
+  
+    const moveEndHandler = () => handleViewportChange();
     
     map.on('moveend', moveEndHandler);
     map.on('zoomend', moveEndHandler);
@@ -689,7 +682,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       mergeBusinessesIntoCache(businesses);
     }
   }, [businesses, mergeBusinessesIntoCache]);
-
 
   // Handle emoji landmarks
   useEffect(() => {
