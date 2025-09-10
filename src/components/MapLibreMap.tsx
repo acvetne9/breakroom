@@ -159,36 +159,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // Track last viewport to support refreshes
   const lastViewportRef = useRef<{ bounds: { north: number; south: number; east: number; west: number }; timestamp: number } | null>(null);
 
-  const visibleBounds = {
-    north: bounds.getNorth(),
-    south: bounds.getSouth(),
-    east: bounds.getEast(),
-    west: bounds.getWest(),
-  };
-  
-  const [inside, outside] = (rawBusinesses || []).reduce<[Business[], Business[]]>(
-    (acc, b) => {
-      if (!b?.position) return acc;
-      if (
-        b.position.lat <= visibleBounds.north &&
-        b.position.lat >= visibleBounds.south &&
-        b.position.lng <= visibleBounds.east &&
-        b.position.lng >= visibleBounds.west
-      ) {
-        acc[0].push(b); // inside
-      } else {
-        acc[1].push(b); // outside buffer
-      }
-      return acc;
-    },
-    [[], []]
-  );
-
-  const insideSampled = createGridSampling(visibleBounds, inside, businessLimit);
-  const outsideSampled = createGridSampling(expandedBounds, outside, businessLimit * 0.3);
-  
-  const distributedBusinesses = [...insideSampled, ...outsideSampled].slice(0, businessLimit);
-
   map.on('move', () => {
     if (moveTimeoutRef.current) clearTimeout(moveTimeoutRef.current);
     moveTimeoutRef.current = setTimeout(() => {
@@ -250,6 +220,37 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const bounds = map.getBounds();
       const zoom = map.getZoom();
       const now = Date.now();
+
+      const visibleBounds = {
+        north: bounds.getNorth(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        west: bounds.getWest(),
+      };
+      
+      const [inside, outside] = (rawBusinesses || []).reduce<[Business[], Business[]]>(
+        (acc, b) => {
+          if (!b?.position) return acc;
+          if (
+            b.position.lat <= visibleBounds.north &&
+            b.position.lat >= visibleBounds.south &&
+            b.position.lng <= visibleBounds.east &&
+            b.position.lng >= visibleBounds.west
+          ) {
+            acc[0].push(b); // inside
+          } else {
+            acc[1].push(b); // outside buffer
+          }
+          return acc;
+        },
+        [[], []]
+      );
+
+const insideSampled = createGridSampling(visibleBounds, inside, businessLimit);
+const outsideSampled = createGridSampling(expandedBounds, outside, businessLimit * 0.3);
+
+const distributedBusinesses = [...insideSampled, ...outsideSampled].slice(0, businessLimit);
+
   
       const shouldRefreshPrevious =
         lastViewportRef.current &&
