@@ -171,12 +171,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   const { isProcessing, setIsProcessing } = mapDataHook;
   const { 
-    businesses, 
+    businesses: rawBusinesses, 
     loading: businessesLoading, 
     loadBusinessesInViewport, 
     fetchFullBusinessDetails,
     isSearching
   } = businessesHook;
+
+  // Ensure businesses is always an array to prevent dependency array crashes
+  const businesses = Array.isArray(rawBusinesses) ? rawBusinesses : [];
 
   // Optimized business limit calculation
   const getBusinessLimitForViewport = useCallback((zoom: number, bounds: Bounds): number => {
@@ -210,6 +213,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Optimized business click handler
   const handleBusinessClick = useCallback(async (business: any) => {
+    console.log('🔍 DEBUG: MapLibreMap handleBusinessClick deps check', { 
+      fetchFullBusinessDetails: typeof fetchFullBusinessDetails,
+      callbackRefs: typeof callbackRefs.current 
+    });
     if (!business || !callbackRefs.current.onBusinessClick) return;
     
     try {
@@ -238,6 +245,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Debounced viewport change handler
   const handleViewportChange = useCallback(async () => {
+    console.log('🔍 DEBUG: handleViewportChange deps check', { 
+      map: typeof map,
+      mapLoaded: typeof mapLoaded,
+      loadBusinessesInViewport: typeof loadBusinessesInViewport,
+      getBusinessLimitForViewport: typeof getBusinessLimitForViewport 
+    });
     if (!map || !mapLoaded || !loadBusinessesInViewport || isLoadingRef.current) return;
 
     // Debounce rapid viewport changes
