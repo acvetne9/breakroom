@@ -519,7 +519,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         layers.forEach(layer => {
           try {
             if (!mapInstance.getLayer(layer.id)) {
-              mapInstance.addLayer(layer);
+              mapInstance.addLayer(layer as any);
             }
           } catch (error) {
             console.warn(`Failed to add layer ${layer.id}:`, error);
