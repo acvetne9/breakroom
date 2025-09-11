@@ -25,7 +25,8 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      padding: '20px' // Ensure content doesn't touch edges on mobile
     },
     background: {
       position: 'absolute',
@@ -40,22 +41,33 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: 'center'
+      justifyContent: 'center',
+      width: '100%',
+      maxWidth: '400px' // Prevent too wide on desktop
     },
-    mugContainer: {
-      display: 'inline-block',
-      position: 'relative'
+    // FIX 1: Create proper space for the mug INCLUDING the handle
+    mugWrapper: {
+      position: 'relative',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '120px', // Fixed width to accommodate mug + handle + scaling
+      height: '120px', // Fixed height for consistent centering
+      marginBottom: '0px' // Remove space - text will be directly under
     },
     coffeeMug: {
       display: 'inline-block',
       position: 'relative',
-      transformOrigin: 'bottom center',  // scale from the bottom
+      transform: 'scale(1.5)',
+      transformOrigin: 'center center',
       animation: 'mugSmoothEntrance 1.2s ease-out forwards',
-      opacity: 0
+      opacity: 0,
+      // FIX 2: Offset the mug slightly right to account for left-extending handle
+      left: '6px' // Half the handle width to visually center the whole mug
     },
     mugBody: {
-      width: 'clamp(75px, 9vw, 90px)',   // increased from 6vw
-      height: 'clamp(90px, 10.5vw, 108px)', // increased from 7vw
+      width: '48px', // Fixed size for consistency
+      height: '60px',
       backgroundColor: '#B22222',
       borderRadius: '3px',
       position: 'relative',
@@ -69,15 +81,14 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       position: 'absolute',
       left: '-12px',
       top: '8px',
-      width: 'clamp(16px, 3vw, 18px)',
-      height: 'clamp(32px, 6vw, 36px)',
-      border: '5px solid #B22222',
+      width: '16px',
+      height: '32px',
+      border: '4px solid #B22222',
       borderRight: 'none',
       borderRadius: '12px 0 0 12px',
       background: 'transparent',
       boxShadow: 'inset 2px 0 0 rgba(0, 0, 0, 0.1)'
     },
-
     mugBodyBefore: {
       position: 'absolute',
       top: '6px',
@@ -87,22 +98,30 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       backgroundColor: 'rgba(0, 0, 0, 0.15)',
       borderRadius: '1.5px'
     },
-    textWrapper: {
-      width: '90%',
-      maxWidth: '800px',
+    // FIX 3: Perfect text centering using single container
+    textContainer: {
       display: 'flex',
-      justifyContent: 'space-between',
       alignItems: 'center',
+      justifyContent: 'center',
+      width: '100%',
       fontFamily: "'Courier New', Courier, monospace",
-      fontSize: '36px',
+      fontSize: 'clamp(28px, 8vw, 36px)', // Responsive font size
       fontWeight: 'bold',
       color: '#B22222',
-      position: 'relative'
+      letterSpacing: '0.05em' // Slight letter spacing for better appearance
     },
     textSpan: {
       display: 'inline-block',
       opacity: 0,
       animation: 'fadeInUp 0.8s forwards'
+    },
+    // FIX 4: Use exact spacing for perfect 1px separation
+    textGap: {
+      width: '1px', // Exact 1px spacing
+      display: 'inline-block',
+      opacity: 0,
+      animation: 'fadeInUp 0.8s forwards',
+      animationDelay: '1.25s'
     }
   };
 
@@ -111,7 +130,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       <div style={styles.background} />
 
       <div style={styles.animationContainer}>
-        <div style={styles.mugContainer}>
+        <div style={styles.mugWrapper}>
           <div style={styles.coffeeMug}>
             <div style={styles.mugBody}>
               <div style={styles.mugBodyBefore}></div>
@@ -120,8 +139,9 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
           </div>
         </div>
 
-        <div style={styles.textWrapper}>
+        <div style={styles.textContainer}>
           <span style={{ ...styles.textSpan, animationDelay: '1.2s' }}>break</span>
+          <span style={styles.textGap}></span>
           <span style={{ ...styles.textSpan, animationDelay: '1.3s' }}>room</span>
         </div>
       </div>
@@ -129,12 +149,19 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       <style>{`
         @keyframes mugSmoothEntrance {
           0% { opacity: 0; transform: translateY(120px) scale(0.3); }
-          100% { opacity: 1; transform: translateY(0) scale(1); }
+          100% { opacity: 1; transform: translateY(0) scale(1.5); }
         }
 
         @keyframes fadeInUp {
           0% { opacity: 0; transform: translateY(20px); }
           100% { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Ensure perfect centering on all devices */
+        @media (max-width: 480px) {
+          .animation-container {
+            padding: 0 10px;
+          }
         }
       `}</style>
     </div>
