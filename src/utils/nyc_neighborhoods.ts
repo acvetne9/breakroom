@@ -32,7 +32,7 @@ export const nycNeighborhoodBoundaries = {
       { lat: 40.782, lon: -73.981 },
       { lat: 40.785, lon: -73.983 },
       { lat: 40.788, lon: -73.981 }
-    ]
+    ],
     "Midtown": [
       { lat: 40.762, lon: -73.990 },
       { lat: 40.766, lon: -73.983 },
@@ -477,5 +477,53 @@ export function getNeighborhoodBoundary(borough: string, neighborhood: string) {
   return boundary;
 }
 
-// Example usage:
-// const harlemBoundary = getNeighborhoodBoundary("Manhattan", "Harlem");
+// Convert boundaries to neighborhood data format expected by other components
+export const nycNeighborhoods = Object.fromEntries(
+  Object.entries(nycNeighborhoodBoundaries).map(([borough, neighborhoods]) => [
+    borough,
+    Object.entries(neighborhoods).map(([name, boundary]) => {
+      // Calculate center point from boundary
+      const lats = boundary.map(p => p.lat);
+      const lons = boundary.map(p => p.lon);
+      const lat = (Math.min(...lats) + Math.max(...lats)) / 2;
+      const lon = (Math.min(...lons) + Math.max(...lons)) / 2;
+      
+      return { name, lat, lon, boundary };
+    })
+  ])
+);
+
+// Generate boundary using neighborhood and neighbors
+export function generateNeighborhoodBoundary(
+  neighborhood: { name: string; lat: number; lon: number }, 
+  neighbors: { name: string; lat: number; lon: number }[]
+) {
+  // Find the actual boundary from our data
+  for (const [borough, neighborhoods] of Object.entries(nycNeighborhoodBoundaries)) {
+    if (neighborhoods[neighborhood.name]) {
+      return neighborhoods[neighborhood.name];
+    }
+  }
+  
+  // Fallback: create a simple boundary around the center point
+  const radius = 0.01; // ~1km
+  return [
+    { lat: neighborhood.lat + radius, lon: neighborhood.lon - radius },
+    { lat: neighborhood.lat + radius, lon: neighborhood.lon + radius },
+    { lat: neighborhood.lat - radius, lon: neighborhood.lon + radius },
+    { lat: neighborhood.lat - radius, lon: neighborhood.lon - radius },
+    { lat: neighborhood.lat + radius, lon: neighborhood.lon - radius }
+  ];
+}
+
+// Haversine distance calculation (in km)
+export function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
