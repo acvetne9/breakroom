@@ -114,26 +114,11 @@
   /* Ensure MapLibre canvas works properly on mobile */
   .maplibregl-canvas {
     touch-action: none !important;
-    will-change: transform !important;
   }
   
-  /* Fix for mobile map controls and performance */
+  /* Fix for mobile map controls */
   .maplibregl-ctrl-group {
     box-shadow: 0 0 0 2px rgba(0,0,0,.1) !important;
-  }
-  
-  /* Mobile performance optimizations for map */
-  .maplibre-map canvas {
-    image-rendering: -webkit-optimize-contrast !important;
-    image-rendering: crisp-edges !important;
-  }
-  
-  /* Disable text selection on map for better mobile UX */
-  .maplibre-map * {
-    -webkit-user-select: none !important;
-    -moz-user-select: none !important;
-    -ms-user-select: none !important;
-    user-select: none !important;
   }
   
   /* Prevent scrolling on the main app */

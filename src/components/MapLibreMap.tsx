@@ -573,7 +573,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: 'vector' as const,
           tiles: [absoluteTilesUrl],
           minzoom: 10,
-          maxzoom: 16
+          maxzoom: 16,
+          scheme: 'xyz' as const
         }
       },
       glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
@@ -581,140 +582,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         {
           id: 'background',
           type: 'background' as const,
-          paint: { 'background-color': '#B3E5FC' }
-        },
-        // Water areas
-        {
-          id: 'water',
-          type: 'fill' as const,
-          source: 'nyc-tiles',
-          'source-layer': 'water',
-          paint: {
-            'fill-color': '#4A90E2',
-            'fill-opacity': 0.8
-          }
-        },
-        // Land/ground
-        {
-          id: 'landcover',
-          type: 'fill' as const,
-          source: 'nyc-tiles',
-          'source-layer': 'landcover',
-          paint: {
-            'fill-color': '#F5F5DC',
-            'fill-opacity': 0.9
-          }
-        },
-        // Parks and green spaces
-        {
-          id: 'parks',
-          type: 'fill' as const,
-          source: 'nyc-tiles',
-          'source-layer': 'landuse',
-          filter: ['==', ['get', 'class'], 'park'] as any,
-          paint: {
-            'fill-color': '#90EE90',
-            'fill-opacity': 0.7
-          }
-        },
-        // Roads - minor
-        {
-          id: 'roads-minor',
-          type: 'line' as const,
-          source: 'nyc-tiles',
-          'source-layer': 'transportation',
-          filter: ['in', ['get', 'class'], 'minor', 'service'] as any,
-          paint: {
-            'line-color': '#FFFFFF',
-            'line-width': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              10, 0.5,
-              14, 1,
-              18, 2
-            ] as any
-          }
-        },
-        // Roads - major
-        {
-          id: 'roads-major',
-          type: 'line' as const,
-          source: 'nyc-tiles',
-          'source-layer': 'transportation',
-          filter: ['in', ['get', 'class'], 'primary', 'secondary', 'tertiary'] as any,
-          paint: {
-            'line-color': '#FFFFFF',
-            'line-width': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              10, 1,
-              14, 2,
-              18, 4
-            ] as any
-          }
-        },
-        // Highways
-        {
-          id: 'roads-highway',
-          type: 'line' as const,
-          source: 'nyc-tiles',
-          'source-layer': 'transportation',
-          filter: ['in', ['get', 'class'], 'motorway', 'trunk'] as any,
-          paint: {
-            'line-color': '#FFE135',
-            'line-width': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              10, 1.5,
-              14, 3,
-              18, 6
-            ] as any
-          }
-        },
-        // Buildings
-        {
-          id: 'buildings',
-          type: 'fill' as const,
-          source: 'nyc-tiles',
-          'source-layer': 'building',
-          minzoom: 13,
-          paint: {
-            'fill-color': '#D3D3D3',
-            'fill-opacity': 0.8,
-            'fill-outline-color': '#A9A9A9'
-          }
-        },
-        // Place labels (city names, etc)
-        {
-          id: 'place-labels',
-          type: 'symbol' as const,
-          source: 'nyc-tiles',
-          'source-layer': 'place',
-          filter: ['in', ['get', 'class'], 'city', 'town', 'village'] as any,
-          layout: {
-            'text-field': ['get', 'name'] as any,
-            'text-font': ['Open Sans Regular'],
-            'text-size': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              10, 12,
-              14, 16,
-              18, 20
-            ] as any,
-            'text-anchor': 'center' as any
-          },
-          paint: {
-            'text-color': '#333333',
-            'text-halo-color': '#FFFFFF',
-            'text-halo-width': 1
-          }
+          paint: { 'background-color': '#F5F5DC' }
         }
       ]
-    } as any;
+    };
 
     const mapInstance = new maplibregl.Map({
       container: mapRef.current!,
@@ -730,89 +601,99 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
 
     // Enhanced error handling
-    mapInstance.on('error', (e: any) => {
+    mapInstance.on('error', (e) => {
       console.error('🚨 Map error:', e.error);
-      console.error('🚨 Error details:', {
-        message: e.error?.message,
-        sourceId: e.sourceId || 'unknown',
-        url: e.error?.url
-      });
-    });
-
-    mapInstance.on('sourcedata', (e: any) => {
-      if (e.sourceId === 'nyc-tiles') {
-        console.log('📡 NYC tiles source data event:', {
-          sourceId: e.sourceId,
-          isSourceLoaded: e.isSourceLoaded,
-          coord: e.coord || 'no coord'
-        });
-      }
-    });
-
-    mapInstance.on('styleimagemissing', (e: any) => {
-      console.warn('🖼️ Style image missing:', e.id);
     });
 
     mapInstance.on('load', () => {
-      console.log('🗺️ NYC tile map loaded');
-      
-      // Test tile accessibility
-      const testTileUrl = '/data/tiles/12/1203/1536.pbf';
-      console.log('🧪 Testing tile URL:', testTileUrl);
-      
-      fetch(testTileUrl)
-        .then(response => {
-          console.log('🧪 Tile response:', response.status, response.statusText);
-          console.log('🧪 Tile headers:', [...response.headers.entries()]);
-          if (response.ok) {
-            return response.arrayBuffer();
-          } else {
-            throw new Error(`Tile not accessible: ${response.status}`);
-          }
-        })
-        .then(buffer => {
-          console.log('✅ Tile accessible! Size:', buffer.byteLength, 'bytes');
-          
-          // Check for tile data after a delay
-          setTimeout(() => {
-            try {
-              const features = mapInstance.querySourceFeatures('nyc-tiles');
-              console.log('🔍 Features found in nyc-tiles:', features.length);
-              if (features.length > 0) {
-                const sourceLayers = [...new Set(features.map((f: any) => f.sourceLayer))];
-                console.log('🗂️ Available source layers:', sourceLayers);
-                console.log('📝 Sample feature:', features[0]);
-              } else {
-                console.warn('⚠️ No features found in tiles - check layer names');
-              }
-            } catch (error) {
-              console.error('❌ Error querying features:', error);
-            }
-          }, 2000);
-          
-        })
-        .catch(error => {
-          console.error('❌ Tile accessibility test failed:', error);
-          console.log('🔧 Falling back to minimal map without vector tiles');
-        });
-      
+      console.log('🗺️ Map loaded');
       setMapLoaded(true);
       callbackRefs.current.onMapLoaded?.();
     });
 
-    // Optimized move handlers for mobile performance
+    // Optimized move handlers
     const callViewportChange = () => handleViewportChangeRef.current();
     const debouncedMoveHandler = (() => {
       let timeout: NodeJS.Timeout;
       return () => {
         clearTimeout(timeout);
-        timeout = setTimeout(callViewportChange, 300); // Increased debounce for mobile
+        timeout = setTimeout(callViewportChange, 150);
       };
     })();
 
     mapInstance.on('moveend', callViewportChange);
     mapInstance.on('zoomend', callViewportChange);
     mapInstance.on('move', debouncedMoveHandler);
+
+    // Add map layers when ready
+    mapInstance.on('sourcedata', (e) => {
+      if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
+        console.log('🔄 Adding NYC layers...');
+        
+        const layers = [
+          {
+            id: 'nyc-land',
+            type: 'fill' as const,
+            source: 'nyc-tiles',
+            'source-layer': 'examplepoints',
+            paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
+            filter: ['==', ['geometry-type'], 'Polygon']
+          },
+          {
+            id: 'nyc-green-spaces',
+            type: 'fill' as const,
+            source: 'nyc-tiles',
+            'source-layer': 'examplepoints',
+            paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
+            filter: [
+              'all',
+              ['==', ['geometry-type'], 'Polygon'],
+              ['any',
+                ['==', ['get', 'leisure'], 'park'],
+                ['==', ['get', 'landuse'], 'cemetery'],
+                ['==', ['get', 'amenity'], 'cemetery'],
+                ['==', ['get', 'amenity'], 'grave_yard'],
+                ['in', 'Cemetery', ['get', 'name']],
+                ['in', 'cemetery', ['get', 'name']]
+              ]
+            ]
+          },
+          {
+            id: 'nyc-water',
+            type: 'fill' as const,
+            source: 'nyc-tiles',
+            'source-layer': 'examplepoints',
+            paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
+            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']]
+          },
+          {
+            id: 'nyc-roads',
+            type: 'line' as const,
+            source: 'nyc-tiles',
+            'source-layer': 'examplepoints',
+            paint: {
+              'line-color': '#666666',
+              'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
+              'line-opacity': 0.8
+            },
+            filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
+          }
+        ];
+
+        layers.forEach(layer => {
+          try {
+            if (!mapInstance.getLayer(layer.id)) {
+              mapInstance.addLayer(layer as any);
+            }
+          } catch (error) {
+            console.warn(`Failed to add layer ${layer.id}:`, error);
+          }
+        });
+        
+        layersAddedRef.current = true;
+        console.log('✅ NYC layers added');
+      }
+    });
 
     setMap(mapInstance);
 
