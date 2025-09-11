@@ -569,12 +569,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const mapStyle = {
       version: 8 as const,
       sources: {
-        'nyc-tiles': {
-          type: 'vector' as const,
-          tiles: [absoluteTilesUrl],
-          minzoom: 10,
-          maxzoom: 16,
-          scheme: 'xyz' as const
+        'osm-tiles': {
+          type: 'raster' as const,
+          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+          tileSize: 256,
+          attribution: '© OpenStreetMap contributors'
         }
       },
       glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
@@ -583,6 +582,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           id: 'background',
           type: 'background' as const,
           paint: { 'background-color': '#F5F5DC' }
+        },
+        {
+          id: 'simple-map',
+          type: 'raster' as const,
+          source: 'osm-tiles',
+          minzoom: 0,
+          maxzoom: 22
         }
       ]
     };
@@ -606,94 +612,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     });
 
     mapInstance.on('load', () => {
-      console.log('🗺️ Map loaded');
+      console.log('🗺️ Simple map loaded');
       setMapLoaded(true);
       callbackRefs.current.onMapLoaded?.();
     });
 
-    // Optimized move handlers
+    // Optimized move handlers for mobile performance
     const callViewportChange = () => handleViewportChangeRef.current();
     const debouncedMoveHandler = (() => {
       let timeout: NodeJS.Timeout;
       return () => {
         clearTimeout(timeout);
-        timeout = setTimeout(callViewportChange, 150);
+        timeout = setTimeout(callViewportChange, 300); // Increased debounce for mobile
       };
     })();
 
     mapInstance.on('moveend', callViewportChange);
     mapInstance.on('zoomend', callViewportChange);
     mapInstance.on('move', debouncedMoveHandler);
-
-    // Add map layers when ready
-    mapInstance.on('sourcedata', (e) => {
-      if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
-        console.log('🔄 Adding NYC layers...');
-        
-        const layers = [
-          {
-            id: 'nyc-land',
-            type: 'fill' as const,
-            source: 'nyc-tiles',
-            'source-layer': 'examplepoints',
-            paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
-            filter: ['==', ['geometry-type'], 'Polygon']
-          },
-          {
-            id: 'nyc-green-spaces',
-            type: 'fill' as const,
-            source: 'nyc-tiles',
-            'source-layer': 'examplepoints',
-            paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
-            filter: [
-              'all',
-              ['==', ['geometry-type'], 'Polygon'],
-              ['any',
-                ['==', ['get', 'leisure'], 'park'],
-                ['==', ['get', 'landuse'], 'cemetery'],
-                ['==', ['get', 'amenity'], 'cemetery'],
-                ['==', ['get', 'amenity'], 'grave_yard'],
-                ['in', 'Cemetery', ['get', 'name']],
-                ['in', 'cemetery', ['get', 'name']]
-              ]
-            ]
-          },
-          {
-            id: 'nyc-water',
-            type: 'fill' as const,
-            source: 'nyc-tiles',
-            'source-layer': 'examplepoints',
-            paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
-            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']]
-          },
-          {
-            id: 'nyc-roads',
-            type: 'line' as const,
-            source: 'nyc-tiles',
-            'source-layer': 'examplepoints',
-            paint: {
-              'line-color': '#666666',
-              'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
-              'line-opacity': 0.8
-            },
-            filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
-          }
-        ];
-
-        layers.forEach(layer => {
-          try {
-            if (!mapInstance.getLayer(layer.id)) {
-              mapInstance.addLayer(layer as any);
-            }
-          } catch (error) {
-            console.warn(`Failed to add layer ${layer.id}:`, error);
-          }
-        });
-        
-        layersAddedRef.current = true;
-        console.log('✅ NYC layers added');
-      }
-    });
 
     setMap(mapInstance);
 
