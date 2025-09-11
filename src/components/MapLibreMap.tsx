@@ -652,7 +652,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 ['==', ['get', 'leisure'], 'park'],
                 ['==', ['get', 'landuse'], 'cemetery'],
                 ['==', ['get', 'amenity'], 'cemetery'],
-                ['==', ['get', 'amenity'], 'grave_yard']
+                ['==', ['get', 'amenity'], 'grave_yard'],
+                ['==', ['get', 'landuse'], 'recreation_ground'],
+                ['==', ['get', 'leisure'], 'recreation_ground']
               ]
             ]
           },
@@ -675,6 +677,32 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               'line-opacity': 0.8
             },
             filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
+          },
+          {
+            id: 'nyc-road-labels',
+            type: 'symbol' as const,
+            source: 'nyc-tiles',
+            'source-layer': 'examplepoints',
+            layout: {
+              'text-field': ['get', 'name'],
+              'text-font': ['Arial Unicode MS Regular', 'Open Sans Regular', 'sans-serif'],
+              'text-size': ['interpolate', ['linear'], ['zoom'], 12, 8, 16, 12],
+              'symbol-placement': 'line',
+              'text-rotation-alignment': 'map',
+              'text-pitch-alignment': 'viewport'
+            },
+            paint: {
+              'text-color': '#333333',
+              'text-halo-color': '#ffffff',
+              'text-halo-width': 1
+            },
+            filter: [
+              'all', 
+              ['==', ['geometry-type'], 'LineString'],
+              ['has', 'highway'],
+              ['has', 'name'],
+              ['>', ['zoom'], 13]
+            ]
           }
         ];
 
