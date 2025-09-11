@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect, Suspense } from 'react';
 import { motion, PanInfo } from 'framer-motion';
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
+import InitiationPage from './InitiationPage';
 
-const InitiationPage = React.lazy(() => import('./InitiationPage'));
 const HomePage = React.lazy(() => import('./HomePage'));
 const SettingsPage = React.lazy(() => import('./SettingsPage'));
 const ExplorePage = React.lazy(() => import('./ExplorePage'));
@@ -480,9 +480,7 @@ const MobileApp: React.FC = () => {
       
       {/* Initiation Card - slides up and disappears */}
       {currentView === 'initiation' && (
-        <Suspense fallback={<Skeleton className="w-full h-full rounded-t-lg" />}>
-          <InitiationPage onComplete={handleInitiationComplete} />
-        </Suspense>
+        <InitiationPage onComplete={handleInitiationComplete} />
       )}
       
       {/* Settings Card - slides from left */}
