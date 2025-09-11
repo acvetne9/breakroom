@@ -482,13 +482,36 @@ export const nycNeighborhoods = Object.fromEntries(
   Object.entries(nycNeighborhoodBoundaries).map(([borough, neighborhoods]) => [
     borough,
     Object.entries(neighborhoods).map(([name, boundary]) => {
-      // Calculate center point from boundary
-      const lats = boundary.map(p => p.lat);
-      const lons = boundary.map(p => p.lon);
-      const lat = (Math.min(...lats) + Math.max(...lats)) / 2;
-      const lon = (Math.min(...lons) + Math.max(...lons)) / 2;
+      // Calculate more accurate center point using centroid of polygon
+      let centroidLat = 0;
+      let centroidLon = 0;
+      let signedArea = 0;
       
-      return { name, lat, lon, boundary };
+      for (let i = 0; i < boundary.length - 1; i++) {
+        const x0 = boundary[i].lon;
+        const y0 = boundary[i].lat;
+        const x1 = boundary[i + 1].lon;
+        const y1 = boundary[i + 1].lat;
+        
+        const a = x0 * y1 - x1 * y0;
+        signedArea += a;
+        centroidLat += (y0 + y1) * a;
+        centroidLon += (x0 + x1) * a;
+      }
+      
+      signedArea *= 0.5;
+      centroidLat /= (6 * signedArea);
+      centroidLon /= (6 * signedArea);
+      
+      // Fallback to geometric center if centroid calculation fails
+      if (isNaN(centroidLat) || isNaN(centroidLon) || Math.abs(signedArea) < 1e-10) {
+        const lats = boundary.map(p => p.lat);
+        const lons = boundary.map(p => p.lon);
+        centroidLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+        centroidLon = (Math.min(...lons) + Math.max(...lons)) / 2;
+      }
+      
+      return { name, lat: centroidLat, lon: centroidLon, boundary };
     })
   ])
 );
@@ -505,15 +528,62 @@ export function generateNeighborhoodBoundary(
     }
   }
   
-  // Fallback: create a simple boundary around the center point
-  const radius = 0.01; // ~1km
-  return [
-    { lat: neighborhood.lat + radius, lon: neighborhood.lon - radius },
-    { lat: neighborhood.lat + radius, lon: neighborhood.lon + radius },
-    { lat: neighborhood.lat - radius, lon: neighborhood.lon + radius },
-    { lat: neighborhood.lat - radius, lon: neighborhood.lon - radius },
-    { lat: neighborhood.lat + radius, lon: neighborhood.lon - radius }
-  ];
+  // Improved fallback: create a more realistic neighborhood boundary
+  // NYC neighborhoods are typically 0.5-2 miles across, so use adaptive sizing
+  const baseRadius = 0.008; // ~0.8km base radius
+  
+  // Adjust radius based on neighborhood context
+  let radius = baseRadius;
+  
+  // Larger radius for well-known major neighborhoods
+  const majorNeighborhoods = ['manhattan', 'brooklyn', 'queens', 'bronx', 'staten island', 'harlem', 'soho', 'chelsea', 'midtown'];
+  if (majorNeighborhoods.some(major => neighborhood.name.toLowerCase().includes(major))) {
+    radius = 0.015; // ~1.5km for major areas
+  }
+  
+  // Create a more irregular, realistic boundary using multiple points
+  const points = 12; // More points for smoother boundary
+  const boundary = [];
+  
+  for (let i = 0; i < points; i++) {
+    const angle = (i / points) * 2 * Math.PI;
+    
+    // Add some irregularity to make it more realistic
+    const irregularity = 0.7 + Math.random() * 0.6; // Random factor between 0.7 and 1.3
+    const currentRadius = radius * irregularity;
+    
+    // Consider nearby neighborhoods to create more logical boundaries
+    let adjustedRadius = currentRadius;
+    if (neighbors.length > 0) {
+      // Find the closest neighbor in this direction
+      const directionLat = neighborhood.lat + Math.cos(angle);
+      const directionLon = neighborhood.lon + Math.sin(angle);
+      
+      let closestDistance = Infinity;
+      neighbors.forEach(neighbor => {
+        const distance = Math.sqrt(
+          Math.pow(neighbor.lat - directionLat, 2) + 
+          Math.pow(neighbor.lon - directionLon, 2)
+        );
+        closestDistance = Math.min(closestDistance, distance);
+      });
+      
+      // Adjust radius to not overlap too much with neighbors
+      if (closestDistance < currentRadius * 2) {
+        adjustedRadius = Math.min(currentRadius, closestDistance * 0.4);
+      }
+    }
+    
+    const lat = neighborhood.lat + adjustedRadius * Math.cos(angle);
+    const lon = neighborhood.lon + adjustedRadius * Math.sin(angle);
+    
+    boundary.push({ lat, lon });
+  }
+  
+  // Close the polygon
+  boundary.push(boundary[0]);
+  
+  return boundary;
 }
 
 // Haversine distance calculation (in km)
