@@ -569,11 +569,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const mapStyle = {
       version: 8 as const,
       sources: {
-        'osm-tiles': {
-          type: 'raster' as const,
-          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-          tileSize: 256,
-          attribution: '© OpenStreetMap contributors'
+        'nyc-tiles': {
+          type: 'vector' as const,
+          tiles: [absoluteTilesUrl],
+          minzoom: 10,
+          maxzoom: 16
         }
       },
       glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
@@ -581,14 +581,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         {
           id: 'background',
           type: 'background' as const,
-          paint: { 'background-color': '#F5F5DC' }
-        },
-        {
-          id: 'simple-map',
-          type: 'raster' as const,
-          source: 'osm-tiles',
-          minzoom: 0,
-          maxzoom: 22
+          paint: { 'background-color': '#B3E5FC' }
         }
       ]
     };
