@@ -208,8 +208,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const mobileFactor = isMobile ? 0.8 : 1.0;  // Less aggressive mobile reduction
     const targetBusinesses = Math.ceil(areaKm2 * baseDensity * mobileFactor);
     
-    const maxLimit = isMobile ? 5000 : 10000;    // Increased limits
-    const minLimit = 500;                        // Increased minimum from 200
+    const maxLimit = isMobile ? 10000 : 20000;    // Increased limits
+    const minLimit = 1000;                        // Increased minimum from 200
     
     return Math.max(minLimit, Math.min(maxLimit, targetBusinesses));
   }, [isMobile]);
