@@ -147,13 +147,14 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
           setBusinesses(viewportBusinesses);
           setCurrentBounds(bounds);
           console.log(`✅ Viewport search completed with ${Array.isArray(viewportBusinesses) ? viewportBusinesses.length : 0} businesses`);
+          return viewportBusinesses;
         } catch (error) {
           console.error('❌ Viewport search error:', error);
+          return [];
         } finally {
           setLoading(false);
           setIsSearching(false);
         }
-        return;
       } else {
         // Same search - accumulate results when panning to new areas
         console.log('🔄 Same search filters - checking if we need to search new area');
@@ -161,7 +162,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
         // For neighborhood searches, don't expand beyond neighborhood bounds
         if (searchFilters?.neighborhoodFilter) {
           console.log('🏙️ Neighborhood search - not expanding beyond neighborhood bounds when panning');
-          return;
+          return businesses;
         }
         
         // Check if we're in a significantly different area (more permissive for searches)
@@ -181,7 +182,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
           // If there's more than 70% overlap, don't search again
           if (overlapRatio > 0.7) {
             console.log('🔄 Area has high overlap with previous search - keeping existing results');
-            return;
+            return businesses;
           }
         }
         
@@ -201,15 +202,18 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
             const existingIds = new Set(Array.isArray(prev) ? prev.map(b => b.id) : []);
             const uniqueNew = Array.isArray(newBusinesses) ? newBusinesses.filter(b => !existingIds.has(b.id)) : [];
             console.log(`📍 Adding ${uniqueNew.length} new businesses to existing ${Array.isArray(prev) ? prev.length : 0}`);
-            return [...(Array.isArray(prev) ? prev : []), ...uniqueNew];
+            const updatedBusinesses = [...(Array.isArray(prev) ? prev : []), ...uniqueNew];
+            return updatedBusinesses;
           });
           setCurrentBounds(expandedBounds);
+          // Return all businesses (existing + new)
+          return [...(Array.isArray(businesses) ? businesses : []), ...(Array.isArray(newBusinesses) ? newBusinesses.filter(b => !(Array.isArray(businesses) ? businesses : []).some(existing => existing.id === b.id)) : [])];
         } catch (error) {
           console.error('❌ New area search error:', error);
+          return businesses;
         } finally {
           setLoading(false);
         }
-        return;
       }
     }
     
@@ -229,7 +233,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
         setBusinesses(cachedBusinesses);
         setCurrentBounds(bounds);
         schedulePreload(bounds);
-        return;
+        return cachedBusinesses;
       }
     }
 
@@ -248,7 +252,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
       if (expandedCached && Array.isArray(expandedCached) && expandedCached.length > 200) {
         setBusinesses(expandedCached);
         setCurrentBounds(expandedBounds);
-        return;
+        return expandedCached;
       }
     }
 
@@ -260,7 +264,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
         const result = await inflightRequests.get(requestKey)!;
         setBusinesses(result);
         setCurrentBounds(expandedBounds);
-        return;
+        return result;
       } catch (error) {
         console.error('In-flight request failed:', error);
       }
@@ -328,8 +332,11 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
         
         if (!searchFilters) schedulePreload(expandedBounds);
         
+        return viewportBusinesses; // Return the businesses for the map
+        
       } catch (error) {
         console.error('❌ Error loading viewport businesses:', error);
+        return [];
       } finally {
         setLoading(false);
         inflightRequests.delete(requestKey);
