@@ -260,10 +260,31 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
           Math.abs(currentBounds.west - expandedBounds.west) < 0.001) {
         return;
       }
-
+      
       setLoading(true);
       
-      const requestPromise = getBusinessesInViewport(expandedBounds, limit, searchFilters, undefined, zoom);
+      // If we have a neighborhood filter, ensure we search within the neighborhood bounds
+      let searchBounds = expandedBounds;
+      if (searchFilters?.neighborhoodFilter) {
+        const neighborhood = searchFilters.neighborhoodFilter;
+        console.log('🏙️ [loadBusinessesInViewport] Neighborhood filter active, using neighborhood bounds:', neighborhood.name);
+        
+        // Create bounds that encompass the neighborhood
+        const boundary = neighborhood.boundary;
+        const lats = boundary.map(p => p.lat);
+        const lons = boundary.map(p => p.lon);
+        
+        searchBounds = {
+          north: Math.max(...lats),
+          south: Math.min(...lats),
+          east: Math.max(...lons),
+          west: Math.min(...lons)
+        };
+        
+        console.log('🏙️ [loadBusinessesInViewport] Using neighborhood bounds:', searchBounds);
+      }
+      
+      const requestPromise = getBusinessesInViewport(searchBounds, limit, searchFilters, undefined, zoom);
       inflightRequests.set(requestKey, requestPromise);
       
       try {
