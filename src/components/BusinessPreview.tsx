@@ -35,11 +35,11 @@ interface BusinessPreviewProps {
 
 const BusinessPreview: React.FC<BusinessPreviewProps> = memo(({ business, posts, onClose, onShowDetails, onStoriesClick }) => {
   // Get stories (posts) for this business
-  const businessStories = posts.filter(post => post.businessId === business.id && post.isStory).slice(0, 3);
+  const businessStories = Array.isArray(posts) ? posts.filter(post => post.businessId === business.id && post.isStory).slice(0, 3) : [];
 
   // Calculate average salary per role type
   const calculateRoleAverages = () => {
-    if (!business.roles || business.roles.length === 0) {
+    if (!Array.isArray(business.roles) || business.roles.length === 0) {
       return [];
     }
 
@@ -47,7 +47,8 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = memo(({ business, posts,
     const roleGroups: { [key: string]: number[] } = {};
     
     business.roles.forEach(role => {
-      const match = role.salary.match(/\$?(\d+(?:\.\d+)?)/);
+      const salaryStr = typeof role.salary === 'string' ? role.salary : '';
+      const match = salaryStr.match(/\$?(\d+(?:\.\d+)?)/);
       const salary = match ? parseFloat(match[1]) : 0;
       
       if (salary > 0) {
@@ -103,21 +104,23 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = memo(({ business, posts,
         <div className="flex justify-between items-start mb-4">
           <div>
             <h3 className="text-lg font-medium text-app-black">{business.name}</h3>
-            <div className="flex items-center mt-1">
-              <span className="text-app-gray-medium text-sm">
-                {business.atmosphere.join(' • ')}
-              </span>
-            </div>
+            {Array.isArray(business.atmosphere) && business.atmosphere.length > 0 && (
+              <div className="flex items-center mt-1">
+                <span className="text-app-gray-medium text-sm">
+                  {business.atmosphere.join(' • ')}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Show averaged salary per role */}
-        {roleAverages.length > 0 && (
+        {Array.isArray(roleAverages) && roleAverages.length > 0 && (
           <div className="mb-4">
             <div 
               className="space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
               style={{ 
-                maxHeight: roleAverages.length > 3 ? '72px' : 'auto' // 3 rows * 24px per row
+                maxHeight: Array.isArray(roleAverages) && roleAverages.length > 3 ? '72px' : 'auto' // 3 rows * 24px per row
               }}
             >
               {roleAverages.map((roleAvg, index) => (
@@ -143,7 +146,7 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = memo(({ business, posts,
             <h4 className="text-sm font-medium text-app-black">Stories 📖</h4>
           </div>
           <div className="space-y-2">
-            {businessStories.length > 0 ? (
+            {Array.isArray(businessStories) && businessStories.length > 0 ? (
               businessStories.map(story => (
                 <div 
                   key={story.id}
@@ -151,7 +154,7 @@ const BusinessPreview: React.FC<BusinessPreviewProps> = memo(({ business, posts,
                   onClick={handleStoryClick}
                 >
                   <p className="line-clamp-2">
-                    {story.text.length > 60 ? `${story.text.substring(0, 60)}...` : story.text}
+                    {story.text && story.text.length > 60 ? `${story.text.substring(0, 60)}...` : (story.text || '')}
                   </p>
                   <span className="absolute bottom-0 left-0 text-xs text-gray-400">{formatTimeAgo(story.createdAt)}</span>
                 </div>

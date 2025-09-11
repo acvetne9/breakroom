@@ -81,7 +81,7 @@ export const useMapWorker = () => {
     zoom: number, 
     bounds: [number, number, number, number]
   ) => {
-    if (businesses.length === 0) return [];
+    if (!Array.isArray(businesses) || businesses.length === 0) return [];
     
     try {
       return await postMessage('cluster', { businesses, zoom, bounds });

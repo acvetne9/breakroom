@@ -74,7 +74,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
     }
   };
 
-  const businessStories = posts.filter(post => post.businessId === business.id && post.isStory);
+  const businessStories = Array.isArray(posts) ? posts.filter(post => post.businessId === business.id && post.isStory) : [];
 
   const handleCardClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -91,7 +91,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
     onRoleVote?.(business.id, roleIndex, voteType);
   };
 
-  const roles = business.roles || [];
+  const roles = Array.isArray(business.roles) ? business.roles : [];
   const shouldScroll = roles.length > 6;
 
   return (
@@ -110,14 +110,16 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
               className="text-xl font-medium text-app-black"
             />
 
-            {(business.address?.trim() || business.atmosphere.length > 0) && (
+            {(
+              business.address?.trim() || (Array.isArray(business.atmosphere) && business.atmosphere.length > 0)
+            ) && (
               <div className="mt-1 flex flex-col gap-0.5">
                 {business.address && (
                   <span className="text-sm text-app-gray-medium">
                     {business.address}
                   </span>
                 )}
-                {business.atmosphere.length > 0 && (
+                {Array.isArray(business.atmosphere) && business.atmosphere.length > 0 && (
                   <span className="text-sm text-app-gray-medium">
                     {business.atmosphere.join(' • ')}
                   </span>
@@ -148,8 +150,8 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
                 <span className="text-app-black">{role.role}</span>
                 <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
                   <span className="font-medium text-app-black">
-                    {role.salary}
-                    {!role.salary.includes('/') && (
+                    {typeof role.salary === 'string' ? role.salary : (business.salary || '$13.6')}
+                    {!(typeof role.salary === 'string' && role.salary.includes('/')) && (
                       <span className="text-xs text-app-gray-medium ml-1">/hr</span>
                     )}
                   </span>
@@ -187,7 +189,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
             More Stories 📖
           </h3>
           <div className="space-y-4">
-            {businessStories.length > 0 ? (
+            {Array.isArray(businessStories) && businessStories.length > 0 ? (
               <>
                 {businessStories.slice(0, 5).map(story => (
                   <div
@@ -196,7 +198,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
                     onClick={(e) => handleStoryClick(story, e)}
                   >
                     <TranslatedText 
-                      text={story.text.length > 100 ? `${story.text.substring(0, 100)}...` : story.text}
+                      text={(story.text && story.text.length > 100) ? `${story.text.substring(0, 100)}...` : (story.text || '')}
                       className="text-app-gray-dark text-sm pb-4"
                     />
                     <span className="absolute bottom-2 left-4 text-xs text-gray-400">
@@ -204,7 +206,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
                     </span>
                   </div>
                 ))}
-                {businessStories.length > 5 && (
+                {Array.isArray(businessStories) && businessStories.length > 5 && (
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();

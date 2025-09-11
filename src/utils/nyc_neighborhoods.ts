@@ -1,241 +1,481 @@
-// ---------------- NYC neighborhoods ----------------
-export const nycNeighborhoods = {
-  Manhattan: [
-    { name: "Harlem", lat: 40.8116, lon: -73.9465 },
-    { name: "Upper East Side", lat: 40.7736, lon: -73.9566 },
-    { name: "Upper West Side", lat: 40.787, lon: -73.9754 },
-    { name: "Midtown", lat: 40.7549, lon: -73.984 },
-    { name: "Lower East Side", lat: 40.717, lon: -73.987 },
-    { name: "Greenwich Village", lat: 40.7336, lon: -74.0027 },
-    { name: "Financial District", lat: 40.7075, lon: -74.0113 }
-  ],
-  Brooklyn: [
-    { name: "Williamsburg", lat: 40.7081, lon: -73.9571 },
-    { name: "Greenpoint", lat: 40.7307, lon: -73.954 },
-    { name: "Bushwick", lat: 40.6958, lon: -73.9171 },
-    { name: "Bedford–Stuyvesant", lat: 40.6872, lon: -73.9418 },
-    { name: "Crown Heights", lat: 40.669, lon: -73.9448 },
-    { name: "Park Slope", lat: 40.672, lon: -73.978 },
-    { name: "Brooklyn Heights", lat: 40.6959, lon: -73.9956 },
-    { name: "Coney Island", lat: 40.5755, lon: -73.9707 },
-    { name: "Brownsville", lat: 40.6629, lon: -73.9133 },
-    { name: "Bensonhurst", lat: 40.6113, lon: -73.997 },
-    { name: "Canarsie", lat: 40.63859, lon: -73.897079 }
-  ],
-  Queens: [
-    { name: "Astoria", lat: 40.7644, lon: -73.9235 },
-    { name: "Long Island City", lat: 40.744, lon: -73.9488 },
-    { name: "Jackson Heights", lat: 40.7557, lon: -73.885 },
-    { name: "Flushing", lat: 40.7675, lon: -73.8331 },
-    { name: "Forest Hills", lat: 40.718, lon: -73.8448 },
-    { name: "Jamaica", lat: 40.7027, lon: -73.789 },
-    { name: "Rockaway Beach", lat: 40.583, lon: -73.8203 },
-    { name: "Ozone Park", lat: 40.678, lon: -73.8507 },
-    { name: "Ridgewood", lat: 40.7101, lon: -73.896 },
-    { name: "Whitestone", lat: 40.7921, lon: -73.8101 }
-  ],
-  Bronx: [
-    { name: "Mott Haven", lat: 40.809, lon: -73.922 },
-    { name: "Fordham", lat: 40.862, lon: -73.891 },
-    { name: "Riverdale", lat: 40.8969, lon: -73.9154 },
-    { name: "Belmont", lat: 40.8555, lon: -73.886 },
-    { name: "Hunts Point", lat: 40.8121, lon: -73.8801 }
-  ],
-  "Staten Island": [
-    { name: "St. George", lat: 40.6437, lon: -74.0732 },
-    { name: "Stapleton", lat: 40.6276, lon: -74.0776 },
-    { name: "Tottenville", lat: 40.5093, lon: -74.2519 },
-    { name: "Great Kills", lat: 40.5537, lon: -74.151 },
-    { name: "New Dorp", lat: 40.5732, lon: -74.1165 }
-  ]
+// ---------------- NYC neighborhoods (approximate polygons) ----------------
+export const nycNeighborhoodBoundaries = {
+  "Manhattan": {
+    "Harlem": [
+      { lat: 40.820, lon: -73.955 },
+      { lat: 40.818, lon: -73.949 },
+      { lat: 40.813, lon: -73.947 },
+      { lat: 40.809, lon: -73.949 },
+      { lat: 40.807, lon: -73.954 },
+      { lat: 40.809, lon: -73.960 },
+      { lat: 40.813, lon: -73.962 },
+      { lat: 40.818, lon: -73.960 },
+      { lat: 40.820, lon: -73.955 } // close loop
+    ],
+    "Upper East Side": [
+      { lat: 40.773, lon: -73.959 },
+      { lat: 40.775, lon: -73.954 },
+      { lat: 40.778, lon: -73.952 },
+      { lat: 40.781, lon: -73.955 },
+      { lat: 40.782, lon: -73.960 },
+      { lat: 40.780, lon: -73.964 },
+      { lat: 40.777, lon: -73.965 },
+      { lat: 40.773, lon: -73.962 },
+      { lat: 40.773, lon: -73.959 } // close loop
+    ],
+    "Upper West Side": [
+      { lat: 40.788, lon: -73.981 },
+      { lat: 40.789, lon: -73.975 },
+      { lat: 40.787, lon: -73.972 },
+      { lat: 40.784, lon: -73.971 },
+      { lat: 40.781, lon: -73.975 },
+      { lat: 40.782, lon: -73.981 },
+      { lat: 40.785, lon: -73.983 },
+      { lat: 40.788, lon: -73.981 }
+    ]
+    "Midtown": [
+      { lat: 40.762, lon: -73.990 },
+      { lat: 40.766, lon: -73.983 },
+      { lat: 40.764, lon: -73.975 },
+      { lat: 40.760, lon: -73.971 },
+      { lat: 40.754, lon: -73.972 },
+      { lat: 40.750, lon: -73.976 },
+      { lat: 40.749, lon: -73.983 },
+      { lat: 40.752, lon: -73.989 },
+      { lat: 40.757, lon: -73.991 },
+      { lat: 40.762, lon: -73.990 } // close loop
+    ],
+    "Lower East Side": [
+      { lat: 40.723, lon: -73.992 },
+      { lat: 40.726, lon: -73.985 },
+      { lat: 40.725, lon: -73.978 },
+      { lat: 40.721, lon: -73.976 },
+      { lat: 40.717, lon: -73.976 },
+      { lat: 40.713, lon: -73.979 },
+      { lat: 40.712, lon: -73.985 },
+      { lat: 40.714, lon: -73.990 },
+      { lat: 40.718, lon: -73.993 },
+      { lat: 40.723, lon: -73.992 } // close loop
+    ],
+    "Greenwich Village": [
+      { lat: 40.740, lon: -74.002 },
+      { lat: 40.738, lon: -73.996 },
+      { lat: 40.735, lon: -73.991 },
+      { lat: 40.731, lon: -73.991 },
+      { lat: 40.728, lon: -73.995 },
+      { lat: 40.727, lon: -74.000 },
+      { lat: 40.729, lon: -74.005 },
+      { lat: 40.733, lon: -74.007 },
+      { lat: 40.738, lon: -74.006 },
+      { lat: 40.740, lon: -74.002 } // close loop
+    ],
+    "Financial District": [
+      { lat: 40.711, lon: -74.013 },
+      { lat: 40.709, lon: -74.010 },
+      { lat: 40.708, lon: -74.006 },
+      { lat: 40.706, lon: -74.004 },
+      { lat: 40.704, lon: -74.004 },
+      { lat: 40.702, lon: -74.007 },
+      { lat: 40.702, lon: -74.010 },
+      { lat: 40.704, lon: -74.013 },
+      { lat: 40.707, lon: -74.015 },
+      { lat: 40.711, lon: -74.013 } // close loop
+    ]
+  },
+  "Brooklyn": {
+    "Williamsburg": [
+      { lat: 40.710, lon: -73.960 },
+      { lat: 40.712, lon: -73.955 },
+      { lat: 40.715, lon: -73.952 },
+      { lat: 40.718, lon: -73.955 },
+      { lat: 40.718, lon: -73.960 },
+      { lat: 40.715, lon: -73.963 },
+      { lat: 40.712, lon: -73.962 },
+      { lat: 40.710, lon: -73.960 }
+    ],
+    "Bushwick": [
+      { lat: 40.698, lon: -73.926 },
+      { lat: 40.700, lon: -73.920 },
+      { lat: 40.703, lon: -73.918 },
+      { lat: 40.707, lon: -73.921 },
+      { lat: 40.707, lon: -73.926 },
+      { lat: 40.703, lon: -73.929 },
+      { lat: 40.700, lon: -73.928 },
+      { lat: 40.698, lon: -73.926 }
+    ],
+    "Greenpoint": [
+      { lat: 40.739, lon: -73.962 },
+      { lat: 40.738, lon: -73.955 },
+      { lat: 40.735, lon: -73.949 },
+      { lat: 40.730, lon: -73.947 },
+      { lat: 40.726, lon: -73.949 },
+      { lat: 40.724, lon: -73.954 },
+      { lat: 40.725, lon: -73.960 },
+      { lat: 40.729, lon: -73.963 },
+      { lat: 40.735, lon: -73.964 },
+      { lat: 40.739, lon: -73.962 } // close loop
+    ],
+    "Bedford–Stuyvesant": [
+      { lat: 40.700, lon: -73.960 },
+      { lat: 40.698, lon: -73.950 },
+      { lat: 40.693, lon: -73.942 },
+      { lat: 40.688, lon: -73.937 },
+      { lat: 40.683, lon: -73.939 },
+      { lat: 40.680, lon: -73.945 },
+      { lat: 40.681, lon: -73.954 },
+      { lat: 40.686, lon: -73.959 },
+      { lat: 40.693, lon: -73.962 },
+      { lat: 40.700, lon: -73.960 } // close loop
+    ],
+    "Crown Heights": [
+      { lat: 40.676, lon: -73.960 },
+      { lat: 40.674, lon: -73.951 },
+      { lat: 40.672, lon: -73.942 },
+      { lat: 40.669, lon: -73.935 },
+      { lat: 40.664, lon: -73.935 },
+      { lat: 40.660, lon: -73.940 },
+      { lat: 40.659, lon: -73.948 },
+      { lat: 40.662, lon: -73.956 },
+      { lat: 40.667, lon: -73.961 },
+      { lat: 40.672, lon: -73.962 },
+      { lat: 40.676, lon: -73.960 } // close loop
+    ],
+    "Park Slope": [
+      { lat: 40.676, lon: -73.993 },
+      { lat: 40.674, lon: -73.987 },
+      { lat: 40.672, lon: -73.981 },
+      { lat: 40.669, lon: -73.976 },
+      { lat: 40.666, lon: -73.977 },
+      { lat: 40.664, lon: -73.982 },
+      { lat: 40.664, lon: -73.989 },
+      { lat: 40.667, lon: -73.994 },
+      { lat: 40.672, lon: -73.996 },
+      { lat: 40.676, lon: -73.993 } // close loop
+    ],
+    "Brooklyn Heights": [
+      { lat: 40.702, lon: -73.998 },
+      { lat: 40.701, lon: -73.994 },
+      { lat: 40.699, lon: -73.990 },
+      { lat: 40.696, lon: -73.988 },
+      { lat: 40.693, lon: -73.990 },
+      { lat: 40.692, lon: -73.994 },
+      { lat: 40.693, lon: -73.999 },
+      { lat: 40.696, lon: -74.001 },
+      { lat: 40.699, lon: -74.001 },
+      { lat: 40.702, lon: -73.998 } // close loop
+    ],
+    "Coney Island": [
+      { lat: 40.583, lon: -73.990 },
+      { lat: 40.582, lon: -73.982 },
+      { lat: 40.580, lon: -73.974 },
+      { lat: 40.576, lon: -73.968 },
+      { lat: 40.573, lon: -73.967 },
+      { lat: 40.570, lon: -73.972 },
+      { lat: 40.568, lon: -73.979 },
+      { lat: 40.569, lon: -73.986 },
+      { lat: 40.573, lon: -73.991 },
+      { lat: 40.578, lon: -73.993 },
+      { lat: 40.583, lon: -73.990 } // close loop
+    ],
+    "Brownsville": [
+      { lat: 40.669, lon: -73.920 },
+      { lat: 40.668, lon: -73.912 },
+      { lat: 40.665, lon: -73.907 },
+      { lat: 40.660, lon: -73.905 },
+      { lat: 40.656, lon: -73.908 },
+      { lat: 40.655, lon: -73.914 },
+      { lat: 40.656, lon: -73.920 },
+      { lat: 40.660, lon: -73.925 },
+      { lat: 40.665, lon: -73.925 },
+      { lat: 40.669, lon: -73.920 } // close loop
+    ],
+    "Bensonhurst": [
+      { lat: 40.619, lon: -74.005 },
+      { lat: 40.618, lon: -73.999 },
+      { lat: 40.616, lon: -73.993 },
+      { lat: 40.612, lon: -73.989 },
+      { lat: 40.608, lon: -73.990 },
+      { lat: 40.605, lon: -73.994 },
+      { lat: 40.604, lon: -74.000 },
+      { lat: 40.606, lon: -74.006 },
+      { lat: 40.610, lon: -74.008 },
+      { lat: 40.615, lon: -74.008 },
+      { lat: 40.619, lon: -74.005 } // close loop
+    ],
+    "Canarsie": [
+      { lat: 40.647, lon: -73.907 },
+      { lat: 40.646, lon: -73.899 },
+      { lat: 40.643, lon: -73.892 },
+      { lat: 40.638, lon: -73.889 },
+      { lat: 40.633, lon: -73.891 },
+      { lat: 40.629, lon: -73.895 },
+      { lat: 40.628, lon: -73.901 },
+      { lat: 40.630, lon: -73.908 },
+      { lat: 40.635, lon: -73.911 },
+      { lat: 40.641, lon: -73.911 },
+      { lat: 40.647, lon: -73.907 } // close loop
+    ]
+  },
+  "Queens": {
+    "Astoria": [
+      { lat: 40.776, lon: -73.930 },
+      { lat: 40.774, lon: -73.922 },
+      { lat: 40.770, lon: -73.916 },
+      { lat: 40.765, lon: -73.913 },
+      { lat: 40.760, lon: -73.914 },
+      { lat: 40.756, lon: -73.918 },
+      { lat: 40.755, lon: -73.925 },
+      { lat: 40.758, lon: -73.931 },
+      { lat: 40.764, lon: -73.934 },
+      { lat: 40.771, lon: -73.934 },
+      { lat: 40.776, lon: -73.930 } // close loop
+    ],
+    "Long Island City": [
+      { lat: 40.752, lon: -73.959 },
+      { lat: 40.751, lon: -73.951 },
+      { lat: 40.748, lon: -73.943 },
+      { lat: 40.743, lon: -73.938 },
+      { lat: 40.739, lon: -73.940 },
+      { lat: 40.737, lon: -73.946 },
+      { lat: 40.738, lon: -73.953 },
+      { lat: 40.742, lon: -73.958 },
+      { lat: 40.747, lon: -73.961 },
+      { lat: 40.752, lon: -73.959 } // close loop
+    ],
+    "Jackson Heights": [
+      { lat: 40.761, lon: -73.897 },
+      { lat: 40.760, lon: -73.889 },
+      { lat: 40.757, lon: -73.883 },
+      { lat: 40.753, lon: -73.879 },
+      { lat: 40.749, lon: -73.881 },
+      { lat: 40.747, lon: -73.886 },
+      { lat: 40.748, lon: -73.892 },
+      { lat: 40.751, lon: -73.897 },
+      { lat: 40.755, lon: -73.900 },
+      { lat: 40.761, lon: -73.897 } // close loop
+    ],
+    "Flushing": [
+      { lat: 40.772, lon: -73.843 },
+      { lat: 40.770, lon: -73.835 },
+      { lat: 40.768, lon: -73.827 },
+      { lat: 40.763, lon: -73.824 },
+      { lat: 40.759, lon: -73.828 },
+      { lat: 40.757, lon: -73.835 },
+      { lat: 40.758, lon: -73.842 },
+      { lat: 40.761, lon: -73.847 },
+      { lat: 40.767, lon: -73.848 },
+      { lat: 40.772, lon: -73.843 } // close loop
+    ],
+    "Forest Hills": [
+      { lat: 40.725, lon: -73.853 },
+      { lat: 40.724, lon: -73.846 },
+      { lat: 40.722, lon: -73.839 },
+      { lat: 40.718, lon: -73.835 },
+      { lat: 40.714, lon: -73.837 },
+      { lat: 40.712, lon: -73.843 },
+      { lat: 40.713, lon: -73.849 },
+      { lat: 40.716, lon: -73.853 },
+      { lat: 40.721, lon: -73.855 },
+      { lat: 40.725, lon: -73.853 } // close loop
+    ],
+    "Jamaica": [
+      { lat: 40.709, lon: -73.798 },
+      { lat: 40.708, lon: -73.791 },
+      { lat: 40.705, lon: -73.785 },
+      { lat: 40.700, lon: -73.782 },
+      { lat: 40.696, lon: -73.785 },
+      { lat: 40.694, lon: -73.791 },
+      { lat: 40.694, lon: -73.798 },
+      { lat: 40.697, lon: -73.803 },
+      { lat: 40.702, lon: -73.805 },
+      { lat: 40.707, lon: -73.803 },
+      { lat: 40.709, lon: -73.798 } // close loop
+    ],
+    "Rockaway Beach": [
+      { lat: 40.590, lon: -73.832 },
+      { lat: 40.589, lon: -73.826 },
+      { lat: 40.587, lon: -73.821 },
+      { lat: 40.584, lon: -73.818 },
+      { lat: 40.581, lon: -73.819 },
+      { lat: 40.579, lon: -73.823 },
+      { lat: 40.579, lon: -73.829 },
+      { lat: 40.582, lon: -73.833 },
+      { lat: 40.586, lon: -73.835 },
+      { lat: 40.590, lon: -73.832 } // close loop
+    ],
+    "Ozone Park": [
+      { lat: 40.684, lon: -73.860 },
+      { lat: 40.682, lon: -73.853 },
+      { lat: 40.680, lon: -73.847 },
+      { lat: 40.676, lon: -73.844 },
+      { lat: 40.672, lon: -73.846 },
+      { lat: 40.670, lon: -73.852 },
+      { lat: 40.671, lon: -73.858 },
+      { lat: 40.674, lon: -73.862 },
+      { lat: 40.679, lon: -73.863 },
+      { lat: 40.684, lon: -73.860 } // close loop
+    ],
+    "Ridgewood": [
+      { lat: 40.717, lon: -73.905 },
+      { lat: 40.716, lon: -73.897 },
+      { lat: 40.713, lon: -73.891 },
+      { lat: 40.709, lon: -73.888 },
+      { lat: 40.705, lon: -73.890 },
+      { lat: 40.703, lon: -73.896 },
+      { lat: 40.703, lon: -73.902 },
+      { lat: 40.706, lon: -73.907 },
+      { lat: 40.711, lon: -73.908 },
+      { lat: 40.717, lon: -73.905 } // close loop
+    ],
+    "Whitestone": [
+      { lat: 40.797, lon: -73.820 },
+      { lat: 40.796, lon: -73.812 },
+      { lat: 40.793, lon: -73.805 },
+      { lat: 40.789, lon: -73.802 },
+      { lat: 40.785, lon: -73.804 },
+      { lat: 40.782, lon: -73.809 },
+      { lat: 40.783, lon: -73.815 },
+      { lat: 40.787, lon: -73.820 },
+      { lat: 40.792, lon: -73.822 },
+      { lat: 40.797, lon: -73.820 } // close loop
+    ]
+  },
+  "Bronx": {
+    "Mott Haven": [
+      { lat: 40.816, lon: -73.929 },
+      { lat: 40.815, lon: -73.923 },
+      { lat: 40.814, lon: -73.918 },
+      { lat: 40.811, lon: -73.916 },
+      { lat: 40.808, lon: -73.916 },
+      { lat: 40.805, lon: -73.919 },
+      { lat: 40.804, lon: -73.924 },
+      { lat: 40.806, lon: -73.928 },
+      { lat: 40.810, lon: -73.930 },
+      { lat: 40.816, lon: -73.929 } // close loop
+    ],
+    "Fordham": [
+      { lat: 40.868, lon: -73.898 },
+      { lat: 40.867, lon: -73.891 },
+      { lat: 40.865, lon: -73.885 },
+      { lat: 40.862, lon: -73.882 },
+      { lat: 40.858, lon: -73.883 },
+      { lat: 40.855, lon: -73.888 },
+      { lat: 40.855, lon: -73.894 },
+      { lat: 40.857, lon: -73.899 },
+      { lat: 40.861, lon: -73.901 },
+      { lat: 40.865, lon: -73.901 },
+      { lat: 40.868, lon: -73.898 } // close loop
+    ],
+    "Riverdale": [
+      { lat: 40.906, lon: -73.921 },
+      { lat: 40.905, lon: -73.913 },
+      { lat: 40.902, lon: -73.907 },
+      { lat: 40.898, lon: -73.902 },
+      { lat: 40.894, lon: -73.902 },
+      { lat: 40.891, lon: -73.907 },
+      { lat: 40.890, lon: -73.914 },
+      { lat: 40.892, lon: -73.920 },
+      { lat: 40.896, lon: -73.924 },
+      { lat: 40.901, lon: -73.925 },
+      { lat: 40.906, lon: -73.921 } // close loop
+    ],
+    "Belmont": [
+      { lat: 40.860, lon: -73.891 },
+      { lat: 40.859, lon: -73.886 },
+      { lat: 40.857, lon: -73.882 },
+      { lat: 40.854, lon: -73.881 },
+      { lat: 40.851, lon: -73.883 },
+      { lat: 40.850, lon: -73.887 },
+      { lat: 40.851, lon: -73.891 },
+      { lat: 40.854, lon: -73.894 },
+      { lat: 40.858, lon: -73.894 },
+      { lat: 40.860, lon: -73.891 } // close loop
+    ],
+    "Hunts Point": [
+      { lat: 40.817, lon: -73.884 },
+      { lat: 40.816, lon: -73.878 },
+      { lat: 40.814, lon: -73.872 },
+      { lat: 40.810, lon: -73.869 },
+      { lat: 40.807, lon: -73.871 },
+      { lat: 40.805, lon: -73.876 },
+      { lat: 40.805, lon: -73.882 },
+      { lat: 40.807, lon: -73.886 },
+      { lat: 40.811, lon: -73.888 },
+      { lat: 40.815, lon: -73.888 },
+      { lat: 40.817, lon: -73.884 } // close loop
+    ]
+  },
+  "Staten Island": {
+    "St. George": [
+      { lat: 40.651, lon: -74.084 },
+      { lat: 40.649, lon: -74.078 },
+      { lat: 40.646, lon: -74.072 },
+      { lat: 40.643, lon: -74.067 },
+      { lat: 40.640, lon: -74.068 },
+      { lat: 40.638, lon: -74.073 },
+      { lat: 40.639, lon: -74.079 },
+      { lat: 40.643, lon: -74.083 },
+      { lat: 40.651, lon: -74.084 } // close loop
+    ],
+    "Stapleton": [
+      { lat: 40.634, lon: -74.090 },
+      { lat: 40.632, lon: -74.084 },
+      { lat: 40.629, lon: -74.078 },
+      { lat: 40.627, lon: -74.072 },
+      { lat: 40.624, lon: -74.068 },
+      { lat: 40.621, lon: -74.066 },
+      { lat: 40.622, lon: -74.072 },
+      { lat: 40.627, lon: -74.079 },
+      { lat: 40.632, lon: -74.086 },
+      { lat: 40.634, lon: -74.090 } // close loop
+    ],
+    "Tottenville": [
+      { lat: 40.517, lon: -74.264 },
+      { lat: 40.514, lon: -74.258 },
+      { lat: 40.511, lon: -74.251 },
+      { lat: 40.509, lon: -74.245 },
+      { lat: 40.505, lon: -74.240 },
+      { lat: 40.501, lon: -74.238 },
+      { lat: 40.502, lon: -74.244 },
+      { lat: 40.506, lon: -74.256 },
+      { lat: 40.512, lon: -74.261 },
+      { lat: 40.517, lon: -74.264 } // close loop
+    ],
+    "Great Kills": [
+      { lat: 40.561, lon: -74.166 },
+      { lat: 40.558, lon: -74.160 },
+      { lat: 40.554, lon: -74.152 },
+      { lat: 40.551, lon: -74.145 },
+      { lat: 40.547, lon: -74.145 },
+      { lat: 40.546, lon: -74.151 },
+      { lat: 40.548, lon: -74.158 },
+      { lat: 40.553, lon: -74.164 },
+      { lat: 40.558, lon: -74.167 },
+      { lat: 40.561, lon: -74.166 } // close loop
+    ],
+    "New Dorp": [
+      { lat: 40.580, lon: -74.128 },
+      { lat: 40.577, lon: -74.123 },
+      { lat: 40.574, lon: -74.118 },
+      { lat: 40.571, lon: -74.115 },
+      { lat: 40.568, lon: -74.114 },
+      { lat: 40.567, lon: -74.118 },
+      { lat: 40.568, lon: -74.122 },
+      { lat: 40.572, lon: -74.125 },
+      { lat: 40.576, lon: -74.127 },
+      { lat: 40.580, lon: -74.128 } // close loop
+    ]
+  }
 };
 
-// ---------------- Utilities ----------------
-export function haversine(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const toRad = deg => (deg * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function bearing(lat1, lon1, lat2, lon2) {
-  const φ1 = (lat1 * Math.PI) / 180;
-  const φ2 = (lat2 * Math.PI) / 180;
-  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
-
-  const y = Math.sin(Δλ) * Math.cos(φ2);
-  const x =
-    Math.cos(φ1) * Math.sin(φ2) -
-    Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
-  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
-}
-
-function destinationPoint(lat, lon, bearingDeg, distanceKm) {
-  const R = 6371;
-  const δ = distanceKm / R;
-  const θ = (bearingDeg * Math.PI) / 180;
-  const φ1 = (lat * Math.PI) / 180;
-  const λ1 = (lon * Math.PI) / 180;
-
-  const φ2 = Math.asin(
-    Math.sin(φ1) * Math.cos(δ) +
-    Math.cos(φ1) * Math.sin(δ) * Math.cos(θ)
-  );
-  const λ2 =
-    λ1 +
-    Math.atan2(
-      Math.sin(θ) * Math.sin(δ) * Math.cos(φ1),
-      Math.cos(δ) - Math.sin(φ1) * Math.sin(φ2)
-    );
-
-  return { lat: (φ2 * 180) / Math.PI, lon: (λ2 * 180) / Math.PI };
-}
-
-// ---------------- Core logic ----------------
-export function findNearbyNeighborhoods(allBoroughs, target, maxDistanceKm = 3) {
-  const neighbors = [];
-  for (const borough in allBoroughs) {
-    for (const n of allBoroughs[borough]) {
-      if (n.name !== target.name) {
-        const d = haversine(target.lat, target.lon, n.lat, n.lon);
-        if (d <= maxDistanceKm) neighbors.push(n);
-      }
-    }
-  }
-  return neighbors;
-}
-
-// ---------------- Improved boundary generation ----------------
-function convexHull(points) {
-  // Graham scan
-  points.sort((a, b) => (a.lon === b.lon ? a.lat - b.lat : a.lon - b.lon));
-  const cross = (o, a, b) =>
-    (a.lon - o.lon) * (b.lat - o.lat) - (a.lat - o.lat) * (b.lon - o.lon);
-
-  const lower = [];
-  for (const p of points) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
-      lower.pop();
-    }
-    lower.push(p);
-  }
-
-  const upper = [];
-  for (let i = points.length - 1; i >= 0; i--) {
-    const p = points[i];
-    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
-      upper.pop();
-    }
-    upper.push(p);
-  }
-
-  upper.pop();
-  lower.pop();
-  return lower.concat(upper);
-}
-
-import concaveman from "concaveman";
-
-// ---------------- Helper: radial buffer cloud ----------------
-function jitteredBufferPoints(lat: number, lon: number, radiusKm = 0.5, radialCount = 16) {
-  const pts: [number, number][] = [];
-  for (let i = 0; i < radialCount; i++) {
-    const θ = (360 / radialCount) * i;
-    const p = destinationPoint(lat, lon, θ, radiusKm);
-    pts.push([p.lon, p.lat]); // concaveman expects [x, y] = [lon, lat]
-  }
-  return pts;
-}
-
-// ---------------- Neighborhood boundary ----------------
-export function generateNeighborhoodBoundary(
-  neighborhood: { name: string; lat: number; lon: number },
-  neighbors: { name: string; lat: number; lon: number }[],
-  bufferKm = 0.6,
-  radialCount = 16,
-  concavity = 2
-) {
-  let cloud: [number, number][] = [];
-
-  // Include the center
-  cloud.push([neighborhood.lon, neighborhood.lat]);
-
-  // Neighbor-driven points (weighted)
-  neighbors.forEach(n => {
-    const dist = haversine(neighborhood.lat, neighborhood.lon, n.lat, n.lon);
-    const θ = bearing(neighborhood.lat, neighborhood.lon, n.lat, n.lon);
-    const weight = Math.min(1, 3 / Math.max(dist, 0.01));
-    const adjustedDist = dist * weight + bufferKm;
-    const p = destinationPoint(neighborhood.lat, neighborhood.lon, θ, adjustedDist);
-    cloud.push([p.lon, p.lat]);
-  });
-
-  // Radial buffer around the centroid
-  cloud.push(...jitteredBufferPoints(neighborhood.lat, neighborhood.lon, bufferKm, radialCount));
-
-  // Concave hull for smooth blob
-  const hull = concaveman(cloud, concavity);
-  return hull.map(([lon, lat]) => ({ lat, lon }));
-}
-
-// ---------------- Borough boundary ----------------
-export function generateBoroughBoundary(
-  neighborhoods: { name: string; lat: number; lon: number }[],
-  bufferKm = 0.8,
-  radialCount = 20,
-  concavity = 2.5
-) {
-  let cloud: [number, number][] = [];
-
-  neighborhoods.forEach(n => {
-    cloud.push([n.lon, n.lat]);
-    cloud.push(...jitteredBufferPoints(n.lat, n.lon, bufferKm, radialCount));
-  });
-
-  const hull = concaveman(cloud, concavity);
-  return hull.map(([lon, lat]) => ({ lat, lon }));
-}
-
 // ---------------- Public helper ----------------
-// ---------------- Unified public helper ----------------
-export function getNeighborhoodBoundary(
-  name: string,
-  maxNeighborDistanceKm = 3
-) {
-  // Check if input is a borough first
-  if (nycNeighborhoods[name]) {
-    const neighborhoods = nycNeighborhoods[name];
-    return generateBoroughBoundary(neighborhoods);
-  }
-
-  // Otherwise, treat as a single neighborhood
-  let neighborhood: { name: string; lat: number; lon: number } | null = null;
-  for (const borough in nycNeighborhoods) {
-    for (const n of nycNeighborhoods[borough]) {
-      if (n.name.toLowerCase() === name.toLowerCase()) {
-        neighborhood = n;
-        break;
-      }
-    }
-    if (neighborhood) break;
-  }
-
-  if (!neighborhood) {
-    throw new Error(`Neighborhood or borough "${name}" not found.`);
-  }
-
-  // Find neighbors across boroughs (for neighborhood mode only)
-  const neighbors = findNearbyNeighborhoods(
-    nycNeighborhoods,
-    neighborhood,
-    maxNeighborDistanceKm
-  );
-
-  // Generate blob-like boundary
-  return generateNeighborhoodBoundary(neighborhood, neighbors);
+export function getNeighborhoodBoundary(borough: string, neighborhood: string) {
+  const boroughData = nycNeighborhoodBoundaries[borough];
+  if (!boroughData) throw new Error(`Borough "${borough}" not found`);
+  const boundary = boroughData[neighborhood];
+  if (!boundary) throw new Error(`Neighborhood "${neighborhood}" not found in ${borough}`)
+  return boundary;
 }
 
+// Example usage:
+// const harlemBoundary = getNeighborhoodBoundary("Manhattan", "Harlem");

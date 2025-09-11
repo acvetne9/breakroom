@@ -57,6 +57,7 @@ export type Database = {
       }
       businesses: {
         Row: {
+          address: string | null
           atmosphere: string[] | null
           business_type: string | null
           created_at: string
@@ -70,6 +71,7 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          address?: string | null
           atmosphere?: string[] | null
           business_type?: string | null
           created_at?: string
@@ -83,6 +85,7 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          address?: string | null
           atmosphere?: string[] | null
           business_type?: string | null
           created_at?: string
@@ -829,6 +832,22 @@ export type Database = {
       geomfromewkt: {
         Args: { "": string }
         Returns: unknown
+      }
+      get_businesses_near_point: {
+        Args: {
+          center_lat: number
+          center_lng: number
+          limit_count?: number
+          radius_meters?: number
+        }
+        Returns: {
+          address: string
+          distance_meters: number
+          id: string
+          lat: number
+          lng: number
+          name: string
+        }[]
       }
       get_proj4_from_srid: {
         Args: { "": number }

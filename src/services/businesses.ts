@@ -1,42 +1,33 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Business, BusinessRole } from '@/types/business';
 
-export async function getBusinessesBasic(limit: number = 2000): Promise<Business[]> {
-  console.log(`🔄 Fetching ${limit} businesses from center outward...`);
-  
-  // NYC center coordinates (approximately Manhattan center)
-  const centerLat = 40.7589; // Times Square area
-  const centerLng = -73.9851;
-  
+// Enhanced function using PostGIS spatial queries
+export async function getBusinessesNearPoint(
+  centerLat: number, 
+  centerLng: number, 
+  radiusMeters: number = 5000,
+  limit: number = 2000
+): Promise<Business[]> {
+  console.log(`🌍 Fetching businesses near ${centerLat}, ${centerLng} within ${radiusMeters}m`);
+
   const { data: businessesData, error } = await supabase
-    .from('businesses')
-    .select('id, name, lat, lng, address')
-    .order('lat')
-    .limit(limit)
-    .returns<any[]>(); // Limit for performance - can increase gradually
+    .rpc('get_businesses_near_point', {
+      center_lat: centerLat,
+      center_lng: centerLng,
+      radius_meters: radiusMeters,
+      limit_count: limit
+    });
 
   if (error) {
-    console.error('❌ Supabase error:', error);
+    console.error('❌ Spatial query error:', error);
     throw error;
   }
 
-  console.log(`📊 Raw data from Supabase: ${businessesData?.length || 0} records`);
+  console.log(`📊 Spatial query returned: ${businessesData?.length || 0} records`);
 
   if (!businessesData) return [];
 
-  // Calculate distance from center and sort by distance
-  const businessesWithDistance = businessesData.map((business: any) => {
-    const distance = Math.sqrt(
-      Math.pow(business.lat - centerLat, 2) + 
-      Math.pow(business.lng - centerLng, 2)
-    );
-    return { ...business, distance };
-  });
-
-  // Sort by distance from center (closest first)
-  businessesWithDistance.sort((a, b) => a.distance - b.distance);
-
-  const basicBusinesses: Business[] = businessesWithDistance.map((business: any) => ({
+  const businesses: Business[] = businessesData.map((business: any) => ({
     id: business.id,
     name: business.name,
     address: business.address,
@@ -46,8 +37,19 @@ export async function getBusinessesBasic(limit: number = 2000): Promise<Business
     roles: [],
   }));
 
-  console.log(`✅ Processed businesses from center out: ${basicBusinesses.length}`);
-  return basicBusinesses;
+  console.log(`✅ Processed spatial businesses: ${businesses.length}`);
+  return businesses;
+}
+
+export async function getBusinessesBasic(limit: number = 2000): Promise<Business[]> {
+  console.log(`🔄 Fetching ${limit} businesses from center outward...`);
+  
+  // NYC center coordinates - use spatial query for better performance
+  const centerLat = 40.7589; // Times Square area
+  const centerLng = -73.9851;
+  
+  // Use the new spatial function for better performance
+  return getBusinessesNearPoint(centerLat, centerLng, 10000, limit);
 }
 
 export const getBusinessesInViewport = async (
@@ -178,6 +180,48 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
   return fullBusiness;
 }
 
+// Add geocoding and business creation functionality
+export async function geocodeAndCreateBusiness(name: string, address?: string): Promise<{ id: string; lat: number; lng: number }> {
+  if (!address) {
+    throw new Error('Address is required for creating a new business');
+  }
+
+  console.log(`🌍 Geocoding business: ${name} at ${address}`);
+
+  // Call the geocode edge function
+  const { data: geocodeResult, error: geocodeError } = await supabase.functions.invoke('geocode-address', {
+    body: { address }
+  });
+
+  if (geocodeError || !geocodeResult) {
+    console.error('❌ Geocoding failed:', geocodeError);
+    throw new Error(`Failed to geocode address: ${address}`);
+  }
+
+  console.log(`✅ Geocoded coordinates: ${geocodeResult.latitude}, ${geocodeResult.longitude}`);
+
+  // Create the business with geocoded coordinates
+  const { data: newBusiness, error: createError } = await supabase
+    .from('businesses')
+    .insert({
+      name,
+      address: geocodeResult.display_name || address,
+      lat: geocodeResult.latitude,
+      lng: geocodeResult.longitude,
+      atmosphere: [],
+    })
+    .select('id, lat, lng')
+    .single();
+
+  if (createError) {
+    console.error('❌ Failed to create business:', createError);
+    throw createError;
+  }
+
+  console.log(`✅ Created business with ID: ${newBusiness.id}`);
+  return newBusiness;
+}
+
 export async function createOrUpdateBusinessRole(businessLocation: string, role: string, salary: string): Promise<void> {
   // First, try to find an existing business by name (location)
   let businessId: string;
@@ -195,9 +239,8 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
   if (existingBusiness) {
     businessId = existingBusiness.id;
   } else {
-    // Don't create businesses without proper coordinates
-    throw new Error(`Business "${businessLocation}" not found. Businesses must be created with proper coordinates first.`);
-
+    // Suggest using geocodeAndCreateBusiness instead
+    throw new Error(`Business "${businessLocation}" not found. Use geocodeAndCreateBusiness() to create it with coordinates first.`);
   }
 
   // Check if this exact role already exists for this business

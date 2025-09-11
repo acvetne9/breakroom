@@ -107,10 +107,10 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     }
     
     // Check cache first for better performance
-    const cachedResults = resultsCache.current.get(q);
-    if (cachedResults) {
-      console.log('💾 Using cached results for:', q);
-      setSearchResults(cachedResults);
+      const cachedResults = resultsCache.current.get(q);
+      if (cachedResults && Array.isArray(cachedResults)) {
+        console.log('💾 Using cached results for:', q);
+        setSearchResults(cachedResults);
       setShowDropdown(true);
       setIsSearching(false);
       return;
@@ -150,7 +150,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           resultsCache.current.delete(firstKey);
         }
         
-        setSearchResults(results);
+        setSearchResults(Array.isArray(results) ? results : []);
         // Debounced idle search: parse filters and push to parent for live filtering
         try {
           const parsed = parseSearchFilters(q);
@@ -284,7 +284,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       
       // Only proceed if filters have meaningful content
       if (filters && (
-        (filters.textTerms && filters.textTerms.length > 0) ||
+        (filters.textTerms && Array.isArray(filters.textTerms) && filters.textTerms.length > 0) ||
         filters.salaryQuery ||
         filters.roleFilter ||
         filters.businessTypeFilter ||
@@ -369,7 +369,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       </div>
 
       {/* Search Results Dropdown */}
-      {showDropdown && (searchResults.length > 0 || isSearching || (value.trim() && !isSearching && searchResults.length === 0)) && (
+      {showDropdown && (Array.isArray(searchResults) && searchResults.length > 0 || isSearching || (value.trim() && !isSearching && Array.isArray(searchResults) && searchResults.length === 0)) && (
         <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 z-50`}>
           <div 
             className="bg-background shadow-lg border-2 max-h-60 overflow-y-auto"
@@ -383,13 +383,13 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
               <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
                 Searching...
               </div>
-            ) : searchResults.length === 0 && value.trim() ? (
+            ) : Array.isArray(searchResults) && searchResults.length === 0 && value.trim() ? (
               <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
                 Couldn't find any businesses 😱
               </div>
             ) : (
               <div className="p-3">
-                {searchResults.map((result, index) => (
+                {Array.isArray(searchResults) && searchResults.map((result, index) => (
                   <div key={result.id}>
                     <div
                       className="cursor-pointer py-1.5 px-0 rounded transition-colors hover:bg-accent/20"
@@ -421,7 +421,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                         </div>
                       )}
                     </div>
-                    {index < searchResults.length - 1 && (
+                    {index < (Array.isArray(searchResults) ? searchResults.length - 1 : -1) && (
                       <div className="h-px bg-border/30 my-1.5"></div>
                     )}
                   </div>

@@ -81,7 +81,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
           try {
             const businesses = await getBusinessesInViewport(area, 2000, undefined, undefined, zoom);
             setCachedBusinesses(area, businesses);
-            console.log(`🔮 Preloaded ${businesses.length} businesses for adjacent area`);
+            console.log(`🔮 Preloaded ${Array.isArray(businesses) ? businesses.length : 0} businesses for adjacent area`);
           } catch (error) {
             console.warn('Preload failed for area:', area, error);
           }
@@ -131,7 +131,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
           const viewportBusinesses = await getBusinessesInViewport(bounds, limit, searchFilters, undefined, zoom);
           setBusinesses(viewportBusinesses);
           setCurrentBounds(bounds);
-          console.log(`✅ Viewport search completed with ${viewportBusinesses.length} businesses`);
+          console.log(`✅ Viewport search completed with ${Array.isArray(viewportBusinesses) ? viewportBusinesses.length : 0} businesses`);
         } catch (error) {
           console.error('❌ Viewport search error:', error);
         } finally {
@@ -177,10 +177,10 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
           };
           const newBusinesses = await getBusinessesInViewport(expandedBounds, limit, searchFilters, undefined, zoom);
           setBusinesses(prev => {
-            const existingIds = new Set(prev.map(b => b.id));
-            const uniqueNew = newBusinesses.filter(b => !existingIds.has(b.id));
-            console.log(`📍 Adding ${uniqueNew.length} new businesses to existing ${prev.length}`);
-            return [...prev, ...uniqueNew];
+            const existingIds = new Set(Array.isArray(prev) ? prev.map(b => b.id) : []);
+            const uniqueNew = Array.isArray(newBusinesses) ? newBusinesses.filter(b => !existingIds.has(b.id)) : [];
+            console.log(`📍 Adding ${uniqueNew.length} new businesses to existing ${Array.isArray(prev) ? prev.length : 0}`);
+            return [...(Array.isArray(prev) ? prev : []), ...uniqueNew];
           });
           setCurrentBounds(expandedBounds);
         } catch (error) {
@@ -204,7 +204,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
     // Don't override existing search results with cached data
     if (!searchFilters && !lastSearchFilters) {
       const cachedBusinesses = getCachedBusinesses(bounds);
-      if (cachedBusinesses && cachedBusinesses.length > 200) {
+      if (cachedBusinesses && Array.isArray(cachedBusinesses) && cachedBusinesses.length > 200) {
         setBusinesses(cachedBusinesses);
         setCurrentBounds(bounds);
         schedulePreload(bounds);
@@ -212,7 +212,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
       }
     }
 
-    const isInitialLoad = businesses.length === 0;
+    const isInitialLoad = !Array.isArray(businesses) || businesses.length === 0;
     const expansionFactor = isInitialLoad ? 0.3 : 0.15;
     
     const expandedBounds = {
@@ -224,7 +224,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
 
     if (!searchFilters && !lastSearchFilters) {
       const expandedCached = getCachedBusinesses(expandedBounds);
-      if (expandedCached && expandedCached.length > 200) {
+      if (expandedCached && Array.isArray(expandedCached) && expandedCached.length > 200) {
         setBusinesses(expandedCached);
         setCurrentBounds(expandedBounds);
         return;
@@ -249,7 +249,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
       clearTimeout(loadTimeoutRef.current);
     }
 
-    const shouldLoadImmediately = businesses.length === 0;
+    const shouldLoadImmediately = !Array.isArray(businesses) || businesses.length === 0;
     const delay = shouldLoadImmediately ? 0 : (isMoving ? 400 : 150);
 
     loadTimeoutRef.current = setTimeout(async () => {
@@ -277,9 +277,9 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
           setBusinesses(viewportBusinesses);
         } else {
           setBusinesses(prev => {
-            const existingMap = new Map(prev.map(b => [b.id, b]));
-            const newBusinesses = viewportBusinesses.filter(b => !existingMap.has(b.id));
-            return [...prev, ...newBusinesses];
+            const existingMap = new Map(Array.isArray(prev) ? prev.map(b => [b.id, b]) : []);
+            const newBusinesses = Array.isArray(viewportBusinesses) ? viewportBusinesses.filter(b => !existingMap.has(b.id)) : [];
+            return [...(Array.isArray(prev) ? prev : []), ...newBusinesses];
           });
         }
         setCurrentBounds(expandedBounds);
@@ -293,7 +293,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
         inflightRequests.delete(requestKey);
       }
     }, delay);
-  }, [loading, getCachedBusinesses, setCachedBusinesses, searchFilters, lastSearchFilters, isSearching, schedulePreload, currentBounds, businesses.length, zoom]);
+  }, [loading, getCachedBusinesses, setCachedBusinesses, searchFilters, lastSearchFilters, isSearching, schedulePreload, currentBounds, Array.isArray(businesses) ? businesses.length : 0, zoom]);
 
   // Cleanup progressive search and pending timeouts on filter changes
   useEffect(() => {
@@ -316,9 +316,9 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
       const cachedBusiness = detailsCache.get(businessId)!;
       
       // Update businesses array with cached details
-      setBusinesses(prev => prev.map(business => 
+      setBusinesses(prev => Array.isArray(prev) ? prev.map(business => 
         business.id === businessId ? cachedBusiness : business
-      ));
+      ) : [cachedBusiness]);
       
       return cachedBusiness;
     }
@@ -337,9 +337,9 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
       detailsCache.set(businessId, fullBusiness);
 
       // Update businesses array
-      setBusinesses(prev => prev.map(business => 
+      setBusinesses(prev => Array.isArray(prev) ? prev.map(business => 
         business.id === businessId ? fullBusiness : business
-      ));
+      ) : [fullBusiness]);
 
       return fullBusiness;
     } catch (error) {

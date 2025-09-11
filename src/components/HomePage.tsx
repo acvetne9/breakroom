@@ -127,6 +127,11 @@ const HomePage: React.FC<HomePageProps> = ({
 
   const handleSearchChange = (value: string, business?: EnhancedBusiness, filters?: any, neighborhoodCoords?: { lat: number; lon: number }) => {
     console.log('🔍 Search change in HomePage:', { value, filters, neighborhoodCoords, hasFilters: !!filters });
+    console.log('🔍 DEBUG: handleSearchChange deps check', { 
+      searchFilters: typeof searchFilters, 
+      neighborhoodCenter: typeof neighborhoodCenter,
+      searchCompleted: typeof searchCompleted 
+    });
     setSearchValue(value);
     setSearchFilters(filters);
     
@@ -151,6 +156,9 @@ const HomePage: React.FC<HomePageProps> = ({
   };
 
   const handleSearchBusinessSelect = (business: EnhancedBusiness) => {
+    console.log('🔍 DEBUG: handleSearchBusinessSelect deps check', { 
+      searchFilters: typeof searchFilters 
+    });
     const mapBusiness = {
       ...business,
       businessType: business.businessType || business.business_type,
@@ -161,6 +169,10 @@ const HomePage: React.FC<HomePageProps> = ({
   };
 
   const handleBusinessClick = (business: any) => {
+    console.log('🔍 DEBUG: handleBusinessClick deps check', { 
+      onBusinessSelect: typeof onBusinessSelect,
+      onLocationSave: typeof onLocationSave 
+    });
     onBusinessSelect?.(business);
     setShowBusinessDetails(false);
     
