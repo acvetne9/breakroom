@@ -652,9 +652,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 ['==', ['get', 'leisure'], 'park'],
                 ['==', ['get', 'landuse'], 'cemetery'],
                 ['==', ['get', 'amenity'], 'cemetery'],
-                ['==', ['get', 'amenity'], 'grave_yard'],
-                ['in', 'Cemetery', ['get', 'name']],
-                ['in', 'cemetery', ['get', 'name']]
+                ['==', ['get', 'amenity'], 'grave_yard']
               ]
             ]
           },
