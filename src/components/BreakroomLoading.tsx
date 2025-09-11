@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-const BreakroomLoading = ({ onComplete }) => {
+const BreakroomLoading = ({ onComplete }: { onComplete?: () => void }) => {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
@@ -15,17 +15,17 @@ const BreakroomLoading = ({ onComplete }) => {
 
   const styles = {
     container: {
-      position: 'fixed',
+      position: 'fixed' as const,
       inset: 0,
       zIndex: 20000,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      overflow: 'hidden',
+      display: 'flex' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      overflow: 'hidden' as const,
       padding: '20px'
     },
     background: {
-      position: 'absolute',
+      position: 'absolute' as const,
       inset: 0,
       background: `
         radial-gradient(ellipse at top left, #FFFACD 0%, #F7DC6F 35%, transparent 70%),
@@ -33,26 +33,26 @@ const BreakroomLoading = ({ onComplete }) => {
       `
     },
     animationContainer: {
-      position: 'relative',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
+      position: 'relative' as const,
+      display: 'flex' as const,
+      flexDirection: 'column' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
       width: '100%',
       maxWidth: '400px'
     },
     mugWrapper: {
-      position: 'relative',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
+      position: 'relative' as const,
+      display: 'flex' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
       width: '120px',
       height: '120px',
       marginBottom: '0px'
     },
     coffeeMug: {
-      display: 'inline-block',
-      position: 'relative',
+      display: 'inline-block' as const,
+      position: 'relative' as const,
       transform: 'scale(1.5)',
       transformOrigin: 'center center',
       animation: 'mugSmoothEntrance 1.2s ease-out forwards',
@@ -64,7 +64,7 @@ const BreakroomLoading = ({ onComplete }) => {
       height: '60px',
       backgroundColor: '#B22222',
       borderRadius: '3px',
-      position: 'relative',
+      position: 'relative' as const,
       boxShadow: `
         inset -6px 0 0 rgba(0, 0, 0, 0.2),
         inset 0 -6px 0 rgba(0, 0, 0, 0.15),
@@ -72,19 +72,19 @@ const BreakroomLoading = ({ onComplete }) => {
       `
     },
     mugHandle: {
-      position: 'absolute',
+      position: 'absolute' as const,
       left: '-12px',
       top: '8px',
       width: '16px',
       height: '32px',
       border: '4px solid #B22222',
-      borderRight: 'none',
+      borderRight: 'none' as const,
       borderRadius: '12px 0 0 12px',
       background: 'transparent',
       boxShadow: 'inset 2px 0 0 rgba(0, 0, 0, 0.1)'
     },
     mugBodyBefore: {
-      position: 'absolute',
+      position: 'absolute' as const,
       top: '6px',
       left: '6px',
       right: '6px',
