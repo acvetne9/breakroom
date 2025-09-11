@@ -294,16 +294,20 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
         const neighborhood = searchFilters.neighborhoodFilter;
         console.log('🏙️ [loadBusinessesInViewport] Neighborhood filter active, using neighborhood bounds:', neighborhood.name);
         
-        // Create bounds that encompass the neighborhood
+        // Create bounds that encompass the neighborhood with padding
         const boundary = neighborhood.boundary;
         const lats = boundary.map(p => p.lat);
         const lons = boundary.map(p => p.lon);
         
+        // Add padding to ensure we capture all businesses in the area
+        const latPadding = 0.015; // ~1.5km padding
+        const lonPadding = 0.020; // ~1.5km padding (adjusted for longitude)
+        
         searchBounds = {
-          north: Math.max(...lats),
-          south: Math.min(...lats),
-          east: Math.max(...lons),
-          west: Math.min(...lons)
+          north: Math.max(...lats) + latPadding,
+          south: Math.min(...lats) - latPadding,
+          east: Math.max(...lons) + lonPadding,
+          west: Math.min(...lons) - lonPadding
         };
         
         console.log('🏙️ [loadBusinessesInViewport] Using neighborhood bounds:', searchBounds);

@@ -265,16 +265,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const loadNeighborhoodBusinesses = async () => {
       console.log('🏙️ Search filters changed, loading neighborhood businesses');
       
-      // Create neighborhood bounds from the boundary points
+      // Create neighborhood bounds from the boundary points with padding
       const boundary = searchFilters.neighborhoodFilter.boundary;
       const lats = boundary.map(p => p.lat);
       const lons = boundary.map(p => p.lon);
       
+      // Add padding to ensure we capture all businesses in the area
+      const latPadding = 0.015; // ~1.5km padding
+      const lonPadding = 0.020; // ~1.5km padding (adjusted for longitude)
+      
       const neighborhoodBounds: Bounds = {
-        north: Math.max(...lats),
-        south: Math.min(...lats),
-        east: Math.max(...lons),
-        west: Math.min(...lons)
+        north: Math.max(...lats) + latPadding,
+        south: Math.min(...lats) - latPadding,
+        east: Math.max(...lons) + lonPadding,
+        west: Math.min(...lons) - lonPadding
       };
       
       try {
@@ -319,16 +323,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (searchFilters?.neighborhoodFilter) {
       console.log('🏙️ Neighborhood filter active, loading businesses within neighborhood bounds');
       
-      // Create neighborhood bounds from the boundary points
+      // Create neighborhood bounds from the boundary points with padding
       const boundary = searchFilters.neighborhoodFilter.boundary;
       const lats = boundary.map(p => p.lat);
       const lons = boundary.map(p => p.lon);
       
+      // Add padding to ensure we capture all businesses in the area
+      const latPadding = 0.015; // ~1.5km padding
+      const lonPadding = 0.020; // ~1.5km padding (adjusted for longitude)
+      
       const neighborhoodBounds: Bounds = {
-        north: Math.max(...lats),
-        south: Math.min(...lats),
-        east: Math.max(...lons),
-        west: Math.min(...lons)
+        north: Math.max(...lats) + latPadding,
+        south: Math.min(...lats) - latPadding,
+        east: Math.max(...lons) + lonPadding,
+        west: Math.min(...lons) - lonPadding
       };
       
       try {
