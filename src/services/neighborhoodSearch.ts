@@ -34,38 +34,39 @@ export function findNeighborhood(searchTerm: string): NeighborhoodBounds | null 
   return null;
 }
 
-// Check if a point is inside a polygon using ray casting algorithm
-function isPointInPolygon(point: { lat: number; lon: number }, polygon: { lat: number; lon: number }[]): boolean {
-  let inside = false;
-  const x = point.lon;
-  const y = point.lat;
-  
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i].lon;
-    const yi = polygon[i].lat;
-    const xj = polygon[j].lon;
-    const yj = polygon[j].lat;
-    
-    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
-      inside = !inside;
-    }
-  }
-  
-  return inside;
-}
-
-// Filter businesses within neighborhood bounds
+// Filter businesses within neighborhood rectangular bounds
 export function filterBusinessesByNeighborhood(
   businesses: Business[], 
   neighborhoodBounds: NeighborhoodBounds
 ): Business[] {
+  // Create rectangular bounds from the neighborhood boundary points
+  const lats = neighborhoodBounds.boundary.map(p => p.lat);
+  const lons = neighborhoodBounds.boundary.map(p => p.lon);
+  
+  // Add generous padding to ensure we capture all businesses in the area
+  const latPadding = 0.020; // ~2km padding
+  const lonPadding = 0.025; // ~2km padding (adjusted for longitude)
+  
+  const rectBounds = {
+    north: Math.max(...lats) + latPadding,
+    south: Math.min(...lats) - latPadding,
+    east: Math.max(...lons) + lonPadding,
+    west: Math.min(...lons) - lonPadding
+  };
+  
+  console.log('🏙️ [filterBusinessesByNeighborhood] Using rectangular bounds:', rectBounds);
+  
   return businesses.filter(business => {
     if (!business.position?.lat || !business.position?.lng) return false;
     
-    const businessPoint = { lat: business.position.lat, lon: business.position.lng };
+    const lat = business.position.lat;
+    const lng = business.position.lng;
     
-    // Strict boundary check - only businesses within the actual neighborhood polygon
-    return isPointInPolygon(businessPoint, neighborhoodBounds.boundary);
+    // Simple rectangular bounds check - capture all businesses within the rectangle
+    return lat <= rectBounds.north && 
+           lat >= rectBounds.south && 
+           lng <= rectBounds.east && 
+           lng >= rectBounds.west;
   });
 }
 
