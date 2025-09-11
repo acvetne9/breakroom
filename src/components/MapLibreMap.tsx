@@ -826,6 +826,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   return (
     <div
       ref={mapRef}
+      className="maplibre-map"
       style={{
         position: 'absolute',
         top: 0,
