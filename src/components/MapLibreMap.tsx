@@ -197,19 +197,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const lngKm = lngDiff * 111 * Math.cos(avgLat * Math.PI / 180);
     const areaKm2 = latKm * lngKm;
     
-    // Adaptive density based on zoom level
+    // Adaptive density based on zoom level - increased for more consistent loading
     let baseDensity: number;
-    if (zoom >= 16) baseDensity = 300;
-    else if (zoom >= 14) baseDensity = 150;
-    else if (zoom >= 12) baseDensity = 80;
-    else baseDensity = 40;
+    if (zoom >= 16) baseDensity = 500;        // Increased from 300
+    else if (zoom >= 14) baseDensity = 250;   // Increased from 150  
+    else if (zoom >= 12) baseDensity = 150;   // Increased from 80
+    else baseDensity = 80;                    // Increased from 40
     
     // Adjust for mobile performance
-    const mobileFactor = isMobile ? 0.7 : 1.0;
+    const mobileFactor = isMobile ? 0.8 : 1.0;  // Less aggressive mobile reduction
     const targetBusinesses = Math.ceil(areaKm2 * baseDensity * mobileFactor);
     
-    const maxLimit = isMobile ? 3000 : 6000;
-    const minLimit = 200;
+    const maxLimit = isMobile ? 5000 : 10000;    // Increased limits
+    const minLimit = 500;                        // Increased minimum from 200
     
     return Math.max(minLimit, Math.min(maxLimit, targetBusinesses));
   }, [isMobile]);
@@ -294,8 +294,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           cacheSize: businessCacheRef.current.getAll()?.length || 0
         });
 
-        // Load businesses with buffer
-        const rawBusinesses = await loadBusinessesInViewport(expandedBounds, Math.floor(businessLimit * 1.3));
+        // Load businesses with more generous buffer for consistency
+        const rawBusinesses = await loadBusinessesInViewport(expandedBounds, Math.floor(businessLimit * 1.5));
 
         if (!Array.isArray(rawBusinesses) || rawBusinesses.length === 0) {
           console.log('No businesses loaded for viewport');
@@ -328,9 +328,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         });
 
-        // Apply optimized sampling
-        const visibleSampled = createOptimizedGridSampling(visibleBounds, visible, Math.floor(businessLimit * 0.8));
-        const bufferSampled = createOptimizedGridSampling(expandedBounds, buffer, Math.floor(businessLimit * 0.2));
+        // Apply optimized sampling - more generous for visible area
+        const visibleSampled = createOptimizedGridSampling(visibleBounds, visible, Math.floor(businessLimit * 0.9));
+        const bufferSampled = createOptimizedGridSampling(expandedBounds, buffer, Math.floor(businessLimit * 0.3));
 
         const finalBusinesses = [...visibleSampled, ...bufferSampled];
 
