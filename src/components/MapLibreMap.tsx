@@ -268,9 +268,45 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     });
     if (!map || !mapLoaded || !loadBusinessesInViewport || isLoadingRef.current) return;
 
-    // If neighborhood search is active, don't load businesses outside neighborhood bounds
+    // If neighborhood search is active, load businesses within neighborhood bounds
     if (searchFilters?.neighborhoodFilter) {
-      console.log('🏙️ Neighborhood filter active, skipping viewport business loading');
+      console.log('🏙️ Neighborhood filter active, loading businesses within neighborhood bounds');
+      
+      // Create neighborhood bounds from the boundary points
+      const boundary = searchFilters.neighborhoodFilter.boundary;
+      const lats = boundary.map(p => p.lat);
+      const lons = boundary.map(p => p.lon);
+      
+      const neighborhoodBounds: Bounds = {
+        north: Math.max(...lats),
+        south: Math.min(...lats),
+        east: Math.max(...lons),
+        west: Math.min(...lons)
+      };
+      
+      try {
+        isLoadingRef.current = true;
+        const zoom = map.getZoom();
+        const businessLimit = getBusinessLimitForViewport(zoom, neighborhoodBounds);
+        
+        console.log('🏙️ Loading neighborhood businesses:', {
+          neighborhood: searchFilters.neighborhoodFilter.name,
+          bounds: neighborhoodBounds,
+          businessLimit
+        });
+        
+        const neighborhoodBusinesses = await loadBusinessesInViewport(neighborhoodBounds, businessLimit);
+        
+        if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length > 0) {
+          console.log(`✅ Loaded ${neighborhoodBusinesses.length} businesses for ${searchFilters.neighborhoodFilter.name}`);
+          businessCacheRef.current.addMultiple(neighborhoodBusinesses);
+        }
+        
+      } catch (error) {
+        console.error('❌ Error loading neighborhood businesses:', error);
+      } finally {
+        isLoadingRef.current = false;
+      }
       return;
     }
 
