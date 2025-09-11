@@ -582,9 +582,139 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           id: 'background',
           type: 'background' as const,
           paint: { 'background-color': '#B3E5FC' }
+        },
+        // Water areas
+        {
+          id: 'water',
+          type: 'fill' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'water',
+          paint: {
+            'fill-color': '#4A90E2',
+            'fill-opacity': 0.8
+          }
+        },
+        // Land/ground
+        {
+          id: 'landcover',
+          type: 'fill' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'landcover',
+          paint: {
+            'fill-color': '#F5F5DC',
+            'fill-opacity': 0.9
+          }
+        },
+        // Parks and green spaces
+        {
+          id: 'parks',
+          type: 'fill' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'landuse',
+          filter: ['==', ['get', 'class'], 'park'] as any,
+          paint: {
+            'fill-color': '#90EE90',
+            'fill-opacity': 0.7
+          }
+        },
+        // Roads - minor
+        {
+          id: 'roads-minor',
+          type: 'line' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'transportation',
+          filter: ['in', ['get', 'class'], 'minor', 'service'] as any,
+          paint: {
+            'line-color': '#FFFFFF',
+            'line-width': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              10, 0.5,
+              14, 1,
+              18, 2
+            ] as any
+          }
+        },
+        // Roads - major
+        {
+          id: 'roads-major',
+          type: 'line' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'transportation',
+          filter: ['in', ['get', 'class'], 'primary', 'secondary', 'tertiary'] as any,
+          paint: {
+            'line-color': '#FFFFFF',
+            'line-width': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              10, 1,
+              14, 2,
+              18, 4
+            ] as any
+          }
+        },
+        // Highways
+        {
+          id: 'roads-highway',
+          type: 'line' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'transportation',
+          filter: ['in', ['get', 'class'], 'motorway', 'trunk'] as any,
+          paint: {
+            'line-color': '#FFE135',
+            'line-width': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              10, 1.5,
+              14, 3,
+              18, 6
+            ] as any
+          }
+        },
+        // Buildings
+        {
+          id: 'buildings',
+          type: 'fill' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'building',
+          minzoom: 13,
+          paint: {
+            'fill-color': '#D3D3D3',
+            'fill-opacity': 0.8,
+            'fill-outline-color': '#A9A9A9'
+          }
+        },
+        // Place labels (city names, etc)
+        {
+          id: 'place-labels',
+          type: 'symbol' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'place',
+          filter: ['in', ['get', 'class'], 'city', 'town', 'village'] as any,
+          layout: {
+            'text-field': ['get', 'name'] as any,
+            'text-font': ['Open Sans Regular'],
+            'text-size': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              10, 12,
+              14, 16,
+              18, 20
+            ] as any,
+            'text-anchor': 'center' as any
+          },
+          paint: {
+            'text-color': '#333333',
+            'text-halo-color': '#FFFFFF',
+            'text-halo-width': 1
+          }
         }
       ]
-    };
+    } as any;
 
     const mapInstance = new maplibregl.Map({
       container: mapRef.current!,
