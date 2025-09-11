@@ -730,12 +730,72 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
 
     // Enhanced error handling
-    mapInstance.on('error', (e) => {
+    mapInstance.on('error', (e: any) => {
       console.error('🚨 Map error:', e.error);
+      console.error('🚨 Error details:', {
+        message: e.error?.message,
+        sourceId: e.sourceId || 'unknown',
+        url: e.error?.url
+      });
+    });
+
+    mapInstance.on('sourcedata', (e: any) => {
+      if (e.sourceId === 'nyc-tiles') {
+        console.log('📡 NYC tiles source data event:', {
+          sourceId: e.sourceId,
+          isSourceLoaded: e.isSourceLoaded,
+          coord: e.coord || 'no coord'
+        });
+      }
+    });
+
+    mapInstance.on('styleimagemissing', (e: any) => {
+      console.warn('🖼️ Style image missing:', e.id);
     });
 
     mapInstance.on('load', () => {
-      console.log('🗺️ Simple map loaded');
+      console.log('🗺️ NYC tile map loaded');
+      
+      // Test tile accessibility
+      const testTileUrl = '/data/tiles/12/1203/1536.pbf';
+      console.log('🧪 Testing tile URL:', testTileUrl);
+      
+      fetch(testTileUrl)
+        .then(response => {
+          console.log('🧪 Tile response:', response.status, response.statusText);
+          console.log('🧪 Tile headers:', [...response.headers.entries()]);
+          if (response.ok) {
+            return response.arrayBuffer();
+          } else {
+            throw new Error(`Tile not accessible: ${response.status}`);
+          }
+        })
+        .then(buffer => {
+          console.log('✅ Tile accessible! Size:', buffer.byteLength, 'bytes');
+          
+          // Check for tile data after a delay
+          setTimeout(() => {
+            try {
+              const features = mapInstance.querySourceFeatures('nyc-tiles');
+              console.log('🔍 Features found in nyc-tiles:', features.length);
+              if (features.length > 0) {
+                const sourceLayers = [...new Set(features.map((f: any) => f.sourceLayer))];
+                console.log('🗂️ Available source layers:', sourceLayers);
+                console.log('📝 Sample feature:', features[0]);
+              } else {
+                console.warn('⚠️ No features found in tiles - check layer names');
+              }
+            } catch (error) {
+              console.error('❌ Error querying features:', error);
+            }
+          }, 2000);
+          
+        })
+        .catch(error => {
+          console.error('❌ Tile accessibility test failed:', error);
+          console.log('🔧 Falling back to minimal map without vector tiles');
+        });
+      
       setMapLoaded(true);
       callbackRefs.current.onMapLoaded?.();
     });
