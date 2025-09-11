@@ -724,7 +724,7 @@ export function findNeighborhood(searchTerm: string): NeighborhoodBounds | null 
   return null;
 }
 
-// Filter businesses within neighborhood rectangular bounds
+// Filter businesses within neighborhood rectangular bounds with generous padding
 export function filterBusinessesByNeighborhood(
   businesses: Business[], 
   neighborhoodBounds: NeighborhoodBounds
@@ -733,9 +733,9 @@ export function filterBusinessesByNeighborhood(
   const lats = neighborhoodBounds.boundary.map(p => p.lat);
   const lons = neighborhoodBounds.boundary.map(p => p.lon);
   
-  // Add generous padding to ensure we capture all businesses in the area
-  const latPadding = 0.020; // ~2km padding
-  const lonPadding = 0.025; // ~2km padding (adjusted for longitude)
+  // Use much more generous padding to capture all businesses in the broader neighborhood area
+  const latPadding = 0.050; // ~5km padding - much more generous
+  const lonPadding = 0.060; // ~6km padding - adjusted for longitude, very generous
   
   const rectBounds = {
     north: Math.max(...lats) + latPadding,
@@ -744,20 +744,28 @@ export function filterBusinessesByNeighborhood(
     west: Math.min(...lons) - lonPadding
   };
   
-  console.log('🏙️ [filterBusinessesByNeighborhood] Using rectangular bounds:', rectBounds);
+  console.log('🏙️ [filterBusinessesByNeighborhood] Neighborhood:', neighborhoodBounds.name);
+  console.log('🏙️ [filterBusinessesByNeighborhood] Original boundary points:', neighborhoodBounds.boundary.length);
+  console.log('🏙️ [filterBusinessesByNeighborhood] Generous rectangular bounds:', rectBounds);
+  console.log('🏙️ [filterBusinessesByNeighborhood] Total businesses to filter:', businesses.length);
   
-  return businesses.filter(business => {
+  const filtered = businesses.filter(business => {
     if (!business.position?.lat || !business.position?.lng) return false;
     
     const lat = business.position.lat;
     const lng = business.position.lng;
     
-    // Simple rectangular bounds check - capture all businesses within the rectangle
-    return lat <= rectBounds.north && 
-           lat >= rectBounds.south && 
-           lng <= rectBounds.east && 
-           lng >= rectBounds.west;
+    // Very inclusive rectangular bounds check - capture all businesses within the generous area
+    const inBounds = lat <= rectBounds.north && 
+                     lat >= rectBounds.south && 
+                     lng <= rectBounds.east && 
+                     lng >= rectBounds.west;
+    
+    return inBounds;
   });
+  
+  console.log('🏙️ [filterBusinessesByNeighborhood] Businesses found in area:', filtered.length);
+  return filtered;
 }
 
 // Get all neighborhood names for autocomplete/matching
