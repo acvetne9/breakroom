@@ -64,21 +64,8 @@ export function filterBusinessesByNeighborhood(
     
     const businessPoint = { lat: business.position.lat, lon: business.position.lng };
     
-    // First check if it's within the polygon boundary
-    if (isPointInPolygon(businessPoint, neighborhoodBounds.boundary)) {
-      return true;
-    }
-    
-    // Fallback: check if it's within reasonable distance from neighborhood center
-    const distance = haversine(
-      neighborhoodBounds.center.lat,
-      neighborhoodBounds.center.lon,
-      business.position.lat,
-      business.position.lng
-    );
-    
-    // Within 1.5km of neighborhood center as fallback
-    return distance <= 1.5;
+    // Strict boundary check - only businesses within the actual neighborhood polygon
+    return isPointInPolygon(businessPoint, neighborhoodBounds.boundary);
   });
 }
 
