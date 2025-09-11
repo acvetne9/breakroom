@@ -49,14 +49,13 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
     coffeeMug: {
       display: 'inline-block',
       position: 'relative',
-      transform: 'scale(1.5)',          // default scale for desktop
       transformOrigin: 'bottom center',  // scale from the bottom
       animation: 'mugSmoothEntrance 1.2s ease-out forwards',
       opacity: 0
     },
     mugBody: {
-      width: 'clamp(50px, 6vw, 60px)',   // slightly bigger min to match old size
-      height: 'clamp(60px, 7vw, 72px)',
+      width: 'clamp(75px, 9vw, 90px)',   // increased from 6vw
+      height: 'clamp(90px, 10.5vw, 108px)', // increased from 7vw
       backgroundColor: '#B22222',
       borderRadius: '3px',
       position: 'relative',
