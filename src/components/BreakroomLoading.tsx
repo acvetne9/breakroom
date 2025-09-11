@@ -93,29 +93,29 @@ const BreakroomLoading = ({ onComplete }) => {
       borderRadius: '1.5px'
     },
     textContainer: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
+      display: 'flex' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
       width: '100%',
       fontFamily: "'Courier New', Courier, monospace",
       fontSize: 'clamp(32px, 9vw, 42px)',
-      fontWeight: 'bold',
+      fontWeight: 'bold' as const,
       color: '#B22222',
       letterSpacing: '0.05em'
     },
     textSpanLeft: {
-      display: 'inline-block',
+      display: 'inline-block' as const,
       opacity: 0,
       animation: 'slideInFromRight 0.8s forwards'
     },
     textSpanRight: {
-      display: 'inline-block',
+      display: 'inline-block' as const,
       opacity: 0,
       animation: 'slideInFromLeft 0.8s forwards'
     },
     textGap: {
       width: '1px',
-      display: 'inline-block',
+      display: 'inline-block' as const,
       opacity: 0,
       animation: 'fadeIn 0.3s forwards',
       animationDelay: '1.6s'
