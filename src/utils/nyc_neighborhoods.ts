@@ -528,61 +528,94 @@ export function generateNeighborhoodBoundary(
     }
   }
   
-  // Improved fallback: create a more realistic neighborhood boundary
-  // NYC neighborhoods are typically 0.5-2 miles across, so use adaptive sizing
-  const baseRadius = 0.008; // ~0.8km base radius
+  console.log(`🏙️ Generating improved boundary for ${neighborhood.name}`);
   
-  // Adjust radius based on neighborhood context
-  let radius = baseRadius;
-  
-  // Larger radius for well-known major neighborhoods
-  const majorNeighborhoods = ['manhattan', 'brooklyn', 'queens', 'bronx', 'staten island', 'harlem', 'soho', 'chelsea', 'midtown'];
-  if (majorNeighborhoods.some(major => neighborhood.name.toLowerCase().includes(major))) {
-    radius = 0.015; // ~1.5km for major areas
-  }
-  
-  // Create a more irregular, realistic boundary using multiple points
-  const points = 12; // More points for smoother boundary
-  const boundary = [];
-  
-  for (let i = 0; i < points; i++) {
-    const angle = (i / points) * 2 * Math.PI;
+  // Determine accurate radius based on neighborhood characteristics
+  const getNeighborhoodRadius = (name: string): number => {
+    const nameLower = name.toLowerCase();
     
-    // Add some irregularity to make it more realistic
-    const irregularity = 0.7 + Math.random() * 0.6; // Random factor between 0.7 and 1.3
-    const currentRadius = radius * irregularity;
+    // Major areas and districts - larger boundaries
+    if (['financial district', 'midtown', 'upper east side', 'upper west side', 'downtown'].some(area => nameLower.includes(area))) {
+      return 0.012; // ~1.3km radius
+    }
     
-    // Consider nearby neighborhoods to create more logical boundaries
-    let adjustedRadius = currentRadius;
-    if (neighbors.length > 0) {
-      // Find the closest neighbor in this direction
-      const directionLat = neighborhood.lat + Math.cos(angle);
-      const directionLon = neighborhood.lon + Math.sin(angle);
-      
-      let closestDistance = Infinity;
-      neighbors.forEach(neighbor => {
-        const distance = Math.sqrt(
-          Math.pow(neighbor.lat - directionLat, 2) + 
-          Math.pow(neighbor.lon - directionLon, 2)
-        );
-        closestDistance = Math.min(closestDistance, distance);
-      });
-      
-      // Adjust radius to not overlap too much with neighbors
-      if (closestDistance < currentRadius * 2) {
-        adjustedRadius = Math.min(currentRadius, closestDistance * 0.4);
+    // Well-known large neighborhoods
+    if (['chinatown', 'little italy', 'soho', 'tribeca', 'chelsea', 'greenwich village', 'east village', 'west village'].some(area => nameLower.includes(area))) {
+      return 0.008; // ~900m radius
+    }
+    
+    // Medium neighborhoods
+    if (['nolita', 'bowery', 'murray hill', 'gramercy', 'flatiron'].some(area => nameLower.includes(area))) {
+      return 0.006; // ~650m radius
+    }
+    
+    // Small but distinct areas
+    if (['battery park', 'stone street', 'south street seaport'].some(area => nameLower.includes(area))) {
+      return 0.004; // ~450m radius
+    }
+    
+    // Default for other neighborhoods
+    return 0.007; // ~750m radius
+  };
+
+  const baseRadius = getNeighborhoodRadius(neighborhood.name);
+  
+  // Create 16-20 points for very realistic boundaries
+  const numPoints = 16 + Math.floor(Math.random() * 5); // 16-20 points
+  const boundary: { lat: number; lon: number }[] = [];
+  
+  // Sort neighbors by distance and use them to influence boundary shape
+  const influentialNeighbors = neighbors
+    .map(n => ({
+      ...n,
+      distance: haversine(neighborhood.lat, neighborhood.lon, n.lat, n.lon),
+      angle: Math.atan2(n.lat - neighborhood.lat, n.lon - neighborhood.lon)
+    }))
+    .filter(n => n.distance < baseRadius * 3) // Only use nearby neighbors
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, 6); // Use closest 6 neighbors for influence
+  
+  for (let i = 0; i < numPoints; i++) {
+    const baseAngle = (2 * Math.PI * i) / numPoints;
+    
+    // Start with base radius
+    let currentRadius = baseRadius;
+    
+    // Apply neighbor influence for more realistic boundaries
+    if (influentialNeighbors.length > 0) {
+      for (const neighbor of influentialNeighbors) {
+        const angleDiff = Math.abs(baseAngle - neighbor.angle);
+        const normalizedAngleDiff = Math.min(angleDiff, 2 * Math.PI - angleDiff);
+        
+        // Strong influence when pointing directly toward neighbor
+        if (normalizedAngleDiff < Math.PI / 4) { // Within 45 degrees
+          const influence = 1 - (normalizedAngleDiff / (Math.PI / 4));
+          const distanceFactor = Math.max(0.3, 1 - (neighbor.distance / (baseRadius * 2)));
+          currentRadius *= (0.5 + (1 - influence * distanceFactor) * 0.5); // Reduce radius toward neighbors
+        }
       }
     }
     
-    const lat = neighborhood.lat + adjustedRadius * Math.cos(angle);
-    const lon = neighborhood.lon + adjustedRadius * Math.sin(angle);
+    // Add natural variation and irregularity
+    const radiusVariation = 0.75 + Math.random() * 0.5; // 75%-125% variation
+    currentRadius *= radiusVariation;
+    
+    // Add small angular offset for organic shape
+    const angleOffset = (Math.random() - 0.5) * 0.3; // ±0.15 radians (~±9°)
+    const finalAngle = baseAngle + angleOffset;
+    
+    const lat = neighborhood.lat + currentRadius * Math.cos(finalAngle);
+    const lon = neighborhood.lon + currentRadius * Math.sin(finalAngle) / Math.cos(neighborhood.lat * Math.PI / 180);
     
     boundary.push({ lat, lon });
   }
   
   // Close the polygon
-  boundary.push(boundary[0]);
+  if (boundary.length > 0) {
+    boundary.push({ ...boundary[0] });
+  }
   
+  console.log(`✅ Generated ${boundary.length} accurate boundary points for ${neighborhood.name}`);
   return boundary;
 }
 

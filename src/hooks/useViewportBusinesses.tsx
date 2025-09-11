@@ -102,6 +102,21 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
       stringified: JSON.stringify(searchFilters)
     });
     
+    // If neighborhood search is active, always use neighborhood bounds instead of viewport bounds
+    if (searchFilters?.neighborhoodFilter) {
+      console.log('🏙️ Neighborhood search active - restricting to neighborhood bounds only');
+      
+      const neighborhoodBounds = {
+        north: Math.max(...searchFilters.neighborhoodFilter.boundary.map(p => p.lat)),
+        south: Math.min(...searchFilters.neighborhoodFilter.boundary.map(p => p.lat)),
+        east: Math.max(...searchFilters.neighborhoodFilter.boundary.map(p => p.lon)),
+        west: Math.min(...searchFilters.neighborhoodFilter.boundary.map(p => p.lon))
+      };
+      
+      console.log('🏙️ Using neighborhood bounds instead of viewport:', neighborhoodBounds);
+      bounds = neighborhoodBounds;
+    }
+    
     const isNewSearch = JSON.stringify(searchFilters) !== JSON.stringify(lastSearchFilters);
     
     // Only prevent loading for identical requests, allow new searches to interrupt
@@ -142,6 +157,12 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
       } else {
         // Same search - accumulate results when panning to new areas
         console.log('🔄 Same search filters - checking if we need to search new area');
+        
+        // For neighborhood searches, don't expand beyond neighborhood bounds
+        if (searchFilters?.neighborhoodFilter) {
+          console.log('🏙️ Neighborhood search - not expanding beyond neighborhood bounds when panning');
+          return;
+        }
         
         // Check if we're in a significantly different area (more permissive for searches)
         if (currentBounds) {

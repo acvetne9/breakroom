@@ -168,6 +168,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     callbackRefs.current = { onBusinessClick, onMapLoaded, onBusinessesLoaded };
   }, [onBusinessClick, onMapLoaded, onBusinessesLoaded]);
 
+  // Center map on neighborhood when neighborhoodCenter changes
+  useEffect(() => {
+    if (!map || !neighborhoodCenter) return;
+    
+    console.log('🏙️ Centering map on neighborhood:', neighborhoodCenter);
+    map.flyTo({
+      center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
+      zoom: 14, // Good zoom level for neighborhood view
+      duration: 2000
+    });
+  }, [map, neighborhoodCenter]);
+
   // Initialize hooks (must be called unconditionally at top level)
   const mapDataHook = useViewportMapData();
   const businessesHook = useViewportBusinesses(searchFilters);
@@ -255,6 +267,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       getBusinessLimitForViewport: typeof getBusinessLimitForViewport 
     });
     if (!map || !mapLoaded || !loadBusinessesInViewport || isLoadingRef.current) return;
+
+    // If neighborhood search is active, don't load businesses outside neighborhood bounds
+    if (searchFilters?.neighborhoodFilter) {
+      console.log('🏙️ Neighborhood filter active, skipping viewport business loading');
+      return;
+    }
 
     // Debounce rapid viewport changes
     if (debounceTimeoutRef.current) {
