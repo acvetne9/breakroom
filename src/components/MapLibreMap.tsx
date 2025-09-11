@@ -258,6 +258,53 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [fetchFullBusinessDetails]);
 
+  // Load neighborhood businesses when search filters change
+  useEffect(() => {
+    if (!map || !mapLoaded || !searchFilters?.neighborhoodFilter || !loadBusinessesInViewport) return;
+    
+    const loadNeighborhoodBusinesses = async () => {
+      console.log('🏙️ Search filters changed, loading neighborhood businesses');
+      
+      // Create neighborhood bounds from the boundary points
+      const boundary = searchFilters.neighborhoodFilter.boundary;
+      const lats = boundary.map(p => p.lat);
+      const lons = boundary.map(p => p.lon);
+      
+      const neighborhoodBounds: Bounds = {
+        north: Math.max(...lats),
+        south: Math.min(...lats),
+        east: Math.max(...lons),
+        west: Math.min(...lons)
+      };
+      
+      try {
+        const zoom = map.getZoom();
+        const businessLimit = getBusinessLimitForViewport(zoom, neighborhoodBounds);
+        
+        console.log('🏙️ Initial neighborhood business load:', {
+          neighborhood: searchFilters.neighborhoodFilter.name,
+          bounds: neighborhoodBounds,
+          businessLimit
+        });
+        
+        const neighborhoodBusinesses = await loadBusinessesInViewport(neighborhoodBounds, businessLimit);
+        
+        if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length > 0) {
+          console.log(`✅ Initially loaded ${neighborhoodBusinesses.length} businesses for ${searchFilters.neighborhoodFilter.name}`);
+          businessCacheRef.current.addMultiple(neighborhoodBusinesses);
+        } else {
+          console.log('❌ No businesses found for neighborhood:', searchFilters.neighborhoodFilter.name);
+        }
+        
+      } catch (error) {
+        console.error('❌ Error loading initial neighborhood businesses:', error);
+      }
+    };
+    
+    // Small delay to ensure map is ready
+    setTimeout(loadNeighborhoodBusinesses, 500);
+  }, [map, mapLoaded, searchFilters?.neighborhoodFilter, loadBusinessesInViewport, getBusinessLimitForViewport]);
+
   // Debounced viewport change handler
   const handleViewportChange = useCallback(async () => {
     console.log('🔍 DEBUG: handleViewportChange deps check', { 
