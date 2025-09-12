@@ -48,7 +48,7 @@ const BreakroomLoading = ({ onComplete }: { onComplete?: () => void }) => {
       justifyContent: 'center' as const,
       width: '120px',
       height: '120px',
-      marginBottom: '-20px'
+      marginBottom: '20px'
     },
     coffeeMug: {
       display: 'inline-block' as const,
@@ -98,7 +98,7 @@ const BreakroomLoading = ({ onComplete }: { onComplete?: () => void }) => {
       justifyContent: 'center' as const,
       width: '100%',
       fontFamily: "'Courier New', Courier, monospace",
-      fontSize: 'clamp(32px, 9vw, 42px)',
+      fontSize: 'clamp(42px, 11vw, 56px)',
       fontWeight: 'bold' as const,
       color: '#B22222',
       letterSpacing: '0.05em'
