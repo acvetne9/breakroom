@@ -564,14 +564,40 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (!mapRef.current || map) return;
 
-    const absoluteTilesUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+    // Check if we're running in Capacitor
+    const isCapacitor = !!(window as any).Capacitor || window.location.protocol === 'capacitor:';
     
-    const mapStyle = {
+    // For Capacitor, use OpenStreetMap tiles instead of local .pbf tiles
+    const mapStyle = isCapacitor ? {
+      version: 8 as const,
+      sources: {
+        'osm': {
+          type: 'raster' as const,
+          tiles: [
+            'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
+          ],
+          tileSize: 256,
+          attribution: '© OpenStreetMap contributors'
+        }
+      },
+      layers: [
+        {
+          id: 'osm',
+          type: 'raster' as const,
+          source: 'osm',
+          minzoom: 0,
+          maxzoom: 19
+        }
+      ],
+      glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf'
+    } : {
       version: 8 as const,
       sources: {
         'nyc-tiles': {
           type: 'vector' as const,
-          tiles: [absoluteTilesUrl],
+          tiles: [`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`],
           minzoom: 10,
           maxzoom: 16,
           scheme: 'xyz' as const

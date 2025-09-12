@@ -3,8 +3,13 @@ import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 
-// Register service worker to normalize .pbf headers on the fly
-if ('serviceWorker' in navigator) {
+// Check if we're running in Capacitor
+const isCapacitor = () => {
+  return !!(window as any).Capacitor || window.location.protocol === 'capacitor:';
+};
+
+// Register service worker to normalize .pbf headers on the fly (web only)
+if ('serviceWorker' in navigator && !isCapacitor()) {
   window.addEventListener('load', async () => {
     try {
       // Unregister any existing service workers first
@@ -28,6 +33,8 @@ if ('serviceWorker' in navigator) {
       console.log('🧩 Service worker registration failed:', err);
     }
   });
+} else if (isCapacitor()) {
+  console.log('🔧 Running in Capacitor - service worker disabled');
 }
 
 createRoot(document.getElementById("root")!).render(
