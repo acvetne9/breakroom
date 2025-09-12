@@ -436,17 +436,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                         <div>
                           <div className="flex justify-between items-center">
                             <span className="font-medium">{result.name}</span>
-                            <span className="text-sm opacity-70">{(result as EnhancedBusiness).salary}</span>
-                          </div>
-                          <div className="flex gap-2 mt-1">
-                            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">
-                              {(result as EnhancedBusiness).businessType || 'Business'}
-                            </span>
-                            {(result as EnhancedBusiness).roles?.map((role, roleIndex) => (
-                              <span key={roleIndex} className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
-                                {role.role} - {role.salary}
-                              </span>
-                            ))}
+                            <span className="text-sm opacity-70">{(result as EnhancedBusiness).businessType || 'Business'}</span>
                           </div>
                         </div>
                       )}
