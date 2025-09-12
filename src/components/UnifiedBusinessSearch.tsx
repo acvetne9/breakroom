@@ -247,12 +247,13 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         
         // Debug: Log the scoring for results
         if (businessResults.length > 0) {
-          console.log('📊 Sample results with relevance scores:');
+          console.log('📊 Sample results with relevance and richness scores:');
           const sampleResults = businessResults.slice(0, 8);
           sampleResults.forEach(business => {
             const relevanceScore = calculateRelevanceScore(business, q);
+            const richnessScore = calculateDataRichnessScore(business);
             const relevant = relevanceScore >= (q.length >= 6 ? 20 : q.length >= 4 ? 25 : 30);
-            console.log(`  ${relevant ? '✅' : '❌'} "${business.name}" (Relevance: ${relevanceScore})`);
+            console.log(`  ${relevant ? '✅' : '❌'} "${business.name}" (Relevance: ${relevanceScore}, Richness: ${richnessScore})`);
           });
           
           console.log(`📈 Final results: ${relevantResults.length} businesses passed relevance threshold`);
@@ -262,7 +263,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
             console.log('🏆 Final sorted results:');
             relevantResults.slice(0, 5).forEach((business, index) => {
               const relevanceScore = calculateRelevanceScore(business, q);
-              console.log(`  ${index + 1}. "${business.name}" (Relevance: ${relevanceScore})`);
+              const richnessScore = calculateDataRichnessScore(business);
+              console.log(`  ${index + 1}. "${business.name}" (R: ${relevanceScore}, D: ${richnessScore})`);
             });
           }
         }
