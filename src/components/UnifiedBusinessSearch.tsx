@@ -245,13 +245,28 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         
         console.log(`🎯 Query: "${q}" - Found ${businessResults.length} raw results, filtered to ${relevantResults.length} relevant results`);
         
-        // Debug: Log the scoring for the first few results
+        // Debug: Log the scoring for results
         if (businessResults.length > 0) {
-          console.log('📊 Top raw results and their scores:');
-          businessResults.slice(0, 5).forEach(business => {
-            const score = calculateRelevanceScore(business, q);
-            console.log(`  - "${business.name}" (Score: ${score})`);
+          console.log('📊 Sample results with relevance and richness scores:');
+          const sampleResults = businessResults.slice(0, 8);
+          sampleResults.forEach(business => {
+            const relevanceScore = calculateRelevanceScore(business, q);
+            const richnessScore = calculateDataRichnessScore(business);
+            const relevant = relevanceScore >= (q.length >= 6 ? 20 : q.length >= 4 ? 25 : 30);
+            console.log(`  ${relevant ? '✅' : '❌'} "${business.name}" (Relevance: ${relevanceScore}, Richness: ${richnessScore})`);
           });
+          
+          console.log(`📈 Final results: ${relevantResults.length} businesses passed relevance threshold`);
+          
+          // Show final sorted order with both scores
+          if (relevantResults.length > 0) {
+            console.log('🏆 Final sorted results:');
+            relevantResults.slice(0, 5).forEach((business, index) => {
+              const relevanceScore = calculateRelevanceScore(business, q);
+              const richnessScore = calculateDataRichnessScore(business);
+              console.log(`  ${index + 1}. "${business.name}" (R: ${relevanceScore}, D: ${richnessScore})`);
+            });
+          }
         }
         
         results.push(...relevantResults);
