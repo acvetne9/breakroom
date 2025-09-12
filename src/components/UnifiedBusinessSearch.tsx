@@ -153,16 +153,20 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           });
         }
         
-        // Get more business results
-        const businessResults = await searchBusinessesEnhanced(q, 50);
+        // Get business results
+        const businessResults = await searchBusinessesEnhanced(q, 10);
         
-        // Filter results but be more permissive
-        const filteredResults = businessResults.filter(business =>
-          isOneCharOff(business.name, q)
+        // Apply fuzzy match filtering so results still appear if off by 1 char
+        const fuzzyResults = businessResults.filter(business =>
+          isOneCharOff(business.name.toLowerCase(), q.toLowerCase())
         );
         
-        // Return more results (up to 20)
-        results.push(...filteredResults.slice(0, 20));
+        // Push normal + fuzzy results (remove duplicates by ID)
+        const allResults = [...businessResults, ...fuzzyResults].filter(
+          (v, i, arr) => arr.findIndex(x => x.id === v.id) === i
+        );
+        
+        results.push(...allResults);
 
         
         if (seq !== searchSeqRef.current) return;
@@ -431,11 +435,18 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                         // Business result
                         <div>
                           <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-2">
-                              <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                              <span className="font-medium">{result.name}</span>
-                            </div>
-                            <span className="text-sm opacity-70">{(result as EnhancedBusiness).businessType || 'Business'}</span>
+                            <span className="font-medium">{result.name}</span>
+                            <span className="text-sm opacity-70">{(result as EnhancedBusiness).salary}</span>
+                          </div>
+                          <div className="flex gap-2 mt-1">
+                            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">
+                              {(result as EnhancedBusiness).businessType || 'Business'}
+                            </span>
+                            {(result as EnhancedBusiness).roles?.map((role, roleIndex) => (
+                              <span key={roleIndex} className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                                {role.role} - {role.salary}
+                              </span>
+                            ))}
                           </div>
                         </div>
                       )}
