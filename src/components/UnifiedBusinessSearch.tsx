@@ -153,16 +153,16 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           });
         }
         
-        // Get business results
-        const businessResults = await searchBusinessesEnhanced(q, 15);
+        // Get more business results
+        const businessResults = await searchBusinessesEnhanced(q, 50);
         
-        // Filter results to only include relevant matches
+        // Filter results but be more permissive
         const filteredResults = businessResults.filter(business =>
           isOneCharOff(business.name, q)
         );
         
-        // Limit to top 10 most relevant results
-        results.push(...filteredResults.slice(0, 10));
+        // Return more results (up to 20)
+        results.push(...filteredResults.slice(0, 20));
 
         
         if (seq !== searchSeqRef.current) return;
