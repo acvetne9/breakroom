@@ -48,7 +48,7 @@ const BreakroomLoading = ({ onComplete }: { onComplete?: () => void }) => {
       justifyContent: 'center' as const,
       width: '120px',
       height: '120px',
-      marginBottom: '20px'
+      marginBottom: '-20px'
     },
     coffeeMug: {
       display: 'inline-block' as const,
