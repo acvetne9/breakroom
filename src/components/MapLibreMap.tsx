@@ -564,35 +564,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (!mapRef.current || map) return;
 
-    // Check if we're running in Capacitor
-    const isCapacitor = !!(window as any).Capacitor || window.location.protocol === 'capacitor:';
-    
-    // For Capacitor, use OpenStreetMap tiles instead of local .pbf tiles
-    const mapStyle = isCapacitor ? {
-      version: 8 as const,
-      sources: {
-        'osm': {
-          type: 'raster' as const,
-          tiles: [
-            'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
-            'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-            'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
-          ],
-          tileSize: 256,
-          attribution: '© OpenStreetMap contributors'
-        }
-      },
-      layers: [
-        {
-          id: 'osm',
-          type: 'raster' as const,
-          source: 'osm',
-          minzoom: 0,
-          maxzoom: 19
-        }
-      ],
-      glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf'
-    } : {
+    const mapStyle = {
       version: 8 as const,
       sources: {
         'nyc-tiles': {
