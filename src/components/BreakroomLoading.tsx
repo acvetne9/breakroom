@@ -164,9 +164,20 @@ const BreakroomLoading = ({ onComplete }: { onComplete?: () => void }) => {
           100% { opacity: 1; }
         }
 
-        @media (max-width: 480px) {
+        @media (max-width: 768px) {
           .animation-container {
             padding: 0 10px;
+          }
+        }
+
+        @media (max-width: 480px) {
+          div[style*="fontFamily"] {
+            font-weight: 900 !important;
+            text-shadow: 2px 2px 0px rgba(178, 34, 34, 0.6), 0 0 25px rgba(178, 34, 34, 0.5) !important;
+          }
+          
+          div[style*="fontFamily"] span {
+            font-weight: 900 !important;
           }
         }
       `}</style>
