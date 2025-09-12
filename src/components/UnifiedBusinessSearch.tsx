@@ -27,22 +27,106 @@ interface NeighborhoodResult {
 
 type SearchResult = EnhancedBusiness | NeighborhoodResult;
 
-const isOneCharOff = (a: string, b: string) => {
-  if (Math.abs(a.length - b.length) > 1) return false;
+// Enhanced relevance scoring function
+const calculateRelevanceScore = (business: EnhancedBusiness, query: string): number => {
+  const queryLower = query.toLowerCase().trim();
+  const nameLower = business.name.toLowerCase();
+  const businessType = business.businessType?.toLowerCase() || '';
+  const roles = business.roles?.map(r => r.role.toLowerCase()) || [];
+  
+  let score = 0;
+  
+  // Exact match (highest priority)
+  if (nameLower === queryLower) {
+    score += 100;
+  }
+  
+  // Starts with query (very high priority)
+  else if (nameLower.startsWith(queryLower)) {
+    score += 80;
+  }
+  
+  // Contains query as whole word (high priority)
+  else if (new RegExp(`\\b${queryLower}\\b`).test(nameLower)) {
+    score += 60;
+  }
+  
+  // Contains query as substring (medium priority)
+  else if (nameLower.includes(queryLower)) {
+    score += 40;
+  }
+  
+  // Check business type relevance
+  if (businessType.includes(queryLower)) {
+    score += 30;
+  }
+  
+  // Check roles relevance
+  roles.forEach(role => {
+    if (role.includes(queryLower)) {
+      score += 25;
+    }
+  });
+  
+  // Fuzzy matching for typos (lower priority)
+  const editDistance = calculateEditDistance(nameLower, queryLower);
+  const maxLength = Math.max(nameLower.length, queryLower.length);
+  const similarity = 1 - (editDistance / maxLength);
+  
+  // Only add fuzzy score if similarity is high (> 70%)
+  if (similarity > 0.7 && editDistance <= 3) {
+    score += Math.round(similarity * 20);
+  }
+  
+  // Bonus for shorter names (more likely to be relevant)
+  if (business.name.length <= 50) {
+    score += 5;
+  }
+  
+  return score;
+};
 
-  let mismatches = 0;
-  let i = 0, j = 0;
-  while (i < a.length && j < b.length) {
-    if (a[i] !== b[j]) {
-      if (++mismatches > 1) return false;
-      if (a.length > b.length) i++;
-      else if (a.length < b.length) j++;
-      else { i++; j++; }
-    } else {
-      i++; j++;
+// Levenshtein distance for fuzzy matching
+const calculateEditDistance = (str1: string, str2: string): number => {
+  const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+  
+  for (let i = 0; i <= str1.length; i += 1) {
+    matrix[0][i] = i;
+  }
+  
+  for (let j = 0; j <= str2.length; j += 1) {
+    matrix[j][0] = j;
+  }
+  
+  for (let j = 1; j <= str2.length; j += 1) {
+    for (let i = 1; i <= str1.length; i += 1) {
+      const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+      matrix[j][i] = Math.min(
+        matrix[j][i - 1] + 1, // deletion
+        matrix[j - 1][i] + 1, // insertion
+        matrix[j - 1][i - 1] + indicator, // substitution
+      );
     }
   }
-  return true;
+  
+  return matrix[str2.length][str1.length];
+};
+
+// Filter and sort results by relevance
+const getRelevantResults = (businesses: EnhancedBusiness[], query: string, maxResults: number = 10): EnhancedBusiness[] => {
+  if (!query.trim()) return [];
+  
+  const scoredResults = businesses
+    .map(business => ({
+      business,
+      score: calculateRelevanceScore(business, query)
+    }))
+    .filter(result => result.score > 0) // Only keep results with some relevance
+    .sort((a, b) => b.score - a.score) // Sort by score descending
+    .slice(0, maxResults) // Limit results
+    .map(result => result.business);
+    
+  return scoredResults;
 };
 
 const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
@@ -107,7 +191,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     };
   }, []);
 
-  // Debounced suggestions with improved caching
+  // Enhanced debounced suggestions with relevance scoring
   useEffect(() => {
     const q = value.trim();
     if (!q) {
@@ -125,10 +209,10 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     }
     
     // Check cache first for better performance
-      const cachedResults = resultsCache.current.get(q);
-      if (cachedResults && Array.isArray(cachedResults)) {
-        console.log('💾 Using cached results for:', q);
-        setSearchResults(cachedResults);
+    const cachedResults = resultsCache.current.get(q);
+    if (cachedResults && Array.isArray(cachedResults)) {
+      console.log('💾 Using cached results for:', q);
+      setSearchResults(cachedResults);
       setShowDropdown(true);
       setIsSearching(false);
       return;
@@ -153,21 +237,15 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           });
         }
         
-        // Get business results
-        const businessResults = await searchBusinessesEnhanced(q, 10);
+        // Get business results with increased limit for filtering
+        const businessResults = await searchBusinessesEnhanced(q, 50); // Get more results to filter
         
-        // Apply fuzzy match filtering so results still appear if off by 1 char
-        const fuzzyResults = businessResults.filter(business =>
-          isOneCharOff(business.name.toLowerCase(), q.toLowerCase())
-        );
+        // Apply relevance-based filtering and sorting
+        const relevantResults = getRelevantResults(businessResults, q, 8); // Return top 8 relevant results
         
-        // Push normal + fuzzy results (remove duplicates by ID)
-        const allResults = [...businessResults, ...fuzzyResults].filter(
-          (v, i, arr) => arr.findIndex(x => x.id === v.id) === i
-        );
+        console.log(`🎯 Query: "${q}" - Found ${businessResults.length} raw results, filtered to ${relevantResults.length} relevant results`);
         
-        results.push(...allResults);
-
+        results.push(...relevantResults);
         
         if (seq !== searchSeqRef.current) return;
         
@@ -181,6 +259,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         }
         
         setSearchResults(Array.isArray(results) ? results : []);
+        
         // Debounced idle search: parse filters and push to parent for live filtering
         try {
           const parsed = parseSearchFilters(q);
@@ -300,10 +379,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       return;
     }
     
-    // Commit the query and apply filters immediately (require 4+ characters for meaningful search)
+    // Commit the query and apply filters immediately (require 3+ characters for meaningful search)
     console.log('🔍 [performSearch] Trimmed value:', trimmedValue, 'length:', trimmedValue.length);
-    console.log('🔍 [performSearch] Current committed query:', committedQueryRef.current);
-    console.log('🔍 [performSearch] Last executed query:', lastExecutedQuery.current);
     
     if (trimmedValue.length >= 3 && committedQueryRef.current !== trimmedValue) {
       console.log('🔍 Committing search query:', trimmedValue);
@@ -326,7 +403,6 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         onChange(value, undefined, filters);
       } else {
         console.log('⚠️ No valid filters found for query:', trimmedValue);
-        console.log('⚠️ Filters object:', filters);
         if (lastFiltersRef.current !== null) {
           lastFiltersRef.current = null;
           committedQueryRef.current = '';
@@ -341,8 +417,6 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       committedQueryRef.current = '';
       lastExecutedQuery.current = '';
       onChange(value, undefined, null);
-    } else {
-      console.log('🔍 [performSearch] No action taken - length:', trimmedValue.length, 'committed:', committedQueryRef.current);
     }
     setShowDropdown(false);
   };
@@ -415,7 +489,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
               </div>
             ) : Array.isArray(searchResults) && searchResults.length === 0 && value.trim() ? (
               <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
-                Couldn't find any businesses 😱
+                No relevant businesses found
               </div>
             ) : (
               <div className="p-3">
