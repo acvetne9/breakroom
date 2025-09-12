@@ -247,7 +247,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         
         // Debug: Log the scoring for results
         if (businessResults.length > 0) {
-          console.log('📊 Sample results with relevance and richness scores:');
+          console.log('📊 Sample results with relevance scores:');
           const sampleResults = businessResults.slice(0, 8);
           sampleResults.forEach(business => {
             const relevanceScore = calculateRelevanceScore(business, q);
@@ -262,7 +262,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
             console.log('🏆 Final sorted results:');
             relevantResults.slice(0, 5).forEach((business, index) => {
               const relevanceScore = calculateRelevanceScore(business, q);
-              console.log(`  ${index + 1}. "${business.name}" (R: ${relevanceScore})`);
+              console.log(`  ${index + 1}. "${business.name}" (Relevance: ${relevanceScore})`);
             });
           }
         }
