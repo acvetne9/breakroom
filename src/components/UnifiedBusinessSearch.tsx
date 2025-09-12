@@ -245,6 +245,15 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         
         console.log(`🎯 Query: "${q}" - Found ${businessResults.length} raw results, filtered to ${relevantResults.length} relevant results`);
         
+        // Debug: Log the scoring for the first few results
+        if (businessResults.length > 0) {
+          console.log('📊 Top raw results and their scores:');
+          businessResults.slice(0, 5).forEach(business => {
+            const score = calculateRelevanceScore(business, q);
+            console.log(`  - "${business.name}" (Score: ${score})`);
+          });
+        }
+        
         results.push(...relevantResults);
         
         if (seq !== searchSeqRef.current) return;
