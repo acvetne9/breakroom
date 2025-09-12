@@ -240,6 +240,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Ensure businesses is always an array to prevent dependency array crashes
   const businesses = Array.isArray(rawBusinesses) ? rawBusinesses : [];
+  
+  // Log businesses for debugging
+  useEffect(() => {
+    console.log(`🎯 MapLibreMap received ${businesses.length} businesses:`, {
+      searchFilters: !!searchFilters,
+      hasNeighborhoodFilter: !!searchFilters?.neighborhoodFilter,
+      businessNames: businesses.slice(0, 5).map(b => b.name)
+    });
+  }, [businesses, searchFilters]);
 
   // Optimized business limit calculation
   const getBusinessLimitForViewport = useCallback((zoom: number, bounds: Bounds): number => {

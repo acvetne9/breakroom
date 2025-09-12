@@ -348,8 +348,20 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       const business = result as EnhancedBusiness;
       console.log('🏢 [handleResultClick] Business clicked:', business.name);
       
-      // Perform search with current value
-      performSearch();
+      // Update the search input with business name for search
+      onChange(business.name);
+      
+      // Perform search with business name to ensure it shows on map
+      const filters = parseSearchFilters(business.name);
+      if (filters) {
+        committedQueryRef.current = business.name;
+        lastExecutedQuery.current = business.name;
+        lastFiltersRef.current = JSON.stringify(filters);
+        onChange(business.name, business, filters);
+      } else {
+        // Fallback: trigger basic search without filters but with business selection
+        onChange(business.name, business, null);
+      }
       
       // Still call the business select callback for any other handling needed
       onBusinessSelect?.(business);
