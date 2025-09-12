@@ -106,14 +106,25 @@
     height: 100dvh;
   }
   
-  /* Allow proper touch events for maps and other interactive elements */
-  .maplibre-map {
-    touch-action: pan-x pan-y !important;
-  }
-  
-  /* Ensure MapLibre canvas works properly on mobile */
-  .maplibregl-canvas {
-    touch-action: none !important;
+  /* Mobile-specific map fixes */
+  @media (max-width: 768px) {
+    .maplibre-map {
+      touch-action: pan-x pan-y !important;
+      -webkit-transform: translateZ(0);
+      transform: translateZ(0);
+    }
+    
+    .maplibregl-canvas {
+      touch-action: none !important;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    
+    .maplibregl-canvas-container {
+      cursor: inherit;
+    }
   }
   
   /* Fix for mobile map controls */

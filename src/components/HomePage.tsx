@@ -230,7 +230,7 @@ const HomePage: React.FC<HomePageProps> = ({
         </div>
       )}
 
-      <div>
+      <div className="relative w-full h-full">
         {/* MapLibre with OpenStreetMap base layer */}
         <MapLibreMap
           onBusinessClick={handleBusinessClick}
