@@ -174,6 +174,7 @@ const BreakroomLoading = ({ onComplete }: { onComplete?: () => void }) => {
           div[style*="fontFamily"] {
             font-weight: 900 !important;
             text-shadow: 2px 2px 0px rgba(178, 34, 34, 0.6), 0 0 25px rgba(178, 34, 34, 0.5) !important;
+            transform: perspective(500px) rotateX(-5deg) translateX(0px) !important;
           }
           
           div[style*="fontFamily"] span {
