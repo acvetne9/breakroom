@@ -158,7 +158,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         
         // Filter results to only include relevant matches
         const filteredResults = businessResults.filter(business =>
-          isRelevantMatch(business.name, q)
+          isOneCharOff(business.name, q)
         );
         
         // Limit to top 10 most relevant results
