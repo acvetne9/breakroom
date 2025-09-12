@@ -685,23 +685,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'source-layer': 'examplepoints',
             layout: {
               'text-field': ['get', 'name'],
-              'text-font': ['Arial Unicode MS Regular', 'Open Sans Regular', 'sans-serif'],
-              'text-size': ['interpolate', ['linear'], ['zoom'], 12, 8, 16, 12],
+              'text-font': ['Helvetica Neue', 'Arial', 'sans-serif'],
+              'text-size': ['interpolate', ['linear'], ['zoom'], 11, 9, 16, 14],
               'symbol-placement': 'line',
               'text-rotation-alignment': 'map',
-              'text-pitch-alignment': 'viewport'
+              'text-pitch-alignment': 'viewport',
+              'text-max-angle': 30
             },
             paint: {
-              'text-color': '#333333',
+              'text-color': '#2d3748',
               'text-halo-color': '#ffffff',
-              'text-halo-width': 1
+              'text-halo-width': 2
             },
             filter: [
               'all', 
               ['==', ['geometry-type'], 'LineString'],
               ['has', 'highway'],
               ['has', 'name'],
-              ['>', ['zoom'], 13]
+              ['>', ['zoom'], 11]
             ]
           }
         ];
