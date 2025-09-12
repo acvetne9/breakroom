@@ -154,19 +154,15 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         }
         
         // Get business results
-        const businessResults = await searchBusinessesEnhanced(q, 10);
+        const businessResults = await searchBusinessesEnhanced(q, 15);
         
-        // Apply fuzzy match filtering so results still appear if off by 1 char
-        const fuzzyResults = businessResults.filter(business =>
-          isOneCharOff(business.name.toLowerCase(), q.toLowerCase())
+        // Filter results to only include relevant matches
+        const filteredResults = businessResults.filter(business =>
+          isRelevantMatch(business.name, q)
         );
         
-        // Push normal + fuzzy results (remove duplicates by ID)
-        const allResults = [...businessResults, ...fuzzyResults].filter(
-          (v, i, arr) => arr.findIndex(x => x.id === v.id) === i
-        );
-        
-        results.push(...allResults);
+        // Limit to top 10 most relevant results
+        results.push(...filteredResults.slice(0, 10));
 
         
         if (seq !== searchSeqRef.current) return;
