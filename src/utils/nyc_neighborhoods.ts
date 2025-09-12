@@ -1,16 +1,35 @@
 // ---------------- NYC neighborhoods (approximate polygons) ----------------
+import { Business } from '@/types/business';
+
+export interface NeighborhoodBounds {
+  name: string;
+  borough: string;
+  center: { lat: number; lon: number };
+  boundary: { lat: number; lon: number }[];
+}
+
 export const nycNeighborhoodBoundaries = {
   "Manhattan": {
     "Harlem": [
-      { lat: 40.820, lon: -73.955 },
-      { lat: 40.818, lon: -73.949 },
-      { lat: 40.813, lon: -73.947 },
-      { lat: 40.809, lon: -73.949 },
-      { lat: 40.807, lon: -73.954 },
-      { lat: 40.809, lon: -73.960 },
-      { lat: 40.813, lon: -73.962 },
-      { lat: 40.818, lon: -73.960 },
-      { lat: 40.820, lon: -73.955 } // close loop
+      { lat: 40.800, lon: -73.970 },
+      { lat: 40.810, lon: -73.965 },
+      { lat: 40.820, lon: -73.960 },
+      { lat: 40.830, lon: -73.955 },
+      { lat: 40.835, lon: -73.950 },
+      { lat: 40.840, lon: -73.945 },
+      { lat: 40.842, lon: -73.940 },
+      { lat: 40.840, lon: -73.935 },
+      { lat: 40.835, lon: -73.930 },
+      { lat: 40.830, lon: -73.928 },
+      { lat: 40.825, lon: -73.930 },
+      { lat: 40.820, lon: -73.935 },
+      { lat: 40.815, lon: -73.940 },
+      { lat: 40.810, lon: -73.945 },
+      { lat: 40.805, lon: -73.950 },
+      { lat: 40.800, lon: -73.955 },
+      { lat: 40.798, lon: -73.960 },
+      { lat: 40.799, lon: -73.965 },
+      { lat: 40.800, lon: -73.970 }
     ],
     "Upper East Side": [
       { lat: 40.773, lon: -73.959 },
@@ -32,18 +51,31 @@ export const nycNeighborhoodBoundaries = {
       { lat: 40.782, lon: -73.981 },
       { lat: 40.785, lon: -73.983 },
       { lat: 40.788, lon: -73.981 }
-    ]
+    ],
     "Midtown": [
-      { lat: 40.762, lon: -73.990 },
-      { lat: 40.766, lon: -73.983 },
-      { lat: 40.764, lon: -73.975 },
-      { lat: 40.760, lon: -73.971 },
-      { lat: 40.754, lon: -73.972 },
-      { lat: 40.750, lon: -73.976 },
-      { lat: 40.749, lon: -73.983 },
-      { lat: 40.752, lon: -73.989 },
-      { lat: 40.757, lon: -73.991 },
-      { lat: 40.762, lon: -73.990 } // close loop
+      { lat: 40.740, lon: -74.010 },
+      { lat: 40.750, lon: -74.005 },
+      { lat: 40.760, lon: -74.000 },
+      { lat: 40.770, lon: -73.995 },
+      { lat: 40.775, lon: -73.990 },
+      { lat: 40.780, lon: -73.985 },
+      { lat: 40.782, lon: -73.980 },
+      { lat: 40.780, lon: -73.975 },
+      { lat: 40.775, lon: -73.970 },
+      { lat: 40.770, lon: -73.965 },
+      { lat: 40.765, lon: -73.960 },
+      { lat: 40.760, lon: -73.958 },
+      { lat: 40.755, lon: -73.960 },
+      { lat: 40.750, lon: -73.965 },
+      { lat: 40.745, lon: -73.970 },
+      { lat: 40.742, lon: -73.975 },
+      { lat: 40.740, lon: -73.980 },
+      { lat: 40.738, lon: -73.985 },
+      { lat: 40.738, lon: -73.990 },
+      { lat: 40.739, lon: -73.995 },
+      { lat: 40.740, lon: -74.000 },
+      { lat: 40.740, lon: -74.005 },
+      { lat: 40.740, lon: -74.010 }
     ],
     "Lower East Side": [
       { lat: 40.723, lon: -73.992 },
@@ -84,14 +116,25 @@ export const nycNeighborhoodBoundaries = {
   },
   "Brooklyn": {
     "Williamsburg": [
-      { lat: 40.710, lon: -73.960 },
-      { lat: 40.712, lon: -73.955 },
-      { lat: 40.715, lon: -73.952 },
-      { lat: 40.718, lon: -73.955 },
-      { lat: 40.718, lon: -73.960 },
-      { lat: 40.715, lon: -73.963 },
-      { lat: 40.712, lon: -73.962 },
-      { lat: 40.710, lon: -73.960 }
+      { lat: 40.705, lon: -73.970 },
+      { lat: 40.708, lon: -73.965 },
+      { lat: 40.712, lon: -73.960 },
+      { lat: 40.716, lon: -73.955 },
+      { lat: 40.720, lon: -73.950 },
+      { lat: 40.725, lon: -73.948 },
+      { lat: 40.730, lon: -73.950 },
+      { lat: 40.735, lon: -73.952 },
+      { lat: 40.738, lon: -73.955 },
+      { lat: 40.740, lon: -73.960 },
+      { lat: 40.738, lon: -73.965 },
+      { lat: 40.735, lon: -73.968 },
+      { lat: 40.730, lon: -73.970 },
+      { lat: 40.725, lon: -73.972 },
+      { lat: 40.720, lon: -73.970 },
+      { lat: 40.716, lon: -73.968 },
+      { lat: 40.712, lon: -73.970 },
+      { lat: 40.708, lon: -73.972 },
+      { lat: 40.705, lon: -73.970 }
     ],
     "Bushwick": [
       { lat: 40.698, lon: -73.926 },
@@ -104,16 +147,27 @@ export const nycNeighborhoodBoundaries = {
       { lat: 40.698, lon: -73.926 }
     ],
     "Greenpoint": [
-      { lat: 40.739, lon: -73.962 },
-      { lat: 40.738, lon: -73.955 },
-      { lat: 40.735, lon: -73.949 },
-      { lat: 40.730, lon: -73.947 },
-      { lat: 40.726, lon: -73.949 },
-      { lat: 40.724, lon: -73.954 },
-      { lat: 40.725, lon: -73.960 },
-      { lat: 40.729, lon: -73.963 },
-      { lat: 40.735, lon: -73.964 },
-      { lat: 40.739, lon: -73.962 } // close loop
+      { lat: 40.720, lon: -73.975 },
+      { lat: 40.725, lon: -73.970 },
+      { lat: 40.730, lon: -73.965 },
+      { lat: 40.735, lon: -73.960 },
+      { lat: 40.740, lon: -73.955 },
+      { lat: 40.745, lon: -73.950 },
+      { lat: 40.748, lon: -73.945 },
+      { lat: 40.750, lon: -73.940 },
+      { lat: 40.748, lon: -73.935 },
+      { lat: 40.745, lon: -73.932 },
+      { lat: 40.740, lon: -73.930 },
+      { lat: 40.735, lon: -73.932 },
+      { lat: 40.730, lon: -73.935 },
+      { lat: 40.725, lon: -73.940 },
+      { lat: 40.722, lon: -73.945 },
+      { lat: 40.720, lon: -73.950 },
+      { lat: 40.718, lon: -73.955 },
+      { lat: 40.717, lon: -73.960 },
+      { lat: 40.718, lon: -73.965 },
+      { lat: 40.720, lon: -73.970 },
+      { lat: 40.720, lon: -73.975 }
     ],
     "Bedford–Stuyvesant": [
       { lat: 40.700, lon: -73.960 },
@@ -141,16 +195,27 @@ export const nycNeighborhoodBoundaries = {
       { lat: 40.676, lon: -73.960 } // close loop
     ],
     "Park Slope": [
-      { lat: 40.676, lon: -73.993 },
-      { lat: 40.674, lon: -73.987 },
-      { lat: 40.672, lon: -73.981 },
-      { lat: 40.669, lon: -73.976 },
-      { lat: 40.666, lon: -73.977 },
-      { lat: 40.664, lon: -73.982 },
-      { lat: 40.664, lon: -73.989 },
-      { lat: 40.667, lon: -73.994 },
-      { lat: 40.672, lon: -73.996 },
-      { lat: 40.676, lon: -73.993 } // close loop
+      { lat: 40.660, lon: -74.005 },
+      { lat: 40.665, lon: -74.000 },
+      { lat: 40.670, lon: -73.995 },
+      { lat: 40.675, lon: -73.990 },
+      { lat: 40.680, lon: -73.985 },
+      { lat: 40.685, lon: -73.980 },
+      { lat: 40.688, lon: -73.975 },
+      { lat: 40.690, lon: -73.970 },
+      { lat: 40.688, lon: -73.965 },
+      { lat: 40.685, lon: -73.962 },
+      { lat: 40.680, lon: -73.960 },
+      { lat: 40.675, lon: -73.962 },
+      { lat: 40.670, lon: -73.965 },
+      { lat: 40.665, lon: -73.970 },
+      { lat: 40.662, lon: -73.975 },
+      { lat: 40.660, lon: -73.980 },
+      { lat: 40.658, lon: -73.985 },
+      { lat: 40.657, lon: -73.990 },
+      { lat: 40.658, lon: -73.995 },
+      { lat: 40.660, lon: -74.000 },
+      { lat: 40.660, lon: -74.005 }
     ],
     "Brooklyn Heights": [
       { lat: 40.702, lon: -73.998 },
@@ -477,5 +542,241 @@ export function getNeighborhoodBoundary(borough: string, neighborhood: string) {
   return boundary;
 }
 
-// Example usage:
-// const harlemBoundary = getNeighborhoodBoundary("Manhattan", "Harlem");
+// Convert boundaries to neighborhood data format expected by other components
+export const nycNeighborhoods = Object.fromEntries(
+  Object.entries(nycNeighborhoodBoundaries).map(([borough, neighborhoods]) => [
+    borough,
+    Object.entries(neighborhoods).map(([name, boundary]) => {
+      // Calculate more accurate center point using centroid of polygon
+      let centroidLat = 0;
+      let centroidLon = 0;
+      let signedArea = 0;
+      
+      for (let i = 0; i < boundary.length - 1; i++) {
+        const x0 = boundary[i].lon;
+        const y0 = boundary[i].lat;
+        const x1 = boundary[i + 1].lon;
+        const y1 = boundary[i + 1].lat;
+        
+        const a = x0 * y1 - x1 * y0;
+        signedArea += a;
+        centroidLat += (y0 + y1) * a;
+        centroidLon += (x0 + x1) * a;
+      }
+      
+      signedArea *= 0.5;
+      centroidLat /= (6 * signedArea);
+      centroidLon /= (6 * signedArea);
+      
+      // Fallback to geometric center if centroid calculation fails
+      if (isNaN(centroidLat) || isNaN(centroidLon) || Math.abs(signedArea) < 1e-10) {
+        const lats = boundary.map(p => p.lat);
+        const lons = boundary.map(p => p.lon);
+        centroidLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+        centroidLon = (Math.min(...lons) + Math.max(...lons)) / 2;
+      }
+      
+      return { name, lat: centroidLat, lon: centroidLon, boundary };
+    })
+  ])
+);
+
+// Generate boundary using neighborhood and neighbors
+export function generateNeighborhoodBoundary(
+  neighborhood: { name: string; lat: number; lon: number }, 
+  neighbors: { name: string; lat: number; lon: number }[]
+) {
+  // Find the actual boundary from our data
+  for (const [borough, neighborhoods] of Object.entries(nycNeighborhoodBoundaries)) {
+    if (neighborhoods[neighborhood.name]) {
+      return neighborhoods[neighborhood.name];
+    }
+  }
+  
+  console.log(`🏙️ Generating improved boundary for ${neighborhood.name}`);
+  
+  // Determine accurate radius based on neighborhood characteristics
+  const getNeighborhoodRadius = (name: string): number => {
+    const nameLower = name.toLowerCase();
+    
+    // Major areas and districts - larger boundaries
+    if (['financial district', 'midtown', 'upper east side', 'upper west side', 'downtown'].some(area => nameLower.includes(area))) {
+      return 0.012; // ~1.3km radius
+    }
+    
+    // Well-known large neighborhoods
+    if (['chinatown', 'little italy', 'soho', 'tribeca', 'chelsea', 'greenwich village', 'east village', 'west village'].some(area => nameLower.includes(area))) {
+      return 0.008; // ~900m radius
+    }
+    
+    // Medium neighborhoods
+    if (['nolita', 'bowery', 'murray hill', 'gramercy', 'flatiron'].some(area => nameLower.includes(area))) {
+      return 0.006; // ~650m radius
+    }
+    
+    // Small but distinct areas
+    if (['battery park', 'stone street', 'south street seaport'].some(area => nameLower.includes(area))) {
+      return 0.004; // ~450m radius
+    }
+    
+    // Default for other neighborhoods
+    return 0.007; // ~750m radius
+  };
+
+  const baseRadius = getNeighborhoodRadius(neighborhood.name);
+  
+  // Create 16-20 points for very realistic boundaries
+  const numPoints = 16 + Math.floor(Math.random() * 5); // 16-20 points
+  const boundary: { lat: number; lon: number }[] = [];
+  
+  // Sort neighbors by distance and use them to influence boundary shape
+  const influentialNeighbors = neighbors
+    .map(n => ({
+      ...n,
+      distance: haversine(neighborhood.lat, neighborhood.lon, n.lat, n.lon),
+      angle: Math.atan2(n.lat - neighborhood.lat, n.lon - neighborhood.lon)
+    }))
+    .filter(n => n.distance < baseRadius * 3) // Only use nearby neighbors
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, 6); // Use closest 6 neighbors for influence
+  
+  for (let i = 0; i < numPoints; i++) {
+    const baseAngle = (2 * Math.PI * i) / numPoints;
+    
+    // Start with base radius
+    let currentRadius = baseRadius;
+    
+    // Apply neighbor influence for more realistic boundaries
+    if (influentialNeighbors.length > 0) {
+      for (const neighbor of influentialNeighbors) {
+        const angleDiff = Math.abs(baseAngle - neighbor.angle);
+        const normalizedAngleDiff = Math.min(angleDiff, 2 * Math.PI - angleDiff);
+        
+        // Strong influence when pointing directly toward neighbor
+        if (normalizedAngleDiff < Math.PI / 4) { // Within 45 degrees
+          const influence = 1 - (normalizedAngleDiff / (Math.PI / 4));
+          const distanceFactor = Math.max(0.3, 1 - (neighbor.distance / (baseRadius * 2)));
+          currentRadius *= (0.5 + (1 - influence * distanceFactor) * 0.5); // Reduce radius toward neighbors
+        }
+      }
+    }
+    
+    // Add natural variation and irregularity
+    const radiusVariation = 0.75 + Math.random() * 0.5; // 75%-125% variation
+    currentRadius *= radiusVariation;
+    
+    // Add small angular offset for organic shape
+    const angleOffset = (Math.random() - 0.5) * 0.3; // ±0.15 radians (~±9°)
+    const finalAngle = baseAngle + angleOffset;
+    
+    const lat = neighborhood.lat + currentRadius * Math.cos(finalAngle);
+    const lon = neighborhood.lon + currentRadius * Math.sin(finalAngle) / Math.cos(neighborhood.lat * Math.PI / 180);
+    
+    boundary.push({ lat, lon });
+  }
+  
+  // Close the polygon
+  if (boundary.length > 0) {
+    boundary.push({ ...boundary[0] });
+  }
+  
+  console.log(`✅ Generated ${boundary.length} accurate boundary points for ${neighborhood.name}`);
+  return boundary;
+}
+
+// Haversine distance calculation (in km)
+export function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// Find neighborhood by name (case insensitive)
+export function findNeighborhood(searchTerm: string): NeighborhoodBounds | null {
+  const term = searchTerm.toLowerCase().trim();
+  
+  for (const [borough, neighborhoods] of Object.entries(nycNeighborhoods)) {
+    for (const neighborhood of neighborhoods) {
+      if (neighborhood.name.toLowerCase().includes(term) || term.includes(neighborhood.name.toLowerCase())) {
+        // Get boundary from nycNeighborhoodBoundaries if available, otherwise generate
+        let boundary = nycNeighborhoodBoundaries[borough]?.[neighborhood.name];
+        if (!boundary) {
+          // Get other neighborhoods in the same borough as neighbors
+          const neighbors = neighborhoods.filter(n => n.name !== neighborhood.name);
+          boundary = generateNeighborhoodBoundary(neighborhood, neighbors);
+        }
+        
+        return {
+          name: neighborhood.name,
+          borough,
+          center: { lat: neighborhood.lat, lon: neighborhood.lon },
+          boundary
+        };
+      }
+    }
+  }
+  
+  return null;
+}
+
+// Filter businesses within neighborhood rectangular bounds with generous padding
+export function filterBusinessesByNeighborhood(
+  businesses: Business[], 
+  neighborhoodBounds: NeighborhoodBounds
+): Business[] {
+  // Create rectangular bounds from the neighborhood boundary points
+  const lats = neighborhoodBounds.boundary.map(p => p.lat);
+  const lons = neighborhoodBounds.boundary.map(p => p.lon);
+  
+  // Use much more generous padding to capture all businesses in the broader neighborhood area
+  const latPadding = 0.050; // ~5km padding - much more generous
+  const lonPadding = 0.060; // ~6km padding - adjusted for longitude, very generous
+  
+  const rectBounds = {
+    north: Math.max(...lats) + latPadding,
+    south: Math.min(...lats) - latPadding,
+    east: Math.max(...lons) + lonPadding,
+    west: Math.min(...lons) - lonPadding
+  };
+  
+  console.log('🏙️ [filterBusinessesByNeighborhood] Neighborhood:', neighborhoodBounds.name);
+  console.log('🏙️ [filterBusinessesByNeighborhood] Original boundary points:', neighborhoodBounds.boundary.length);
+  console.log('🏙️ [filterBusinessesByNeighborhood] Generous rectangular bounds:', rectBounds);
+  console.log('🏙️ [filterBusinessesByNeighborhood] Total businesses to filter:', businesses.length);
+  
+  const filtered = businesses.filter(business => {
+    if (!business.position?.lat || !business.position?.lng) return false;
+    
+    const lat = business.position.lat;
+    const lng = business.position.lng;
+    
+    // Very inclusive rectangular bounds check - capture all businesses within the generous area
+    const inBounds = lat <= rectBounds.north && 
+                     lat >= rectBounds.south && 
+                     lng <= rectBounds.east && 
+                     lng >= rectBounds.west;
+    
+    return inBounds;
+  });
+  
+  console.log('🏙️ [filterBusinessesByNeighborhood] Businesses found in area:', filtered.length);
+  return filtered;
+}
+
+// Get all neighborhood names for autocomplete/matching
+export function getAllNeighborhoodNames(): string[] {
+  const names: string[] = [];
+  
+  for (const neighborhoods of Object.values(nycNeighborhoods)) {
+    for (const neighborhood of neighborhoods) {
+      names.push(neighborhood.name);
+    }
+  }
+  
+  return names.sort();
+}

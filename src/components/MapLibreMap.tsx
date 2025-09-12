@@ -37,10 +37,55 @@ interface ViewportState {
 // Singleton overlay for performance
 let overlayInstance: MapboxOverlay | null = null;
 
-// Optimized grid sampling with better distribution
-const createOptimizedGridSampling = (bounds: Bounds, businesses: Business[], maxBusinesses: number): Business[] => {
+// Optimized grid sampling with visible area priority
+const createOptimizedGridSampling = (bounds: Bounds, businesses: Business[], maxBusinesses: number, prioritizeVisible: boolean = false): Business[] => {
   if (!businesses || businesses.length <= maxBusinesses) return businesses;
 
+  // If prioritizing visible area, be less aggressive with sampling
+  if (prioritizeVisible) {
+    console.log(`🎯 Prioritizing visible area sampling: ${businesses.length} -> ${maxBusinesses} businesses`);
+    
+    // For visible area, use a larger grid to keep more businesses
+    const gridSize = Math.ceil(Math.sqrt(maxBusinesses / 1.5)); // Less aggressive grid
+    const latStep = (bounds.north - bounds.south) / gridSize;
+    const lngStep = (bounds.east - bounds.west) / gridSize;
+
+    const grid = Array.from({ length: gridSize }, () => 
+      Array.from({ length: gridSize }, () => [] as Business[])
+    );
+
+    // Distribute businesses into grid cells
+    businesses.forEach(business => {
+      if (!business?.position?.lat || !business?.position?.lng) return;
+
+      const latIndex = Math.min(
+        gridSize - 1,
+        Math.max(0, Math.floor((business.position.lat - bounds.south) / latStep))
+      );
+      const lngIndex = Math.min(
+        gridSize - 1,
+        Math.max(0, Math.floor((business.position.lng - bounds.west) / lngStep))
+      );
+
+      grid[latIndex][lngIndex].push(business);
+    });
+
+    // Sample more generously from each cell for visible area
+    const businessesPerCell = Math.ceil(maxBusinesses / (gridSize * gridSize * 0.7)); // More per cell
+    const result: Business[] = [];
+
+    grid.forEach(row => {
+      row.forEach(cell => {
+        if (cell.length === 0) return;
+        // Take more businesses from each cell for visible area
+        result.push(...cell.slice(0, businessesPerCell));
+      });
+    });
+
+    return result.slice(0, maxBusinesses);
+  }
+
+  // Original logic for buffer areas
   const gridSize = Math.ceil(Math.sqrt(maxBusinesses / 2));
   const latStep = (bounds.north - bounds.south) / gridSize;
   const lngStep = (bounds.east - bounds.west) / gridSize;
@@ -168,6 +213,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     callbackRefs.current = { onBusinessClick, onMapLoaded, onBusinessesLoaded };
   }, [onBusinessClick, onMapLoaded, onBusinessesLoaded]);
 
+  // Center map on neighborhood when neighborhoodCenter changes
+  useEffect(() => {
+    if (!map || !neighborhoodCenter) return;
+    
+    console.log('🏙️ Centering map on neighborhood:', neighborhoodCenter);
+    map.flyTo({
+      center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
+      zoom: 14, // Good zoom level for neighborhood view
+      duration: 2000
+    });
+  }, [map, neighborhoodCenter]);
+
   // Initialize hooks (must be called unconditionally at top level)
   const mapDataHook = useViewportMapData();
   const businessesHook = useViewportBusinesses(searchFilters);
@@ -197,19 +254,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const lngKm = lngDiff * 111 * Math.cos(avgLat * Math.PI / 180);
     const areaKm2 = latKm * lngKm;
     
-    // Adaptive density based on zoom level
+    // Adaptive density based on zoom level - increased for more consistent loading
     let baseDensity: number;
-    if (zoom >= 16) baseDensity = 300;
-    else if (zoom >= 14) baseDensity = 150;
-    else if (zoom >= 12) baseDensity = 80;
-    else baseDensity = 40;
+    if (zoom >= 16) baseDensity = 500;        // Increased from 300
+    else if (zoom >= 14) baseDensity = 250;   // Increased from 150  
+    else if (zoom >= 12) baseDensity = 150;   // Increased from 80
+    else baseDensity = 80;                    // Increased from 40
     
     // Adjust for mobile performance
-    const mobileFactor = isMobile ? 0.7 : 1.0;
+    const mobileFactor = isMobile ? 0.8 : 1.0;  // Less aggressive mobile reduction
     const targetBusinesses = Math.ceil(areaKm2 * baseDensity * mobileFactor);
     
-    const maxLimit = isMobile ? 3000 : 6000;
-    const minLimit = 200;
+    const maxLimit = isMobile ? 10000 : 20000;    // Increased limits
+    const minLimit = 1000;                        // Increased minimum from 200
     
     return Math.max(minLimit, Math.min(maxLimit, targetBusinesses));
   }, [isMobile]);
@@ -246,6 +303,57 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [fetchFullBusinessDetails]);
 
+  // Load neighborhood businesses when search filters change
+  useEffect(() => {
+    if (!map || !mapLoaded || !searchFilters?.neighborhoodFilter || !loadBusinessesInViewport) return;
+    
+    const loadNeighborhoodBusinesses = async () => {
+      console.log('🏙️ Search filters changed, loading neighborhood businesses');
+      
+      // Create neighborhood bounds from the boundary points with padding
+      const boundary = searchFilters.neighborhoodFilter.boundary;
+      const lats = boundary.map(p => p.lat);
+      const lons = boundary.map(p => p.lon);
+      
+      // Add padding to ensure we capture all businesses in the area
+      const latPadding = 0.015; // ~1.5km padding
+      const lonPadding = 0.020; // ~1.5km padding (adjusted for longitude)
+      
+      const neighborhoodBounds: Bounds = {
+        north: Math.max(...lats) + latPadding,
+        south: Math.min(...lats) - latPadding,
+        east: Math.max(...lons) + lonPadding,
+        west: Math.min(...lons) - lonPadding
+      };
+      
+      try {
+        const zoom = map.getZoom();
+        const businessLimit = getBusinessLimitForViewport(zoom, neighborhoodBounds);
+        
+        console.log('🏙️ Initial neighborhood business load:', {
+          neighborhood: searchFilters.neighborhoodFilter.name,
+          bounds: neighborhoodBounds,
+          businessLimit
+        });
+        
+        const neighborhoodBusinesses = await loadBusinessesInViewport(neighborhoodBounds, businessLimit);
+        
+        if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length > 0) {
+          console.log(`✅ Initially loaded ${neighborhoodBusinesses.length} businesses for ${searchFilters.neighborhoodFilter.name}`);
+          businessCacheRef.current.addMultiple(neighborhoodBusinesses);
+        } else {
+          console.log('❌ No businesses found for neighborhood:', searchFilters.neighborhoodFilter.name);
+        }
+        
+      } catch (error) {
+        console.error('❌ Error loading initial neighborhood businesses:', error);
+      }
+    };
+    
+    // Small delay to ensure map is ready
+    setTimeout(loadNeighborhoodBusinesses, 500);
+  }, [map, mapLoaded, searchFilters?.neighborhoodFilter, loadBusinessesInViewport, getBusinessLimitForViewport]);
+
   // Debounced viewport change handler
   const handleViewportChange = useCallback(async () => {
     console.log('🔍 DEBUG: handleViewportChange deps check', { 
@@ -256,116 +364,129 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     });
     if (!map || !mapLoaded || !loadBusinessesInViewport || isLoadingRef.current) return;
 
-    // Debounce rapid viewport changes
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-
-    debounceTimeoutRef.current = setTimeout(async () => {
+    // If neighborhood search is active, load businesses within neighborhood bounds
+    if (searchFilters?.neighborhoodFilter) {
+      console.log('🏙️ Neighborhood filter active, loading businesses within neighborhood bounds');
+      
+      // Create neighborhood bounds from the boundary points with padding
+      const boundary = searchFilters.neighborhoodFilter.boundary;
+      const lats = boundary.map(p => p.lat);
+      const lons = boundary.map(p => p.lon);
+      
+      // Add padding to ensure we capture all businesses in the area
+      const latPadding = 0.015; // ~1.5km padding
+      const lonPadding = 0.020; // ~1.5km padding (adjusted for longitude)
+      
+      const neighborhoodBounds: Bounds = {
+        north: Math.max(...lats) + latPadding,
+        south: Math.min(...lats) - latPadding,
+        east: Math.max(...lons) + lonPadding,
+        west: Math.min(...lons) - lonPadding
+      };
+      
       try {
         isLoadingRef.current = true;
-        
-        const bounds = map.getBounds();
         const zoom = map.getZoom();
-        const now = Date.now();
-
-        // Check if we need to refresh previous viewport
-        const shouldRefreshPrevious = lastViewportRef.current && 
-          (now - lastViewportRef.current.timestamp > 8000) &&
-          Math.abs(zoom - lastViewportRef.current.zoom) < 2;
-
-        // Create expanded bounds for buffer loading
-        const latDiff = bounds.getNorth() - bounds.getSouth();
-        const lngDiff = bounds.getEast() - bounds.getWest();
-        const expansion = Math.min(0.1, Math.max(0.03, 1 / zoom)); // Adaptive expansion
-
-        const expandedBounds: Bounds = {
-          north: bounds.getNorth() + latDiff * expansion,
-          south: bounds.getSouth() - latDiff * expansion,
-          east: bounds.getEast() + lngDiff * expansion,
-          west: bounds.getWest() - lngDiff * expansion,
-        };
-
-        const businessLimit = getBusinessLimitForViewport(zoom, expandedBounds);
+        const businessLimit = getBusinessLimitForViewport(zoom, neighborhoodBounds);
         
-        console.log('🗺️ Loading businesses:', {
-          zoom: zoom.toFixed(2),
-          businessLimit,
-          cacheSize: businessCacheRef.current.getAll()?.length || 0
+        console.log('🏙️ Loading neighborhood businesses:', {
+          neighborhood: searchFilters.neighborhoodFilter.name,
+          bounds: neighborhoodBounds,
+          businessLimit
         });
-
-        // Load businesses with buffer
-        const rawBusinesses = await loadBusinessesInViewport(expandedBounds, Math.floor(businessLimit * 1.3));
-
-        if (!Array.isArray(rawBusinesses) || rawBusinesses.length === 0) {
-          console.log('No businesses loaded for viewport');
-          return;
+        
+        const neighborhoodBusinesses = await loadBusinessesInViewport(neighborhoodBounds, businessLimit);
+        
+        if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length > 0) {
+          console.log(`✅ Loaded ${neighborhoodBusinesses.length} businesses for ${searchFilters.neighborhoodFilter.name}`);
+          businessCacheRef.current.addMultiple(neighborhoodBusinesses);
         }
-
-        // Separate visible and buffer businesses
-        const visibleBounds: Bounds = {
-          north: bounds.getNorth(),
-          south: bounds.getSouth(),
-          east: bounds.getEast(),
-          west: bounds.getWest(),
-        };
-
-        const visible: Business[] = [];
-        const buffer: Business[] = [];
-
-        rawBusinesses.forEach((b: Business) => {
-          if (!b?.position) return;
-          
-          const isVisible = b.position.lat <= visibleBounds.north &&
-            b.position.lat >= visibleBounds.south &&
-            b.position.lng <= visibleBounds.east &&
-            b.position.lng >= visibleBounds.west;
-          
-          if (isVisible) {
-            visible.push(b);
-          } else {
-            buffer.push(b);
-          }
-        });
-
-        // Apply optimized sampling
-        const visibleSampled = createOptimizedGridSampling(visibleBounds, visible, Math.floor(businessLimit * 0.8));
-        const bufferSampled = createOptimizedGridSampling(expandedBounds, buffer, Math.floor(businessLimit * 0.2));
-
-        const finalBusinesses = [...visibleSampled, ...bufferSampled];
-
-        // Update cache
-        businessCacheRef.current.addMultiple(finalBusinesses);
-
-        // Store current viewport state
-        lastViewportRef.current = { bounds: expandedBounds, zoom, timestamp: now };
-
-        // Background refresh of previous area if needed
-        if (shouldRefreshPrevious && lastViewportRef.current && loadBusinessesInViewport) {
-          setTimeout(() => {
-            if (lastViewportRef.current && loadBusinessesInViewport) {
-              loadBusinessesInViewport(lastViewportRef.current.bounds, Math.floor(businessLimit * 0.3));
-            }
-          }, 2000);
-        }
-
+        
       } catch (error) {
-        console.error('Error in handleViewportChange:', error);
+        console.error('❌ Error loading neighborhood businesses:', error);
       } finally {
-        setTimeout(() => {
-          isLoadingRef.current = false;
-        }, 500);
+        isLoadingRef.current = false;
       }
-    }, 300); // Debounce delay
+      return;
+    }
 
-  }, [map, mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport]);
+    // Get current visible bounds - this is the key fix
+    const currentBounds = map.getBounds();
+    const currentZoom = map.getZoom();
+    
+    // Create tight bounds for the visible area FIRST
+    const visibleBounds: Bounds = {
+      north: currentBounds.getNorth(),
+      south: currentBounds.getSouth(),
+      east: currentBounds.getEast(),
+      west: currentBounds.getWest(),
+    };
+    
+    console.log('🗺️ Current visible bounds:', visibleBounds);
+    
+    // Load businesses for the EXACT visible area first
+    try {
+      isLoadingRef.current = true;
+      const visibleBusinessLimit = Math.floor(getBusinessLimitForViewport(currentZoom, visibleBounds) * 0.8);
+      
+      console.log('🎯 Loading businesses for VISIBLE area:', {
+        zoom: currentZoom.toFixed(2),
+        businessLimit: visibleBusinessLimit,
+        bounds: visibleBounds
+      });
+      
+      const visibleBusinesses = await loadBusinessesInViewport(visibleBounds, visibleBusinessLimit);
+      
+      if (Array.isArray(visibleBusinesses) && visibleBusinesses.length > 0) {
+        console.log(`✅ Loaded ${visibleBusinesses.length} businesses for VISIBLE viewport`);
+        businessCacheRef.current.addMultiple(visibleBusinesses);
+      } else {
+        console.log('❌ No businesses loaded for visible viewport');
+      }
+      
+      // Then load buffer area (don't wait for this)
+      setTimeout(async () => {
+        const latDiff = visibleBounds.north - visibleBounds.south;
+        const lngDiff = visibleBounds.east - visibleBounds.west;
+        const expansion = 0.3; // 30% expansion for buffer
+        
+        const bufferBounds: Bounds = {
+          north: visibleBounds.north + latDiff * expansion,
+          south: visibleBounds.south - latDiff * expansion,
+          east: visibleBounds.east + lngDiff * expansion,
+          west: visibleBounds.west - lngDiff * expansion,
+        };
+        
+        const bufferBusinessLimit = Math.floor(getBusinessLimitForViewport(currentZoom, bufferBounds) * 0.3);
+        
+        console.log('🔮 Loading buffer businesses:', {
+          businessLimit: bufferBusinessLimit,
+          bounds: bufferBounds
+        });
+        
+        const bufferBusinesses = await loadBusinessesInViewport(bufferBounds, bufferBusinessLimit);
+        if (Array.isArray(bufferBusinesses) && bufferBusinesses.length > 0) {
+          console.log(`🔮 Loaded ${bufferBusinesses.length} buffer businesses`);
+          businessCacheRef.current.addMultiple(bufferBusinesses);
+        }
+      }, 100);
+      
+    } catch (error) {
+      console.error('❌ Error in handleViewportChange:', error);
+    } finally {
+      setTimeout(() => {
+        isLoadingRef.current = false;
+      }, 200);
+    }
+
+  }, [map, mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters]);
 
   // Keep a ref to latest handler for stable listeners
   useEffect(() => {
     handleViewportChangeRef.current = handleViewportChange;
   }, [handleViewportChange]);
 
-  // Memoized DeckGL layers with better caching
+  // Memoized DeckGL layers with better caching and visible area focus
   const deckGLLayers = useMemo(() => {
     const cachedBusinesses = businessCacheRef.current.getAll();
     
@@ -389,6 +510,45 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         businessesToRender = flattenedBusinesses;
       }
 
+      // Filter businesses to current viewport if map is loaded
+      if (map && mapLoaded) {
+        const currentBounds = map.getBounds();
+        const visibleBusinesses = businessesToRender.filter(business => {
+          if (!business?.position?.lat || !business?.position?.lng) return false;
+          
+          return business.position.lat <= currentBounds.getNorth() &&
+                 business.position.lat >= currentBounds.getSouth() &&
+                 business.position.lng <= currentBounds.getEast() &&
+                 business.position.lng >= currentBounds.getWest();
+        });
+        
+        // Combine visible businesses with some cached ones for smooth scrolling
+        const bufferBusinesses = businessesToRender.filter(business => {
+          if (!business?.position?.lat || !business?.position?.lng) return false;
+          
+          const latBuffer = (currentBounds.getNorth() - currentBounds.getSouth()) * 0.2;
+          const lngBuffer = (currentBounds.getEast() - currentBounds.getWest()) * 0.2;
+          
+          return business.position.lat <= currentBounds.getNorth() + latBuffer &&
+                 business.position.lat >= currentBounds.getSouth() - latBuffer &&
+                 business.position.lng <= currentBounds.getEast() + lngBuffer &&
+                 business.position.lng >= currentBounds.getWest() - lngBuffer;
+        });
+        
+        // Prioritize visible businesses, add some buffer ones
+        businessesToRender = [...visibleBusinesses, ...bufferBusinesses.slice(0, 1000)];
+        
+        // Remove duplicates
+        const seen = new Set();
+        businessesToRender = businessesToRender.filter(business => {
+          if (seen.has(business.id)) return false;
+          seen.add(business.id);
+          return true;
+        });
+        
+        console.log(`🎯 Rendering ${visibleBusinesses.length} visible + ${bufferBusinesses.length - visibleBusinesses.length} buffer businesses`);
+      }
+
       return [createBusinessScatterplotLayer({
         businesses: businessesToRender,
         selectedBusinessId: selectedBusiness?.id,
@@ -398,7 +558,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.error('Error creating DeckGL layers:', error);
       return [];
     }
-  }, [selectedBusiness?.id, isClusteredData, businesses, handleBusinessClick]);
+  }, [selectedBusiness?.id, isClusteredData, businesses, handleBusinessClick, map, mapLoaded]);
 
   // Initialize map with optimized configuration
   useEffect(() => {
@@ -493,8 +653,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 ['==', ['get', 'landuse'], 'cemetery'],
                 ['==', ['get', 'amenity'], 'cemetery'],
                 ['==', ['get', 'amenity'], 'grave_yard'],
-                ['in', 'Cemetery', ['get', 'name']],
-                ['in', 'cemetery', ['get', 'name']]
+                ['==', ['get', 'landuse'], 'recreation_ground'],
+                ['==', ['get', 'leisure'], 'recreation_ground']
               ]
             ]
           },
@@ -517,6 +677,32 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               'line-opacity': 0.8
             },
             filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
+          },
+          {
+            id: 'nyc-road-labels',
+            type: 'symbol' as const,
+            source: 'nyc-tiles',
+            'source-layer': 'examplepoints',
+            layout: {
+              'text-field': ['get', 'name'],
+              'text-font': ['Arial Unicode MS Regular', 'Open Sans Regular', 'sans-serif'],
+              'text-size': ['interpolate', ['linear'], ['zoom'], 12, 8, 16, 12],
+              'symbol-placement': 'line',
+              'text-rotation-alignment': 'map',
+              'text-pitch-alignment': 'viewport'
+            },
+            paint: {
+              'text-color': '#333333',
+              'text-halo-color': '#ffffff',
+              'text-halo-width': 1
+            },
+            filter: [
+              'all', 
+              ['==', ['geometry-type'], 'LineString'],
+              ['has', 'highway'],
+              ['has', 'name'],
+              ['>', ['zoom'], 13]
+            ]
           }
         ];
 
@@ -583,21 +769,30 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [map, mapLoaded]);
 
-  // Update DeckGL layers with throttling
+  // Update DeckGL layers with throttling and immediate visible area updates
   useEffect(() => {
     if (!deckOverlay || !overlayReady) return;
     
     if (updateTimeoutRef.current) clearTimeout(updateTimeoutRef.current);
     
-    updateTimeoutRef.current = setTimeout(() => {
+    // Update immediately for visible area, then throttle for performance
+    const updateLayers = () => {
       try {
         deckOverlay.setProps({ layers: deckGLLayers });
         console.log(`🎯 Updated DeckGL with ${deckGLLayers?.length || 0} layers`);
       } catch (error) {
         console.error('Error updating DeckGL:', error);
       }
-    }, 50);
-  }, [deckOverlay, overlayReady, deckGLLayers]);
+    };
+    
+    // Update immediately if we have visible businesses
+    if (map && mapLoaded && deckGLLayers.length > 0) {
+      updateLayers();
+    } else {
+      // Throttle updates for other cases
+      updateTimeoutRef.current = setTimeout(updateLayers, 50);
+    }
+  }, [deckOverlay, overlayReady, deckGLLayers, map, mapLoaded]);
 
   // Handle search filter changes
   useEffect(() => {
@@ -717,6 +912,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   return (
     <div
       ref={mapRef}
+      className="maplibre-map"
       style={{
         position: 'absolute',
         top: 0,

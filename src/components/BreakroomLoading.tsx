@@ -1,10 +1,6 @@
-import React, { useEffect, useState, CSSProperties } from 'react';
+import React, { useEffect, useState } from 'react';
 
-interface BreakroomLoadingProps {
-  onComplete?: () => void;
-}
-
-const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
+const BreakroomLoading = ({ onComplete }: { onComplete?: () => void }) => {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
@@ -17,18 +13,19 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
 
   if (!isVisible) return null;
 
-  const styles: { [key: string]: CSSProperties } = {
+  const styles = {
     container: {
-      position: 'fixed',
+      position: 'fixed' as const,
       inset: 0,
       zIndex: 20000,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      overflow: 'hidden'
+      display: 'flex' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      overflow: 'hidden' as const,
+      padding: '20px'
     },
     background: {
-      position: 'absolute',
+      position: 'absolute' as const,
       inset: 0,
       background: `
         radial-gradient(ellipse at top left, #FFFACD 0%, #F7DC6F 35%, transparent 70%),
@@ -36,30 +33,38 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       `
     },
     animationContainer: {
-      position: 'relative',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center'
+      position: 'relative' as const,
+      display: 'flex' as const,
+      flexDirection: 'column' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      width: '100%',
+      maxWidth: '400px'
     },
-    mugContainer: {
-      display: 'inline-block',
-      position: 'relative'
+    mugWrapper: {
+      position: 'relative' as const,
+      display: 'flex' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      width: '120px',
+      height: '120px',
+      marginBottom: '0px'
     },
     coffeeMug: {
-      display: 'inline-block',
-      position: 'relative',
-      transform: 'scale(1.5)',          // default scale for desktop
-      transformOrigin: 'bottom center',  // scale from the bottom
+      display: 'inline-block' as const,
+      position: 'relative' as const,
+      transform: 'scale(1.5)',
+      transformOrigin: 'center center',
       animation: 'mugSmoothEntrance 1.2s ease-out forwards',
-      opacity: 0
+      opacity: 0,
+      left: '6px'
     },
     mugBody: {
-      width: 'clamp(50px, 6vw, 60px)',   // slightly bigger min to match old size
-      height: 'clamp(60px, 7vw, 72px)',
+      width: '48px',
+      height: '60px',
       backgroundColor: '#B22222',
       borderRadius: '3px',
-      position: 'relative',
+      position: 'relative' as const,
       boxShadow: `
         inset -6px 0 0 rgba(0, 0, 0, 0.2),
         inset 0 -6px 0 rgba(0, 0, 0, 0.15),
@@ -67,20 +72,19 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       `
     },
     mugHandle: {
-      position: 'absolute',
+      position: 'absolute' as const,
       left: '-12px',
       top: '8px',
-      width: 'clamp(16px, 3vw, 18px)',
-      height: 'clamp(32px, 6vw, 36px)',
-      border: '5px solid #B22222',
-      borderRight: 'none',
+      width: '16px',
+      height: '32px',
+      border: '4px solid #B22222',
+      borderRight: 'none' as const,
       borderRadius: '12px 0 0 12px',
       background: 'transparent',
       boxShadow: 'inset 2px 0 0 rgba(0, 0, 0, 0.1)'
     },
-
     mugBodyBefore: {
-      position: 'absolute',
+      position: 'absolute' as const,
       top: '6px',
       left: '6px',
       right: '6px',
@@ -88,22 +92,33 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       backgroundColor: 'rgba(0, 0, 0, 0.15)',
       borderRadius: '1.5px'
     },
-    textWrapper: {
-      width: '90%',
-      maxWidth: '800px',
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
+    textContainer: {
+      display: 'flex' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      width: '100%',
       fontFamily: "'Courier New', Courier, monospace",
-      fontSize: '36px',
-      fontWeight: 'bold',
+      fontSize: 'clamp(32px, 9vw, 42px)',
+      fontWeight: 'bold' as const,
       color: '#B22222',
-      position: 'relative'
+      letterSpacing: '0.05em'
     },
-    textSpan: {
-      display: 'inline-block',
+    textSpanLeft: {
+      display: 'inline-block' as const,
       opacity: 0,
-      animation: 'fadeInUp 0.8s forwards'
+      animation: 'slideInFromRight 0.8s forwards'
+    },
+    textSpanRight: {
+      display: 'inline-block' as const,
+      opacity: 0,
+      animation: 'slideInFromLeft 0.8s forwards'
+    },
+    textGap: {
+      width: '1px',
+      display: 'inline-block' as const,
+      opacity: 0,
+      animation: 'fadeIn 0.3s forwards',
+      animationDelay: '1.6s'
     }
   };
 
@@ -112,7 +127,7 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
       <div style={styles.background} />
 
       <div style={styles.animationContainer}>
-        <div style={styles.mugContainer}>
+        <div style={styles.mugWrapper}>
           <div style={styles.coffeeMug}>
             <div style={styles.mugBody}>
               <div style={styles.mugBodyBefore}></div>
@@ -121,21 +136,38 @@ const BreakroomLoading: React.FC<BreakroomLoadingProps> = ({ onComplete }) => {
           </div>
         </div>
 
-        <div style={styles.textWrapper}>
-          <span style={{ ...styles.textSpan, animationDelay: '1.2s' }}>break</span>
-          <span style={{ ...styles.textSpan, animationDelay: '1.3s' }}>room</span>
+        <div style={styles.textContainer}>
+          <span style={{ ...styles.textSpanLeft, animationDelay: '1.2s' }}>break</span>
+          <span style={styles.textGap}></span>
+          <span style={{ ...styles.textSpanRight, animationDelay: '1.2s' }}>room</span>
         </div>
       </div>
 
       <style>{`
         @keyframes mugSmoothEntrance {
           0% { opacity: 0; transform: translateY(120px) scale(0.3); }
-          100% { opacity: 1; transform: translateY(0) scale(1); }
+          100% { opacity: 1; transform: translateY(0) scale(1.5); }
         }
 
-        @keyframes fadeInUp {
-          0% { opacity: 0; transform: translateY(20px); }
-          100% { opacity: 1; transform: translateY(0); }
+        @keyframes slideInFromLeft {
+          0% { opacity: 0; transform: translateX(-60px); }
+          100% { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes slideInFromRight {
+          0% { opacity: 0; transform: translateX(60px); }
+          100% { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes fadeIn {
+          0% { opacity: 0; }
+          100% { opacity: 1; }
+        }
+
+        @media (max-width: 480px) {
+          .animation-container {
+            padding: 0 10px;
+          }
         }
       `}</style>
     </div>

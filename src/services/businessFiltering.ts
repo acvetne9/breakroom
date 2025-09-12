@@ -1,6 +1,6 @@
 import { Business } from '@/types/business';
 import { parseSearchTerms } from '@/utils/searchUtils';
-import { findNeighborhood, NeighborhoodBounds, filterBusinessesByNeighborhood } from './neighborhoodSearch';
+import { findNeighborhood, NeighborhoodBounds, filterBusinessesByNeighborhood } from '@/utils/nyc_neighborhoods';
 
 export interface SearchFilters {
   textTerms: string[];

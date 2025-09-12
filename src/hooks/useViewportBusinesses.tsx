@@ -90,7 +90,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
     }, 1000); // Preload after 1 second of inactivity
   }, [getCachedBusinesses, setCachedBusinesses]);
 
-  const loadBusinessesInViewport = useCallback(async (bounds: MapBounds, limit: number = 5000, isMoving: boolean = false) => {
+  const loadBusinessesInViewport = useCallback(async (bounds: MapBounds, limit: number = 8000, isMoving: boolean = false) => {
     console.log('🗺️ [loadBusinessesInViewport] Called with bounds:', bounds);
     console.log('🗺️ [loadBusinessesInViewport] searchFilters parameter in hook:', searchFilters);
     console.log('🗺️ [loadBusinessesInViewport] searchFilters detailed state:', { 
@@ -101,6 +101,21 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
       content: searchFilters,
       stringified: JSON.stringify(searchFilters)
     });
+    
+    // If neighborhood search is active, always use neighborhood bounds instead of viewport bounds
+    if (searchFilters?.neighborhoodFilter) {
+      console.log('🏙️ Neighborhood search active - restricting to neighborhood bounds only');
+      
+      const neighborhoodBounds = {
+        north: Math.max(...searchFilters.neighborhoodFilter.boundary.map(p => p.lat)),
+        south: Math.min(...searchFilters.neighborhoodFilter.boundary.map(p => p.lat)),
+        east: Math.max(...searchFilters.neighborhoodFilter.boundary.map(p => p.lon)),
+        west: Math.min(...searchFilters.neighborhoodFilter.boundary.map(p => p.lon))
+      };
+      
+      console.log('🏙️ Using neighborhood bounds instead of viewport:', neighborhoodBounds);
+      bounds = neighborhoodBounds;
+    }
     
     const isNewSearch = JSON.stringify(searchFilters) !== JSON.stringify(lastSearchFilters);
     
@@ -132,16 +147,23 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
           setBusinesses(viewportBusinesses);
           setCurrentBounds(bounds);
           console.log(`✅ Viewport search completed with ${Array.isArray(viewportBusinesses) ? viewportBusinesses.length : 0} businesses`);
+          return viewportBusinesses;
         } catch (error) {
           console.error('❌ Viewport search error:', error);
+          return [];
         } finally {
           setLoading(false);
           setIsSearching(false);
         }
-        return;
       } else {
         // Same search - accumulate results when panning to new areas
         console.log('🔄 Same search filters - checking if we need to search new area');
+        
+        // For neighborhood searches, don't expand beyond neighborhood bounds
+        if (searchFilters?.neighborhoodFilter) {
+          console.log('🏙️ Neighborhood search - not expanding beyond neighborhood bounds when panning');
+          return businesses;
+        }
         
         // Check if we're in a significantly different area (more permissive for searches)
         if (currentBounds) {
@@ -160,7 +182,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
           // If there's more than 70% overlap, don't search again
           if (overlapRatio > 0.7) {
             console.log('🔄 Area has high overlap with previous search - keeping existing results');
-            return;
+            return businesses;
           }
         }
         
@@ -180,15 +202,18 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
             const existingIds = new Set(Array.isArray(prev) ? prev.map(b => b.id) : []);
             const uniqueNew = Array.isArray(newBusinesses) ? newBusinesses.filter(b => !existingIds.has(b.id)) : [];
             console.log(`📍 Adding ${uniqueNew.length} new businesses to existing ${Array.isArray(prev) ? prev.length : 0}`);
-            return [...(Array.isArray(prev) ? prev : []), ...uniqueNew];
+            const updatedBusinesses = [...(Array.isArray(prev) ? prev : []), ...uniqueNew];
+            return updatedBusinesses;
           });
           setCurrentBounds(expandedBounds);
+          // Return all businesses (existing + new)
+          return [...(Array.isArray(businesses) ? businesses : []), ...(Array.isArray(newBusinesses) ? newBusinesses.filter(b => !(Array.isArray(businesses) ? businesses : []).some(existing => existing.id === b.id)) : [])];
         } catch (error) {
           console.error('❌ New area search error:', error);
+          return businesses;
         } finally {
           setLoading(false);
         }
-        return;
       }
     }
     
@@ -208,7 +233,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
         setBusinesses(cachedBusinesses);
         setCurrentBounds(bounds);
         schedulePreload(bounds);
-        return;
+        return cachedBusinesses;
       }
     }
 
@@ -227,7 +252,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
       if (expandedCached && Array.isArray(expandedCached) && expandedCached.length > 200) {
         setBusinesses(expandedCached);
         setCurrentBounds(expandedBounds);
-        return;
+        return expandedCached;
       }
     }
 
@@ -239,7 +264,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
         const result = await inflightRequests.get(requestKey)!;
         setBusinesses(result);
         setCurrentBounds(expandedBounds);
-        return;
+        return result;
       } catch (error) {
         console.error('In-flight request failed:', error);
       }
@@ -260,10 +285,35 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
           Math.abs(currentBounds.west - expandedBounds.west) < 0.001) {
         return;
       }
-
+      
       setLoading(true);
       
-      const requestPromise = getBusinessesInViewport(expandedBounds, limit, searchFilters, undefined, zoom);
+      // If we have a neighborhood filter, ensure we search within the neighborhood bounds
+      let searchBounds = expandedBounds;
+      if (searchFilters?.neighborhoodFilter) {
+        const neighborhood = searchFilters.neighborhoodFilter;
+        console.log('🏙️ [loadBusinessesInViewport] Neighborhood filter active, using neighborhood bounds:', neighborhood.name);
+        
+        // Create bounds that encompass the neighborhood with padding
+        const boundary = neighborhood.boundary;
+        const lats = boundary.map(p => p.lat);
+        const lons = boundary.map(p => p.lon);
+        
+        // Add padding to ensure we capture all businesses in the area
+        const latPadding = 0.015; // ~1.5km padding
+        const lonPadding = 0.020; // ~1.5km padding (adjusted for longitude)
+        
+        searchBounds = {
+          north: Math.max(...lats) + latPadding,
+          south: Math.min(...lats) - latPadding,
+          east: Math.max(...lons) + lonPadding,
+          west: Math.min(...lons) - lonPadding
+        };
+        
+        console.log('🏙️ [loadBusinessesInViewport] Using neighborhood bounds:', searchBounds);
+      }
+      
+      const requestPromise = getBusinessesInViewport(searchBounds, limit, searchFilters, undefined, zoom);
       inflightRequests.set(requestKey, requestPromise);
       
       try {
@@ -286,8 +336,11 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
         
         if (!searchFilters) schedulePreload(expandedBounds);
         
+        return viewportBusinesses; // Return the businesses for the map
+        
       } catch (error) {
         console.error('❌ Error loading viewport businesses:', error);
+        return [];
       } finally {
         setLoading(false);
         inflightRequests.delete(requestKey);

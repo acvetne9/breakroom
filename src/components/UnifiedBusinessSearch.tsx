@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { searchBusinessesEnhanced, EnhancedBusiness } from '@/services/enhancedBusinessSearch';
 import { parseSearchFilters } from '@/services/businessFiltering';
-import { findNeighborhood } from '@/services/neighborhoodSearch';
+import { findNeighborhood } from '@/utils/nyc_neighborhoods';
 import { isProfane } from '@/utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 import { Search } from 'lucide-react';
@@ -26,6 +26,24 @@ interface NeighborhoodResult {
 }
 
 type SearchResult = EnhancedBusiness | NeighborhoodResult;
+
+const isOneCharOff = (a: string, b: string) => {
+  if (Math.abs(a.length - b.length) > 1) return false;
+
+  let mismatches = 0;
+  let i = 0, j = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] !== b[j]) {
+      if (++mismatches > 1) return false;
+      if (a.length > b.length) i++;
+      else if (a.length < b.length) j++;
+      else { i++; j++; }
+    } else {
+      i++; j++;
+    }
+  }
+  return true;
+};
 
 const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   value,
@@ -137,7 +155,19 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         
         // Get business results
         const businessResults = await searchBusinessesEnhanced(q, 10);
-        results.push(...businessResults);
+        
+        // Apply fuzzy match filtering so results still appear if off by 1 char
+        const fuzzyResults = businessResults.filter(business =>
+          isOneCharOff(business.name.toLowerCase(), q.toLowerCase())
+        );
+        
+        // Push normal + fuzzy results (remove duplicates by ID)
+        const allResults = [...businessResults, ...fuzzyResults].filter(
+          (v, i, arr) => arr.findIndex(x => x.id === v.id) === i
+        );
+        
+        results.push(...allResults);
+
         
         if (seq !== searchSeqRef.current) return;
         

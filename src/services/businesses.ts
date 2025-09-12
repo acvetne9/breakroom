@@ -41,7 +41,7 @@ export async function getBusinessesNearPoint(
   return businesses;
 }
 
-export async function getBusinessesBasic(limit: number = 2000): Promise<Business[]> {
+export async function getBusinessesBasic(limit: number = 5000): Promise<Business[]> {
   console.log(`🔄 Fetching ${limit} businesses from center outward...`);
   
   // NYC center coordinates - use spatial query for better performance
@@ -54,7 +54,7 @@ export async function getBusinessesBasic(limit: number = 2000): Promise<Business
 
 export const getBusinessesInViewport = async (
   bounds: { north: number; south: number; east: number; west: number },
-  limit: number = 2000,
+  limit: number = 5000,
   searchFilters?: any,
   onProgress?: (businesses: Business[], isComplete: boolean) => void,
   zoom: number = 12
