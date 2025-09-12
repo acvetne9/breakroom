@@ -684,25 +684,31 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             source: 'nyc-tiles',
             'source-layer': 'examplepoints',
             layout: {
-              'text-field': ['get', 'name'],
-              'text-font': ['Helvetica Neue', 'Arial', 'sans-serif'],
-              'text-size': ['interpolate', ['linear'], ['zoom'], 11, 9, 16, 14],
+              'text-field': ['case', 
+                ['has', 'name'], ['get', 'name'],
+                ''
+              ],
+              'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+              'text-size': ['interpolate', ['linear'], ['zoom'], 12, 10, 16, 14],
               'symbol-placement': 'line',
               'text-rotation-alignment': 'map',
               'text-pitch-alignment': 'viewport',
-              'text-max-angle': 30
+              'text-max-angle': 45,
+              'text-keep-upright': true
             },
             paint: {
               'text-color': '#2d3748',
               'text-halo-color': '#ffffff',
-              'text-halo-width': 2
+              'text-halo-width': 1.5,
+              'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 13, 1]
             },
             filter: [
               'all', 
               ['==', ['geometry-type'], 'LineString'],
               ['has', 'highway'],
               ['has', 'name'],
-              ['>', ['zoom'], 11]
+              ['!=', ['get', 'name'], ''],
+              ['>=', ['zoom'], 12]
             ]
           }
         ];
