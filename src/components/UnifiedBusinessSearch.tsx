@@ -431,7 +431,10 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                         // Business result
                         <div>
                           <div className="flex justify-between items-center">
-                            <span className="font-medium">{result.name}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                              <span className="font-medium">{result.name}</span>
+                            </div>
                             <span className="text-sm opacity-70">{(result as EnhancedBusiness).businessType || 'Business'}</span>
                           </div>
                         </div>
