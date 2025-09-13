@@ -859,8 +859,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       
       // For web environment with vector tiles
       if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
-        console.log('🔄 Source data loaded, adding vector layers via sourcedata event...');
+        console.log('🔄 NYC tiles source loaded, adding vector layers via sourcedata event...');
         addVectorLayers(mapInstance);
+      } else if (e.sourceId === 'nyc-tiles') {
+        console.log('🔄 NYC tiles sourcedata event:', {
+          sourceId: e.sourceId,
+          isSourceLoaded: e.isSourceLoaded,
+          layersAdded: layersAddedRef.current
+        });
       }
     });
 
@@ -883,8 +889,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
     }
 
+    console.log('🗺️ Map instance created, setting up event listeners...');
+    console.log('🗺️ Map container dimensions:', {
+      width: mapRef.current?.clientWidth,
+      height: mapRef.current?.clientHeight
+    });
+    
+    console.log('🗺️ Map instance created, setting up event listeners...');
+    console.log('🗺️ Map container dimensions:', {
+      width: mapRef.current?.clientWidth,
+      height: mapRef.current?.clientHeight
+    });
+    
     setMap(mapInstance);
-    console.log('🗺️ Map instance created');
 
     return () => {
       // Cleanup
