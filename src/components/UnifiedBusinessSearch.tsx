@@ -116,16 +116,23 @@ const calculateEditDistance = (str1: string, str2: string): number => {
 const getRelevantResults = (businesses: EnhancedBusiness[], query: string, maxResults: number = 10): EnhancedBusiness[] => {
   if (!query.trim()) return [];
   
+  console.log(`🔍 getRelevantResults called with ${businesses.length} businesses, query: "${query}"`);
+  
   const scoredResults = businesses
     .map(business => ({
       business,
       score: calculateRelevanceScore(business, query)
     }))
-    .filter(result => result.score > 0) // Only keep results with some relevance
+    .filter(result => {
+      const passed = result.score > 0;
+      console.log(`  ${passed ? '✅' : '❌'} "${result.business.name}" (Score: ${result.score})`);
+      return passed;
+    })
     .sort((a, b) => b.score - a.score) // Sort by score descending
     .slice(0, maxResults) // Limit results
     .map(result => result.business);
     
+  console.log(`📊 Final filtered results: ${scoredResults.length} businesses`);
   return scoredResults;
 };
 
@@ -143,6 +150,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string>('');
   const { toast } = useToast();
   
   const inputRef = useRef<HTMLInputElement>(null);
@@ -191,13 +199,17 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     };
   }, []);
 
-  // Enhanced debounced suggestions with relevance scoring
+  // Enhanced debounced suggestions with relevance scoring and debugging
   useEffect(() => {
     const q = value.trim();
+    console.log(`🎯 Search effect triggered with query: "${q}"`);
+    
     if (!q) {
+      console.log('🧹 Empty query, clearing results');
       setSearchResults([]);
       setShowDropdown(false);
       setIsSearching(false);
+      setDebugInfo('Empty search query');
       // Clear filters when search is empty - only if there were filters before
       if (lastFiltersRef.current !== null) {
         console.log('🧹 Clearing search - removing all filters');
@@ -211,65 +223,75 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     // Check cache first for better performance
     const cachedResults = resultsCache.current.get(q);
     if (cachedResults && Array.isArray(cachedResults)) {
-      console.log('💾 Using cached results for:', q);
+      console.log('💾 Using cached results for:', q, 'Count:', cachedResults.length);
       setSearchResults(cachedResults);
       setShowDropdown(true);
       setIsSearching(false);
+      setDebugInfo(`Cached results: ${cachedResults.length} items`);
       return;
     }
     
     // Only show suggestions, don't execute search automatically
     setIsSearching(true);
     setShowDropdown(true);
+    setDebugInfo('Searching...');
     const seq = ++searchSeqRef.current;
+    
     const timer = setTimeout(async () => {
+      console.log(`🔍 Starting async search for: "${q}" (seq: ${seq})`);
+      
       try {
         const results: SearchResult[] = [];
         
         // Check if the query matches a neighborhood
+        console.log('🏙️ Checking for neighborhood match...');
         const neighborhood = findNeighborhood(q);
         if (neighborhood) {
+          console.log('✅ Found neighborhood:', neighborhood.name, neighborhood.borough);
           results.push({
             id: `neighborhood-${neighborhood.name}`,
             name: `${neighborhood.name} - Search Neighborhood`,
             isNeighborhood: true as const,
             borough: neighborhood.borough
           });
+        } else {
+          console.log('❌ No neighborhood match found');
         }
         
         // Get business results with increased limit for filtering
-        const businessResults = await searchBusinessesEnhanced(q, 50); // Get more results to filter
+        console.log('🏢 Fetching business results...');
+        let businessResults: EnhancedBusiness[] = [];
         
-        // Apply relevance-based filtering and sorting
-        const relevantResults = getRelevantResults(businessResults, q, 8); // Return top 8 relevant results
-        
-        console.log(`🎯 Query: "${q}" - Found ${businessResults.length} raw results, filtered to ${relevantResults.length} relevant results`);
-        
-        // Debug: Log the scoring for results
-        if (businessResults.length > 0) {
-          console.log('📊 Sample results with relevance scores:');
-          const sampleResults = businessResults.slice(0, 8);
-          sampleResults.forEach(business => {
-            const relevanceScore = calculateRelevanceScore(business, q);
-            const relevant = relevanceScore >= (q.length >= 6 ? 20 : q.length >= 4 ? 25 : 30);
-            console.log(`  ${relevant ? '✅' : '❌'} "${business.name}" (Relevance: ${relevanceScore})`);
-          });
+        try {
+          businessResults = await searchBusinessesEnhanced(q, 50);
+          console.log(`✅ searchBusinessesEnhanced returned ${businessResults.length} results`);
           
-          console.log(`📈 Final results: ${relevantResults.length} businesses passed relevance threshold`);
-          
-          // Show final sorted order with both scores
-          if (relevantResults.length > 0) {
-            console.log('🏆 Final sorted results:');
-            relevantResults.slice(0, 5).forEach((business, index) => {
-              const relevanceScore = calculateRelevanceScore(business, q);
-              console.log(`  ${index + 1}. "${business.name}" (Relevance: ${relevanceScore})`);
+          // Log sample of raw results for debugging
+          if (businessResults.length > 0) {
+            console.log('📋 Sample raw results:');
+            businessResults.slice(0, 3).forEach((business, i) => {
+              console.log(`  ${i + 1}. "${business.name}" (Type: ${business.businessType || 'N/A'})`);
             });
           }
+        } catch (searchError) {
+          console.error('❌ searchBusinessesEnhanced failed:', searchError);
+          setDebugInfo(`Search API error: ${searchError.message || 'Unknown error'}`);
+          // Continue with empty results rather than throwing
         }
+        
+        // Apply relevance-based filtering and sorting
+        console.log('🎯 Applying relevance filtering...');
+        const relevantResults = getRelevantResults(businessResults, q, 8);
+        
+        console.log(`📊 Query: "${q}" - Found ${businessResults.length} raw results, filtered to ${relevantResults.length} relevant results`);
         
         results.push(...relevantResults);
         
-        if (seq !== searchSeqRef.current) return;
+        // Check if this search was superseded
+        if (seq !== searchSeqRef.current) {
+          console.log(`⏭️ Search superseded (seq ${seq} vs current ${searchSeqRef.current})`);
+          return;
+        }
         
         // Cache the results
         resultsCache.current.set(q, results);
@@ -280,13 +302,16 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           resultsCache.current.delete(firstKey);
         }
         
+        console.log(`✅ Setting ${results.length} final results`);
         setSearchResults(Array.isArray(results) ? results : []);
+        setDebugInfo(`Found ${results.length} results (${relevantResults.length} businesses, ${results.length - relevantResults.length} neighborhoods)`);
         
         // Debounced idle search: parse filters and push to parent for live filtering
         try {
           const parsed = parseSearchFilters(q);
           const filtersKey = parsed ? JSON.stringify(parsed) : null;
           if (lastFiltersRef.current !== filtersKey) {
+            console.log('🔧 Applying new filters:', parsed);
             lastFiltersRef.current = filtersKey;
             if (parsed?.neighborhoodFilter) {
               const neighborhoodCoords = {
@@ -299,29 +324,42 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
             }
           }
         } catch (e) {
-          console.warn('Idle search filter parse failed:', e);
+          console.warn('⚠️ Idle search filter parse failed:', e);
         }
       } catch (error) {
-        console.error('Search suggestions error:', error);
-        if (seq === searchSeqRef.current) setSearchResults([]);
+        console.error('❌ Search suggestions error:', error);
+        setDebugInfo(`Error: ${error.message || 'Unknown search error'}`);
+        if (seq === searchSeqRef.current) {
+          setSearchResults([]);
+        }
       } finally {
-        if (seq === searchSeqRef.current) setIsSearching(false);
+        if (seq === searchSeqRef.current) {
+          setIsSearching(false);
+        }
       }
     }, 300); // Faster suggestions with caching
-    return () => clearTimeout(timer);
+    
+    return () => {
+      console.log('🧹 Cleaning up search timer');
+      clearTimeout(timer);
+    };
   }, [value, onChange]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
+    console.log(`📝 Input changed to: "${newValue}"`);
     onChange(newValue);
     if (!newValue.trim()) {
       setSearchResults([]);
       setShowDropdown(false);
       setIsSearching(false);
+      setDebugInfo('');
     }
   };
 
   const handleResultClick = (result: SearchResult) => {
+    console.log('🖱️ Result clicked:', result);
+    
     if ('isNeighborhood' in result && result.isNeighborhood) {
       // Handle neighborhood click - search for all businesses in that neighborhood
       const neighborhoodName = result.name.replace(' - Search Neighborhood', '');
@@ -445,6 +483,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      console.log('⏎ Enter key pressed, performing search');
       performSearch();
     }
   };
@@ -477,6 +516,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           onBlur={handleInputBlur}
           onKeyDown={handleKeyDown}
           onFocus={() => {
+            console.log('🎯 Input focused, value length:', value.length);
             if (value.length > 2) {
               setShowDropdown(true);
             }
@@ -494,6 +534,13 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         )}
       </div>
 
+      {/* Debug Info - Remove this in production */}
+      {process.env.NODE_ENV === 'development' && debugInfo && (
+        <div className="absolute top-full left-0 right-0 z-[70] bg-yellow-100 border border-yellow-300 p-2 text-xs text-yellow-800">
+          🐛 Debug: {debugInfo} | Results: {searchResults.length} | Searching: {isSearching ? 'Yes' : 'No'} | Dropdown: {showDropdown ? 'Open' : 'Closed'}
+        </div>
+      )}
+
       {/* Search Results Dropdown */}
       {showDropdown && (Array.isArray(searchResults) && searchResults.length > 0 || isSearching || (value.trim() && !isSearching && Array.isArray(searchResults) && searchResults.length === 0)) && (
         <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 z-[60]`}>
@@ -510,8 +557,13 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                 Searching...
               </div>
             ) : Array.isArray(searchResults) && searchResults.length === 0 && value.trim() ? (
-              <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
-                No relevant businesses found
+              <div className="flex flex-col items-center justify-center py-4 text-sm text-muted-foreground">
+                <div>No relevant businesses found</div>
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="text-xs mt-2 text-gray-400">
+                    Try: "restaurant", "lawyer", "Brooklyn", or salary ranges
+                  </div>
+                )}
               </div>
             ) : (
               <div className="p-3">
