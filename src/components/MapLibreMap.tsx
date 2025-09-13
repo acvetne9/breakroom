@@ -598,19 +598,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     // Create appropriate map style based on environment
     const createMapStyle = () => {
       if (isCapacitor()) {
-        // For Capacitor, use a simple raster-based style
+        // For Capacitor, use a more reliable raster-based style with better error handling
+        console.log('🔧 Creating Capacitor raster map style');
         return {
           version: 8 as const,
           sources: {
             'osm': {
               type: 'raster' as const,
               tiles: [
-                'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
+                'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
               ],
               tileSize: 256,
-              attribution: '© OpenStreetMap contributors'
+              attribution: '© OpenStreetMap contributors',
+              maxzoom: 19
             }
           },
           layers: [
@@ -624,7 +624,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               type: 'raster' as const,
               source: 'osm',
               minzoom: 0,
-              maxzoom: 18
+              maxzoom: 19
             }
           ]
         };
@@ -668,7 +668,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       style: mapStyle,
       center: [-73.986104, 40.715245],
       zoom: 12.77,
-      maxZoom: 18,
+      maxZoom: isCapacitor() ? 19 : 18,
       minZoom: 9,
       renderWorldCopies: false,
       attributionControl: false,
@@ -677,6 +677,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         if (resourceType === 'Tile') {
           console.log('🔧 Tile request:', { url, resourceType, isCapacitor: isCapacitor() });
         }
+        
+        // For Capacitor, ensure HTTPS requests
+        if (isCapacitor() && url.startsWith('http://')) {
+          const httpsUrl = url.replace('http://', 'https://');
+          console.log('🔒 Converting to HTTPS for Capacitor:', httpsUrl);
+          return { url: httpsUrl };
+        }
+        
         return { url };
       }
     });
@@ -835,11 +843,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     // Add map layers when ready with environment-specific handling
     mapInstance.on('sourcedata', (e) => {
       if (isCapacitor()) {
-        // For Capacitor with raster tiles, no additional layers needed
-        // The OSM raster layer provides the base map
+        // For Capacitor with raster tiles
         if (e.sourceId === 'osm' && e.isSourceLoaded && !layersAddedRef.current) {
           console.log('✅ Capacitor raster tiles loaded successfully');
           layersAddedRef.current = true;
+        } else if (e.sourceId === 'osm') {
+          console.log('🔄 OSM source event:', {
+            sourceId: e.sourceId,
+            isSourceLoaded: e.isSourceLoaded,
+            layersAdded: layersAddedRef.current
+          });
         }
         return;
       }
@@ -850,6 +863,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         addVectorLayers(mapInstance);
       }
     });
+
+    // Additional mobile-specific event handlers
+    if (isCapacitor()) {
+      mapInstance.on('data', (e: any) => {
+        if (e.dataType === 'source' && e.sourceId === 'osm') {
+          console.log('📊 OSM data event:', {
+            dataType: e.dataType,
+            sourceId: e.sourceId,
+            isSourceLoaded: e.isSourceLoaded
+          });
+        }
+      });
+
+      mapInstance.on('dataloading', (e: any) => {
+        if (e.dataType === 'source' && e.sourceId === 'osm') {
+          console.log('⏳ OSM data loading:', e.sourceId);
+        }
+      });
+    }
 
     setMap(mapInstance);
     console.log('🗺️ Map instance created');
