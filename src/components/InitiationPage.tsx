@@ -201,7 +201,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                 value={salary}
                 onChange={handleSalaryChange}
                 onBlur={checkForCompletion}
-                placeholder="$0.00"
+                placeholder="Earnings Est."
                 className="app-input text-center text-lg flex-1 !py-0 h-12"
               />
               <select
