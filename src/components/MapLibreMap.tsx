@@ -578,17 +578,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const getTileUrl = () => {
       const baseUrl = '/data/tiles/{z}/{x}/{y}.pbf';
       
-      // Always use absolute URLs - MapLibre requires proper protocols
-      if (isCapacitor()) {
-        // For Capacitor, use the production URL as it can access it via the network
-        const capacitorUrl = 'https://8b6dea56-dc8e-4244-a645-44c92d10150b.lovableproject.com/data/tiles/{z}/{x}/{y}.pbf';
-        console.log('🔧 Using Capacitor absolute URL:', capacitorUrl);
-        return capacitorUrl;
-      }
-      
-      // For web environments, use full origin-based URL
+      // Always use current origin for consistency
       const fullUrl = `${window.location.origin}${baseUrl}`;
-      console.log('🔧 Using web tile URL:', fullUrl);
+      console.log('🔧 Using tile URL:', fullUrl);
+      console.log('🔧 Environment - isCapacitor:', isCapacitor(), 'isMobile:', isMobile);
       return fullUrl;
     };
 
