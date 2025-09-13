@@ -577,7 +577,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     // Custom tile loading for Capacitor to handle gzipped tiles
     const createTileSource = () => {
       if (isCapacitor()) {
-        // For Capacitor, we need to handle gzipped tiles manually
+        // For Capacitor, use a simpler approach to avoid gzipped tile issues
+        console.log('🔧 Using Capacitor-compatible tile configuration');
         return {
           type: 'vector' as const,
           tiles: [`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`],
@@ -588,7 +589,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       } else {
         // For web, use standard tile loading
         const fullUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-        console.log('🔧 Using tile URL:', fullUrl);
+        console.log('🔧 Using web tile URL:', fullUrl);
         return {
           type: 'vector' as const,
           tiles: [fullUrl],
@@ -604,8 +605,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       sources: {
         'nyc-tiles': createTileSource()
       },
-      // Add working glyphs configuration
-      glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+      // Use working glyphs configuration, but simpler for Capacitor
+      glyphs: isCapacitor() ? undefined : 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
       layers: [
         {
           id: 'background',
@@ -634,11 +635,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       renderWorldCopies: false,
       attributionControl: false,
       transformRequest: (url, resourceType) => {
-        // For Capacitor, intercept tile requests to handle gzipped tiles
+        // For Capacitor, log tile requests for debugging
         if (isCapacitor() && resourceType === 'Tile' && url.includes('/data/tiles/')) {
           console.log('🔧 Intercepting tile request for Capacitor:', url);
-          // Let MapLibre handle the request but log for debugging
-          return { url };
         }
         return { url };
       }
@@ -671,118 +670,130 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     mapInstance.on('zoomend', callViewportChange);
     mapInstance.on('move', debouncedMoveHandler);
 
-    // Add map layers when ready
+    // Add map layers when ready with complete layer definitions
     mapInstance.on('sourcedata', (e) => {
       if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
         console.log('🔄 Adding NYC layers...');
         
-        const layers = [
-          {
-            id: 'nyc-land',
-            type: 'fill' as const,
-            source: 'nyc-tiles',
-            'source-layer': 'examplepoints',
-            layout: {},
-            paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
-            filter: ['==', ['geometry-type'], 'Polygon']
-          },
-          {
-            id: 'nyc-green-spaces',
-            type: 'fill' as const,
-            source: 'nyc-tiles',
-            'source-layer': 'examplepoints',
-            layout: {},
-            paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
-            filter: [
-              'all',
-              ['==', ['geometry-type'], 'Polygon'],
-              ['any',
-                ['==', ['get', 'leisure'], 'park'],
-                ['==', ['get', 'landuse'], 'cemetery'],
-                ['==', ['get', 'amenity'], 'cemetery'],
-                ['==', ['get', 'amenity'], 'grave_yard'],
-                ['==', ['get', 'landuse'], 'recreation_ground'],
-                ['==', ['get', 'leisure'], 'recreation_ground'],
-                ['in', 'cemetery', ['get', 'name']],
-                ['in', 'Cemetery', ['get', 'name']],
-                ['in', 'Graveyard', ['get', 'name']],
-                ['in', 'graveyard', ['get', 'name']],
-                ['==', ['get', 'place'], 'cemetery'],
-                ['==', ['get', 'historic'], 'cemetery']
-              ]
-            ]
-          },
-          {
-            id: 'nyc-water',
-            type: 'fill' as const,
-            source: 'nyc-tiles',
-            'source-layer': 'examplepoints',
-            layout: {},
-            paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
-            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']]
-          },
-          {
-            id: 'nyc-roads',
-            type: 'line' as const,
-            source: 'nyc-tiles',
-            'source-layer': 'examplepoints',
-            layout: {},
-            paint: {
-              'line-color': '#666666',
-              'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
-              'line-opacity': 0.8
-            },
-            filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
-          },
-          {
-            id: 'nyc-road-labels',
-            type: 'symbol' as const,
-            source: 'nyc-tiles',
-            'source-layer': 'examplepoints',
-            layout: {
-              'text-field': ['get', 'name'],
-              'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
-              'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
-              'text-max-width': 8,
-              'text-line-height': 1.2,
-              'symbol-placement': 'line',
-              'text-rotation-alignment': 'map',
-              'text-allow-overlap': false,
-              'text-ignore-placement': false
-            },
-            paint: {
-              'text-color': '#333333',
-              'text-halo-color': '#FFFFFF',
-              'text-halo-width': 1.5,
-              'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 1]
-            },
-            filter: [
-              'all', 
-              ['==', ['geometry-type'], 'LineString'], 
-              ['has', 'name'],
-              ['has', 'highway'],
-              ['!=', ['get', 'name'], '']
-            ],
-            minzoom: 12
-          }
-        ];
-
-        layers.forEach(layer => {
-          try {
-            if (!mapInstance.getLayer(layer.id)) {
-              mapInstance.addLayer(layer as any);
+        try {
+          const layers = [
+            {
+              id: 'nyc-land',
+              type: 'fill' as const,
+              source: 'nyc-tiles',
+              'source-layer': 'examplepoints',
+              layout: {}, // Ensure layout is always defined
+              paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
+              filter: ['==', ['geometry-type'], 'Polygon']
             }
-          } catch (error) {
-            console.warn(`Failed to add layer ${layer.id}:`, error);
+          ];
+
+          // Add more layers only if not in Capacitor to avoid tile parsing issues
+          if (!isCapacitor()) {
+            layers.push(
+              {
+                id: 'nyc-green-spaces',
+                type: 'fill' as const,
+                source: 'nyc-tiles',
+                'source-layer': 'examplepoints',
+                layout: {}, // Ensure layout is always defined
+                paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
+                filter: [
+                  'all',
+                  ['==', ['geometry-type'], 'Polygon'],
+                  ['any',
+                    ['==', ['get', 'leisure'], 'park'],
+                    ['==', ['get', 'landuse'], 'cemetery'],
+                    ['==', ['get', 'amenity'], 'cemetery'],
+                    ['==', ['get', 'amenity'], 'grave_yard'],
+                    ['==', ['get', 'landuse'], 'recreation_ground'],
+                    ['==', ['get', 'leisure'], 'recreation_ground'],
+                    ['in', 'cemetery', ['get', 'name']],
+                    ['in', 'Cemetery', ['get', 'name']],
+                    ['in', 'Graveyard', ['get', 'name']],
+                    ['in', 'graveyard', ['get', 'name']],
+                    ['==', ['get', 'place'], 'cemetery'],
+                    ['==', ['get', 'historic'], 'cemetery']
+                  ]
+                ] as any
+              } as any,
+              {
+                id: 'nyc-water',
+                type: 'fill' as const,
+                source: 'nyc-tiles',
+                'source-layer': 'examplepoints',
+                layout: {}, // Ensure layout is always defined
+                paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
+                filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']] as any
+              } as any,
+              {
+                id: 'nyc-roads',
+                type: 'line' as const,
+                source: 'nyc-tiles',
+                'source-layer': 'examplepoints',
+                layout: {}, // Ensure layout is always defined
+                paint: {
+                  'line-color': '#666666',
+                  'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
+                  'line-opacity': 0.8
+                },
+                filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']] as any
+              } as any,
+              {
+                id: 'nyc-road-labels',
+                type: 'symbol' as const,
+                source: 'nyc-tiles',
+                'source-layer': 'examplepoints',
+                layout: {
+                  'text-field': ['get', 'name'],
+                  'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+                  'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
+                  'text-max-width': 8,
+                  'text-line-height': 1.2,
+                  'symbol-placement': 'line',
+                  'text-rotation-alignment': 'map',
+                  'text-allow-overlap': false,
+                  'text-ignore-placement': false
+                },
+                paint: {
+                  'text-color': '#333333',
+                  'text-halo-color': '#FFFFFF',
+                  'text-halo-width': 1.5,
+                  'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 1]
+                },
+                filter: [
+                  'all', 
+                  ['==', ['geometry-type'], 'LineString'], 
+                  ['has', 'name'],
+                  ['has', 'highway'],
+                  ['!=', ['get', 'name'], '']
+                ] as any,
+                minzoom: 12
+              } as any
+            );
           }
-        });
-        
-        layersAddedRef.current = true;
-        console.log('✅ NYC layers added');
+
+          layers.forEach(layer => {
+            try {
+              if (!mapInstance.getLayer(layer.id)) {
+                console.log('📍 Adding layer:', layer.id);
+                mapInstance.addLayer(layer as any);
+              }
+            } catch (error) {
+              console.error('❌ Error adding layer:', layer.id, error);
+            }
+          });
+
+          layersAddedRef.current = true;
+          console.log(`✅ Added ${layers.length} layers successfully (Capacitor: ${isCapacitor()})`);
+        } catch (error) {
+          console.error('❌ Error adding layers:', error);
+        }
       }
     });
 
     setMap(mapInstance);
+    console.log('🗺️ Map instance created');
 
     return () => {
       // Cleanup
@@ -805,7 +816,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       setMapLoaded(false);
       setMap(null);
     };
-  }, []);
+  }, [isMobile]);
 
   // Initialize DeckGL overlay
   useEffect(() => {
