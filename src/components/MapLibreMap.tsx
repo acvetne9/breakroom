@@ -584,7 +584,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           scheme: 'xyz' as const
         }
       },
-      glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+      // Use more reliable font source for mobile compatibility
+      glyphs: isMobile 
+        ? undefined // No custom fonts on mobile - use system fonts
+        : 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
       layers: [
         {
           id: 'background',
