@@ -195,12 +195,8 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
           </div>
         
           <div className="text-center mt-8">
-            <p ref={bossRef} className="text-app-black text-lg leading-relaxed">
-              {bossWraps ? (
-                <>Don't worry, 😉<br />your boss won't find out</>
-              ) : (
-                "Don't worry, 😉 your boss won't find out"
-              )}
+            <p className="text-app-black text-lg leading-relaxed">
+              Don't worry, 😉 your boss won't find out
             </p>
           </div>
         
