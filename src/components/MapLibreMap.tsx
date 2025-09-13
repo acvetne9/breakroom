@@ -603,7 +603,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           scheme: 'xyz' as const
         }
       },
-      // Remove glyphs config to let MapLibre handle fonts properly
+      // Add working glyphs configuration
+      glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
       layers: [
         {
           id: 'background',
@@ -726,8 +727,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'source-layer': 'examplepoints',
             layout: {
               'text-field': ['get', 'name'],
-              'text-font': ['Arial'], // Use system font
-              'text-size': ['interpolate', ['linear'], ['zoom'], 10, 8, 16, 14],
+              'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+              'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
               'text-max-width': 8,
               'text-line-height': 1.2,
               'symbol-placement': 'line',
@@ -739,7 +740,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               'text-color': '#333333',
               'text-halo-color': '#FFFFFF',
               'text-halo-width': 1.5,
-              'text-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0, 12, 0.7, 16, 1]
+              'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 1]
             },
             filter: [
               'all', 
@@ -750,7 +751,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             ],
             minzoom: 12
           }
-          // Road labels layer added back with system font support
         ];
 
         layers.forEach(layer => {
