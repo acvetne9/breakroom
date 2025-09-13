@@ -574,22 +574,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (!mapRef.current || map) return;
 
-    // Custom tile loading for Capacitor to handle gzipped tiles
+    // Comprehensive tile configuration for different environments
     const createTileSource = () => {
       if (isCapacitor()) {
-        // For Capacitor, use a simpler approach to avoid gzipped tile issues
-        console.log('🔧 Using Capacitor-compatible tile configuration');
-        return {
-          type: 'vector' as const,
-          tiles: [`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`],
-          minzoom: 10,
-          maxzoom: 16,
-          scheme: 'xyz' as const
-        };
+        // For Capacitor, use OpenStreetMap raster tiles as fallback
+        // since vector tiles from capacitor://localhost don't work reliably
+        console.log('🔧 Using Capacitor raster tile fallback');
+        return null; // We'll create a raster source instead
       } else {
-        // For web, use standard tile loading
+        // For web, use vector tiles
         const fullUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-        console.log('🔧 Using web tile URL:', fullUrl);
+        console.log('🔧 Using web vector tiles:', fullUrl);
         return {
           type: 'vector' as const,
           tiles: [fullUrl],
@@ -600,24 +595,67 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     };
 
-    const mapStyle = {
-      version: 8 as const,
-      sources: {
-        'nyc-tiles': createTileSource()
-      },
-      // Use working glyphs configuration, but simpler for Capacitor
-      glyphs: isCapacitor() ? undefined : 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-      layers: [
-        {
-          id: 'background',
-          type: 'background' as const,
-          paint: { 'background-color': '#F5F5DC' }
+    // Create appropriate map style based on environment
+    const createMapStyle = () => {
+      if (isCapacitor()) {
+        // For Capacitor, use a simple raster-based style
+        return {
+          version: 8 as const,
+          sources: {
+            'osm': {
+              type: 'raster' as const,
+              tiles: [
+                'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
+              ],
+              tileSize: 256,
+              attribution: '© OpenStreetMap contributors'
+            }
+          },
+          layers: [
+            {
+              id: 'background',
+              type: 'background' as const,
+              paint: { 'background-color': '#B3E5FC' }
+            },
+            {
+              id: 'osm',
+              type: 'raster' as const,
+              source: 'osm',
+              minzoom: 0,
+              maxzoom: 18
+            }
+          ]
+        };
+      } else {
+        // For web, use vector tiles with full styling
+        const vectorSource = createTileSource();
+        if (!vectorSource) {
+          throw new Error('Vector source creation failed');
         }
-      ]
+        
+        return {
+          version: 8 as const,
+          sources: {
+            'nyc-tiles': vectorSource
+          },
+          glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+          layers: [
+            {
+              id: 'background',
+              type: 'background' as const,
+              paint: { 'background-color': '#F5F5DC' }
+            }
+          ]
+        };
+      }
     };
 
+    const mapStyle = createMapStyle();
+
     // Log the tile configuration for debugging
-    console.log('🗺️ Map initialization - Tile config:', mapStyle.sources['nyc-tiles']);
+    console.log('🗺️ Map initialization - Style sources:', Object.keys(mapStyle.sources));
     console.log('🗺️ Environment check - isCapacitor:', isCapacitor(), 'isMobile:', isMobile);
     console.log('🗺️ Current location:', {
       protocol: window.location.protocol,
@@ -635,9 +673,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       renderWorldCopies: false,
       attributionControl: false,
       transformRequest: (url, resourceType) => {
-        // For Capacitor, log tile requests for debugging
-        if (isCapacitor() && resourceType === 'Tile' && url.includes('/data/tiles/')) {
-          console.log('🔧 Intercepting tile request for Capacitor:', url);
+        // Enhanced logging for all environments
+        if (resourceType === 'Tile') {
+          console.log('🔧 Tile request:', { url, resourceType, isCapacitor: isCapacitor() });
         }
         return { url };
       }
@@ -670,10 +708,21 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     mapInstance.on('zoomend', callViewportChange);
     mapInstance.on('move', debouncedMoveHandler);
 
-    // Add map layers when ready with complete layer definitions
+    // Add map layers when ready with environment-specific handling
     mapInstance.on('sourcedata', (e) => {
+      if (isCapacitor()) {
+        // For Capacitor with raster tiles, no additional layers needed
+        // The OSM raster layer provides the base map
+        if (e.sourceId === 'osm' && e.isSourceLoaded && !layersAddedRef.current) {
+          console.log('✅ Capacitor raster tiles loaded successfully');
+          layersAddedRef.current = true;
+        }
+        return;
+      }
+      
+      // For web environment with vector tiles
       if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
-        console.log('🔄 Adding NYC layers...');
+        console.log('🔄 Adding NYC vector layers...');
         
         try {
           const layers = [
@@ -682,102 +731,96 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               type: 'fill' as const,
               source: 'nyc-tiles',
               'source-layer': 'examplepoints',
-              layout: {}, // Ensure layout is always defined
+              layout: {},
               paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
-              filter: ['==', ['geometry-type'], 'Polygon']
-            }
+              filter: ['==', ['geometry-type'], 'Polygon'] as any
+            } as any,
+            {
+              id: 'nyc-green-spaces',
+              type: 'fill' as const,
+              source: 'nyc-tiles',
+              'source-layer': 'examplepoints',
+              layout: {},
+              paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
+              filter: [
+                'all',
+                ['==', ['geometry-type'], 'Polygon'],
+                ['any',
+                  ['==', ['get', 'leisure'], 'park'],
+                  ['==', ['get', 'landuse'], 'cemetery'],
+                  ['==', ['get', 'amenity'], 'cemetery'],
+                  ['==', ['get', 'amenity'], 'grave_yard'],
+                  ['==', ['get', 'landuse'], 'recreation_ground'],
+                  ['==', ['get', 'leisure'], 'recreation_ground'],
+                  ['in', 'cemetery', ['get', 'name']],
+                  ['in', 'Cemetery', ['get', 'name']],
+                  ['in', 'Graveyard', ['get', 'name']],
+                  ['in', 'graveyard', ['get', 'name']],
+                  ['==', ['get', 'place'], 'cemetery'],
+                  ['==', ['get', 'historic'], 'cemetery']
+                ]
+              ] as any
+            } as any,
+            {
+              id: 'nyc-water',
+              type: 'fill' as const,
+              source: 'nyc-tiles',
+              'source-layer': 'examplepoints',
+              layout: {},
+              paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
+              filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']] as any
+            } as any,
+            {
+              id: 'nyc-roads',
+              type: 'line' as const,
+              source: 'nyc-tiles',
+              'source-layer': 'examplepoints',
+              layout: {},
+              paint: {
+                'line-color': '#666666',
+                'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
+                'line-opacity': 0.8
+              },
+              filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']] as any
+            } as any,
+            {
+              id: 'nyc-road-labels',
+              type: 'symbol' as const,
+              source: 'nyc-tiles',
+              'source-layer': 'examplepoints',
+              layout: {
+                'text-field': ['get', 'name'],
+                'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+                'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
+                'text-max-width': 8,
+                'text-line-height': 1.2,
+                'symbol-placement': 'line',
+                'text-rotation-alignment': 'map',
+                'text-allow-overlap': false,
+                'text-ignore-placement': false
+              },
+              paint: {
+                'text-color': '#333333',
+                'text-halo-color': '#FFFFFF',
+                'text-halo-width': 1.5,
+                'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 1]
+              },
+              filter: [
+                'all', 
+                ['==', ['geometry-type'], 'LineString'], 
+                ['has', 'name'],
+                ['has', 'highway'],
+                ['!=', ['get', 'name'], '']
+              ] as any,
+              minzoom: 12
+            } as any
           ];
-
-          // Add more layers only if not in Capacitor to avoid tile parsing issues
-          if (!isCapacitor()) {
-            layers.push(
-              {
-                id: 'nyc-green-spaces',
-                type: 'fill' as const,
-                source: 'nyc-tiles',
-                'source-layer': 'examplepoints',
-                layout: {}, // Ensure layout is always defined
-                paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
-                filter: [
-                  'all',
-                  ['==', ['geometry-type'], 'Polygon'],
-                  ['any',
-                    ['==', ['get', 'leisure'], 'park'],
-                    ['==', ['get', 'landuse'], 'cemetery'],
-                    ['==', ['get', 'amenity'], 'cemetery'],
-                    ['==', ['get', 'amenity'], 'grave_yard'],
-                    ['==', ['get', 'landuse'], 'recreation_ground'],
-                    ['==', ['get', 'leisure'], 'recreation_ground'],
-                    ['in', 'cemetery', ['get', 'name']],
-                    ['in', 'Cemetery', ['get', 'name']],
-                    ['in', 'Graveyard', ['get', 'name']],
-                    ['in', 'graveyard', ['get', 'name']],
-                    ['==', ['get', 'place'], 'cemetery'],
-                    ['==', ['get', 'historic'], 'cemetery']
-                  ]
-                ] as any
-              } as any,
-              {
-                id: 'nyc-water',
-                type: 'fill' as const,
-                source: 'nyc-tiles',
-                'source-layer': 'examplepoints',
-                layout: {}, // Ensure layout is always defined
-                paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
-                filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']] as any
-              } as any,
-              {
-                id: 'nyc-roads',
-                type: 'line' as const,
-                source: 'nyc-tiles',
-                'source-layer': 'examplepoints',
-                layout: {}, // Ensure layout is always defined
-                paint: {
-                  'line-color': '#666666',
-                  'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
-                  'line-opacity': 0.8
-                },
-                filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']] as any
-              } as any,
-              {
-                id: 'nyc-road-labels',
-                type: 'symbol' as const,
-                source: 'nyc-tiles',
-                'source-layer': 'examplepoints',
-                layout: {
-                  'text-field': ['get', 'name'],
-                  'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
-                  'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
-                  'text-max-width': 8,
-                  'text-line-height': 1.2,
-                  'symbol-placement': 'line',
-                  'text-rotation-alignment': 'map',
-                  'text-allow-overlap': false,
-                  'text-ignore-placement': false
-                },
-                paint: {
-                  'text-color': '#333333',
-                  'text-halo-color': '#FFFFFF',
-                  'text-halo-width': 1.5,
-                  'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 1]
-                },
-                filter: [
-                  'all', 
-                  ['==', ['geometry-type'], 'LineString'], 
-                  ['has', 'name'],
-                  ['has', 'highway'],
-                  ['!=', ['get', 'name'], '']
-                ] as any,
-                minzoom: 12
-              } as any
-            );
-          }
 
           layers.forEach(layer => {
             try {
               if (!mapInstance.getLayer(layer.id)) {
                 console.log('📍 Adding layer:', layer.id);
-                mapInstance.addLayer(layer as any);
+                mapInstance.addLayer(layer);
               }
             } catch (error) {
               console.error('❌ Error adding layer:', layer.id, error);
@@ -785,9 +828,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           });
 
           layersAddedRef.current = true;
-          console.log(`✅ Added ${layers.length} layers successfully (Capacitor: ${isCapacitor()})`);
+          console.log(`✅ Added ${layers.length} vector layers successfully`);
         } catch (error) {
-          console.error('❌ Error adding layers:', error);
+          console.error('❌ Error adding vector layers:', error);
         }
       }
     });
