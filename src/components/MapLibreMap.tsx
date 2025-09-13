@@ -603,8 +603,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           scheme: 'xyz' as const
         }
       },
-      // Add minimal local font support using system fonts
-      glyphs: 'data:application/x-protobuf;base64,', // Empty glyphs to prevent external font requests
+      // Remove glyphs config to let MapLibre handle fonts properly
       layers: [
         {
           id: 'background',
