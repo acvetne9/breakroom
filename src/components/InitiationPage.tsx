@@ -223,9 +223,9 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                 Don't worry, your boss won't find out 😉
               </span>
               <span className="sm:hidden">
-                Don't worry, 😉
+                Don't worry! 😉
                 <br />
-                your boss won't find out
+                Your boss won't find out
               </span>
             </p>
           </div>
