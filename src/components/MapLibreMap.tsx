@@ -727,31 +727,29 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'source-layer': 'examplepoints',
             layout: {
               'text-field': ['get', 'name'],
-              'text-size': ['interpolate', ['linear'], ['zoom'], 8, 9, 12, 11, 16, 15, 18, 18],
-              'text-max-width': 12,
-              'text-line-height': 1.1,
+              'text-font': ['Arial'], // Use system font
+              'text-size': ['interpolate', ['linear'], ['zoom'], 10, 8, 16, 14],
+              'text-max-width': 8,
+              'text-line-height': 1.2,
               'symbol-placement': 'line',
               'text-rotation-alignment': 'map',
               'text-allow-overlap': false,
-              'text-ignore-placement': false,
-              'text-anchor': 'center',
-              'text-keep-upright': true
+              'text-ignore-placement': false
             },
             paint: {
-              'text-color': '#2d3748',
-              'text-halo-color': '#ffffff',
-              'text-halo-width': 2,
-              'text-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0.6, 10, 0.8, 12, 1, 18, 1]
+              'text-color': '#333333',
+              'text-halo-color': '#FFFFFF',
+              'text-halo-width': 1.5,
+              'text-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0, 12, 0.7, 16, 1]
             },
             filter: [
               'all', 
               ['==', ['geometry-type'], 'LineString'], 
               ['has', 'name'],
               ['has', 'highway'],
-              ['!=', ['get', 'name'], ''],
-              ['!in', ['get', 'highway'], ['literal', ['path', 'footway', 'cycleway', 'steps', 'pedestrian']]]
+              ['!=', ['get', 'name'], '']
             ],
-            minzoom: 10
+            minzoom: 12
           }
           // Road labels layer added back with system font support
         ];
