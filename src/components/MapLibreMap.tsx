@@ -578,15 +578,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const getTileUrl = () => {
       const baseUrl = '/data/tiles/{z}/{x}/{y}.pbf';
       
-      // For Capacitor (mobile app), use relative path which will be handled by the native app
+      // Always use absolute URLs - MapLibre requires proper protocols
       if (isCapacitor()) {
-        console.log('🔧 Using Capacitor tile path');
-        return baseUrl;
+        // For Capacitor, use the production URL as it can access it via the network
+        const capacitorUrl = 'https://8b6dea56-dc8e-4244-a645-44c92d10150b.lovableproject.com/data/tiles/{z}/{x}/{y}.pbf';
+        console.log('🔧 Using Capacitor absolute URL:', capacitorUrl);
+        return capacitorUrl;
       }
       
       // For web environments, use full origin-based URL
       const fullUrl = `${window.location.origin}${baseUrl}`;
-      console.log('🔧 Using web tile path:', fullUrl);
+      console.log('🔧 Using web tile URL:', fullUrl);
       return fullUrl;
     };
 
@@ -610,6 +612,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         }
       ]
     };
+
+    // Log the tile URL being used for debugging
+    console.log('🗺️ Map initialization - Tile URL:', mapStyle.sources['nyc-tiles'].tiles[0]);
+    console.log('🗺️ Environment check - isCapacitor:', isCapacitor());
+    console.log('🗺️ Current location:', {
+      protocol: window.location.protocol,
+      origin: window.location.origin,
+      href: window.location.href
+    });
 
     const mapInstance = new maplibregl.Map({
       container: mapRef.current!,
