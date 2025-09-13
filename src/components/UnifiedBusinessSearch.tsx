@@ -247,13 +247,12 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         
         // Debug: Log the scoring for results
         if (businessResults.length > 0) {
-          console.log('📊 Sample results with relevance and richness scores:');
+          console.log('📊 Sample results with relevance scores:');
           const sampleResults = businessResults.slice(0, 8);
           sampleResults.forEach(business => {
             const relevanceScore = calculateRelevanceScore(business, q);
-            const richnessScore = calculateDataRichnessScore(business);
             const relevant = relevanceScore >= (q.length >= 6 ? 20 : q.length >= 4 ? 25 : 30);
-            console.log(`  ${relevant ? '✅' : '❌'} "${business.name}" (Relevance: ${relevanceScore}, Richness: ${richnessScore})`);
+            console.log(`  ${relevant ? '✅' : '❌'} "${business.name}" (Relevance: ${relevanceScore})`);
           });
           
           console.log(`📈 Final results: ${relevantResults.length} businesses passed relevance threshold`);
@@ -263,8 +262,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
             console.log('🏆 Final sorted results:');
             relevantResults.slice(0, 5).forEach((business, index) => {
               const relevanceScore = calculateRelevanceScore(business, q);
-              const richnessScore = calculateDataRichnessScore(business);
-              console.log(`  ${index + 1}. "${business.name}" (R: ${relevanceScore}, D: ${richnessScore})`);
+              console.log(`  ${index + 1}. "${business.name}" (Relevance: ${relevanceScore})`);
             });
           }
         }
@@ -498,9 +496,9 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
 
       {/* Search Results Dropdown */}
       {showDropdown && (Array.isArray(searchResults) && searchResults.length > 0 || isSearching || (value.trim() && !isSearching && Array.isArray(searchResults) && searchResults.length === 0)) && (
-        <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 z-50`}>
+        <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 z-[60]`}>
           <div 
-            className="bg-background shadow-lg border-2 max-h-60 overflow-y-auto"
+            className="bg-background shadow-lg border-2 max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
             style={{ borderRadius: '6px', borderColor: 'hsl(var(--border))' }}
             onScroll={() => {
               isScrolling.current = true;
