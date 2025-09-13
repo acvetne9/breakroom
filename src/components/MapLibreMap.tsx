@@ -603,7 +603,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           scheme: 'xyz' as const
         }
       },
-      // Completely omit glyphs property to prevent any font loading
+      // Add minimal local font support using system fonts
+      glyphs: 'data:application/x-protobuf;base64,', // Empty glyphs to prevent external font requests
       layers: [
         {
           id: 'background',
@@ -718,8 +719,39 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               'line-opacity': 0.8
             },
             filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
+          },
+          {
+            id: 'nyc-road-labels',
+            type: 'symbol' as const,
+            source: 'nyc-tiles',
+            'source-layer': 'examplepoints',
+            layout: {
+              'text-field': ['get', 'name'],
+              'text-font': ['Arial'], // Use system font
+              'text-size': ['interpolate', ['linear'], ['zoom'], 10, 8, 16, 14],
+              'text-max-width': 8,
+              'text-line-height': 1.2,
+              'symbol-placement': 'line',
+              'text-rotation-alignment': 'map',
+              'text-allow-overlap': false,
+              'text-ignore-placement': false
+            },
+            paint: {
+              'text-color': '#333333',
+              'text-halo-color': '#FFFFFF',
+              'text-halo-width': 1.5,
+              'text-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0, 12, 0.7, 16, 1]
+            },
+            filter: [
+              'all', 
+              ['==', ['geometry-type'], 'LineString'], 
+              ['has', 'name'],
+              ['has', 'highway'],
+              ['!=', ['get', 'name'], '']
+            ],
+            minzoom: 12
           }
-          // Removed road labels layer entirely to prevent font loading issues
+          // Road labels layer added back with system font support
         ];
 
         layers.forEach(layer => {
