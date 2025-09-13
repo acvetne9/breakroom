@@ -578,7 +578,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       sources: {
         'nyc-tiles': {
           type: 'vector' as const,
-          tiles: [`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`],
+          tiles: [
+            // Use different tile URL for mobile/Capacitor vs web
+            window.location.protocol === 'capacitor:' 
+              ? 'https://8b6dea56-dc8e-4244-a645-44c92d10150b.lovableproject.com/data/tiles/{z}/{x}/{y}.pbf'
+              : `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`
+          ],
           minzoom: 10,
           maxzoom: 16,
           scheme: 'xyz' as const
