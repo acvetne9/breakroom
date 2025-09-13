@@ -324,6 +324,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
         }
         
         if (searchFilters) {
+          console.log(`🔍 Setting ${viewportBusinesses.length} businesses from search results`);
           setBusinesses(viewportBusinesses);
         } else {
           setBusinesses(prev => {

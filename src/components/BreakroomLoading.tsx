@@ -48,7 +48,7 @@ const BreakroomLoading = ({ onComplete }: { onComplete?: () => void }) => {
       justifyContent: 'center' as const,
       width: '120px',
       height: '120px',
-      marginBottom: '0px'
+      marginBottom: '-15px'
     },
     coffeeMug: {
       display: 'inline-block' as const,
@@ -73,15 +73,15 @@ const BreakroomLoading = ({ onComplete }: { onComplete?: () => void }) => {
     },
     mugHandle: {
       position: 'absolute' as const,
-      left: '-12px',
-      top: '8px',
-      width: '16px',
-      height: '32px',
-      border: '4px solid #B22222',
+      left: '-16px',
+      top: '6px',
+      width: '20px',
+      height: '40px',
+      border: '6px solid #B22222',
       borderRight: 'none' as const,
-      borderRadius: '12px 0 0 12px',
+      borderRadius: '16px 0 0 16px',
       background: 'transparent',
-      boxShadow: 'inset 2px 0 0 rgba(0, 0, 0, 0.1)'
+      boxShadow: 'inset 3px 0 0 rgba(0, 0, 0, 0.1)'
     },
     mugBodyBefore: {
       position: 'absolute' as const,
@@ -98,7 +98,7 @@ const BreakroomLoading = ({ onComplete }: { onComplete?: () => void }) => {
       justifyContent: 'center' as const,
       width: '100%',
       fontFamily: "'Courier New', Courier, monospace",
-      fontSize: 'clamp(32px, 9vw, 42px)',
+      fontSize: 'clamp(42px, 11vw, 56px)',
       fontWeight: 'bold' as const,
       color: '#B22222',
       letterSpacing: '0.05em'
@@ -164,9 +164,21 @@ const BreakroomLoading = ({ onComplete }: { onComplete?: () => void }) => {
           100% { opacity: 1; }
         }
 
-        @media (max-width: 480px) {
+        @media (max-width: 768px) {
           .animation-container {
             padding: 0 10px;
+          }
+        }
+
+        @media (max-width: 480px) {
+          div[style*="fontFamily"] {
+            font-weight: 900 !important;
+            text-shadow: 2px 2px 0px rgba(178, 34, 34, 0.6), 0 0 25px rgba(178, 34, 34, 0.5) !important;
+            transform: perspective(500px) rotateX(-5deg) translateX(0px) !important;
+          }
+          
+          div[style*="fontFamily"] span {
+            font-weight: 900 !important;
           }
         }
       `}</style>

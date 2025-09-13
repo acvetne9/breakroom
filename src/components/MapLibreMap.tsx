@@ -240,6 +240,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Ensure businesses is always an array to prevent dependency array crashes
   const businesses = Array.isArray(rawBusinesses) ? rawBusinesses : [];
+  
+  // Log businesses for debugging
+  useEffect(() => {
+    console.log(`🎯 MapLibreMap received ${businesses.length} businesses:`, {
+      searchFilters: !!searchFilters,
+      hasNeighborhoodFilter: !!searchFilters?.neighborhoodFilter,
+      businessNames: businesses.slice(0, 5).map(b => b.name)
+    });
+  }, [businesses, searchFilters]);
 
   // Optimized business limit calculation
   const getBusinessLimitForViewport = useCallback((zoom: number, bounds: Bounds): number => {
@@ -564,14 +573,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (!mapRef.current || map) return;
 
-    const absoluteTilesUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-    
     const mapStyle = {
       version: 8 as const,
       sources: {
         'nyc-tiles': {
           type: 'vector' as const,
-          tiles: [absoluteTilesUrl],
+          tiles: [`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`],
           minzoom: 10,
           maxzoom: 16,
           scheme: 'xyz' as const
@@ -654,7 +661,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 ['==', ['get', 'amenity'], 'cemetery'],
                 ['==', ['get', 'amenity'], 'grave_yard'],
                 ['==', ['get', 'landuse'], 'recreation_ground'],
-                ['==', ['get', 'leisure'], 'recreation_ground']
+                ['==', ['get', 'leisure'], 'recreation_ground'],
+                ['in', 'cemetery', ['get', 'name']],
+                ['in', 'Cemetery', ['get', 'name']],
+                ['in', 'Graveyard', ['get', 'name']],
+                ['in', 'graveyard', ['get', 'name']],
+                ['==', ['get', 'place'], 'cemetery'],
+                ['==', ['get', 'historic'], 'cemetery']
               ]
             ]
           },
@@ -684,24 +697,31 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             source: 'nyc-tiles',
             'source-layer': 'examplepoints',
             layout: {
-              'text-field': ['get', 'name'],
-              'text-font': ['Arial Unicode MS Regular', 'Open Sans Regular', 'sans-serif'],
-              'text-size': ['interpolate', ['linear'], ['zoom'], 12, 8, 16, 12],
+              'text-field': ['case', 
+                ['has', 'name'], ['get', 'name'],
+                ''
+              ],
+              'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+              'text-size': ['interpolate', ['linear'], ['zoom'], 12, 10, 16, 14],
               'symbol-placement': 'line',
               'text-rotation-alignment': 'map',
-              'text-pitch-alignment': 'viewport'
+              'text-pitch-alignment': 'viewport',
+              'text-max-angle': 45,
+              'text-keep-upright': true
             },
             paint: {
-              'text-color': '#333333',
+              'text-color': '#2d3748',
               'text-halo-color': '#ffffff',
-              'text-halo-width': 1
+              'text-halo-width': 1.5,
+              'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 13, 1]
             },
             filter: [
               'all', 
               ['==', ['geometry-type'], 'LineString'],
               ['has', 'highway'],
               ['has', 'name'],
-              ['>', ['zoom'], 13]
+              ['!=', ['get', 'name'], ''],
+              ['>=', ['zoom'], 12]
             ]
           }
         ];
