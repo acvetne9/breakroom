@@ -572,6 +572,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Initialize map with optimized configuration
   useEffect(() => {
+    console.log('🔄 MapLibre useEffect triggered', { 
+      hasContainer: !!mapRef.current, 
+      hasMap: !!map,
+      isCapacitor: isCapacitor(),
+      containerDimensions: mapRef.current ? {
+        width: mapRef.current.clientWidth,
+        height: mapRef.current.clientHeight
+      } : null
+    });
+    
     if (!mapRef.current || map) return;
 
     // Comprehensive tile configuration for different environments
@@ -663,6 +673,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       href: window.location.href
     });
 
+    console.log('🗺️ Creating MapLibre instance with style:', {
+      version: mapStyle.version,
+      sourceCount: Object.keys(mapStyle.sources).length,
+      sources: Object.keys(mapStyle.sources),
+      layerCount: mapStyle.layers.length,
+      hasGlyphs: !!mapStyle.glyphs
+    });
+
     const mapInstance = new maplibregl.Map({
       container: mapRef.current!,
       style: mapStyle,
@@ -689,7 +707,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     });
     
+    console.log('✅ MapLibre instance created successfully');
+    
+    // Immediately set bounds after creation
+    console.log('🗺️ Setting map bounds for NYC region...');
     mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
+    
+    // Test basic map functionality
+    console.log('🧪 Testing map methods:', {
+      getZoom: mapInstance.getZoom(),
+      getCenter: mapInstance.getCenter(),
+      isStyleLoaded: mapInstance.isStyleLoaded()
+    });
 
     // Enhanced error handling and loading
     mapInstance.on('error', (e) => {
