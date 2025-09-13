@@ -1,4 +1,25 @@
-import React, { useState, useEffect, useRef } from 'react';
+{/* Search Results Dropdown */}
+      {showDropdown && (Array.isArray(searchResults) && searchResults.length > 0 || isSearching || (value.trim() && !isSearching && Array.isArray(searchResults) && searchResults.length === 0)) && (
+        <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 z-[60]`}>
+          <div 
+            className="bg-background shadow-lg border-2 max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
+            style={{ borderRadius: '6px', borderColor: 'hsl(var(--border))' }}
+            onScroll={() => {
+              isScrolling.current = true;
+              setTimeout(() => { isScrolling.current = false; }, 200);
+            }}
+          >
+            {isSearching ? (
+              <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+                Searching...
+              </div>
+            ) : Array.isArray(searchResults) && searchResults.length === 0 && value.trim() ? (
+              <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+                No relevant businesses found
+              </div>
+            ) : (
+              <div className="p-3">
+                {Array.isArray(searchResults) && searchResults.map((result, index)import React, { useState, useEffect, useRef } from 'react';
 import { searchBusinessesEnhanced, EnhancedBusiness } from '@/services/enhancedBusinessSearch';
 import { parseSearchFilters } from '@/services/businessFiltering';
 import { findNeighborhood } from '@/utils/nyc_neighborhoods';
@@ -534,13 +555,6 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         )}
       </div>
 
-      {/* Debug Info - Remove this in production */}
-      {process.env.NODE_ENV === 'development' && debugInfo && (
-        <div className="absolute top-full left-0 right-0 z-[70] bg-yellow-100 border border-yellow-300 p-2 text-xs text-yellow-800">
-          🐛 Debug: {debugInfo} | Results: {searchResults.length} | Searching: {isSearching ? 'Yes' : 'No'} | Dropdown: {showDropdown ? 'Open' : 'Closed'}
-        </div>
-      )}
-
       {/* Search Results Dropdown */}
       {showDropdown && (Array.isArray(searchResults) && searchResults.length > 0 || isSearching || (value.trim() && !isSearching && Array.isArray(searchResults) && searchResults.length === 0)) && (
         <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 z-[60]`}>
@@ -557,17 +571,53 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                 Searching...
               </div>
             ) : Array.isArray(searchResults) && searchResults.length === 0 && value.trim() ? (
-              <div className="flex flex-col items-center justify-center py-4 text-sm text-muted-foreground">
-                <div>No relevant businesses found</div>
-                {process.env.NODE_ENV === 'development' && (
-                  <div className="text-xs mt-2 text-gray-400">
-                    Try: "restaurant", "lawyer", "Brooklyn", or salary ranges
-                  </div>
-                )}
+              <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+                No relevant businesses found
               </div>
             ) : (
               <div className="p-3">
                 {Array.isArray(searchResults) && searchResults.map((result, index) => (
+                  <div key={result.id}>
+                    <div
+                      className="cursor-pointer py-1.5 px-0 rounded transition-colors hover:bg-accent/20"
+                      onClick={() => handleResultClick(result)}
+                    >
+                      {'isNeighborhood' in result && result.isNeighborhood ? (
+                        // Neighborhood result
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">{result.name}</span>
+                          <span className="text-xs opacity-70">{result.borough}</span>
+                        </div>
+                      ) : (
+                        // Business result
+                        <div>
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">{result.name}</span>
+                            <span className="text-sm opacity-70">{(result as EnhancedBusiness).salary}</span>
+                          </div>
+                          <div className="flex gap-2 mt-1">
+                            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">
+                              {(result as EnhancedBusiness).businessType || 'Business'}
+                            </span>
+                            {(result as EnhancedBusiness).roles?.map((role, roleIndex) => (
+                              <span key={roleIndex} className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                                {role.role} - {role.salary}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {index < (Array.isArray(searchResults) ? searchResults.length - 1 : -1) && (
+                      <div className="h-px bg-border/30 my-1.5"></div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}) => (
                   <div key={result.id}>
                     <div
                       className="cursor-pointer py-1.5 px-0 rounded transition-colors hover:bg-accent/20"
