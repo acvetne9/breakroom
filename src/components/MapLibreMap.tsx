@@ -6,6 +6,7 @@ import { createBusinessScatterplotLayer, createBusinessClusterLayer } from '@/ut
 import { useViewportMapData } from '../hooks/useViewportMapData';
 import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
 import { useIsMobile } from '../hooks/use-mobile';
+import { isCapacitor } from '@/utils/tileDecompression';
 import type { GeoJSONFeature } from 'maplibre-gl';
 import type { Business } from '@/types/business';
 
@@ -573,17 +574,28 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (!mapRef.current || map) return;
 
+    // Determine the correct tile URL based on environment
+    const getTileUrl = () => {
+      const baseUrl = '/data/tiles/{z}/{x}/{y}.pbf';
+      
+      // For Capacitor (mobile app), use relative path which will be handled by the native app
+      if (isCapacitor()) {
+        console.log('🔧 Using Capacitor tile path');
+        return baseUrl;
+      }
+      
+      // For web environments, use full origin-based URL
+      const fullUrl = `${window.location.origin}${baseUrl}`;
+      console.log('🔧 Using web tile path:', fullUrl);
+      return fullUrl;
+    };
+
     const mapStyle = {
       version: 8 as const,
       sources: {
         'nyc-tiles': {
           type: 'vector' as const,
-          tiles: [
-            // Use different tile URL for mobile/Capacitor vs web
-            window.location.protocol === 'capacitor:' 
-              ? 'https://8b6dea56-dc8e-4244-a645-44c92d10150b.lovableproject.com/data/tiles/{z}/{x}/{y}.pbf'
-              : `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`
-          ],
+          tiles: [getTileUrl()],
           minzoom: 10,
           maxzoom: 16,
           scheme: 'xyz' as const
