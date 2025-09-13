@@ -589,10 +589,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           scheme: 'xyz' as const
         }
       },
-      // Use more reliable font source for mobile compatibility
-      glyphs: isMobile 
-        ? undefined // No custom fonts on mobile - use system fonts
-        : 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
+      // Use system fonts for better cross-platform compatibility
+      glyphs: undefined, // Disable custom fonts to prevent loading errors
       layers: [
         {
           id: 'background',
@@ -709,7 +707,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 ['has', 'name'], ['get', 'name'],
                 ''
               ],
-              'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+              'text-font': undefined, // Use system fonts instead of custom fonts
               'text-size': ['interpolate', ['linear'], ['zoom'], 12, 10, 16, 14],
               'symbol-placement': 'line',
               'text-rotation-alignment': 'map',
