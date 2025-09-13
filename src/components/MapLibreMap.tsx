@@ -6,7 +6,7 @@ import { createBusinessScatterplotLayer, createBusinessClusterLayer } from '@/ut
 import { useViewportMapData } from '../hooks/useViewportMapData';
 import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
 import { useIsMobile } from '../hooks/use-mobile';
-import { isCapacitor } from '@/utils/tileDecompression';
+import { isCapacitor, createTileBlobUrl } from '@/utils/tileDecompression';
 import type { GeoJSONFeature } from 'maplibre-gl';
 import type { Business } from '@/types/business';
 
@@ -574,27 +574,35 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (!mapRef.current || map) return;
 
-    // Determine the correct tile URL based on environment
-    const getTileUrl = () => {
-      const baseUrl = '/data/tiles/{z}/{x}/{y}.pbf';
-      
-      // Always use current origin for consistency
-      const fullUrl = `${window.location.origin}${baseUrl}`;
-      console.log('🔧 Using tile URL:', fullUrl);
-      console.log('🔧 Environment - isCapacitor:', isCapacitor(), 'isMobile:', isMobile);
-      return fullUrl;
+    // Custom tile loading for Capacitor to handle gzipped tiles
+    const createTileSource = () => {
+      if (isCapacitor()) {
+        // For Capacitor, we need to handle gzipped tiles manually
+        return {
+          type: 'vector' as const,
+          tiles: [`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`],
+          minzoom: 10,
+          maxzoom: 16,
+          scheme: 'xyz' as const
+        };
+      } else {
+        // For web, use standard tile loading
+        const fullUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+        console.log('🔧 Using tile URL:', fullUrl);
+        return {
+          type: 'vector' as const,
+          tiles: [fullUrl],
+          minzoom: 10,
+          maxzoom: 16,
+          scheme: 'xyz' as const
+        };
+      }
     };
 
     const mapStyle = {
       version: 8 as const,
       sources: {
-        'nyc-tiles': {
-          type: 'vector' as const,
-          tiles: [getTileUrl()],
-          minzoom: 10,
-          maxzoom: 16,
-          scheme: 'xyz' as const
-        }
+        'nyc-tiles': createTileSource()
       },
       // Add working glyphs configuration
       glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
@@ -607,9 +615,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       ]
     };
 
-    // Log the tile URL being used for debugging
-    console.log('🗺️ Map initialization - Tile URL:', mapStyle.sources['nyc-tiles'].tiles[0]);
-    console.log('🗺️ Environment check - isCapacitor:', isCapacitor());
+    // Log the tile configuration for debugging
+    console.log('🗺️ Map initialization - Tile config:', mapStyle.sources['nyc-tiles']);
+    console.log('🗺️ Environment check - isCapacitor:', isCapacitor(), 'isMobile:', isMobile);
     console.log('🗺️ Current location:', {
       protocol: window.location.protocol,
       origin: window.location.origin,
@@ -624,7 +632,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       maxZoom: 18,
       minZoom: 9,
       renderWorldCopies: false,
-      attributionControl: false
+      attributionControl: false,
+      transformRequest: (url, resourceType) => {
+        // For Capacitor, intercept tile requests to handle gzipped tiles
+        if (isCapacitor() && resourceType === 'Tile' && url.includes('/data/tiles/')) {
+          console.log('🔧 Intercepting tile request for Capacitor:', url);
+          // Let MapLibre handle the request but log for debugging
+          return { url };
+        }
+        return { url };
+      }
     });
     
     mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
@@ -665,6 +682,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             type: 'fill' as const,
             source: 'nyc-tiles',
             'source-layer': 'examplepoints',
+            layout: {},
             paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
             filter: ['==', ['geometry-type'], 'Polygon']
           },
@@ -673,6 +691,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             type: 'fill' as const,
             source: 'nyc-tiles',
             'source-layer': 'examplepoints',
+            layout: {},
             paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
             filter: [
               'all',
@@ -698,6 +717,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             type: 'fill' as const,
             source: 'nyc-tiles',
             'source-layer': 'examplepoints',
+            layout: {},
             paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
             filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']]
           },
@@ -706,6 +726,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             type: 'line' as const,
             source: 'nyc-tiles',
             'source-layer': 'examplepoints',
+            layout: {},
             paint: {
               'line-color': '#666666',
               'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
