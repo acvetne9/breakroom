@@ -570,21 +570,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [selectedBusiness?.id, isClusteredData, businesses, handleBusinessClick, map, mapLoaded]);
 
-  // Force map recreation when component mounts to ensure custom tiles load
-  useEffect(() => {
-    if (map) {
-      console.log('🔄 Forcing map recreation to load custom tiles...');
-      try {
-        map.remove();
-      } catch (e) {
-        console.log('🔄 Map removal error (expected):', e);
-      }
-      setMap(null);
-      setMapLoaded(false);
-      layersAddedRef.current = false;
-    }
-  }, []); // Only run on mount
-
   // Initialize map with optimized configuration
   useEffect(() => {
     console.log('🔄 MapLibre useEffect triggered', { 
@@ -597,121 +582,84 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       } : null
     });
     
-    if (!mapRef.current || map) {
-      console.log('🔄 Skipping map creation - container or map already exists');
-      return;
-    }
-
-    console.log('🗺️ Starting NEW map initialization...');
+    if (!mapRef.current || map) return;
 
     // Comprehensive tile configuration for different environments
     const createTileSource = () => {
-      // Always try to use custom NYC vector tiles first, regardless of environment
-      const tileUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-      console.log('🔧 Creating NYC custom vector tile source:', tileUrl);
-      
-      return {
-        type: 'vector' as const,
-        tiles: [tileUrl],
-        minzoom: 10,
-        maxzoom: 16,
-        scheme: 'xyz' as const
-      };
-    };
-
-    // Test if a sample tile exists and log the result
-    const testTileAccess = async () => {
-      const testTileUrl = `${window.location.origin}/data/tiles/12/1203/1536.pbf`;
-      console.log('🧪 Testing tile accessibility:', testTileUrl);
-      
-      try {
-        const response = await fetch(testTileUrl);
-        console.log('🧪 Tile test result:', {
-          status: response.status,
-          statusText: response.statusText,
-          contentType: response.headers.get('content-type'),
-          contentLength: response.headers.get('content-length')
-        });
-        
-        if (response.ok) {
-          console.log('✅ Custom tiles are accessible!');
-        } else {
-          console.error('❌ Custom tiles not accessible:', response.status);
-        }
-      } catch (error) {
-        console.error('❌ Error testing tile access:', error);
+      if (isCapacitor()) {
+        // For Capacitor, use OpenStreetMap raster tiles as fallback
+        // since vector tiles from capacitor://localhost don't work reliably
+        console.log('🔧 Using Capacitor raster tile fallback');
+        return null; // We'll create a raster source instead
+      } else {
+        // For web, use vector tiles
+        const fullUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+        console.log('🔧 Using web vector tiles:', fullUrl);
+        return {
+          type: 'vector' as const,
+          tiles: [fullUrl],
+          minzoom: 10,
+          maxzoom: 16,
+          scheme: 'xyz' as const
+        };
       }
     };
-    
-    testTileAccess();
 
-    // Create appropriate map style - ALWAYS use custom NYC tiles with design system colors
+    // Create appropriate map style based on environment
     const createMapStyle = () => {
-      console.log('🔧 Creating map style with NYC custom vector tiles and design system colors');
-      
-      const vectorSource = createTileSource();
-      console.log('🔧 Vector source created:', vectorSource);
-
-      // Get CSS variables for design system colors
-      const getCSSVariable = (variable: string) => {
-        if (typeof window !== 'undefined') {
-          const value = getComputedStyle(document.documentElement).getPropertyValue(variable).trim();
-          if (value) {
-            // Convert HSL to hex for MapLibre compatibility
-            const [h, s, l] = value.split(' ').map(v => parseFloat(v.replace('%', '')));
-            const hslToHex = (h: number, s: number, l: number) => {
-              const sNorm = s / 100;
-              const lNorm = l / 100;
-              const c = (1 - Math.abs(2 * lNorm - 1)) * sNorm;
-              const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
-              const m = lNorm - c / 2;
-              let r = 0, g = 0, b = 0;
-              
-              if (0 <= h && h < 60) { r = c; g = x; b = 0; }
-              else if (60 <= h && h < 120) { r = x; g = c; b = 0; }
-              else if (120 <= h && h < 180) { r = 0; g = c; b = x; }
-              else if (180 <= h && h < 240) { r = 0; g = x; b = c; }
-              else if (240 <= h && h < 300) { r = x; g = 0; b = c; }
-              else if (300 <= h && h < 360) { r = c; g = 0; b = x; }
-              
-              r = Math.round((r + m) * 255);
-              g = Math.round((g + m) * 255);
-              b = Math.round((b + m) * 255);
-              
-              return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-            };
-            return hslToHex(h, s, l);
-          }
+      if (isCapacitor()) {
+        // For Capacitor, use a more reliable raster-based style with better error handling
+        console.log('🔧 Creating Capacitor raster map style');
+        return {
+          version: 8 as const,
+          sources: {
+            'osm': {
+              type: 'raster' as const,
+              tiles: [
+                'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+              ],
+              tileSize: 256,
+              attribution: '© OpenStreetMap contributors',
+              maxzoom: 19
+            }
+          },
+          layers: [
+            {
+              id: 'background',
+              type: 'background' as const,
+              paint: { 'background-color': '#B3E5FC' }
+            },
+            {
+              id: 'osm',
+              type: 'raster' as const,
+              source: 'osm',
+              minzoom: 0,
+              maxzoom: 19
+            }
+          ]
+        };
+      } else {
+        // For web, use vector tiles with full styling
+        const vectorSource = createTileSource();
+        if (!vectorSource) {
+          throw new Error('Vector source creation failed');
         }
-        return null;
-      };
-
-      // Design system colors with fallbacks
-      const colors = {
-        background: getCSSVariable('--background') || '#ffffff',
-        muted: getCSSVariable('--muted') || '#f5f6fa', 
-        primary: getCSSVariable('--app-yellow') || '#ffd700',
-        grayLight: getCSSVariable('--app-gray-light') || '#b4b8c1',
-        grayMedium: getCSSVariable('--app-gray-medium') || '#7a808a',
-        grayDark: getCSSVariable('--app-gray-dark') || '#262b37'
-      };
-
-      console.log('🎨 Using design system colors:', colors);
         
-      return {
-        version: 8 as const,
-        sources: {
-          'nyc-tiles': vectorSource
-        },
-        glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-        layers: [
-          {
-            id: 'background',
-            type: 'background' as const,
-            paint: { 'background-color': colors.background }
-          }
-        ]
-      };
+        return {
+          version: 8 as const,
+          sources: {
+            'nyc-tiles': vectorSource
+          },
+          glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+          layers: [
+            {
+              id: 'background',
+              type: 'background' as const,
+              paint: { 'background-color': '#F5F5DC' }
+            }
+          ]
+        };
+      }
     };
 
     const mapStyle = createMapStyle();
@@ -775,74 +723,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     // Enhanced error handling and loading
     mapInstance.on('error', (e) => {
       console.error('🚨 Map error:', e.error);
-      console.error('🚨 Error details:', {
-        type: e.type,
-        message: e.error?.message
-      });
     });
 
     mapInstance.on('load', () => {
-      console.log('🗺️ Map loaded successfully - adding vector layers immediately');
+      console.log('🗺️ Map loaded successfully');
       setMapLoaded(true);
       callbackRefs.current.onMapLoaded?.();
       
-      // Always add vector layers immediately after map loads
-      console.log('🔄 Adding NYC vector layers immediately after map load...');
-      setTimeout(() => {
-        addVectorLayers(mapInstance);
-      }, 100);
+      // For desktop, manually add layers after map loads if sourcedata doesn't fire
+      if (!isCapacitor() && !layersAddedRef.current) {
+        console.log('🔄 Manually adding vector layers after map load...');
+        setTimeout(() => {
+          if (!layersAddedRef.current) {
+            addVectorLayers(mapInstance);
+          }
+        }, 1000);
+      }
     });
 
-    // Function to add vector layers with design system colors
+    // Function to add vector layers
     const addVectorLayers = (mapInstance: maplibregl.Map) => {
       try {
-        // Get design system colors for map layers
-        const getCSSVariable = (variable: string) => {
-          if (typeof window !== 'undefined') {
-            const value = getComputedStyle(document.documentElement).getPropertyValue(variable).trim();
-            if (value) {
-              // Convert HSL to hex for MapLibre compatibility
-              const [h, s, l] = value.split(' ').map(v => parseFloat(v.replace('%', '')));
-              const hslToHex = (h: number, s: number, l: number) => {
-                const sNorm = s / 100;
-                const lNorm = l / 100;
-                const c = (1 - Math.abs(2 * lNorm - 1)) * sNorm;
-                const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
-                const m = lNorm - c / 2;
-                let r = 0, g = 0, b = 0;
-                
-                if (0 <= h && h < 60) { r = c; g = x; b = 0; }
-                else if (60 <= h && h < 120) { r = x; g = c; b = 0; }
-                else if (120 <= h && h < 180) { r = 0; g = c; b = x; }
-                else if (180 <= h && h < 240) { r = 0; g = x; b = c; }
-                else if (240 <= h && h < 300) { r = x; g = 0; b = c; }
-                else if (300 <= h && h < 360) { r = c; g = 0; b = x; }
-                
-                r = Math.round((r + m) * 255);
-                g = Math.round((g + m) * 255);
-                b = Math.round((b + m) * 255);
-                
-                return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-              };
-              return hslToHex(h, s, l);
-            }
-          }
-          return null;
-        };
-
-        // Design system colors with fallbacks
-        const colors = {
-          background: getCSSVariable('--background') || '#ffffff',
-          muted: getCSSVariable('--muted') || '#f5f6fa',
-          primary: getCSSVariable('--app-yellow') || '#ffd700',
-          grayLight: getCSSVariable('--app-gray-light') || '#b4b8c1', 
-          grayMedium: getCSSVariable('--app-gray-medium') || '#7a808a',
-          grayDark: getCSSVariable('--app-gray-dark') || '#262b37',
-          white: getCSSVariable('--app-white') || '#ffffff'
-        };
-
-        console.log('🎨 Using design system colors for map layers:', colors);
-
         const layers = [
           {
             id: 'nyc-land',
@@ -850,7 +751,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             source: 'nyc-tiles',
             'source-layer': 'examplepoints',
             layout: {},
-            paint: { 'fill-color': colors.muted, 'fill-opacity': 1.0 },
+            paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
             filter: ['==', ['geometry-type'], 'Polygon'] as any
           },
           {
@@ -859,7 +760,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             source: 'nyc-tiles',
             'source-layer': 'examplepoints',
             layout: {},
-            paint: { 'fill-color': colors.primary, 'fill-opacity': 0.6 },
+            paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
             filter: [
               'all',
               ['==', ['geometry-type'], 'Polygon'],
@@ -885,7 +786,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             source: 'nyc-tiles',
             'source-layer': 'examplepoints',
             layout: {},
-            paint: { 'fill-color': colors.grayLight, 'fill-opacity': 0.8 },
+            paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
             filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']] as any
           },
           {
@@ -895,7 +796,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'source-layer': 'examplepoints',
             layout: {},
             paint: {
-              'line-color': colors.grayMedium,
+              'line-color': '#666666',
               'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
               'line-opacity': 0.8
             },
@@ -918,8 +819,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               'text-ignore-placement': false
             },
             paint: {
-              'text-color': colors.grayDark,
-              'text-halo-color': colors.white,
+              'text-color': '#333333',
+              'text-halo-color': '#FFFFFF',
               'text-halo-width': 1.5,
               'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 1]
             },
@@ -968,37 +869,32 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     mapInstance.on('zoomend', callViewportChange);
     mapInstance.on('move', debouncedMoveHandler);
 
-    // Add map layers when ready - enhanced debugging
+    // Add map layers when ready with environment-specific handling
     mapInstance.on('sourcedata', (e) => {
-      console.log('🔄 Source data event:', {
-        sourceId: e.sourceId,
-        sourceDataType: e.sourceDataType,
-        isSourceLoaded: e.isSourceLoaded,
-        layersAdded: layersAddedRef.current
-      });
+      if (isCapacitor()) {
+        // For Capacitor with raster tiles
+        if (e.sourceId === 'osm' && e.isSourceLoaded && !layersAddedRef.current) {
+          console.log('✅ Capacitor raster tiles loaded successfully');
+          layersAddedRef.current = true;
+        } else if (e.sourceId === 'osm') {
+          console.log('🔄 OSM source event:', {
+            sourceId: e.sourceId,
+            isSourceLoaded: e.isSourceLoaded,
+            layersAdded: layersAddedRef.current
+          });
+        }
+        return;
+      }
       
-      // For NYC vector tiles
+      // For web environment with vector tiles
       if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
-        console.log('✅ NYC tiles source loaded, adding vector layers...');
+        console.log('🔄 NYC tiles source loaded, adding vector layers via sourcedata event...');
         addVectorLayers(mapInstance);
-      }
-    });
-
-    // Add tile loading debugging
-    mapInstance.on('dataloading', (e: any) => {
-      if (e.sourceId === 'nyc-tiles') {
-        console.log('🔄 NYC tiles data loading:', {
+      } else if (e.sourceId === 'nyc-tiles') {
+        console.log('🔄 NYC tiles sourcedata event:', {
           sourceId: e.sourceId,
-          sourceDataType: e.sourceDataType
-        });
-      }
-    });
-
-    mapInstance.on('data', (e: any) => {
-      if (e.sourceId === 'nyc-tiles') {
-        console.log('🔄 NYC tiles data loaded:', {
-          sourceId: e.sourceId,
-          sourceDataType: e.sourceDataType
+          isSourceLoaded: e.isSourceLoaded,
+          layersAdded: layersAddedRef.current
         });
       }
     });
@@ -1222,39 +1118,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded, map]);
 
-  // Get design system background color for container
-  const getBackgroundColor = () => {
-    if (typeof window !== 'undefined') {
-      const value = getComputedStyle(document.documentElement).getPropertyValue('--background').trim();
-      if (value) {
-        const [h, s, l] = value.split(' ').map(v => parseFloat(v.replace('%', '')));
-        const hslToHex = (h: number, s: number, l: number) => {
-          const sNorm = s / 100;
-          const lNorm = l / 100;
-          const c = (1 - Math.abs(2 * lNorm - 1)) * sNorm;
-          const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
-          const m = lNorm - c / 2;
-          let r = 0, g = 0, b = 0;
-          
-          if (0 <= h && h < 60) { r = c; g = x; b = 0; }
-          else if (60 <= h && h < 120) { r = x; g = c; b = 0; }
-          else if (120 <= h && h < 180) { r = 0; g = c; b = x; }
-          else if (180 <= h && h < 240) { r = 0; g = x; b = c; }
-          else if (240 <= h && h < 300) { r = x; g = 0; b = c; }
-          else if (300 <= h && h < 360) { r = c; g = 0; b = x; }
-          
-          r = Math.round((r + m) * 255);
-          g = Math.round((g + m) * 255);
-          b = Math.round((b + m) * 255);
-          
-          return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-        };
-        return hslToHex(h, s, l);
-      }
-    }
-    return '#ffffff'; // fallback
-  };
-
   return (
     <div
       ref={mapRef}
@@ -1267,10 +1130,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         right: 0,
         width: '100%',
         height: '100%',
-        minWidth: '200px', // Minimum width for thin screens
-        minHeight: '200px', // Minimum height for thin screens
         zIndex: 1,
-        backgroundColor: getBackgroundColor()
+        backgroundColor: '#B3E5FC'
       }}
     />
   );
