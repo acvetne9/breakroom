@@ -645,12 +645,58 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     
     testTileAccess();
 
-    // Create appropriate map style - ALWAYS use custom NYC tiles
+    // Create appropriate map style - ALWAYS use custom NYC tiles with design system colors
     const createMapStyle = () => {
-      console.log('🔧 Creating map style with NYC custom vector tiles');
+      console.log('🔧 Creating map style with NYC custom vector tiles and design system colors');
       
       const vectorSource = createTileSource();
       console.log('🔧 Vector source created:', vectorSource);
+
+      // Get CSS variables for design system colors
+      const getCSSVariable = (variable: string) => {
+        if (typeof window !== 'undefined') {
+          const value = getComputedStyle(document.documentElement).getPropertyValue(variable).trim();
+          if (value) {
+            // Convert HSL to hex for MapLibre compatibility
+            const [h, s, l] = value.split(' ').map(v => parseFloat(v.replace('%', '')));
+            const hslToHex = (h: number, s: number, l: number) => {
+              const sNorm = s / 100;
+              const lNorm = l / 100;
+              const c = (1 - Math.abs(2 * lNorm - 1)) * sNorm;
+              const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+              const m = lNorm - c / 2;
+              let r = 0, g = 0, b = 0;
+              
+              if (0 <= h && h < 60) { r = c; g = x; b = 0; }
+              else if (60 <= h && h < 120) { r = x; g = c; b = 0; }
+              else if (120 <= h && h < 180) { r = 0; g = c; b = x; }
+              else if (180 <= h && h < 240) { r = 0; g = x; b = c; }
+              else if (240 <= h && h < 300) { r = x; g = 0; b = c; }
+              else if (300 <= h && h < 360) { r = c; g = 0; b = x; }
+              
+              r = Math.round((r + m) * 255);
+              g = Math.round((g + m) * 255);
+              b = Math.round((b + m) * 255);
+              
+              return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+            };
+            return hslToHex(h, s, l);
+          }
+        }
+        return null;
+      };
+
+      // Design system colors with fallbacks
+      const colors = {
+        background: getCSSVariable('--background') || '#ffffff',
+        muted: getCSSVariable('--muted') || '#f5f6fa', 
+        primary: getCSSVariable('--app-yellow') || '#ffd700',
+        grayLight: getCSSVariable('--app-gray-light') || '#b4b8c1',
+        grayMedium: getCSSVariable('--app-gray-medium') || '#7a808a',
+        grayDark: getCSSVariable('--app-gray-dark') || '#262b37'
+      };
+
+      console.log('🎨 Using design system colors:', colors);
         
       return {
         version: 8 as const,
@@ -662,7 +708,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           {
             id: 'background',
             type: 'background' as const,
-            paint: { 'background-color': '#f8f9fa' }
+            paint: { 'background-color': colors.background }
           }
         ]
       };
@@ -747,9 +793,56 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }, 100);
     });
 
-    // Function to add vector layers
+    // Function to add vector layers with design system colors
     const addVectorLayers = (mapInstance: maplibregl.Map) => {
       try {
+        // Get design system colors for map layers
+        const getCSSVariable = (variable: string) => {
+          if (typeof window !== 'undefined') {
+            const value = getComputedStyle(document.documentElement).getPropertyValue(variable).trim();
+            if (value) {
+              // Convert HSL to hex for MapLibre compatibility
+              const [h, s, l] = value.split(' ').map(v => parseFloat(v.replace('%', '')));
+              const hslToHex = (h: number, s: number, l: number) => {
+                const sNorm = s / 100;
+                const lNorm = l / 100;
+                const c = (1 - Math.abs(2 * lNorm - 1)) * sNorm;
+                const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+                const m = lNorm - c / 2;
+                let r = 0, g = 0, b = 0;
+                
+                if (0 <= h && h < 60) { r = c; g = x; b = 0; }
+                else if (60 <= h && h < 120) { r = x; g = c; b = 0; }
+                else if (120 <= h && h < 180) { r = 0; g = c; b = x; }
+                else if (180 <= h && h < 240) { r = 0; g = x; b = c; }
+                else if (240 <= h && h < 300) { r = x; g = 0; b = c; }
+                else if (300 <= h && h < 360) { r = c; g = 0; b = x; }
+                
+                r = Math.round((r + m) * 255);
+                g = Math.round((g + m) * 255);
+                b = Math.round((b + m) * 255);
+                
+                return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+              };
+              return hslToHex(h, s, l);
+            }
+          }
+          return null;
+        };
+
+        // Design system colors with fallbacks
+        const colors = {
+          background: getCSSVariable('--background') || '#ffffff',
+          muted: getCSSVariable('--muted') || '#f5f6fa',
+          primary: getCSSVariable('--app-yellow') || '#ffd700',
+          grayLight: getCSSVariable('--app-gray-light') || '#b4b8c1', 
+          grayMedium: getCSSVariable('--app-gray-medium') || '#7a808a',
+          grayDark: getCSSVariable('--app-gray-dark') || '#262b37',
+          white: getCSSVariable('--app-white') || '#ffffff'
+        };
+
+        console.log('🎨 Using design system colors for map layers:', colors);
+
         const layers = [
           {
             id: 'nyc-land',
@@ -757,7 +850,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             source: 'nyc-tiles',
             'source-layer': 'examplepoints',
             layout: {},
-            paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
+            paint: { 'fill-color': colors.muted, 'fill-opacity': 1.0 },
             filter: ['==', ['geometry-type'], 'Polygon'] as any
           },
           {
@@ -766,7 +859,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             source: 'nyc-tiles',
             'source-layer': 'examplepoints',
             layout: {},
-            paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
+            paint: { 'fill-color': colors.primary, 'fill-opacity': 0.6 },
             filter: [
               'all',
               ['==', ['geometry-type'], 'Polygon'],
@@ -792,7 +885,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             source: 'nyc-tiles',
             'source-layer': 'examplepoints',
             layout: {},
-            paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
+            paint: { 'fill-color': colors.grayLight, 'fill-opacity': 0.8 },
             filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']] as any
           },
           {
@@ -802,7 +895,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'source-layer': 'examplepoints',
             layout: {},
             paint: {
-              'line-color': '#666666',
+              'line-color': colors.grayMedium,
               'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
               'line-opacity': 0.8
             },
@@ -825,8 +918,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               'text-ignore-placement': false
             },
             paint: {
-              'text-color': '#333333',
-              'text-halo-color': '#FFFFFF',
+              'text-color': colors.grayDark,
+              'text-halo-color': colors.white,
               'text-halo-width': 1.5,
               'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 1]
             },
@@ -1129,6 +1222,39 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded, map]);
 
+  // Get design system background color for container
+  const getBackgroundColor = () => {
+    if (typeof window !== 'undefined') {
+      const value = getComputedStyle(document.documentElement).getPropertyValue('--background').trim();
+      if (value) {
+        const [h, s, l] = value.split(' ').map(v => parseFloat(v.replace('%', '')));
+        const hslToHex = (h: number, s: number, l: number) => {
+          const sNorm = s / 100;
+          const lNorm = l / 100;
+          const c = (1 - Math.abs(2 * lNorm - 1)) * sNorm;
+          const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+          const m = lNorm - c / 2;
+          let r = 0, g = 0, b = 0;
+          
+          if (0 <= h && h < 60) { r = c; g = x; b = 0; }
+          else if (60 <= h && h < 120) { r = x; g = c; b = 0; }
+          else if (120 <= h && h < 180) { r = 0; g = c; b = x; }
+          else if (180 <= h && h < 240) { r = 0; g = x; b = c; }
+          else if (240 <= h && h < 300) { r = x; g = 0; b = c; }
+          else if (300 <= h && h < 360) { r = c; g = 0; b = x; }
+          
+          r = Math.round((r + m) * 255);
+          g = Math.round((g + m) * 255);
+          b = Math.round((b + m) * 255);
+          
+          return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+        };
+        return hslToHex(h, s, l);
+      }
+    }
+    return '#ffffff'; // fallback
+  };
+
   return (
     <div
       ref={mapRef}
@@ -1141,8 +1267,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         right: 0,
         width: '100%',
         height: '100%',
+        minWidth: '200px', // Minimum width for thin screens
+        minHeight: '200px', // Minimum height for thin screens
         zIndex: 1,
-        backgroundColor: '#B3E5FC'
+        backgroundColor: getBackgroundColor()
       }}
     />
   );
