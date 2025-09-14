@@ -27,8 +27,8 @@ interface NeighborhoodResult {
 
 type SearchResult = EnhancedBusiness | NeighborhoodResult;
 
-// Enhanced relevance scoring function
-const calculateRelevanceScore = (business: EnhancedBusiness, query: string): number => {
+// Enhanced relevance scoring function with tie-breaking
+const calculateRelevanceScore = (business: EnhancedBusiness, query: string, index: number = 0): number => {
   const queryLower = query.toLowerCase().trim();
   const nameLower = business.name.toLowerCase();
   const businessType = business.businessType?.toLowerCase() || '';
@@ -83,6 +83,10 @@ const calculateRelevanceScore = (business: EnhancedBusiness, query: string): num
     score += 5;
   }
   
+  // Tie-breaking: add small fractional value based on original order
+  // This ensures consistent ordering for items with same score
+  score += (1000 - index) / 100000; // Adds 0.01 to 0.00001 based on original position
+  
   return score;
 };
 
@@ -112,17 +116,25 @@ const calculateEditDistance = (str1: string, str2: string): number => {
   return matrix[str2.length][str1.length];
 };
 
-// Filter and sort results by relevance
+// Filter and sort results by relevance with proper tie-breaking
 const getRelevantResults = (businesses: EnhancedBusiness[], query: string, maxResults: number = 10): EnhancedBusiness[] => {
   if (!query.trim()) return [];
   
   const scoredResults = businesses
-    .map(business => ({
+    .map((business, index) => ({
       business,
-      score: calculateRelevanceScore(business, query)
+      score: calculateRelevanceScore(business, query, index),
+      originalIndex: index // Preserve original order for additional tie-breaking
     }))
     .filter(result => result.score > 0) // Only keep results with some relevance
-    .sort((a, b) => b.score - a.score) // Sort by score descending
+    .sort((a, b) => {
+      // Primary sort: by score (descending)
+      if (a.score !== b.score) {
+        return b.score - a.score;
+      }
+      // Secondary sort: by original index (ascending) for consistent ordering
+      return a.originalIndex - b.originalIndex;
+    })
     .slice(0, maxResults) // Limit results
     .map(result => result.business);
     
@@ -194,13 +206,13 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   // Enhanced debounced suggestions with relevance scoring
   useEffect(() => {
     const q = value.trim();
+    
     if (!q) {
       setSearchResults([]);
       setShowDropdown(false);
       setIsSearching(false);
       // Clear filters when search is empty - only if there were filters before
       if (lastFiltersRef.current !== null) {
-        console.log('🧹 Clearing search - removing all filters');
         lastFiltersRef.current = null;
         committedQueryRef.current = '';
         onChange(value, undefined, null);
@@ -211,7 +223,6 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     // Check cache first for better performance
     const cachedResults = resultsCache.current.get(q);
     if (cachedResults && Array.isArray(cachedResults)) {
-      console.log('💾 Using cached results for:', q);
       setSearchResults(cachedResults);
       setShowDropdown(true);
       setIsSearching(false);
@@ -222,6 +233,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     setIsSearching(true);
     setShowDropdown(true);
     const seq = ++searchSeqRef.current;
+    
     const timer = setTimeout(async () => {
       try {
         const results: SearchResult[] = [];
@@ -238,39 +250,21 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         }
         
         // Get business results with increased limit for filtering
-        const businessResults = await searchBusinessesEnhanced(q, 50); // Get more results to filter
+        let businessResults: EnhancedBusiness[] = [];
+        
+        try {
+          businessResults = await searchBusinessesEnhanced(q, 50);
+        } catch (searchError) {
+          console.error('Search API error:', searchError);
+          // Continue with empty results rather than throwing
+        }
         
         // Apply relevance-based filtering and sorting
-        const relevantResults = getRelevantResults(businessResults, q, 8); // Return top 8 relevant results
-        
-        console.log(`🎯 Query: "${q}" - Found ${businessResults.length} raw results, filtered to ${relevantResults.length} relevant results`);
-        
-        // Debug: Log the scoring for results
-        if (businessResults.length > 0) {
-          console.log('📊 Sample results with relevance and richness scores:');
-          const sampleResults = businessResults.slice(0, 8);
-          sampleResults.forEach(business => {
-            const relevanceScore = calculateRelevanceScore(business, q);
-            const richnessScore = calculateDataRichnessScore(business);
-            const relevant = relevanceScore >= (q.length >= 6 ? 20 : q.length >= 4 ? 25 : 30);
-            console.log(`  ${relevant ? '✅' : '❌'} "${business.name}" (Relevance: ${relevanceScore}, Richness: ${richnessScore})`);
-          });
-          
-          console.log(`📈 Final results: ${relevantResults.length} businesses passed relevance threshold`);
-          
-          // Show final sorted order with both scores
-          if (relevantResults.length > 0) {
-            console.log('🏆 Final sorted results:');
-            relevantResults.slice(0, 5).forEach((business, index) => {
-              const relevanceScore = calculateRelevanceScore(business, q);
-              const richnessScore = calculateDataRichnessScore(business);
-              console.log(`  ${index + 1}. "${business.name}" (R: ${relevanceScore}, D: ${richnessScore})`);
-            });
-          }
-        }
+        const relevantResults = getRelevantResults(businessResults, q, 8);
         
         results.push(...relevantResults);
         
+        // Check if this search was superseded
         if (seq !== searchSeqRef.current) return;
         
         // Cache the results
@@ -305,11 +299,16 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         }
       } catch (error) {
         console.error('Search suggestions error:', error);
-        if (seq === searchSeqRef.current) setSearchResults([]);
+        if (seq === searchSeqRef.current) {
+          setSearchResults([]);
+        }
       } finally {
-        if (seq === searchSeqRef.current) setIsSearching(false);
+        if (seq === searchSeqRef.current) {
+          setIsSearching(false);
+        }
       }
     }, 300); // Faster suggestions with caching
+    
     return () => clearTimeout(timer);
   }, [value, onChange]);
 
@@ -327,7 +326,6 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     if ('isNeighborhood' in result && result.isNeighborhood) {
       // Handle neighborhood click - search for all businesses in that neighborhood
       const neighborhoodName = result.name.replace(' - Search Neighborhood', '');
-      console.log('🏙️ [handleResultClick] Neighborhood clicked:', neighborhoodName);
       
       // Update the search input with just the neighborhood name
       onChange(neighborhoodName);
@@ -348,7 +346,6 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     } else {
       // Handle business click
       const business = result as EnhancedBusiness;
-      console.log('🏢 [handleResultClick] Business clicked:', business.name);
       
       // Perform search with current value
       performSearch();
@@ -368,13 +365,10 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   };
 
   const performSearch = () => {
-    console.log('🔍 [performSearch] Called with value:', value);
-    
     const trimmedValue = value.trim();
     
     // Check if this is the same query we just executed
     if (trimmedValue === lastExecutedQuery.current && trimmedValue.length >= 3) {
-      console.log('🚫 [performSearch] Skipping - same query already executed:', trimmedValue);
       setShowDropdown(false);
       return;
     }
@@ -382,7 +376,6 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     if (!trimmedValue) {
       // Clear search - commit empty query to clear filters
       if (committedQueryRef.current !== '') {
-        console.log('🔄 Clearing search - removing all filters');
         committedQueryRef.current = '';
         lastFiltersRef.current = null;
         lastExecutedQuery.current = '';
@@ -393,7 +386,6 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     
     // Check for profanity in search terms
     if (isProfane(trimmedValue)) {
-      console.log('🚫 Search blocked - profanity detected:', trimmedValue);
       toast({
         title: "Search blocked",
         description: "Inappropriate search terms detected",
@@ -404,14 +396,10 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     }
     
     // Commit the query and apply filters immediately (require 3+ characters for meaningful search)
-    console.log('🔍 [performSearch] Trimmed value:', trimmedValue, 'length:', trimmedValue.length);
-    
     if (trimmedValue.length >= 3 && committedQueryRef.current !== trimmedValue) {
-      console.log('🔍 Committing search query:', trimmedValue);
       committedQueryRef.current = trimmedValue;
       lastExecutedQuery.current = trimmedValue;
       const filters = parseSearchFilters(trimmedValue);
-      console.log('🔍 [performSearch] Parsed filters:', filters);
       
       // Only proceed if filters have meaningful content
       if (filters && (
@@ -421,12 +409,10 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         filters.businessTypeFilter ||
         filters.neighborhoodFilter
       )) {
-        console.log('✅ Applying valid search filters:', filters);
         const filtersKey = JSON.stringify(filters);
         lastFiltersRef.current = filtersKey;
         onChange(value, undefined, filters);
       } else {
-        console.log('⚠️ No valid filters found for query:', trimmedValue);
         if (lastFiltersRef.current !== null) {
           lastFiltersRef.current = null;
           committedQueryRef.current = '';
@@ -436,7 +422,6 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       }
     } else if (trimmedValue.length < 3 && lastFiltersRef.current !== null) {
       // Clear filters if search is too short
-      console.log('🧹 Search too short, clearing filters');
       lastFiltersRef.current = null;
       committedQueryRef.current = '';
       lastExecutedQuery.current = '';
@@ -498,9 +483,9 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
 
       {/* Search Results Dropdown */}
       {showDropdown && (Array.isArray(searchResults) && searchResults.length > 0 || isSearching || (value.trim() && !isSearching && Array.isArray(searchResults) && searchResults.length === 0)) && (
-        <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 z-50`}>
+        <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 z-[60]`}>
           <div 
-            className="bg-background shadow-lg border-2 max-h-60 overflow-y-auto"
+            className="bg-background shadow-lg border-2 max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
             style={{ borderRadius: '6px', borderColor: 'hsl(var(--border))' }}
             onScroll={() => {
               isScrolling.current = true;
@@ -531,21 +516,9 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                         </div>
                       ) : (
                         // Business result
-                        <div>
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">{result.name}</span>
-                            <span className="text-sm opacity-70">{(result as EnhancedBusiness).salary}</span>
-                          </div>
-                          <div className="flex gap-2 mt-1">
-                            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">
-                              {(result as EnhancedBusiness).businessType || 'Business'}
-                            </span>
-                            {(result as EnhancedBusiness).roles?.map((role, roleIndex) => (
-                              <span key={roleIndex} className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
-                                {role.role} - {role.salary}
-                              </span>
-                            ))}
-                          </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">{result.name}</span>
+                          <span className="text-sm opacity-70">{(result as EnhancedBusiness).businessType || 'Business'}</span>
                         </div>
                       )}
                     </div>

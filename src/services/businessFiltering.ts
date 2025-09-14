@@ -63,11 +63,7 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
     commonRoles.includes(term.toLowerCase())
   );
   
-  // If no exact role match found, treat the first text term as a potential role
-  if (!roleFilter && filteredTextTerms.length > 0) {
-    console.log('🔍 [parseSearchFilters] No exact role match found, using first term as potential role:', filteredTextTerms[0]);
-    roleFilter = filteredTextTerms[0];
-  }
+  // Only use terms that explicitly match known roles
   
   let businessTypeFilter = filteredTextTerms.find(term =>
     commonBusinessTypes.includes(term.toLowerCase())

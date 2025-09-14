@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 
 // Import the predefined job options to check against
 const JOB_OPTIONS = ["Software Engineer", "Frontend Developer", "Backend Developer", "Full Stack Developer", "Mobile App Developer", "Web Developer", "UI Designer", "UX Designer", "Data Scientist", "Machine Learning Engineer", "AI Researcher", "Cloud Architect", "DevOps Engineer", "Systems Administrator", "Network Engineer", "Database Administrator", "Cybersecurity Analyst", "QA Engineer", "Game Developer", "Embedded Systems Engineer", "Technical Writer", "Product Manager", "Scrum Master", "IT Support Specialist", "Help Desk Technician", "Doctor", "Nurse", "Licensed Practical Nurse", "Certified Nursing Assistant", "Pharmacist", "Pharmacy Technician", "Paramedic", "Emergency Medical Technician", "Dentist", "Dental Hygienist", "Dental Assistant", "Veterinarian", "Veterinary Technician", "Physical Therapist", "Occupational Therapist", "Radiologic Technologist", "Medical Assistant", "Surgical Technologist", "Respiratory Therapist", "Home Health Aide", "Barista", "Server", "Cook", "Line Cook", "Prep Cook", "Sous Chef", "Chef", "Pastry Chef", "Food Service Worker", "Waiter", "Waitress", "Host", "Hostess", "Busser", "Dishwasher", "Caterer", "Food Runner", "Fast Food Worker", "Drive-Thru Operator", "Bartender", "Barback", "Delivery Driver", "Pizza Delivery Driver", "Hotel Housekeeper", "Front Desk Clerk", "Hotel Concierge", "Bellhop", "Room Service Attendant", "Valet Attendant", "Casino Dealer", "Casino Host", "Event Coordinator", "Wedding Planner", "Banquet Server", "Club Promoter", "Tour Guide", "Cashier", "Retail Associate", "Sales Associate", "Stock Associate", "Customer Service Representative", "Customer Service", "Inventory Clerk", "Shelf Stocker", "Store Manager", "Assistant Store Manager", "Greeter", "Bagging Clerk", "Mall Security Guard", "Merchandiser", "Personal Shopper", "Gift Wrapper", "Loss Prevention Specialist", "Taxi Driver", "Ride-share Driver", "Driver", "Bus Driver", "School Bus Driver", "Truck Driver", "Delivery Driver", "Courier", "Bicycle Messenger", "Forklift Operator", "Warehouse Worker", "Order Picker", "Package Handler", "Logistics Coordinator", "Dock Worker", "Shipping Clerk", "Nanny", "Babysitter", "Daycare Worker", "Preschool Teacher", "Childcare Assistant", "Elder Caregiver", "Home Health Aide", "Housekeeper", "Cleaner", "Janitor", "Maid", "Pet Sitter", "Dog Walker", "Pet Groomer", "Landscaper", "Gardener", "Pool Cleaner", "Electrician", "Plumber", "Carpenter", "Welder", "HVAC Technician", "Auto Mechanic", "Diesel Mechanic", "Machinist", "Construction Worker", "General Laborer", "Roofing Specialist", "Painter", "Drywall Installer", "Flooring Installer", "Bricklayer", "Receptionist", "Administrative Assistant", "Office Clerk", "Data Entry Clerk", "File Clerk", "Executive Assistant", "Secretary", "Office Manager", "Virtual Assistant", "Call Center Representative", "Collections Agent", "Telemarketer", "Appointment Setter", "Mailroom Clerk", "Switchboard Operator", "Accountant", "Auditor", "Bookkeeper", "Tax Preparer", "Financial Analyst", "Budget Analyst", "Loan Officer", "Insurance Agent", "Claims Adjuster", "Bank Teller", "Mortgage Broker", "Investment Analyst", "Payroll Specialist", "Real Estate Agent", "Property Manager", "Teacher", "Teaching Assistant", "Substitute Teacher", "School Counselor", "Principal", "Tutor", "Librarian", "Library Assistant", "Academic Advisor", "Professor", "Lawyer", "Paralegal", "Legal Assistant", "Court Clerk", "Judge", "Security Guard", "Private Investigator", "Police Officer", "Corrections Officer", "Firefighter", "Manager", "Assistant Manager", "Shift Leader", "Supervisor", "Team Lead", "Freelance Writer", "Graphic Designer", "Illustrator", "Photographer", "Video Editor", "Voice Actor", "Music Producer", "Social Media Influencer", "Virtual Tutor", "Translator", "Maintenance Worker", "Facilities Technician", "Groundskeeper", "Building Superintendent", "Handyman", "Lifeguard", "Camp Counselor", "Amusement Park Worker", "Theme Park Attendant", "Carnival Worker", "Tour Bus Driver", "Street Performer", "Festival Staff", "Farm Worker", "Fruit Picker", "City Planner", "Urban Planner", "Building Inspector", "City Clerk", "City Council Member", "Mayor's Assistant", "Public Works Laborer", "Water Treatment Plant Operator", "Waste Management Worker", "Sanitation Worker", "Street Sweeper Operator", "Parking Enforcement Officer", "Meter Reader", "Building Maintenance Worker", "Parks and Recreation Worker", "Recreation Coordinator", "Community Outreach Specialist", "City Bus Driver", "Transit Operator", "Traffic Engineer", "Civil Engineer (Municipal)", "City Electrician", "Zoning Officer", "Public Safety Officer", "Emergency Management Coordinator", "City Attorney", "Planning and Zoning Coordinator", "City Engineer", "City Project Manager", "Permit Technician", "Code Enforcement Officer", "Neighborhood Services Coordinator", "City Grant Writer", "Community Development Specialist", "Animal Control Officer", "Public Health Inspector", "City Auditor", "Budget Officer", "City Finance Director", "Environmental Compliance Specialist", "City Surveyor", "Municipal Court Clerk", "Recycling Program Coordinator", "Water Quality Technician", "Traffic Signal Technician", "Road Maintenance Worker", "City Arborist", "Crew Member", "Associate", "Team Member", "Helper", "Laborer", "Worker", "Staff Member", "General Worker", "Operator", "Technician", "Specialist", "Coordinator", "Agent", "Assistant", "Personal Trainer", "Psychiatrist", "Consultant"];
+
 interface InitiationPageProps {
   onComplete: (data: {
     salary: string;
@@ -125,9 +126,17 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
         <div className="space-y-6">
           <div className="text-center">
             <h1 className="text-app-black mb-6 font-normal text-lg">
-              Make A Difference! ❤️
-              <br />
-              Share A Past Or Current Job
+              {/* Full text for larger screens, condensed for smaller screens */}
+              <span className="hidden sm:inline">
+                Make A Difference! ❤️
+                <br />
+                Share A Past Or Current Job
+              </span>
+              <span className="sm:hidden">
+                Make A Difference! ❤️
+                <br />
+                Share A Past Or Current Job
+              </span>
             </h1>
           </div>
         
@@ -147,7 +156,13 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
         
           <div className="text-center">
             <p className="text-app-black mb-4 text-lg">
-              Find Work That Works For You 👷‍♀️
+              {/* Full text for larger screens, condensed for smaller screens */}
+              <span className="hidden sm:inline">
+                Find Work That Works For You 👷‍♀️
+              </span>
+              <span className="sm:hidden">
+                Work That Works For You 👷‍♀️
+              </span>
             </p>
           </div>
         
@@ -164,7 +179,15 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
         
           <div className="text-center">
             <p className="text-app-black mb-4 text-lg font-normal">
-              3 Easy Questions. Kept Anonymous 🤐
+              {/* Full text for larger screens, condensed for smaller screens */}
+              <span className="hidden sm:inline">
+                3 Easy Questions. Kept Anonymous 🤐
+              </span>
+              <span className="sm:hidden">
+                3 Easy Questions.
+                <br />
+                Kept Anonymous 🤐
+              </span>
             </p>
           </div>
         
@@ -195,7 +218,15 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
         
           <div className="text-center mt-8">
             <p className="text-app-black text-lg">
-              Don't worry, your boss won't find out 😉
+              {/* Full text for larger screens, condensed for smaller screens */}
+              <span className="hidden sm:inline">
+                Don't worry, your boss won't find out 😉
+              </span>
+              <span className="sm:hidden">
+                Don't worry! 😉
+                <br />
+                Your boss won't find out
+              </span>
             </p>
           </div>
         
@@ -269,8 +300,6 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
             </div>
           )}
         </div>
-
-
       </div>
     </div>
   );
