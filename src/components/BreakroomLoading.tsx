@@ -56,15 +56,16 @@ const BreakroomLoading = ({ onComplete }: { onComplete?: () => void }) => {
       transform: 'scale(1.5)',
       transformOrigin: 'center center',
       animation: 'mugSmoothEntrance 1.2s ease-out forwards',
-      opacity: 0,
-      left: '6px'
+      opacity: 0
     },
     mugBody: {
       width: '48px',
       height: '60px',
       backgroundColor: '#B22222',
       borderRadius: '3px',
-      position: 'relative' as const,
+      position: 'absolute' as const,
+      left: '50%',
+      transform: 'translateX(-50%)',
       boxShadow: `
         inset -6px 0 0 rgba(0, 0, 0, 0.2),
         inset 0 -6px 0 rgba(0, 0, 0, 0.15),
@@ -73,7 +74,7 @@ const BreakroomLoading = ({ onComplete }: { onComplete?: () => void }) => {
     },
     mugHandle: {
       position: 'absolute' as const,
-      left: '-16px',
+      left: 'calc(50% - 40px)',
       top: '6px',
       width: '20px',
       height: '40px',
