@@ -53,6 +53,8 @@ const BreakroomLoading = ({ onComplete }: { onComplete?: () => void }) => {
     coffeeMug: {
       display: 'inline-block' as const,
       position: 'relative' as const,
+      width: '48px',
+      height: '60px',
       transform: 'scale(1.5)',
       transformOrigin: 'center center',
       animation: 'mugSmoothEntrance 1.2s ease-out forwards',
@@ -70,7 +72,8 @@ const BreakroomLoading = ({ onComplete }: { onComplete?: () => void }) => {
       boxShadow: `
         inset -6px 0 0 rgba(0, 0, 0, 0.2),
         inset 0 -6px 0 rgba(0, 0, 0, 0.15),
-        0 3px 6px rgba(0, 0, 0, 0.25)`
+        0 3px 6px rgba(0, 0, 0, 0.25)
+      `
     },
     mugHandle: {
       position: 'absolute' as const,
