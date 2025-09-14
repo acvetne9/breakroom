@@ -65,12 +65,12 @@ const BreakroomLoading = ({ onComplete }: { onComplete?: () => void }) => {
       borderRadius: '3px',
       position: 'absolute' as const,
       left: '50%',
+      top: '0',
       transform: 'translateX(-50%)',
       boxShadow: `
         inset -6px 0 0 rgba(0, 0, 0, 0.2),
         inset 0 -6px 0 rgba(0, 0, 0, 0.15),
-        0 3px 6px rgba(0, 0, 0, 0.25)
-      `
+        0 3px 6px rgba(0, 0, 0, 0.25)`
     },
     mugHandle: {
       position: 'absolute' as const,
