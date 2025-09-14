@@ -570,6 +570,21 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [selectedBusiness?.id, isClusteredData, businesses, handleBusinessClick, map, mapLoaded]);
 
+  // Force map recreation when component mounts to ensure custom tiles load
+  useEffect(() => {
+    if (map) {
+      console.log('🔄 Forcing map recreation to load custom tiles...');
+      try {
+        map.remove();
+      } catch (e) {
+        console.log('🔄 Map removal error (expected):', e);
+      }
+      setMap(null);
+      setMapLoaded(false);
+      layersAddedRef.current = false;
+    }
+  }, []); // Only run on mount
+
   // Initialize map with optimized configuration
   useEffect(() => {
     console.log('🔄 MapLibre useEffect triggered', { 
@@ -582,84 +597,75 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       } : null
     });
     
-    if (!mapRef.current || map) return;
+    if (!mapRef.current || map) {
+      console.log('🔄 Skipping map creation - container or map already exists');
+      return;
+    }
+
+    console.log('🗺️ Starting NEW map initialization...');
 
     // Comprehensive tile configuration for different environments
     const createTileSource = () => {
-      if (isCapacitor()) {
-        // For Capacitor, use OpenStreetMap raster tiles as fallback
-        // since vector tiles from capacitor://localhost don't work reliably
-        console.log('🔧 Using Capacitor raster tile fallback');
-        return null; // We'll create a raster source instead
-      } else {
-        // For web, use vector tiles
-        const fullUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-        console.log('🔧 Using web vector tiles:', fullUrl);
-        return {
-          type: 'vector' as const,
-          tiles: [fullUrl],
-          minzoom: 10,
-          maxzoom: 16,
-          scheme: 'xyz' as const
-        };
-      }
+      // Always try to use custom NYC vector tiles first, regardless of environment
+      const tileUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+      console.log('🔧 Creating NYC custom vector tile source:', tileUrl);
+      
+      return {
+        type: 'vector' as const,
+        tiles: [tileUrl],
+        minzoom: 10,
+        maxzoom: 16,
+        scheme: 'xyz' as const
+      };
     };
 
-    // Create appropriate map style based on environment
-    const createMapStyle = () => {
-      if (isCapacitor()) {
-        // For Capacitor, use a more reliable raster-based style with better error handling
-        console.log('🔧 Creating Capacitor raster map style');
-        return {
-          version: 8 as const,
-          sources: {
-            'osm': {
-              type: 'raster' as const,
-              tiles: [
-                'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-              ],
-              tileSize: 256,
-              attribution: '© OpenStreetMap contributors',
-              maxzoom: 19
-            }
-          },
-          layers: [
-            {
-              id: 'background',
-              type: 'background' as const,
-              paint: { 'background-color': '#B3E5FC' }
-            },
-            {
-              id: 'osm',
-              type: 'raster' as const,
-              source: 'osm',
-              minzoom: 0,
-              maxzoom: 19
-            }
-          ]
-        };
-      } else {
-        // For web, use vector tiles with full styling
-        const vectorSource = createTileSource();
-        if (!vectorSource) {
-          throw new Error('Vector source creation failed');
-        }
+    // Test if a sample tile exists and log the result
+    const testTileAccess = async () => {
+      const testTileUrl = `${window.location.origin}/data/tiles/12/1203/1536.pbf`;
+      console.log('🧪 Testing tile accessibility:', testTileUrl);
+      
+      try {
+        const response = await fetch(testTileUrl);
+        console.log('🧪 Tile test result:', {
+          status: response.status,
+          statusText: response.statusText,
+          contentType: response.headers.get('content-type'),
+          contentLength: response.headers.get('content-length')
+        });
         
-        return {
-          version: 8 as const,
-          sources: {
-            'nyc-tiles': vectorSource
-          },
-          glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-          layers: [
-            {
-              id: 'background',
-              type: 'background' as const,
-              paint: { 'background-color': '#F5F5DC' }
-            }
-          ]
-        };
+        if (response.ok) {
+          console.log('✅ Custom tiles are accessible!');
+        } else {
+          console.error('❌ Custom tiles not accessible:', response.status);
+        }
+      } catch (error) {
+        console.error('❌ Error testing tile access:', error);
       }
+    };
+    
+    testTileAccess();
+
+    // Create appropriate map style - ALWAYS use custom NYC tiles
+    const createMapStyle = () => {
+      console.log('🔧 Creating map style with NYC custom vector tiles');
+      
+      const vectorSource = createTileSource();
+      console.log('🔧 Vector source created:', vectorSource);
+        
+      return {
+        version: 8 as const,
+        sources: {
+          'nyc-tiles': vectorSource
+        },
+        glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+        layers: [
+          {
+            id: 'background',
+            type: 'background' as const,
+            paint: { 'background-color': '#f8f9fa' }
+          }
+        ]
+      };
     };
 
     const mapStyle = createMapStyle();
@@ -723,22 +729,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     // Enhanced error handling and loading
     mapInstance.on('error', (e) => {
       console.error('🚨 Map error:', e.error);
+      console.error('🚨 Error details:', {
+        type: e.type,
+        message: e.error?.message
+      });
     });
 
     mapInstance.on('load', () => {
-      console.log('🗺️ Map loaded successfully');
+      console.log('🗺️ Map loaded successfully - adding vector layers immediately');
       setMapLoaded(true);
       callbackRefs.current.onMapLoaded?.();
       
-      // For desktop, manually add layers after map loads if sourcedata doesn't fire
-      if (!isCapacitor() && !layersAddedRef.current) {
-        console.log('🔄 Manually adding vector layers after map load...');
-        setTimeout(() => {
-          if (!layersAddedRef.current) {
-            addVectorLayers(mapInstance);
-          }
-        }, 1000);
-      }
+      // Always add vector layers immediately after map loads
+      console.log('🔄 Adding NYC vector layers immediately after map load...');
+      setTimeout(() => {
+        addVectorLayers(mapInstance);
+      }, 100);
     });
 
     // Function to add vector layers
@@ -869,32 +875,37 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     mapInstance.on('zoomend', callViewportChange);
     mapInstance.on('move', debouncedMoveHandler);
 
-    // Add map layers when ready with environment-specific handling
+    // Add map layers when ready - enhanced debugging
     mapInstance.on('sourcedata', (e) => {
-      if (isCapacitor()) {
-        // For Capacitor with raster tiles
-        if (e.sourceId === 'osm' && e.isSourceLoaded && !layersAddedRef.current) {
-          console.log('✅ Capacitor raster tiles loaded successfully');
-          layersAddedRef.current = true;
-        } else if (e.sourceId === 'osm') {
-          console.log('🔄 OSM source event:', {
-            sourceId: e.sourceId,
-            isSourceLoaded: e.isSourceLoaded,
-            layersAdded: layersAddedRef.current
-          });
-        }
-        return;
-      }
+      console.log('🔄 Source data event:', {
+        sourceId: e.sourceId,
+        sourceDataType: e.sourceDataType,
+        isSourceLoaded: e.isSourceLoaded,
+        layersAdded: layersAddedRef.current
+      });
       
-      // For web environment with vector tiles
+      // For NYC vector tiles
       if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
-        console.log('🔄 NYC tiles source loaded, adding vector layers via sourcedata event...');
+        console.log('✅ NYC tiles source loaded, adding vector layers...');
         addVectorLayers(mapInstance);
-      } else if (e.sourceId === 'nyc-tiles') {
-        console.log('🔄 NYC tiles sourcedata event:', {
+      }
+    });
+
+    // Add tile loading debugging
+    mapInstance.on('dataloading', (e: any) => {
+      if (e.sourceId === 'nyc-tiles') {
+        console.log('🔄 NYC tiles data loading:', {
           sourceId: e.sourceId,
-          isSourceLoaded: e.isSourceLoaded,
-          layersAdded: layersAddedRef.current
+          sourceDataType: e.sourceDataType
+        });
+      }
+    });
+
+    mapInstance.on('data', (e: any) => {
+      if (e.sourceId === 'nyc-tiles') {
+        console.log('🔄 NYC tiles data loaded:', {
+          sourceId: e.sourceId,
+          sourceDataType: e.sourceDataType
         });
       }
     });
