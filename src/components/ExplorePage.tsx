@@ -155,9 +155,14 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
 
   const handleBusinessView = (businessId: string) => {
     console.log('👀 Eye clicked - navigating to home page with business:', businessId);
+    console.log('👀 onNavigateToHomeBusiness prop exists:', !!onNavigateToHomeBusiness);
+    
     // Use the new navigation prop to go to home page and open business preview
     if (onNavigateToHomeBusiness) {
+      console.log('👀 Calling onNavigateToHomeBusiness with:', businessId);
       onNavigateToHomeBusiness(businessId);
+    } else {
+      console.warn('👀 onNavigateToHomeBusiness prop not provided');
     }
   };
 
