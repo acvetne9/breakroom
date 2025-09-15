@@ -264,11 +264,13 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                     <div className="flex-shrink-0 w-10 flex justify-center mt-1 my-0">
                       {post.businessId ? (
                         <button
-                          onClick={e => {
-                            console.log('👀 Eye button clicked!', post.businessId);
-                            e.stopPropagation();
-                            handleBusinessView(post.businessId);
-                          }}
+                           onClick={e => {
+                             console.log('👀 Eye button clicked!', post.businessId);
+                             e.stopPropagation();
+                             if (post.businessId) {
+                               handleBusinessView(post.businessId);
+                             }
+                           }}
                           className="flex items-center justify-center w-8 h-8 text-lg hover:bg-gray-100 rounded-full transition-colors"
                           title="View business on map"
                         >
