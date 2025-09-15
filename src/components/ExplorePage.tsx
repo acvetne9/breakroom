@@ -251,50 +251,43 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                 )}
 
                 {/* Post content */}
-                <div className={`relative z-10 pb-10 ${post.images && post.images.length >= 5 ? 'post-overlay rounded-lg p-3' : ''}`}>
+                <div className={`relative z-10 ${post.images && post.images.length >= 5 ? 'post-overlay rounded-lg p-3' : ''}`}>
                   <div className="flex items-start justify-between mb-2">
                     <TranslatedText 
                       text={post.text}
-                      className={`flex-1 pr-4 break-words overflow-wrap-break-word ${
+                      className={`flex-1 break-words overflow-wrap-break-word ${
                         post.author === 'System' 
                           ? 'text-app-gray-medium italic' 
                           : 'text-app-black'
                       }`}
                     />
-                    <div className="flex-shrink-0 w-10 flex justify-center mt-1 my-0">
-                      {post.businessId ? (
-                        <button
-                           onClick={e => {
-                             console.log('👀 Eye button clicked!', post.businessId);
-                             e.stopPropagation();
-                             if (post.businessId) {
-                               handleBusinessView(post.businessId);
-                             }
-                           }}
-                          className="flex items-center justify-center w-8 h-8 text-lg hover:bg-gray-100 rounded-full transition-colors"
-                          title="View business on map"
-                        >
-                          👀
-                        </button>
-                      ) : (
-                        // Show a placeholder to see if the container is working
-                        <div className="w-8 h-8 flex items-center justify-center text-gray-300">
-                          •
-                        </div>
-                      )}
-                    </div>
+                    {/* Eye button - always visible when businessId exists */}
+                    {post.businessId && (
+                      <button
+                        onClick={e => {
+                          console.log('👀 Eye button clicked!', post.businessId);
+                          e.stopPropagation();
+                          if (post.businessId) {
+                            handleBusinessView(post.businessId);
+                          }
+                        }}
+                        className="ml-3 flex-shrink-0 flex items-center justify-center w-8 h-8 text-lg hover:bg-gray-100 rounded-full transition-colors"
+                        title="View business on map"
+                      >
+                        👀
+                      </button>
+                    )}
                   </div>
                   
-                  {/* Timestamp in bottom left */}
-                  <div className="absolute bottom-1 left-1">
+                  {/* Bottom section with timestamp and voting */}
+                  <div className="flex items-end justify-between pt-8">
+                    {/* Timestamp in bottom left */}
                     <span className="text-xs text-gray-400">
                       {post.author === 'System' ? 'Click to share!' : formatTimeAgo(post.createdAt)}
                     </span>
-                  </div>
-                  
-                  {/* Voting component in bottom right */}
-                  {post.author !== 'System' && (
-                    <div className="absolute bottom-1 right-1">
+                    
+                    {/* Voting component in bottom right */}
+                    {post.author !== 'System' && (
                       <VotingComponent 
                         upvotes={post.upvotes} 
                         downvotes={post.downvotes} 
@@ -303,8 +296,8 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                         isOwner={post.author === 'You'}
                         onDelete={() => handlePostDelete(post.id)}
                       />
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
 
                 {/* Expanded view */}
