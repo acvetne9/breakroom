@@ -147,8 +147,11 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   const handleLocationChange = (value: string, fullLocation?: string) => {
     setLocation(value);
     setFullLocation(fullLocation || value);
-    setShowNewBusinessForm(value && value.length > 2);
+  
+    // Only show "new business form" if user typed free text (not from dropdown)
+    setShowNewBusinessForm(!fullLocation && value.length > 2);
   };
+
 
   const handleLocationBlur = () => {
     const value = location.trim();
