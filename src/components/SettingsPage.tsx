@@ -533,7 +533,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             </div>
 
             {/* New Business Form for Current Job */}
-            {showNewBusinessForm && (
+            {showNewBusinessForm === true && (
               <div className="space-y-4">
                 <div>
                   <input
