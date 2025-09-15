@@ -80,6 +80,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [lastValidPastLocations, setLastValidPastLocations] = useState<{[id: string]: string}>({});
   
   const [currentTimePeriod, setCurrentTimePeriod] = useState(initialData.timePeriod || 'HR');
+  const [showNewBusinessForm, setShowNewBusinessForm] = useState(false);
+  const [newBusinessAddress, setNewBusinessAddress] = useState('');
+  const [isCreatingBusiness, setIsCreatingBusiness] = useState(false);
+  const [addressError, setAddressError] = useState('');
   const [pastJobs, setPastJobs] = useState<PastJob[]>([{
     id: '1',
     salary: '',
@@ -303,6 +307,76 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     setCurrentJobChanged(true);
     // Reset validation state when location changes
     setCurrentJobLocationValid(true);
+    setShowNewBusinessForm(value && value.length > 2);
+  };
+
+  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setNewBusinessAddress(value);
+    
+    // Clear previous error when user starts typing
+    if (addressError) {
+      setAddressError('');
+    }
+  };
+
+  const validateAndCreateBusiness = async () => {
+    const address = newBusinessAddress.trim();
+    
+    if (!address) {
+      setAddressError('Please enter a business address');
+      toast({
+        title: 'Address required',
+        description: 'Please enter the business address',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (isProfane(address)) {
+      setAddressError('Invalid address content');
+      toast({
+        title: 'Invalid address',
+        description: 'Inappropriate content detected in address',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!isValidAddress(address)) {
+      setAddressError('Please enter a valid street address (e.g., "123 Main St, City, State")');
+      return;
+    }
+
+    if (!currentJob.salary || !currentJob.role) {
+      toast({
+        title: 'Missing information',
+        description: 'Please fill in salary and role first',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsCreatingBusiness(true);
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      toast({
+        title: 'Business created!',
+        description: 'New business has been added to the map',
+      });
+      setShowNewBusinessForm(false);
+      setNewBusinessAddress('');
+      setAddressError('');
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to create business. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCreatingBusiness(false);
+    }
   };
 
   const handleCurrentJobLocationBlur = () => { 
