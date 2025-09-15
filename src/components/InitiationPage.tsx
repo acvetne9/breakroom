@@ -23,7 +23,7 @@ const isValidAddress = (address: string): boolean => {
   const trimmedAddress = address.trim();
   
   // Check minimum length
-  if (trimmedAddress.length < 8) {
+  if (trimmedAddress.length < 10) {
     return false;
   }
   
@@ -205,11 +205,6 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
 
     if (!isValidAddress(address)) {
       setAddressError('Please enter a valid street address (e.g., "123 Main St, City, State")');
-      toast({
-        title: 'Invalid address format',
-        description: 'Please enter a complete street address with number, street name, and street type',
-        variant: 'destructive',
-      });
       return;
     }
 
