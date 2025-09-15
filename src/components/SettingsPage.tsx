@@ -634,7 +634,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                       setBusinessSelected(false); // reset when typing
                     }}
                     onSelect={(business) => {
-                      setBusiness(business);
+                      setSelectedBusiness(business);
                       setBusinessSelected(true); // valid selection
                     }}
                     onBlur={handleCurrentJobLocationBlur}
