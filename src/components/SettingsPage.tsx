@@ -80,10 +80,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [lastValidPastLocations, setLastValidPastLocations] = useState<{[id: string]: string}>({});
   
   const [currentTimePeriod, setCurrentTimePeriod] = useState(initialData.timePeriod || 'HR');
+  
+  // New business form states
   const [showNewBusinessForm, setShowNewBusinessForm] = useState(false);
   const [newBusinessAddress, setNewBusinessAddress] = useState('');
   const [isCreatingBusiness, setIsCreatingBusiness] = useState(false);
   const [addressError, setAddressError] = useState('');
+  
   const [pastJobs, setPastJobs] = useState<PastJob[]>([{
     id: '1',
     salary: '',
