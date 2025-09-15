@@ -560,8 +560,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     type="text"
                     placeholder="Enter business address..."
                     className="app-input w-full mt-2"
-                    value={currentJobAddress}
-                    onChange={(e) => setCurrentJobAddress(e.target.value)}
+                    value={currentJob.location}
+                    onChange={(e) => handleCurrentJobLocationChange(e.target.value)}
                   />
                 </>
               )}
