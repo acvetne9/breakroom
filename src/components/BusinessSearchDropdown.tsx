@@ -35,7 +35,8 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
   newBusinessAddress: externalAddress = "",
   onAddressChange,
   onCreateBusiness: externalCreateBusiness,
-  isCreatingBusiness: externalIsCreating = false
+  isCreatingBusiness: externalIsCreating = false,
+  onSelect
 }) => {
   const { businesses, setBusinesses } = useBusinessesData();
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -136,7 +137,7 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
     onChange(business.name, business.formatted_address || business.vicinity || business.name);
     setShowDropdown(false);
     setInternalShowAddForm(false);
-    onselect?.(business);
+    onSelect?.(business);
   };
 
   const handleInputBlur = () => {
