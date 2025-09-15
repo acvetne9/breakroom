@@ -385,13 +385,20 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     }
   };
 
-  const handleCurrentJobLocationBlur = () => { 
+  const handleCurrentJobLocationBlur = () => {
     if (currentJob.location && !validateProfanity(currentJob.location, 'location')) {
       setCurrentJob({ ...currentJob, location: '' });
       return;
     }
-
-    // Validate address
+  
+    // ✅ Skip validation if a business was selected (fullLocation exists)
+    if (currentJobFullLocation) {
+      setLastValidCurrentLocation(currentJob.location);
+      setCurrentJobLocationValid(true);
+      return;
+    }
+  
+    // Validate only free-typed addresses
     if (currentJob.location && !isValidAddress(currentJob.location)) {
       setCurrentJobLocationValid(false);
     } else if (currentJob.location) {
@@ -399,6 +406,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       setCurrentJobLocationValid(true);
     }
   };
+
 
   const handleCurrentTimePeriodChange = (value: string) => { setCurrentTimePeriod(value); setCurrentJobChanged(true); };
 
