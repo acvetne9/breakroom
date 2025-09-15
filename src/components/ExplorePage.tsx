@@ -265,11 +265,6 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                             e.stopPropagation();
                             if (post.businessId) {
                               handleBusinessView(post.businessId);
-                            } else if (post.linkedLocation) {
-                              toast({
-                                title: "Location",
-                                description: post.linkedLocation
-                              });
                             }
                           }}
                           className="flex items-center space-x-1 text-app-gray-medium hover:text-app-black"
