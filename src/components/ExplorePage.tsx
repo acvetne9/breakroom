@@ -222,19 +222,32 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
         <div className="space-y-4 px-4">
           {displayPosts.map(post => (
             <div key={post.id} className="relative">
-              {/* Eye button - positioned at the very top level to ensure visibility */}
-              {post.businessId && (
+              {/* DEBUG: Show eye button for ALL posts to test, and log post data */}
+              {(() => {
+                console.log('🔍 Post data:', { 
+                  id: post.id, 
+                  businessId: post.businessId, 
+                  businessName: post.businessName,
+                  hasBusinessId: !!post.businessId 
+                });
+                return true; // Always show for debugging
+              })() && (
                 <button
                   onClick={e => {
-                    console.log('👀 Eye button clicked!', post.businessId);
+                    console.log('👀 Eye button clicked!', { 
+                      businessId: post.businessId,
+                      businessName: post.businessName,
+                      post: post 
+                    });
                     e.stopPropagation();
                     if (post.businessId) {
                       handleBusinessView(post.businessId);
+                    } else {
+                      console.warn('No businessId found on post:', post);
                     }
                   }}
-                  className="absolute top-2 right-2 z-50 flex items-center justify-center w-12 h-12 rounded-full transition-all duration-200 bg-red-500 hover:bg-red-600 shadow-lg border-2 border-white hover:scale-110"
+                  className="absolute top-2 right-2 z-30 flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 bg-white shadow-md border border-gray-300 hover:border-blue-400 hover:shadow-lg"
                   title="View business on map"
-                  style={{ fontSize: '24px' }}
                 >
                   👀
                 </button>
