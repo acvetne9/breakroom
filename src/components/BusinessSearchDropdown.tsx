@@ -19,6 +19,7 @@ interface BusinessSearchDropdownProps {
   onAddressChange?: (address: string) => void;
   onCreateBusiness?: () => void;
   isCreatingBusiness?: boolean;
+  onSelect?: (business: any) => void;
 }
 
 const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
@@ -135,6 +136,7 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
     onChange(business.name, business.formatted_address || business.vicinity || business.name);
     setShowDropdown(false);
     setInternalShowAddForm(false);
+    if (onSelect) onSelect(business);
   };
 
   const handleInputBlur = () => {

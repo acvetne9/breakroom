@@ -527,16 +527,20 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             <div>
               <BusinessSearchDropdown
                 value={currentJob.location}
-                onChange={handleCurrentJobLocationChange}
+                onChange={(val) => {
+                  handleCurrentJobLocationChange(val);
+                  setCurrentJobLocationValid(false); // NEW: reset validity when typing
+                }}
                 onBlur={handleCurrentJobLocationBlur}
+                onSelect={() => setCurrentJobLocationValid(true)} // NEW: mark valid when a business is chosen
                 className={`app-input w-full ${!currentJobLocationValid ? 'border-red-500' : ''}`}
                 placeholder="Where do you work?..."
                 salary={currentJob.salary}
                 role={currentJob.role}
                 timePeriod={currentTimePeriod}
               />
-              {!currentJobLocationValid && (
-                <p className="text-red-500 text-xs mt-1">Please enter a valid address</p>
+              {!businessSelected && businessInput.trim() !== "" && (
+                <p className="text-sm text-red-500 mt-1">Please enter a valid address</p>
               )}
             </div>
 
@@ -617,17 +621,21 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 {/* Location */}
                 <div>
                   <BusinessSearchDropdown
-                    value={job.location}
-                    onChange={(value) => updatePastJob(job.id, 'location', value)}
-                    onBlur={() => handlePastJobBlur(job.id, 'location', job.location)}
-                    className={`app-input w-full ${pastJobLocationValidation[job.id] === false ? 'border-red-500' : ''}`}
-                    placeholder="Where'd you work?..."
-                    salary={job.salary}
-                    role={job.role}
-                    timePeriod={pastJobTimePeriods[job.id]}
+                    value={currentJob.location}
+                    onChange={(val) => {
+                      handleCurrentJobLocationChange(val);
+                      setCurrentJobLocationValid(false); // NEW: reset validity when typing
+                    }}
+                    onBlur={handleCurrentJobLocationBlur}
+                    onSelect={() => setCurrentJobLocationValid(true)} // NEW: mark valid when a business is chosen
+                    className={`app-input w-full ${!currentJobLocationValid ? 'border-red-500' : ''}`}
+                    placeholder="Where do you work?..."
+                    salary={currentJob.salary}
+                    role={currentJob.role}
+                    timePeriod={currentTimePeriod}
                   />
-                  {pastJobLocationValidation[job.id] === false && (
-                    <p className="text-red-500 text-xs mt-1">Please enter a valid address</p>
+                  {!businessSelected && businessInput.trim() !== "" && (
+                    <p className="text-sm text-red-500 mt-1">Please enter a valid address</p>
                   )}
                 </div>
                 
