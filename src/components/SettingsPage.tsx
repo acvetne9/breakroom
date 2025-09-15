@@ -71,6 +71,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     initialData.fullLocation || initialData.location
   );
   
+  // Add validation states for addresses
+  const [currentJobLocationValid, setCurrentJobLocationValid] = useState<boolean>(true);
+  const [pastJobLocationValidation, setPastJobLocationValidation] = useState<{[id: string]: boolean}>({});
+  const [lastValidCurrentLocation, setLastValidCurrentLocation] = useState<string>(
+    initialData.fullLocation || initialData.location
+  );
+  const [lastValidPastLocations, setLastValidPastLocations] = useState<{[id: string]: string}>({});
+  
   const [currentTimePeriod, setCurrentTimePeriod] = useState(initialData.timePeriod || 'HR');
   const [pastJobs, setPastJobs] = useState<PastJob[]>([{
     id: '1',
@@ -104,6 +112,22 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   useEffect(() => { changedJobsRef.current = changedJobs; }, [changedJobs]);
   useEffect(() => { currentJobChangedRef.current = currentJobChanged; }, [currentJobChanged]);
 
+  // Initialize validation states for existing jobs
+  useEffect(() => {
+    const initialValidation: {[id: string]: boolean} = {};
+    const initialValidLocations: {[id: string]: string} = {};
+    
+    pastJobs.forEach(job => {
+      initialValidation[job.id] = true;
+      if (job.location) {
+        initialValidLocations[job.id] = job.location;
+      }
+    });
+    
+    setPastJobLocationValidation(initialValidation);
+    setLastValidPastLocations(initialValidLocations);
+  }, []);
+
   // Close help popup when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -120,6 +144,57 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       document.removeEventListener('click', handleClickOutside);
     };
   }, [showHelpPopup]);
+
+  // Address validation function
+  const isValidAddress = (address: string): boolean => {
+    if (!address || address.trim().length === 0) return true; // Empty is valid (optional field)
+    
+    const trimmedAddress = address.trim();
+    
+    // Check minimum length
+    if (trimmedAddress.length < 10) {
+      return false;
+    }
+    
+    // Check for basic address components
+    const hasNumbers = /\d/.test(trimmedAddress);
+    const hasLetters = /[a-zA-Z]/.test(trimmedAddress);
+    const hasSpaces = /\s/.test(trimmedAddress);
+    
+    // Must have numbers (street number), letters, and spaces
+    if (!hasNumbers || !hasLetters || !hasSpaces) {
+      return false;
+    }
+    
+    // Common street types/suffixes
+    const streetTypes = [
+      'street', 'st', 'avenue', 'ave', 'road', 'rd', 'drive', 'dr', 'lane', 'ln',
+      'boulevard', 'blvd', 'court', 'ct', 'place', 'pl', 'way', 'circle', 'cir',
+      'plaza', 'square', 'sq', 'parkway', 'pkwy', 'trail', 'tr', 'terrace', 'ter',
+      'highway', 'hwy', 'loop', 'row', 'walk', 'alley', 'crescent', 'cres',
+      'grove', 'heights', 'hill', 'park', 'ridge', 'view', 'crossing', 'xing'
+    ];
+    
+    const addressLower = trimmedAddress.toLowerCase();
+    const hasStreetType = streetTypes.some(type => 
+      addressLower.includes(' ' + type + ' ') || 
+      addressLower.endsWith(' ' + type) ||
+      addressLower.includes(' ' + type + ',')
+    );
+    
+    // Check for common address patterns
+    const addressPatterns = [
+      // Pattern: number + street name + type (e.g., "123 Main St")
+      /^\d+\s+[a-zA-Z\s]+\s+(street|st|avenue|ave|road|rd|drive|dr|lane|ln|boulevard|blvd|court|ct|place|pl|way|circle|cir|plaza|square|sq|parkway|pkwy|trail|tr|terrace|ter|highway|hwy|loop|row|walk|alley|crescent|cres|grove|heights|hill|park|ridge|view|crossing|xing)\b/i,
+      // Pattern with apartment/unit numbers
+      /^\d+\s+[a-zA-Z\s]+\s+(street|st|avenue|ave|road|rd|drive|dr|lane|ln|boulevard|blvd|court|ct|place|pl|way|circle|cir|plaza|square|sq|parkway|pkwy|trail|tr|terrace|ter|highway|hwy|loop|row|walk|alley|crescent|cres|grove|heights|hill|park|ridge|view|crossing|xing)\b.*?(apt|apartment|unit|suite|ste)?\s*\#?\d*$/i
+    ];
+    
+    const matchesPattern = addressPatterns.some(pattern => pattern.test(trimmedAddress));
+    
+    // Address is valid if it has street type or matches common patterns
+    return hasStreetType || matchesPattern;
+  };
 
   const validateProfanity = (text: string, fieldName: string): boolean => {
     if (isProfane(text)) {
@@ -183,14 +258,31 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     const newJob: PastJob = { id: newJobId, salary: '', role: '', location: '' };
     setPastJobs([...pastJobs, newJob]);
     setPastJobTimePeriods({ ...pastJobTimePeriods, [newJobId]: 'HR' });
+    setPastJobLocationValidation({ ...pastJobLocationValidation, [newJobId]: true });
+    setLastValidPastLocations({ ...lastValidPastLocations, [newJobId]: '' });
   };
 
-  const removePastJob = (id: string) => setPastJobs(pastJobs.filter(job => job.id !== id));
+  const removePastJob = (id: string) => {
+    setPastJobs(pastJobs.filter(job => job.id !== id));
+    const newValidation = { ...pastJobLocationValidation };
+    const newValidLocations = { ...lastValidPastLocations };
+    delete newValidation[id];
+    delete newValidLocations[id];
+    setPastJobLocationValidation(newValidation);
+    setLastValidPastLocations(newValidLocations);
+  };
+
   const updatePastJob = (id: string, field: keyof Omit<PastJob, 'id'>, value: string) => {
     const processedValue = field === 'salary' ? (value.replace(/[^0-9.]/g, '') ? `$${value.replace(/[^0-9.]/g, '')}` : '') : value;
     setPastJobs(pastJobs.map(job => job.id === id ? { ...job, [field]: processedValue } : job));
     setChangedJobs(prev => new Set([...prev, id]));
+    
+    // Reset validation state when location changes
+    if (field === 'location') {
+      setPastJobLocationValidation({ ...pastJobLocationValidation, [id]: true });
+    }
   };
+
   const updatePastJobTimePeriod = (id: string, timePeriod: string) => {
     setPastJobTimePeriods({ ...pastJobTimePeriods, [id]: timePeriod });
     setChangedJobs(prev => new Set([...prev, id]));
@@ -204,10 +296,109 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const handleCurrentJobRoleChange = (value: string) => { setCurrentJob({ ...currentJob, role: value }); setCurrentJobChanged(true); };
   const handleCurrentJobRoleBlur = () => { if (currentJob.role && !validateProfanity(currentJob.role, 'role')) setCurrentJob({ ...currentJob, role: '' }); };
-  const handleCurrentJobLocationChange = (value: string, fullLocation?: string) => { setCurrentJob({ ...currentJob, location: value }); if (fullLocation) setCurrentJobFullLocation(fullLocation); setCurrentJobChanged(true); };
-  const handleCurrentJobLocationBlur = () => { if (currentJob.location && !validateProfanity(currentJob.location, 'location')) setCurrentJob({ ...currentJob, location: '' }); };
+
+  const handleCurrentJobLocationChange = (value: string, fullLocation?: string) => { 
+    setCurrentJob({ ...currentJob, location: value }); 
+    if (fullLocation) setCurrentJobFullLocation(fullLocation); 
+    setCurrentJobChanged(true);
+    // Reset validation state when location changes
+    setCurrentJobLocationValid(true);
+  };
+
+  const handleCurrentJobLocationBlur = () => { 
+    if (currentJob.location && !validateProfanity(currentJob.location, 'location')) {
+      setCurrentJob({ ...currentJob, location: '' });
+      return;
+    }
+
+    // Validate address
+    if (currentJob.location && !isValidAddress(currentJob.location)) {
+      setCurrentJobLocationValid(false);
+    } else if (currentJob.location) {
+      setLastValidCurrentLocation(currentJob.location);
+      setCurrentJobLocationValid(true);
+    }
+  };
+
   const handleCurrentTimePeriodChange = (value: string) => { setCurrentTimePeriod(value); setCurrentJobChanged(true); };
-  const handlePastJobBlur = (id: string, field: 'role' | 'location', value: string) => { if (value && !validateProfanity(value, field)) updatePastJob(id, field, ''); };
+
+  const handlePastJobBlur = (id: string, field: 'role' | 'location', value: string) => { 
+    if (value && !validateProfanity(value, field)) {
+      updatePastJob(id, field, '');
+      return;
+    }
+
+    // Handle location validation for past jobs
+    if (field === 'location' && value) {
+      if (!isValidAddress(value)) {
+        setPastJobLocationValidation({ ...pastJobLocationValidation, [id]: false });
+      } else {
+        setLastValidPastLocations({ ...lastValidPastLocations, [id]: value });
+        setPastJobLocationValidation({ ...pastJobLocationValidation, [id]: true });
+      }
+    }
+  };
+
+  // Handle page navigation with invalid address recovery
+  const handlePageLeave = () => {
+    // Restore valid addresses if current ones are invalid
+    if (!currentJobLocationValid && lastValidCurrentLocation) {
+      setCurrentJob({ ...currentJob, location: lastValidCurrentLocation });
+      setCurrentJobFullLocation(lastValidCurrentLocation);
+    }
+
+    // Restore valid past job locations
+    Object.keys(pastJobLocationValidation).forEach(jobId => {
+      if (!pastJobLocationValidation[jobId] && lastValidPastLocations[jobId]) {
+        updatePastJob(jobId, 'location', lastValidPastLocations[jobId]);
+      }
+    });
+  };
+
+  // Override the page leave effect to handle address restoration
+  useEffect(() => {
+    return () => {
+      handlePageLeave();
+      
+      if (hasCreatedPostsRef.current || !onJobUpdate) return;
+      hasCreatedPostsRef.current = true;
+
+      const hasCurrentJobChangedFromRefs = () => (
+        currentJobRef.current.salary !== initialCurrentJob.salary ||
+        currentJobRef.current.role !== initialCurrentJob.role ||
+        currentJobRef.current.location !== initialCurrentJob.location ||
+        currentTimePeriodRef.current !== initialTimePeriod
+      );
+
+      const isCurrentJobCompleteFromRefs = () => (
+        currentJobRef.current.salary && currentJobRef.current.role && currentJobRef.current.location && currentTimePeriodRef.current
+      );
+
+      if (currentJobChangedRef.current && hasCurrentJobChangedFromRefs() && isCurrentJobCompleteFromRefs()) {
+        onJobUpdate({
+          salary: currentJobRef.current.salary,
+          role: currentJobRef.current.role,
+          location: currentJobFullLocationRef.current || currentJobRef.current.location,
+          timePeriod: currentTimePeriodRef.current
+        });
+      }
+
+      changedJobsRef.current.forEach(jobId => {
+        const job = pastJobsRef.current.find(j => j.id === jobId);
+        const timePeriod = pastJobTimePeriodsRef.current[jobId];
+        if (job && isPastJobComplete(job, timePeriod)) {
+          onJobUpdate({
+            salary: job.salary,
+            role: job.role,
+            location: job.location,
+            timePeriod: timePeriod
+          });
+        }
+      });
+      
+      onPageLeave?.();
+    };
+  }, []);
 
   // Handle help button click with scroll to bottom
   const handleHelpButtonClick = (e: React.MouseEvent) => {
@@ -245,16 +436,21 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           <h2 className="text-lg font-medium text-app-black mb-4">Current Job</h2>
           <div className="space-y-4">
             {/* Location */}
-            <BusinessSearchDropdown
-              value={currentJob.location}
-              onChange={handleCurrentJobLocationChange}
-              onBlur={handleCurrentJobLocationBlur}
-              className="app-input w-full"
-              placeholder="Where'd you work?..."
-              salary={currentJob.salary}
-              role={currentJob.role}
-              timePeriod={currentTimePeriod}
-            />
+            <div>
+              <BusinessSearchDropdown
+                value={currentJob.location}
+                onChange={handleCurrentJobLocationChange}
+                onBlur={handleCurrentJobLocationBlur}
+                className={`app-input w-full ${!currentJobLocationValid ? 'border-red-500' : ''}`}
+                placeholder="Where'd you work?..."
+                salary={currentJob.salary}
+                role={currentJob.role}
+                timePeriod={currentTimePeriod}
+              />
+              {!currentJobLocationValid && (
+                <p className="text-red-500 text-xs mt-1">Please enter a valid address</p>
+              )}
+            </div>
             
             {/* Role */}
             <JobSearchDropdown
@@ -290,16 +486,21 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             {pastJobs.map(job => (
               <div key={job.id} className="space-y-3 w-full">
                 {/* Location */}
-                <BusinessSearchDropdown
-                  value={job.location}
-                  onChange={(value) => updatePastJob(job.id, 'location', value)}
-                  onBlur={() => handlePastJobBlur(job.id, 'location', job.location)}
-                  className="app-input w-full"
-                  placeholder="Where'd you work?..."
-                  salary={job.salary}
-                  role={job.role}
-                  timePeriod={pastJobTimePeriods[job.id]}
-                />
+                <div>
+                  <BusinessSearchDropdown
+                    value={job.location}
+                    onChange={(value) => updatePastJob(job.id, 'location', value)}
+                    onBlur={() => handlePastJobBlur(job.id, 'location', job.location)}
+                    className={`app-input w-full ${pastJobLocationValidation[job.id] === false ? 'border-red-500' : ''}`}
+                    placeholder="Where'd you work?..."
+                    salary={job.salary}
+                    role={job.role}
+                    timePeriod={pastJobTimePeriods[job.id]}
+                  />
+                  {pastJobLocationValidation[job.id] === false && (
+                    <p className="text-red-500 text-xs mt-1">Please enter a valid address</p>
+                  )}
+                </div>
                 
                 {/* Role */}
                 <JobSearchDropdown
