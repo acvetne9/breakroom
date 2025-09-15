@@ -291,11 +291,11 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
       />
       
       {/* Tiny text bottom left - only show when business not found */}
-      {businessNotFound && (
+      /* {businessNotFound && (
         <div className="absolute -bottom-5 left-0 text-xs text-muted-foreground">
           Business not found - fill address below
         </div>
-      )}
+      )} */
 
       {/* Search Results Dropdown */}
       {showDropdown && searchResults.length > 0 && (
