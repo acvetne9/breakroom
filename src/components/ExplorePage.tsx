@@ -254,29 +254,31 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                   <div className="flex items-start justify-between mb-2">
                     <TranslatedText 
                       text={post.text}
-                      className={`flex-1 break-words overflow-wrap-break-word ${
+                      className={`flex-1 break-words overflow-wrap-break-word pr-3 ${
                         post.author === 'System' 
                           ? 'text-app-gray-medium italic' 
                           : 'text-app-black'
                       }`}
                     />
-                    {/* Eye button - always visible when businessId exists */}
-                    {post.businessId && (
-                      <button
-                        onClick={e => {
-                          console.log('👀 Eye button clicked!', post.businessId);
-                          e.stopPropagation();
-                          if (post.businessId) {
-                            handleBusinessView(post.businessId);
-                          }
-                        }}
-                        className="ml-3 flex-shrink-0 flex items-center justify-center w-10 h-10 text-2xl hover:bg-gray-100 rounded-full transition-colors bg-white/80 backdrop-blur-sm shadow-sm border border-gray-200"
-                        title="View business on map"
-                      >
-                        👀
-                      </button>
-                    )}
                   </div>
+                  
+                  {/* Eye button - positioned in top right corner */}
+                  {post.businessId && (
+                    <button
+                      onClick={e => {
+                        console.log('👀 Eye button clicked!', post.businessId);
+                        e.stopPropagation();
+                        if (post.businessId) {
+                          handleBusinessView(post.businessId);
+                        }
+                      }}
+                      className="absolute top-2 right-2 z-20 flex items-center justify-center w-12 h-12 text-2xl hover:bg-blue-100 rounded-full transition-all duration-200 bg-white shadow-lg border-2 border-blue-200 hover:border-blue-400 hover:scale-110"
+                      title="View business on map"
+                      style={{ fontSize: '20px' }}
+                    >
+                      👀
+                    </button>
+                  )}
                   
                   {/* Bottom section with timestamp and voting */}
                   <div className="flex items-end justify-between pt-8">
