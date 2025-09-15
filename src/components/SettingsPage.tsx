@@ -86,6 +86,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [newBusinessAddress, setNewBusinessAddress] = useState('');
   const [isCreatingBusiness, setIsCreatingBusiness] = useState(false);
   const [addressError, setAddressError] = useState('');
+
+  const [businessSelected, setBusinessSelected] = useState(false);
+  const [businessInput, setBusinessInput] = useState("");
   
   const [pastJobs, setPastJobs] = useState<PastJob[]>([{
     id: '1',
