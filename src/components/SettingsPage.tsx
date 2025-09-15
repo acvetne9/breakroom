@@ -551,7 +551,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 role={currentJob.role}
                 timePeriod={currentTimePeriod}
               />
-            
+          
               {/* Show error + address input */}
               {!currentJobSelected && currentJobInput.trim() !== "" && (
                 <>
@@ -562,12 +562,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     className="app-input w-full mt-2"
                     value={currentJob.location}
                     onChange={(e) => handleCurrentJobLocationChange(e.target.value)}
+                    onBlur={handleCurrentJobLocationBlur}
                   />
                 </>
               )}
             </div>
-
-
+            
             {/* New Business Form for Current Job */}
             {showNewBusinessForm && (
               <div className="space-y-4">
@@ -670,9 +670,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                         type="text"
                         placeholder="Enter business address..."
                         className="app-input w-full mt-2"
-                        value={pastJobAddress}
-                        onChange={(e) => setPastJobAddress(e.target.value)}
+                        value={job.location}
+                        onChange={(e) => updatePastJob(job.id, "location", e.target.value)}
+                        onBlur={() => handlePastJobBlur(job.id, "location", job.location)}
                       />
+
                     </>
                   )}
                 </div>
