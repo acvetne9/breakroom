@@ -19,7 +19,7 @@ interface BusinessSearchDropdownProps {
   onAddressChange?: (address: string) => void;
   onCreateBusiness?: () => void;
   isCreatingBusiness?: boolean;
-  onSelect?: (business: any) => void;
+  onselect?: (business: any) => void;
 }
 
 const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
