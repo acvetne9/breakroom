@@ -242,13 +242,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // Ensure businesses is always an array to prevent dependency array crashes
   const businesses = Array.isArray(rawBusinesses) ? rawBusinesses : [];
   
-  // Log businesses for debugging
+  // Log businesses for debugging and ensure they get cached
   useEffect(() => {
     console.log(`🎯 MapLibreMap received ${businesses.length} businesses:`, {
       searchFilters: !!searchFilters,
       hasNeighborhoodFilter: !!searchFilters?.neighborhoodFilter,
       businessNames: businesses.slice(0, 5).map(b => b.name)
     });
+
+    // CRITICAL: Add businesses from hook to cache so DeckGL can render them
+    if (businesses && businesses.length > 0) {
+      console.log(`🏪 Adding ${businesses.length} businesses to cache for DeckGL rendering`);
+      businessCacheRef.current.addMultiple(businesses);
+      console.log(`💾 Cache now contains ${businessCacheRef.current.getAll().length} businesses`);
+    }
   }, [businesses, searchFilters]);
 
   // Optimized business limit calculation
@@ -500,8 +507,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const deckGLLayers = useMemo(() => {
     const cachedBusinesses = businessCacheRef.current.getAll();
     
+    // Also consider businesses from hook state as fallback/supplement
+    const allBusinesses = cachedBusinesses.length > 0 ? cachedBusinesses : businesses;
+    
     console.log('🎯 DeckGL layers calculation:', {
       cachedBusinessesCount: cachedBusinesses?.length || 0,
+      hookBusinessesCount: businesses?.length || 0,
+      finalBusinessesCount: allBusinesses?.length || 0,
       mapLoaded,
       hasMap: !!map,
       containerDimensions: mapRef.current ? {
@@ -510,13 +522,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       } : null
     });
     
-    if (!cachedBusinesses || cachedBusinesses.length === 0) {
-      console.log('❌ No cached businesses for DeckGL layers');
+    if (!allBusinesses || allBusinesses.length === 0) {
+      console.log('❌ No businesses available for DeckGL layers (cache + hook)');
       return [];
     }
 
     try {
-      let businessesToRender = cachedBusinesses;
+      let businessesToRender = allBusinesses;
       
       // Handle clustered data efficiently
       if (isClusteredData && Array.isArray(businesses) && businesses.length > 0) {
@@ -583,7 +595,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.error('Error creating DeckGL layers:', error);
       return [];
     }
-  }, [selectedBusiness?.id, isClusteredData, businesses, handleBusinessClick, map, mapLoaded]);
+  }, [businesses, selectedBusiness?.id, isClusteredData, handleBusinessClick, map, mapLoaded]);
 
   // Initialize map with optimized configuration
   useEffect(() => {
@@ -1167,10 +1179,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         right: 0,
         width: '100%',
         height: '100%',
-        minWidth: '200px', // Ensure minimum width for narrow screens
-        minHeight: '200px', // Ensure minimum height
+        minWidth: '250px', // Increased minimum width for mobile compatibility
+        minHeight: '300px', // Increased minimum height for mobile compatibility
         zIndex: 1,
-        backgroundColor: '#B3E5FC'
+        backgroundColor: '#B3E5FC',
+        overflow: 'hidden' // Prevent scrollbars on small screens
       }}
     />
   );
