@@ -261,17 +261,27 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                           : 'text-app-black'
                       }`}
                     />
-                    <div className="flex-shrink-0 w-8 flex justify-center mt-1 my-0">
-                      {post.businessId && (
+                    <div className="flex-shrink-0 w-10 flex justify-center mt-1 my-0">
+                      {/* Debug: Always show some indicator */}
+                      {console.log('👁️ Post debug:', { id: post.id, businessId: post.businessId, hasBusinessId: !!post.businessId })}
+                      
+                      {post.businessId ? (
                         <button
                           onClick={e => {
+                            console.log('👀 Eye button clicked!', post.businessId);
                             e.stopPropagation();
                             handleBusinessView(post.businessId);
                           }}
-                          className="flex items-center space-x-1 text-app-gray-medium hover:text-app-black"
+                          className="flex items-center justify-center w-8 h-8 text-lg hover:bg-gray-100 rounded-full transition-colors"
+                          title="View business on map"
                         >
-                          <span className="py-0 my-0">👀</span>
+                          👀
                         </button>
+                      ) : (
+                        // Show a placeholder to see if the container is working
+                        <div className="w-8 h-8 flex items-center justify-center text-gray-300">
+                          •
+                        </div>
                       )}
                     </div>
                   </div>
