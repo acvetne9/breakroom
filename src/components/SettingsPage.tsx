@@ -658,9 +658,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                       !pastJobSelected && pastJobInput.trim() !== "" ? "border-red-500" : ""
                     }`}
                     placeholder="Where did you work?..."
-                    salary={pastJob.salary}
-                    role={pastJob.role}
-                    timePeriod={pastTimePeriod}
+                     salary={job.salary}
+                     role={job.role}
+                     timePeriod={pastJobTimePeriods[job.id]}
                   />
                 
                   {!pastJobSelected && pastJobInput.trim() !== "" && (
