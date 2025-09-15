@@ -533,45 +533,50 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             </div>
 
             {/* New Business Form for Current Job */}
-            {showNewBusinessForm === true && (
-              <div className="space-y-4">
-                <div>
-                  <input
-                    type="text"
-                    value={newBusinessAddress}
-                    onChange={handleAddressChange}
-                    placeholder="Enter business address (e.g., 123 Main St, City, State)..."
-                    className={`app-input w-full ${addressError ? 'border-red-500 border-2' : ''}`}
-                  />
-                  {addressError && (
-                    <p className="text-red-500 text-sm mt-1 px-1">{addressError}</p>
-                  )}
-                  <p className="text-gray-500 text-xs mt-1 px-1">
-                    Please include street number, street name, and street type (e.g., St, Ave, Rd)
-                  </p>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={validateAndCreateBusiness}
-                    disabled={isCreatingBusiness}
-                    className="app-input flex-1 bg-app-yellow text-app-black font-medium"
-                  >
-                    {isCreatingBusiness ? 'Adding Business...' : 'Add New Business'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowNewBusinessForm(false);
-                      setNewBusinessAddress('');
-                      setAddressError('');
-                      setCurrentJob({ ...currentJob, location: '' });
-                    }}
-                    className="app-input w-auto px-6 bg-gray-100 text-app-gray-dark"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
+            {(() => {
+              if (showNewBusinessForm) {
+                return (
+                  <div className="space-y-4">
+                    <div>
+                      <input
+                        type="text"
+                        value={newBusinessAddress}
+                        onChange={handleAddressChange}
+                        placeholder="Enter business address (e.g., 123 Main St, City, State)..."
+                        className={`app-input w-full ${addressError ? 'border-red-500 border-2' : ''}`}
+                      />
+                      {addressError && (
+                        <p className="text-red-500 text-sm mt-1 px-1">{addressError}</p>
+                      )}
+                      <p className="text-gray-500 text-xs mt-1 px-1">
+                        Please include street number, street name, and street type (e.g., St, Ave, Rd)
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={validateAndCreateBusiness}
+                        disabled={isCreatingBusiness}
+                        className="app-input flex-1 bg-app-yellow text-app-black font-medium"
+                      >
+                        {isCreatingBusiness ? 'Adding Business...' : 'Add New Business'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowNewBusinessForm(false);
+                          setNewBusinessAddress('');
+                          setAddressError('');
+                          setCurrentJob({ ...currentJob, location: '' });
+                        }}
+                        className="app-input w-auto px-6 bg-gray-100 text-app-gray-dark"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
             
             {/* Role */}
             <JobSearchDropdown
