@@ -222,6 +222,24 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
         <div className="space-y-4 px-4">
           {displayPosts.map(post => (
             <div key={post.id} className="relative">
+              {/* Eye button - positioned at the very top level to ensure visibility */}
+              {post.businessId && (
+                <button
+                  onClick={e => {
+                    console.log('👀 Eye button clicked!', post.businessId);
+                    e.stopPropagation();
+                    if (post.businessId) {
+                      handleBusinessView(post.businessId);
+                    }
+                  }}
+                  className="absolute top-2 right-2 z-50 flex items-center justify-center w-12 h-12 rounded-full transition-all duration-200 bg-red-500 hover:bg-red-600 shadow-lg border-2 border-white hover:scale-110"
+                  title="View business on map"
+                  style={{ fontSize: '24px' }}
+                >
+                  👀
+                </button>
+              )}
+
               {/* Post with background collage if business has 5+ photos */}
               <div
                 className={`app-popup-transparent p-4 cursor-pointer ${post.images && post.images.length >= 5 ? 'relative overflow-hidden' : ''} ${
@@ -254,31 +272,13 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                   <div className="flex items-start justify-between mb-2">
                     <TranslatedText 
                       text={post.text}
-                      className={`flex-1 break-words overflow-wrap-break-word pr-3 ${
+                      className={`flex-1 break-words overflow-wrap-break-word pr-16 ${
                         post.author === 'System' 
                           ? 'text-app-gray-medium italic' 
                           : 'text-app-black'
                       }`}
                     />
                   </div>
-                  
-                  {/* Eye button - positioned in top right corner */}
-                  {post.businessId && (
-                    <button
-                      onClick={e => {
-                        console.log('👀 Eye button clicked!', post.businessId);
-                        e.stopPropagation();
-                        if (post.businessId) {
-                          handleBusinessView(post.businessId);
-                        }
-                      }}
-                      className="absolute top-2 right-2 z-20 flex items-center justify-center w-12 h-12 text-2xl hover:bg-blue-100 rounded-full transition-all duration-200 bg-white shadow-lg border-2 border-blue-200 hover:border-blue-400 hover:scale-110"
-                      title="View business on map"
-                      style={{ fontSize: '20px' }}
-                    >
-                      👀
-                    </button>
-                  )}
                   
                   {/* Bottom section with timestamp and voting */}
                   <div className="flex items-end justify-between pt-8">
