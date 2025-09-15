@@ -155,11 +155,9 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
 
   const handleBusinessView = (businessId: string) => {
     console.log('👀 Eye clicked - navigating to home page with business:', businessId);
+    // Use the new navigation prop to go to home page and open business preview
     if (onNavigateToHomeBusiness) {
       onNavigateToHomeBusiness(businessId);
-    } else {
-      // Fallback to old behavior if new prop not provided
-      onBusinessView?.(businessId);
     }
   };
 
@@ -259,13 +257,11 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                       }`}
                     />
                     <div className="flex-shrink-0 w-8 flex justify-center mt-1 my-0">
-                      {(post.businessId || post.isJobUpdate) && (
+                      {post.businessId && (
                         <button
                           onClick={e => {
                             e.stopPropagation();
-                            if (post.businessId) {
-                              handleBusinessView(post.businessId);
-                            }
+                            handleBusinessView(post.businessId);
                           }}
                           className="flex items-center space-x-1 text-app-gray-medium hover:text-app-black"
                         >
