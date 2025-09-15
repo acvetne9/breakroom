@@ -1,4 +1,5 @@
 import React, { useState, useMemo, memo, useEffect } from 'react';
+import { Eye } from 'lucide-react';
 import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 import VotingComponent from './VotingComponent';
@@ -154,14 +155,11 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
 
   const handleBusinessView = (businessId: string) => {
     console.log('👀 Eye clicked - navigating to home page with business:', businessId);
-    console.log('👀 onNavigateToHomeBusiness prop exists:', !!onNavigateToHomeBusiness);
-    
-    // Use the new navigation prop to go to home page and open business preview
     if (onNavigateToHomeBusiness) {
-      console.log('👀 Calling onNavigateToHomeBusiness with:', businessId);
       onNavigateToHomeBusiness(businessId);
     } else {
-      console.warn('👀 onNavigateToHomeBusiness prop not provided');
+      // Fallback to old behavior if new prop not provided
+      onBusinessView?.(businessId);
     }
   };
 
@@ -222,37 +220,6 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
         <div className="space-y-4 px-4">
           {displayPosts.map(post => (
             <div key={post.id} className="relative">
-              {/* DEBUG: Show eye button for ALL posts to test, and log post data */}
-              {(() => {
-                console.log('🔍 Post data:', { 
-                  id: post.id, 
-                  businessId: post.businessId, 
-                  businessName: post.businessName,
-                  hasBusinessId: !!post.businessId 
-                });
-                return true; // Always show for debugging
-              })() && (
-                <button
-                  onClick={e => {
-                    console.log('👀 Eye button clicked!', { 
-                      businessId: post.businessId,
-                      businessName: post.businessName,
-                      post: post 
-                    });
-                    e.stopPropagation();
-                    if (post.businessId) {
-                      handleBusinessView(post.businessId);
-                    } else {
-                      console.warn('No businessId found on post:', post);
-                    }
-                  }}
-                  className="absolute top-2 right-2 z-30 flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 bg-white shadow-md border border-gray-300 hover:border-blue-400 hover:shadow-lg"
-                  title="View business on map"
-                >
-                  👀
-                </button>
-              )}
-
               {/* Post with background collage if business has 5+ photos */}
               <div
                 className={`app-popup-transparent p-4 cursor-pointer ${post.images && post.images.length >= 5 ? 'relative overflow-hidden' : ''} ${
@@ -281,27 +248,48 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                 )}
 
                 {/* Post content */}
-                <div className={`relative z-10 ${post.images && post.images.length >= 5 ? 'post-overlay rounded-lg p-3' : ''}`}>
+                <div className={`relative z-10 pb-10 ${post.images && post.images.length >= 5 ? 'post-overlay rounded-lg p-3' : ''}`}>
                   <div className="flex items-start justify-between mb-2">
                     <TranslatedText 
                       text={post.text}
-                      className={`flex-1 break-words overflow-wrap-break-word pr-16 ${
+                      className={`flex-1 pr-4 break-words overflow-wrap-break-word ${
                         post.author === 'System' 
                           ? 'text-app-gray-medium italic' 
                           : 'text-app-black'
                       }`}
                     />
+                    <div className="flex-shrink-0 w-8 flex justify-center mt-1 my-0">
+                      {(post.businessId || post.isJobUpdate) && (
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            if (post.businessId) {
+                              handleBusinessView(post.businessId);
+                            } else if (post.linkedLocation) {
+                              toast({
+                                title: "Location",
+                                description: post.linkedLocation
+                              });
+                            }
+                          }}
+                          className="flex items-center space-x-1 text-app-gray-medium hover:text-app-black"
+                        >
+                          <span className="py-0 my-0">👀</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                   
-                  {/* Bottom section with timestamp and voting */}
-                  <div className="flex items-end justify-between pt-8">
-                    {/* Timestamp in bottom left */}
+                  {/* Timestamp in bottom left */}
+                  <div className="absolute bottom-1 left-1">
                     <span className="text-xs text-gray-400">
                       {post.author === 'System' ? 'Click to share!' : formatTimeAgo(post.createdAt)}
                     </span>
-                    
-                    {/* Voting component in bottom right */}
-                    {post.author !== 'System' && (
+                  </div>
+                  
+                  {/* Voting component in bottom right */}
+                  {post.author !== 'System' && (
+                    <div className="absolute bottom-1 right-1">
                       <VotingComponent 
                         upvotes={post.upvotes} 
                         downvotes={post.downvotes} 
@@ -310,8 +298,8 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                         isOwner={post.author === 'You'}
                         onDelete={() => handlePostDelete(post.id)}
                       />
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Expanded view */}
