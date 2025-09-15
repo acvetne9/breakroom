@@ -33,6 +33,7 @@ interface ExplorePageProps {
   onBackToAllPosts?: () => void;
   onPostVote?: (postId: string, voteType: 'up' | 'down') => void;
   onPostDelete?: (postId: string) => void;
+  onNavigateToHomeBusiness?: (businessId: string) => void; // New prop for navigation
 }
 
 const ExplorePage: React.FC<ExplorePageProps> = memo(({
@@ -45,7 +46,8 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   onPostSubmit,
   onBackToAllPosts,
   onPostVote,
-  onPostDelete
+  onPostDelete,
+  onNavigateToHomeBusiness
 }) => {
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
@@ -152,8 +154,13 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   };
 
   const handleBusinessView = (businessId: string) => {
-    console.log('👀 Eye clicked - navigating to business:', businessId);
-    onBusinessView?.(businessId);
+    console.log('👀 Eye clicked - navigating to home page with business:', businessId);
+    if (onNavigateToHomeBusiness) {
+      onNavigateToHomeBusiness(businessId);
+    } else {
+      // Fallback to old behavior if new prop not provided
+      onBusinessView?.(businessId);
+    }
   };
 
   const handlePostVote = (postId: string, voteType: 'up' | 'down') => {
