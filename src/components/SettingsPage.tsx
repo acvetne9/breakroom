@@ -89,6 +89,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const [businessSelected, setBusinessSelected] = useState(false);
   const [businessInput, setBusinessInput] = useState("");
+  const [selectedBusiness, setSelectedBusiness] = useState<string | null>(null);
   
   const [pastJobs, setPastJobs] = useState<PastJob[]>([{
     id: '1',
@@ -535,7 +536,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   setBusinessSelected(false); // reset when typing
                 }}
                 onSelect={(business) => {
-                  setBusiness(business);
+                  setSelectedBusiness(business);
                   setBusinessSelected(true); // valid selection
                 }}
                 onBlur={handleCurrentJobLocationBlur}
