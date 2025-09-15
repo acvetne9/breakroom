@@ -262,9 +262,6 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                       }`}
                     />
                     <div className="flex-shrink-0 w-10 flex justify-center mt-1 my-0">
-                      {/* Debug: Always show some indicator */}
-                      {console.log('👁️ Post debug:', { id: post.id, businessId: post.businessId, hasBusinessId: !!post.businessId })}
-                      
                       {post.businessId ? (
                         <button
                           onClick={e => {
