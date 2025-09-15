@@ -500,7 +500,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const deckGLLayers = useMemo(() => {
     const cachedBusinesses = businessCacheRef.current.getAll();
     
-    if (!cachedBusinesses || cachedBusinesses.length === 0) return [];
+    console.log('🎯 DeckGL layers calculation:', {
+      cachedBusinessesCount: cachedBusinesses?.length || 0,
+      mapLoaded,
+      hasMap: !!map,
+      containerDimensions: mapRef.current ? {
+        width: mapRef.current.clientWidth,
+        height: mapRef.current.clientHeight
+      } : null
+    });
+    
+    if (!cachedBusinesses || cachedBusinesses.length === 0) {
+      console.log('❌ No cached businesses for DeckGL layers');
+      return [];
+    }
 
     try {
       let businessesToRender = cachedBusinesses;
@@ -559,6 +572,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         console.log(`🎯 Rendering ${visibleBusinesses.length} visible + ${bufferBusinesses.length - visibleBusinesses.length} buffer businesses`);
       }
 
+      console.log(`✅ Creating DeckGL layer with ${businessesToRender.length} businesses`);
+      
       return [createBusinessScatterplotLayer({
         businesses: businessesToRender,
         selectedBusinessId: selectedBusiness?.id,
@@ -583,6 +598,28 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     });
     
     if (!mapRef.current || map) return;
+
+    // Ensure container has minimum dimensions before creating map
+    const container = mapRef.current;
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+    
+    console.log('🔧 Container dimensions check:', { containerWidth, containerHeight });
+    
+    if (containerWidth < 100 || containerHeight < 100) {
+      console.warn('⚠️ Container too small, waiting for proper sizing:', { containerWidth, containerHeight });
+      // Retry after a brief delay to allow layout to complete
+      const retryTimer = setTimeout(() => {
+        if (mapRef.current && !map) {
+          const newWidth = mapRef.current.clientWidth;
+          const newHeight = mapRef.current.clientHeight;
+          console.log('🔄 Retrying map creation with dimensions:', { newWidth, newHeight });
+          // Trigger a re-render by updating a dummy state
+          setMapLoaded(false);
+        }
+      }, 100);
+      return () => clearTimeout(retryTimer);
+    }
 
     // Comprehensive tile configuration for different environments
     const createTileSource = () => {
@@ -1130,6 +1167,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         right: 0,
         width: '100%',
         height: '100%',
+        minWidth: '200px', // Ensure minimum width for narrow screens
+        minHeight: '200px', // Ensure minimum height
         zIndex: 1,
         backgroundColor: '#B3E5FC'
       }}
