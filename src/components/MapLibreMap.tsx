@@ -697,7 +697,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         return {
           version: 8 as const,
           sources: {
-            'nyc-tiles': vectorSource
+            'nyc-tiles': vectorSource,
+            // Add fallback raster source for reliability
+            'fallback-raster': {
+              type: 'raster' as const,
+              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+              tileSize: 256,
+              attribution: '© OpenStreetMap contributors',
+              maxzoom: 19
+            }
           },
           glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
           layers: [
@@ -705,6 +713,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               id: 'background',
               type: 'background' as const,
               paint: { 'background-color': '#F5F5DC' }
+            },
+            // Add a fallback raster layer that's initially invisible
+            {
+              id: 'fallback-base',
+              type: 'raster' as const,
+              source: 'fallback-raster',
+              layout: { visibility: 'none' as const }, // Hidden by default
+              minzoom: 0,
+              maxzoom: 19
             }
           ]
         };
@@ -774,8 +791,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.error('🚨 Map error:', e.error);
     });
 
+    // Add fallback timer to ensure map loads even if 'load' event doesn't fire
+    const loadFallbackTimer = setTimeout(() => {
+      if (!mapLoaded) {
+        console.log('⏰ Map load fallback timer - forcing mapLoaded to true');
+        setMapLoaded(true);
+        callbackRefs.current.onMapLoaded?.();
+      }
+    }, 2000); // 2 second fallback
+
     mapInstance.on('load', () => {
-      console.log('🗺️ Map loaded successfully');
+      console.log('🗺️ Map loaded successfully via load event');
+      clearTimeout(loadFallbackTimer);
       setMapLoaded(true);
       callbackRefs.current.onMapLoaded?.();
       
