@@ -136,7 +136,7 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
     onChange(business.name, business.formatted_address || business.vicinity || business.name);
     setShowDropdown(false);
     setInternalShowAddForm(false);
-    if (onselect) onSelect(business);
+    onSelect?.(business);
   };
 
   const handleInputBlur = () => {
