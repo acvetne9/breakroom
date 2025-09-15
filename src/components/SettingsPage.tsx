@@ -529,14 +529,17 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             {/* Location */}
             <div>
               <BusinessSearchDropdown
-                value={currentJob.location}
+                value={businessInput}
                 onChange={(val) => {
-                  handleCurrentJobLocationChange(val);
-                  setCurrentJobLocationValid(false); // NEW: reset validity when typing
+                  setBusinessInput(val);
+                  setBusinessSelected(false); // reset when typing
+                }}
+                onSelect={(business) => {
+                  setBusiness(business);
+                  setBusinessSelected(true); // valid selection
                 }}
                 onBlur={handleCurrentJobLocationBlur}
-                onSelect={() => setCurrentJobLocationValid(true)} // NEW: mark valid when a business is chosen
-                className={`app-input w-full ${!currentJobLocationValid ? 'border-red-500' : ''}`}
+                className={`app-input w-full ${!businessSelected && businessInput.trim() !== "" ? 'border-red-500' : ''}`}
                 placeholder="Where do you work?..."
                 salary={currentJob.salary}
                 role={currentJob.role}
@@ -624,14 +627,17 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 {/* Location */}
                 <div>
                   <BusinessSearchDropdown
-                    value={currentJob.location}
+                    value={businessInput}
                     onChange={(val) => {
-                      handleCurrentJobLocationChange(val);
-                      setCurrentJobLocationValid(false); // NEW: reset validity when typing
+                      setBusinessInput(val);
+                      setBusinessSelected(false); // reset when typing
+                    }}
+                    onSelect={(business) => {
+                      setBusiness(business);
+                      setBusinessSelected(true); // valid selection
                     }}
                     onBlur={handleCurrentJobLocationBlur}
-                    onSelect={() => setCurrentJobLocationValid(true)} // NEW: mark valid when a business is chosen
-                    className={`app-input w-full ${!currentJobLocationValid ? 'border-red-500' : ''}`}
+                    className={`app-input w-full ${!businessSelected && businessInput.trim() !== "" ? 'border-red-500' : ''}`}
                     placeholder="Where do you work?..."
                     salary={currentJob.salary}
                     role={currentJob.role}
