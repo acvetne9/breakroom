@@ -310,7 +310,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     setCurrentJobChanged(true);
     // Reset validation state when location changes
     setCurrentJobLocationValid(true);
-    setShowNewBusinessForm(value && value.length > 2);
+    
+    // Only show new business form if value exists, has more than 2 characters, and isn't empty
+    const shouldShowForm = value && value.trim().length > 2;
+    setShowNewBusinessForm(shouldShowForm);
   };
 
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
