@@ -87,9 +87,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [isCreatingBusiness, setIsCreatingBusiness] = useState(false);
   const [addressError, setAddressError] = useState('');
 
-  const [businessSelected, setBusinessSelected] = useState(false);
-  const [businessInput, setBusinessInput] = useState("");
-  const [selectedBusiness, setSelectedBusiness] = useState<string | null>(null);
+  // Current job state
+  const [currentJobInput, setCurrentJobInput] = useState("");
+  const [currentJobSelected, setCurrentJobSelected] = useState(false);
+  
+  // Past job state
+  const [pastJobInput, setPastJobInput] = useState("");
+  const [pastJobSelected, setPastJobSelected] = useState(false);
   
   const [pastJobs, setPastJobs] = useState<PastJob[]>([{
     id: '1',
@@ -530,26 +534,39 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             {/* Location */}
             <div>
               <BusinessSearchDropdown
-                value={businessInput}
+                value={currentJobInput}
                 onChange={(val) => {
-                  setBusinessInput(val);
-                  setBusinessSelected(false); // reset when typing
+                  setCurrentJobInput(val);
+                  setCurrentJobSelected(false); // reset validity when typing
                 }}
                 onSelect={(business) => {
-                  setSelectedBusiness(business);
-                  setBusinessSelected(true); // valid selection
+                  setCurrentJobSelected(true);  // mark valid
+                  // store selected if you need it: setCurrentJob(business)
                 }}
-                onBlur={handleCurrentJobLocationBlur}
-                className={`app-input w-full ${!businessSelected && businessInput.trim() !== "" ? 'border-red-500' : ''}`}
+                className={`app-input w-full ${
+                  !currentJobSelected && currentJobInput.trim() !== "" ? "border-red-500" : ""
+                }`}
                 placeholder="Where do you work?..."
                 salary={currentJob.salary}
                 role={currentJob.role}
                 timePeriod={currentTimePeriod}
               />
-              {!businessSelected && businessInput.trim() !== "" && (
-                <p className="text-sm text-red-500 mt-1">Please enter a valid address</p>
+            
+              {/* Show error + address input */}
+              {!currentJobSelected && currentJobInput.trim() !== "" && (
+                <>
+                  <p className="text-red-500 text-xs mt-1">Please enter a valid address</p>
+                  <input
+                    type="text"
+                    placeholder="Enter business address..."
+                    className="app-input w-full mt-2"
+                    value={currentJobAddress}
+                    onChange={(e) => setCurrentJobAddress(e.target.value)}
+                  />
+                </>
               )}
             </div>
+
 
             {/* New Business Form for Current Job */}
             {showNewBusinessForm && (
@@ -628,24 +645,35 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 {/* Location */}
                 <div>
                   <BusinessSearchDropdown
-                    value={businessInput}
+                    value={pastJobInput}
                     onChange={(val) => {
-                      setBusinessInput(val);
-                      setBusinessSelected(false); // reset when typing
+                      setPastJobInput(val);
+                      setPastJobSelected(false);
                     }}
                     onSelect={(business) => {
-                      setSelectedBusiness(business);
-                      setBusinessSelected(true); // valid selection
+                      setPastJobSelected(true);
+                      // store selected if you need it: setPastJob(business)
                     }}
-                    onBlur={handleCurrentJobLocationBlur}
-                    className={`app-input w-full ${!businessSelected && businessInput.trim() !== "" ? 'border-red-500' : ''}`}
-                    placeholder="Where do you work?..."
-                    salary={currentJob.salary}
-                    role={currentJob.role}
-                    timePeriod={currentTimePeriod}
+                    className={`app-input w-full ${
+                      !pastJobSelected && pastJobInput.trim() !== "" ? "border-red-500" : ""
+                    }`}
+                    placeholder="Where did you work?..."
+                    salary={pastJob.salary}
+                    role={pastJob.role}
+                    timePeriod={pastTimePeriod}
                   />
-                  {!businessSelected && businessInput.trim() !== "" && (
-                    <p className="text-sm text-red-500 mt-1">Please enter a valid address</p>
+                
+                  {!pastJobSelected && pastJobInput.trim() !== "" && (
+                    <>
+                      <p className="text-red-500 text-xs mt-1">Please enter a valid address</p>
+                      <input
+                        type="text"
+                        placeholder="Enter business address..."
+                        className="app-input w-full mt-2"
+                        value={pastJobAddress}
+                        onChange={(e) => setPastJobAddress(e.target.value)}
+                      />
+                    </>
                   )}
                 </div>
                 
