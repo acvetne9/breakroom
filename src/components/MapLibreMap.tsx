@@ -937,23 +937,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     };
 
-        // Setup event listeners
-        setupMapEventListeners(mapInstance);
+        try {
+          // Setup event listeners
+          setupMapEventListeners(mapInstance);
 
-        console.log('Map instance created, setting up event listeners...');
-        console.log('Map container dimensions:', {
-          width: mapContainerRef.current?.clientWidth,
-          height: mapContainerRef.current?.clientHeight
-        });
+          console.log('Map instance created, setting up event listeners...');
+          console.log('Map container dimensions:', {
+            width: mapContainerRef.current?.clientWidth,
+            height: mapContainerRef.current?.clientHeight
+          });
 
-      } catch (error) {
-        console.error('Failed to create MapLibre instance:', error);
-      }
-    };
+        } catch (error) {
+          console.error('Failed to create MapLibre instance:', error);
+        }
+      };
 
-    // Start async initialization  
-    initializeMap();
-
+      // Start async initialization  
+      initializeMap();
+  
     return () => {
       // Cleanup
       [updateTimeoutRef, moveTimeoutRef, debounceTimeoutRef].forEach(ref => {
@@ -977,7 +978,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       setMapLoaded(false);
       mapRef.current = null;
     };
-  }, [isMobile, addVectorLayers]);
+    console.log('DEBUG: About to close useEffect');
+  }, []);
 
 
   // // Center map on neighborhood when neighborhoodCenter changes
