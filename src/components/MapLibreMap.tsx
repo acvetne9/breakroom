@@ -767,19 +767,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return () => clearTimeout(retryTimer);
     }
     
-    // Store map instance in ref immediately after creation
-    mapInstance = mapRef.current;
-    
     // Set bounds after storing in ref
     try {
       console.log('🗺️ Setting map bounds for NYC region...');
-      mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
+      mapRef.current.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
       
       // Test basic map functionality
       console.log('🧪 Testing map methods:', {
-        getZoom: mapInstance.getZoom(),
-        getCenter: mapInstance.getCenter(),
-        isStyleLoaded: mapInstance.isStyleLoaded()
+        getZoom: mapRef.current.getZoom(),
+        getCenter: mapRef.current.getCenter(),
+        isStyleLoaded: mapRef.current.isStyleLoaded()
       });
     } catch (error) {
       console.error('Error setting up map:', error);
@@ -863,7 +860,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           // For web environment with vector tiles
           if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
             console.log('NYC tiles source loaded, adding vector layers via sourcedata event...');
-            addVectorLayers(mapInstance);
+            addVectorLayers(mapRef.current);
           } else if (e.sourceId === 'nyc-tiles') {
             console.log('NYC tiles sourcedata event:', {
               sourceId: e.sourceId,
@@ -899,7 +896,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
 
     // Setup event listeners
-    setupMapEventListeners(mapInstance);
+    setupMapEventListeners(mapRef.current);
 
     console.log('Map instance created, setting up event listeners...');
     console.log('Map container dimensions:', {
@@ -918,7 +915,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
       
       try {
-        mapInstance.remove();
+        mapRef.current?.remove();
       } catch (error) {
         console.error('Error removing map:', error);
       }
