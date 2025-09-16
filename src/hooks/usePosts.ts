@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 import { getPosts, createPost, voteOnPost, deletePost, getUserVotes, transformPost, Post, PostData } from '@/services/posts';
-import { useBusinessesData } from './useBusinessesData';
 import { supabase } from '@/integrations/supabase/client';
 
 export const usePosts = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { businesses } = useBusinessesData();
 
   // Fetch posts from backend
   const fetchPosts = async () => {
@@ -24,8 +22,8 @@ export const usePosts = () => {
       }
 
       if (postsData) {
-        // Transform posts and get user votes
-        const transformedPosts = postsData.map(post => transformPost(post, businesses));
+        // Transform posts without businesses data for now
+        const transformedPosts = postsData.map(post => transformPost(post, []));
         const postIds = transformedPosts.map(p => p.id);
         const userVotes = await getUserVotes(postIds);
         
@@ -72,8 +70,8 @@ export const usePosts = () => {
       }
 
       if (data) {
-        // Add the new post to the local state
-        const newPost = transformPost(data, businesses);
+        // Add the new post to the local state (without businesses data for now)
+        const newPost = transformPost(data, []);
         setPosts(prevPosts => [newPost, ...prevPosts]);
         return true;
       }
@@ -190,7 +188,7 @@ export const usePosts = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [businesses]);
+  }, []);
 
   // Filter posts by business
   const getBusinessPosts = (businessId: string) => {

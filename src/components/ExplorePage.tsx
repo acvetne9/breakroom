@@ -44,6 +44,8 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   onNavigateToHomeBusiness,
   onBusinessPreview
 }) => {
+  console.log('🔍 ExplorePage component initializing...');
+  
   const { posts, loading, submitPost, votePost, removePost } = usePosts();
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
