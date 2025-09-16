@@ -739,12 +739,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             paint: { 'background-color': '#F5F5DC' }
           }
         ]
-      };
+    };
     
-    // Initialize map asynchronously 
-    initializeMap();
-
-    async function initializeMap() {
+    // Define and call async initialization function
+    const initializeMap = async () => {
       const mapStyle = await createMapStyle();
 
     // Log the tile configuration for debugging
@@ -950,7 +948,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         } catch (error) {
           console.error('Failed to create MapLibre instance:', error);
         }
-      };
+      }; // Close initializeMap function
 
       // Start async initialization  
       initializeMap();
@@ -978,7 +976,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       setMapLoaded(false);
       mapRef.current = null;
     };
-    console.log('DEBUG: About to close useEffect');
   }, []);
 
 
