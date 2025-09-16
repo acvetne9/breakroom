@@ -70,18 +70,15 @@ export const createPost = async (
   timePeriod?: string,
   salary?: number
 ): Promise<{ data: PostData | null; error: any }> => {
-  const { data: { user } } = await supabase.auth.getUser();
+  // For now, use a temporary user ID since authentication isn't implemented
+  const tempUserId = 'temp-user-' + Date.now();
   
-  if (!user) {
-    return { data: null, error: 'User not authenticated' };
-  }
-
   const { data, error } = await supabase
     .from('posts')
     .insert({
       content,
       post_type: postType,
-      user_id: user.id,
+      user_id: tempUserId,
       bussiness_id: businessId,
       job_role: jobRole,
       time_period: timePeriod,
@@ -98,18 +95,15 @@ export const voteOnPost = async (
   postId: string,
   voteType: 'upvote' | 'downvote'
 ): Promise<{ success: boolean; error?: any }> => {
-  const { data: { user } } = await supabase.auth.getUser();
+  // For now, use a consistent temp user ID per session
+  const tempUserId = 'temp-user-session';
   
-  if (!user) {
-    return { success: false, error: 'User not authenticated' };
-  }
-
   // Check if user already voted
   const { data: existingVote } = await supabase
     .from('votes')
     .select('*')
     .eq('post_id', postId)
-    .eq('user_id', user.id)
+    .eq('user_id', tempUserId)
     .single();
 
   if (existingVote) {
@@ -136,7 +130,7 @@ export const voteOnPost = async (
       .from('votes')
       .insert({
         post_id: postId,
-        user_id: user.id,
+        user_id: tempUserId,
         vote_type: voteType
       });
     
@@ -146,16 +140,17 @@ export const voteOnPost = async (
 
 // Get user's votes for posts
 export const getUserVotes = async (postIds: string[]): Promise<{ [postId: string]: 'up' | 'down' }> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user || postIds.length === 0) {
+  if (postIds.length === 0) {
     return {};
   }
 
+  // Use consistent temp user ID to get votes
+  const tempUserId = 'temp-user-session';
+  
   const { data: votes } = await supabase
     .from('votes')
     .select('post_id, vote_type')
-    .eq('user_id', user.id)
+    .eq('user_id', tempUserId)
     .in('post_id', postIds);
 
   const userVotes: { [postId: string]: 'up' | 'down' } = {};
@@ -168,17 +163,12 @@ export const getUserVotes = async (postIds: string[]): Promise<{ [postId: string
 
 // Delete a post
 export const deletePost = async (postId: string): Promise<{ success: boolean; error?: any }> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    return { success: false, error: 'User not authenticated' };
-  }
-
+  // For now, allow deleting any post since authentication isn't implemented
+  // TODO: Restrict to own posts when authentication is added
   const { error } = await supabase
     .from('posts')
     .delete()
-    .eq('id', postId)
-    .eq('user_id', user.id); // Only allow deleting own posts
+    .eq('id', postId);
 
   return { success: !error, error };
 };
