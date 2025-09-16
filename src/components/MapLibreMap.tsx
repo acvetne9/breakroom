@@ -183,7 +183,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   isClusteredData = false
 }) => {
   const isMobile = useIsMobile();
-  const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [deckOverlay, setDeckOverlay] = useState<MapboxOverlay | null>(null);
