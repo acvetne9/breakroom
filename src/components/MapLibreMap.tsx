@@ -6,9 +6,10 @@ import { createBusinessScatterplotLayer, createBusinessClusterLayer } from '@/ut
 import { useViewportMapData } from '../hooks/useViewportMapData';
 import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
 import { useIsMobile } from '../hooks/use-mobile';
-import { isCapacitor, createTileBlobUrl } from '@/utils/tileDecompression';
+// import { isCapacitor, createTileBlobUrl } from '@/utils/tileDecompression';
 import type { GeoJSONFeature } from 'maplibre-gl';
 import type { Business } from '@/types/business';
+import { createTileBlobUrl } from '@/utils/createTileBlobUrl';
 
 interface MapLibreMapProps {
   onBusinessClick?: (business: any) => void;
@@ -35,7 +36,7 @@ interface ViewportState {
   timestamp: number;
 }
 
-// Singleton overlay for performance
+// Singleton ovxerlay for performance
 let overlayInstance: MapboxOverlay | null = null;
 
 // Optimized grid sampling with visible area priority
@@ -699,8 +700,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     // Comprehensive tile configuration for different environments
     const createTileSource = () => {
+      if (isCapacitor()) {
+        console.log('🔧 Using blob URLs for Capacitor tiles');
+        return {
+          type: 'vector' as const,
+          tiles: [
+            createTileBlobUrl('/data/tiles/{z}/{x}/{y}.pbf')
+          ],
+          minzoom: 10,
+          maxzoom: 16,
+          scheme: 'xyz' as const
+        };
+      }
+    
+      // Web
       const fullUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-      console.log('🔧 Using vector tiles everywhere:', fullUrl);
+      console.log('🔧 Using web vector tiles:', fullUrl);
       return {
         type: 'vector' as const,
         tiles: [fullUrl],
