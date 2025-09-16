@@ -423,13 +423,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [fetchFullBusinessDetails]);
 
   // // Debounced viewport change handler
-  const handleViewportChange = useCallback(async () => {
-    console.log('🔍 DEBUG: handleViewportChange deps check', { 
-      mapRef: typeof mapRef.current,
-      mapLoaded: typeof mapLoaded,
-      loadBusinessesInViewport: typeof loadBusinessesInViewport,
-      getBusinessLimitForViewport: typeof getBusinessLimitForViewport 
-    });
+  // const handleViewportChange = useCallback(async () => {
+  //   console.log('🔍 DEBUG: handleViewportChange deps check', { 
+  //     mapRef: typeof mapRef.current,
+  //     mapLoaded: typeof mapLoaded,
+  //     loadBusinessesInViewport: typeof loadBusinessesInViewport,
+  //     getBusinessLimitForViewport: typeof getBusinessLimitForViewport 
+  //   });
     
   //   if (!mapRef.current || !mapLoaded || !loadBusinessesInViewport || isLoadingRef.current) return;
 
@@ -970,64 +970,64 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // useEffect(() => {
   //   if (!mapRef.current || !neighborhoodCenter) return;
     
-  //   console.log('🏙️ Centering map on neighborhood:', neighborhoodCenter);
-  //   mapRef.current.flyTo({
-  //     center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
-  //     zoom: 14, // Good zoom level for neighborhood view
-  //     duration: 2000
-  //   });
-  // }, [neighborhoodCenter]);
+    console.log('🏙️ Centering map on neighborhood:', neighborhoodCenter);
+    mapRef.current.flyTo({
+      center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
+      zoom: 14, // Good zoom level for neighborhood view
+      duration: 2000
+    });
+  }, [neighborhoodCenter]);
 
-  // // Load neighborhood businesses when search filters change
-  // useEffect(() => {
-  //   if (!mapRef.current || !mapLoaded || !searchFilters?.neighborhoodFilter || !loadBusinessesInViewport) return;
+  // Load neighborhood businesses when search filters change
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded || !searchFilters?.neighborhoodFilter || !loadBusinessesInViewport) return;
     
-  //   const loadNeighborhoodBusinesses = async () => {
-  //     console.log('🏙️ Search filters changed, loading neighborhood businesses');
+    const loadNeighborhoodBusinesses = async () => {
+      console.log('🏙️ Search filters changed, loading neighborhood businesses');
       
-  //     // Create neighborhood bounds from the boundary points with padding
-  //     const boundary = searchFilters.neighborhoodFilter.boundary;
-  //     const lats = boundary.map(p => p.lat);
-  //     const lons = boundary.map(p => p.lon);
+      // Create neighborhood bounds from the boundary points with padding
+      const boundary = searchFilters.neighborhoodFilter.boundary;
+      const lats = boundary.map(p => p.lat);
+      const lons = boundary.map(p => p.lon);
       
-  //     // Add padding to ensure we capture all businesses in the area
-  //     const latPadding = 0.015; // ~1.5km padding
-  //     const lonPadding = 0.020; // ~1.5km padding (adjusted for longitude)
+      // Add padding to ensure we capture all businesses in the area
+      const latPadding = 0.015; // ~1.5km padding
+      const lonPadding = 0.020; // ~1.5km padding (adjusted for longitude)
       
-  //     const neighborhoodBounds: Bounds = {
-  //       north: Math.max(...lats) + latPadding,
-  //       south: Math.min(...lats) - latPadding,
-  //       east: Math.max(...lons) + lonPadding,
-  //       west: Math.min(...lons) - lonPadding
-  //     };
+      const neighborhoodBounds: Bounds = {
+        north: Math.max(...lats) + latPadding,
+        south: Math.min(...lats) - latPadding,
+        east: Math.max(...lons) + lonPadding,
+        west: Math.min(...lons) - lonPadding
+      };
       
-  //     try {
-  //       const zoom = mapRef.current!.getZoom();
-  //       const businessLimit = getBusinessLimitForViewport(zoom, neighborhoodBounds);
+      try {
+        const zoom = mapRef.current!.getZoom();
+        const businessLimit = getBusinessLimitForViewport(zoom, neighborhoodBounds);
         
-  //       console.log('🏙️ Initial neighborhood business load:', {
-  //         neighborhood: searchFilters.neighborhoodFilter.name,
-  //         bounds: neighborhoodBounds,
-  //         businessLimit
-  //       });
+        console.log('🏙️ Initial neighborhood business load:', {
+          neighborhood: searchFilters.neighborhoodFilter.name,
+          bounds: neighborhoodBounds,
+          businessLimit
+        });
         
-  //       const neighborhoodBusinesses = await loadBusinessesInViewport(neighborhoodBounds, businessLimit);
+        const neighborhoodBusinesses = await loadBusinessesInViewport(neighborhoodBounds, businessLimit);
         
-  //       if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length > 0) {
-  //         console.log(`✅ Initially loaded ${neighborhoodBusinesses.length} businesses for ${searchFilters.neighborhoodFilter.name}`);
-  //         businessCacheRef.current.addMultiple(neighborhoodBusinesses);
-  //       } else {
-  //         console.log('❌ No businesses found for neighborhood:', searchFilters.neighborhoodFilter.name);
-  //       }
+        if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length > 0) {
+          console.log(`✅ Initially loaded ${neighborhoodBusinesses.length} businesses for ${searchFilters.neighborhoodFilter.name}`);
+          businessCacheRef.current.addMultiple(neighborhoodBusinesses);
+        } else {
+          console.log('❌ No businesses found for neighborhood:', searchFilters.neighborhoodFilter.name);
+        }
         
-  //     } catch (error) {
-  //       console.error('❌ Error loading initial neighborhood businesses:', error);
-  //     }
-  //   };
+      } catch (error) {
+        console.error('❌ Error loading initial neighborhood businesses:', error);
+      }
+    };
     
-  //   // Small delay to ensure map is ready
-  //   setTimeout(loadNeighborhoodBusinesses, 500);
-  // }, [mapLoaded, searchFilters?.neighborhoodFilter, loadBusinessesInViewport, getBusinessLimitForViewport]);
+    // Small delay to ensure map is ready
+    setTimeout(loadNeighborhoodBusinesses, 500);
+  }, [mapLoaded, searchFilters?.neighborhoodFilter, loadBusinessesInViewport, getBusinessLimitForViewport]);
 
   // // Initialize DeckGL overlay
   // useEffect(() => {
@@ -1077,102 +1077,102 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   //   }
   // }, [deckOverlay, overlayReady, deckGLLayers, mapLoaded]);
 
-  // // Handle search filter changes
-  // useEffect(() => {
-  //   const filtersChanged = JSON.stringify(lastSearchFiltersRef.current) !== JSON.stringify(searchFilters);
-  //   if (!filtersChanged || !mapRef.current || !mapLoaded) return;
+  // Handle search filter changes
+  useEffect(() => {
+    const filtersChanged = JSON.stringify(lastSearchFiltersRef.current) !== JSON.stringify(searchFilters);
+    if (!filtersChanged || !mapRef.current || !mapLoaded) return;
     
-  //   console.log('🔍 Search filters changed, clearing cache');
-  //   lastSearchFiltersRef.current = searchFilters;
-  //   businessCacheRef.current.clear();
-  //   isLoadingRef.current = false;
+    console.log('🔍 Search filters changed, clearing cache');
+    lastSearchFiltersRef.current = searchFilters;
+    businessCacheRef.current.clear();
+    isLoadingRef.current = false;
     
-  //   setTimeout(() => handleViewportChangeRef.current(), 100);
-  // }, [searchFilters, mapLoaded]);
+    setTimeout(() => handleViewportChangeRef.current(), 100);
+  }, [searchFilters, mapLoaded]);
 
-  // // Handle business updates
-  // useEffect(() => {
-  //   if (businesses && Array.isArray(businesses) && businesses.length > 0) {
-  //     businessCacheRef.current.addMultiple(businesses);
-  //     callbackRefs.current.onBusinessesLoaded?.();
-  //   }
-  // }, [businesses]);
+  // Handle business updates
+  useEffect(() => {
+    if (businesses && Array.isArray(businesses) && businesses.length > 0) {
+      businessCacheRef.current.addMultiple(businesses);
+      callbackRefs.current.onBusinessesLoaded?.();
+    }
+  }, [businesses]);
 
-  // // Zoom to selected business
-  // useEffect(() => {
-  //   if (!mapRef.current || !mapLoaded || !selectedBusiness?.position) return;
+  // Zoom to selected business
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded || !selectedBusiness?.position) return;
     
-  //   mapRef.current.easeTo({
-  //     center: [selectedBusiness.position.lng, selectedBusiness.position.lat],
-  //     zoom: Math.max(mapRef.current.getZoom(), 16),
-  //     duration: 600
-  //   });
-  // }, [selectedBusiness?.id, mapLoaded]);
+    mapRef.current.easeTo({
+      center: [selectedBusiness.position.lng, selectedBusiness.position.lat],
+      zoom: Math.max(mapRef.current.getZoom(), 16),
+      duration: 600
+    });
+  }, [selectedBusiness?.id, mapLoaded]);
 
-  // // Handle landmarks with performance optimization
-  // useEffect(() => {
-  //   if (!mapLoaded || !Array.isArray(landmarks) || landmarks.length === 0 || !mapRef.current) return;
+  // Handle landmarks with performance optimization
+  useEffect(() => {
+    if (!mapLoaded || !Array.isArray(landmarks) || landmarks.length === 0 || !mapRef.current) return;
 
-  //   // Clear existing markers
-  //   landmarkMarkersRef.current.forEach(marker => {
-  //     try { marker.remove(); } catch {}
-  //   });
-  //   landmarkMarkersRef.current = [];
+    // Clear existing markers
+    landmarkMarkersRef.current.forEach(marker => {
+      try { marker.remove(); } catch {}
+    });
+    landmarkMarkersRef.current = [];
 
-  //   const zoom = mapRef.current.getZoom();
-  //   const size = Math.max(12, Math.min(32, 16 * Math.pow(1.15, zoom - 10)));
+    const zoom = mapRef.current.getZoom();
+    const size = Math.max(12, Math.min(32, 16 * Math.pow(1.15, zoom - 10)));
 
-  //   const markers = landmarks.map(landmark => {
-  //     const el = document.createElement('div');
-  //     el.textContent = landmark.emoji;
-  //     el.style.cssText = `
-  //       font-size: ${size}px;
-  //       line-height: ${size}px;
-  //       width: ${size}px;
-  //       height: ${size}px;
-  //       user-select: none;
-  //       pointer-events: none;
-  //       text-shadow: 0 0 3px rgba(255,255,255,0.9);
-  //       display: flex;
-  //       align-items: center;
-  //       justify-content: center;
-  //       z-index: 0;
-  //     `;
+    const markers = landmarks.map(landmark => {
+      const el = document.createElement('div');
+      el.textContent = landmark.emoji;
+      el.style.cssText = `
+        font-size: ${size}px;
+        line-height: ${size}px;
+        width: ${size}px;
+        height: ${size}px;
+        user-select: none;
+        pointer-events: none;
+        text-shadow: 0 0 3px rgba(255,255,255,0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 0;
+      `;
 
-  //     try {
-  //       return new maplibregl.Marker({ element: el, anchor: 'center' })
-  //         .setLngLat([landmark.lng, landmark.lat])
-  //         .addTo(mapRef.current!);
-  //     } catch (error) {
-  //       console.error('Error creating marker:', error);
-  //       return null;
-  //     }
-  //   }).filter(Boolean) as maplibregl.Marker[];
+      try {
+        return new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([landmark.lng, landmark.lat])
+          .addTo(mapRef.current!);
+      } catch (error) {
+        console.error('Error creating marker:', error);
+        return null;
+      }
+    }).filter(Boolean) as maplibregl.Marker[];
 
-  //   landmarkMarkersRef.current = markers;
+    landmarkMarkersRef.current = markers;
 
-  //   // Optimized zoom handler for emoji sizing
-  //   const handleZoomChange = () => {
-  //     const newZoom = mapRef.current!.getZoom();
-  //     const newSize = Math.max(12, Math.min(32, 16 * Math.pow(1.15, newZoom - 10)));
+    // Optimized zoom handler for emoji sizing
+    const handleZoomChange = () => {
+      const newZoom = mapRef.current!.getZoom();
+      const newSize = Math.max(12, Math.min(32, 16 * Math.pow(1.15, newZoom - 10)));
       
-  //     markers.forEach(marker => {
-  //       const element = marker.getElement();
-  //       if (element) {
-  //         element.style.fontSize = `${newSize}px`;
-  //         element.style.lineHeight = `${newSize}px`;
-  //         element.style.width = `${newSize}px`;
-  //         element.style.height = `${newSize}px`;
-  //       }
-  //     });
-  //   };
+      markers.forEach(marker => {
+        const element = marker.getElement();
+        if (element) {
+          element.style.fontSize = `${newSize}px`;
+          element.style.lineHeight = `${newSize}px`;
+          element.style.width = `${newSize}px`;
+          element.style.height = `${newSize}px`;
+        }
+      });
+    };
 
-  //   mapRef.current.on('zoom', handleZoomChange);
+    mapRef.current.on('zoom', handleZoomChange);
 
-  //   return () => {
-  //     try { mapRef.current?.off('zoom', handleZoomChange); } catch {}
-  //   };
-  // }, [mapLoaded, landmarks]);
+    return () => {
+      try { mapRef.current?.off('zoom', handleZoomChange); } catch {}
+    };
+  }, [mapLoaded, landmarks]);
 
   // // Initial viewport load
   // useEffect(() => {
