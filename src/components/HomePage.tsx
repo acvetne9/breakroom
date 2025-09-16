@@ -228,7 +228,6 @@ const HomePage: React.FC<HomePageProps> = ({
     };
   
     window.addEventListener('resize', handleResize);
-    // Call once on mount in case initial width < 768px
     handleResize();
   
     return () => window.removeEventListener('resize', handleResize);
