@@ -422,234 +422,234 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [fetchFullBusinessDetails]);
 
-  // // Debounced viewport change handler
-  // const handleViewportChange = useCallback(async () => {
-  //   console.log('🔍 DEBUG: handleViewportChange deps check', { 
-  //     mapRef: typeof mapRef.current,
-  //     mapLoaded: typeof mapLoaded,
-  //     loadBusinessesInViewport: typeof loadBusinessesInViewport,
-  //     getBusinessLimitForViewport: typeof getBusinessLimitForViewport 
-  //   });
+  // Debounced viewport change handler
+  const handleViewportChange = useCallback(async () => {
+    console.log('🔍 DEBUG: handleViewportChange deps check', { 
+      mapRef: typeof mapRef.current,
+      mapLoaded: typeof mapLoaded,
+      loadBusinessesInViewport: typeof loadBusinessesInViewport,
+      getBusinessLimitForViewport: typeof getBusinessLimitForViewport 
+    });
     
-  //   if (!mapRef.current || !mapLoaded || !loadBusinessesInViewport || isLoadingRef.current) return;
+    if (!mapRef.current || !mapLoaded || !loadBusinessesInViewport || isLoadingRef.current) return;
 
-  //   const map = mapRef.current;
+    const map = mapRef.current;
 
-  //   // If neighborhood search is active, load businesses within neighborhood bounds
-  //   if (searchFilters?.neighborhoodFilter) {
-  //     console.log('🏙️ Neighborhood filter active, loading businesses within neighborhood bounds');
+    // If neighborhood search is active, load businesses within neighborhood bounds
+    if (searchFilters?.neighborhoodFilter) {
+      console.log('🏙️ Neighborhood filter active, loading businesses within neighborhood bounds');
       
-  //     // Create neighborhood bounds from the boundary points with padding
-  //     const boundary = searchFilters.neighborhoodFilter.boundary;
-  //     const lats = boundary.map(p => p.lat);
-  //     const lons = boundary.map(p => p.lon);
+      // Create neighborhood bounds from the boundary points with padding
+      const boundary = searchFilters.neighborhoodFilter.boundary;
+      const lats = boundary.map(p => p.lat);
+      const lons = boundary.map(p => p.lon);
       
-  //     // Add padding to ensure we capture all businesses in the area
-  //     const latPadding = 0.015; // ~1.5km padding
-  //     const lonPadding = 0.020; // ~1.5km padding (adjusted for longitude)
+      // Add padding to ensure we capture all businesses in the area
+      const latPadding = 0.015; // ~1.5km padding
+      const lonPadding = 0.020; // ~1.5km padding (adjusted for longitude)
       
-  //     const neighborhoodBounds: Bounds = {
-  //       north: Math.max(...lats) + latPadding,
-  //       south: Math.min(...lats) - latPadding,
-  //       east: Math.max(...lons) + lonPadding,
-  //       west: Math.min(...lons) - lonPadding
-  //     };
+      const neighborhoodBounds: Bounds = {
+        north: Math.max(...lats) + latPadding,
+        south: Math.min(...lats) - latPadding,
+        east: Math.max(...lons) + lonPadding,
+        west: Math.min(...lons) - lonPadding
+      };
       
-  //     try {
-  //       isLoadingRef.current = true;
-  //       const zoom = map.getZoom();
-  //       const businessLimit = getBusinessLimitForViewport(zoom, neighborhoodBounds);
+      try {
+        isLoadingRef.current = true;
+        const zoom = map.getZoom();
+        const businessLimit = getBusinessLimitForViewport(zoom, neighborhoodBounds);
         
-  //       console.log('🏙️ Loading neighborhood businesses:', {
-  //         neighborhood: searchFilters.neighborhoodFilter.name,
-  //         bounds: neighborhoodBounds,
-  //         businessLimit
-  //       });
+        console.log('🏙️ Loading neighborhood businesses:', {
+          neighborhood: searchFilters.neighborhoodFilter.name,
+          bounds: neighborhoodBounds,
+          businessLimit
+        });
         
-  //       const neighborhoodBusinesses = await loadBusinessesInViewport(neighborhoodBounds, businessLimit);
+        const neighborhoodBusinesses = await loadBusinessesInViewport(neighborhoodBounds, businessLimit);
         
-  //       if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length > 0) {
-  //         console.log(`✅ Loaded ${neighborhoodBusinesses.length} businesses for ${searchFilters.neighborhoodFilter.name}`);
-  //         businessCacheRef.current.addMultiple(neighborhoodBusinesses);
-  //       }
+        if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length > 0) {
+          console.log(`✅ Loaded ${neighborhoodBusinesses.length} businesses for ${searchFilters.neighborhoodFilter.name}`);
+          businessCacheRef.current.addMultiple(neighborhoodBusinesses);
+        }
         
-  //     } catch (error) {
-  //       console.error('❌ Error loading neighborhood businesses:', error);
-  //     } finally {
-  //       isLoadingRef.current = false;
-  //     }
-  //     return;
-  //   }
+      } catch (error) {
+        console.error('❌ Error loading neighborhood businesses:', error);
+      } finally {
+        isLoadingRef.current = false;
+      }
+      return;
+    }
 
-  //   // Get current visible bounds - this is the key fix
-  //   const currentBounds = map.getBounds();
-  //   const currentZoom = map.getZoom();
+    // Get current visible bounds - this is the key fix
+    const currentBounds = map.getBounds();
+    const currentZoom = map.getZoom();
     
-  //   // Create tight bounds for the visible area FIRST
-  //   const visibleBounds: Bounds = {
-  //     north: currentBounds.getNorth(),
-  //     south: currentBounds.getSouth(),
-  //     east: currentBounds.getEast(),
-  //     west: currentBounds.getWest(),
-  //   };
+    // Create tight bounds for the visible area FIRST
+    const visibleBounds: Bounds = {
+      north: currentBounds.getNorth(),
+      south: currentBounds.getSouth(),
+      east: currentBounds.getEast(),
+      west: currentBounds.getWest(),
+    };
     
-  //   console.log('🗺️ Current visible bounds:', visibleBounds);
+    console.log('🗺️ Current visible bounds:', visibleBounds);
     
-  //   // Load businesses for the EXACT visible area first
-  //   try {
-  //     isLoadingRef.current = true;
-  //     const visibleBusinessLimit = Math.floor(getBusinessLimitForViewport(currentZoom, visibleBounds) * 0.8);
+    // Load businesses for the EXACT visible area first
+    try {
+      isLoadingRef.current = true;
+      const visibleBusinessLimit = Math.floor(getBusinessLimitForViewport(currentZoom, visibleBounds) * 0.8);
       
-  //     console.log('🎯 Loading businesses for VISIBLE area:', {
-  //       zoom: currentZoom.toFixed(2),
-  //       businessLimit: visibleBusinessLimit,
-  //       bounds: visibleBounds
-  //     });
+      console.log('🎯 Loading businesses for VISIBLE area:', {
+        zoom: currentZoom.toFixed(2),
+        businessLimit: visibleBusinessLimit,
+        bounds: visibleBounds
+      });
       
-  //     const visibleBusinesses = await loadBusinessesInViewport(visibleBounds, visibleBusinessLimit);
+      const visibleBusinesses = await loadBusinessesInViewport(visibleBounds, visibleBusinessLimit);
       
-  //     if (Array.isArray(visibleBusinesses) && visibleBusinesses.length > 0) {
-  //       console.log(`✅ Loaded ${visibleBusinesses.length} businesses for VISIBLE viewport`);
-  //       businessCacheRef.current.addMultiple(visibleBusinesses);
-  //     } else {
-  //       console.log('❌ No businesses loaded for visible viewport');
-  //     }
+      if (Array.isArray(visibleBusinesses) && visibleBusinesses.length > 0) {
+        console.log(`✅ Loaded ${visibleBusinesses.length} businesses for VISIBLE viewport`);
+        businessCacheRef.current.addMultiple(visibleBusinesses);
+      } else {
+        console.log('❌ No businesses loaded for visible viewport');
+      }
       
-  //     // Then load buffer area (don't wait for this)
-  //     setTimeout(async () => {
-  //       const latDiff = visibleBounds.north - visibleBounds.south;
-  //       const lngDiff = visibleBounds.east - visibleBounds.west;
-  //       const expansion = 0.3; // 30% expansion for buffer
+      // Then load buffer area (don't wait for this)
+      setTimeout(async () => {
+        const latDiff = visibleBounds.north - visibleBounds.south;
+        const lngDiff = visibleBounds.east - visibleBounds.west;
+        const expansion = 0.3; // 30% expansion for buffer
         
-  //       const bufferBounds: Bounds = {
-  //         north: visibleBounds.north + latDiff * expansion,
-  //         south: visibleBounds.south - latDiff * expansion,
-  //         east: visibleBounds.east + lngDiff * expansion,
-  //         west: visibleBounds.west - lngDiff * expansion,
-  //       };
+        const bufferBounds: Bounds = {
+          north: visibleBounds.north + latDiff * expansion,
+          south: visibleBounds.south - latDiff * expansion,
+          east: visibleBounds.east + lngDiff * expansion,
+          west: visibleBounds.west - lngDiff * expansion,
+        };
         
-  //       const bufferBusinessLimit = Math.floor(getBusinessLimitForViewport(currentZoom, bufferBounds) * 0.3);
+        const bufferBusinessLimit = Math.floor(getBusinessLimitForViewport(currentZoom, bufferBounds) * 0.3);
         
-  //       console.log('🔮 Loading buffer businesses:', {
-  //         businessLimit: bufferBusinessLimit,
-  //         bounds: bufferBounds
-  //       });
+        console.log('🔮 Loading buffer businesses:', {
+          businessLimit: bufferBusinessLimit,
+          bounds: bufferBounds
+        });
         
-  //       const bufferBusinesses = await loadBusinessesInViewport(bufferBounds, bufferBusinessLimit);
-  //       if (Array.isArray(bufferBusinesses) && bufferBusinesses.length > 0) {
-  //         console.log(`🔮 Loaded ${bufferBusinesses.length} buffer businesses`);
-  //         businessCacheRef.current.addMultiple(bufferBusinesses);
-  //       }
-  //     }, 100);
+        const bufferBusinesses = await loadBusinessesInViewport(bufferBounds, bufferBusinessLimit);
+        if (Array.isArray(bufferBusinesses) && bufferBusinesses.length > 0) {
+          console.log(`🔮 Loaded ${bufferBusinesses.length} buffer businesses`);
+          businessCacheRef.current.addMultiple(bufferBusinesses);
+        }
+      }, 100);
       
-  //   } catch (error) {
-  //     console.error('❌ Error in handleViewportChange:', error);
-  //   } finally {
-  //     setTimeout(() => {
-  //       isLoadingRef.current = false;
-  //     }, 200);
-  //   }
+    } catch (error) {
+      console.error('❌ Error in handleViewportChange:', error);
+    } finally {
+      setTimeout(() => {
+        isLoadingRef.current = false;
+      }, 200);
+    }
 
-  // }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters]);
+  }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters]);
 
   // // Keep a ref to latest handler for stable listeners
-  // useEffect(() => {
-  //   handleViewportChangeRef.current = handleViewportChange;
-  // }, [handleViewportChange]);
+  useEffect(() => {
+    handleViewportChangeRef.current = handleViewportChange;
+  }, [handleViewportChange]);
 
-  // // Memoized DeckGL layers with better caching and visible area focus
-  // const deckGLLayers = useMemo(() => {
-  //   const cachedBusinesses = businessCacheRef.current.getAll();
+  // Memoized DeckGL layers with better caching and visible area focus
+  const deckGLLayers = useMemo(() => {
+    const cachedBusinesses = businessCacheRef.current.getAll();
     
-  //   // Also consider businesses from hook state as fallback/supplement
-  //   const allBusinesses = cachedBusinesses.length > 0 ? cachedBusinesses : businesses;
+    // Also consider businesses from hook state as fallback/supplement
+    const allBusinesses = cachedBusinesses.length > 0 ? cachedBusinesses : businesses;
     
-  //   console.log('🎯 DeckGL layers calculation:', {
-  //     cachedBusinessesCount: cachedBusinesses?.length || 0,
-  //     hookBusinessesCount: businesses?.length || 0,
-  //     finalBusinessesCount: allBusinesses?.length || 0,
-  //     mapLoaded,
-  //     hasMap: !!mapRef.current,
-  //     containerDimensions: mapRef.current ? {
-  //       width: mapRef.current?.getContainer().clientWidth,
-  //       height: mapRef.current?.getContainer().clientHeight
-  //     } : null
-  //   });
+    console.log('🎯 DeckGL layers calculation:', {
+      cachedBusinessesCount: cachedBusinesses?.length || 0,
+      hookBusinessesCount: businesses?.length || 0,
+      finalBusinessesCount: allBusinesses?.length || 0,
+      mapLoaded,
+      hasMap: !!mapRef.current,
+      containerDimensions: mapRef.current ? {
+        width: mapRef.current?.getContainer().clientWidth,
+        height: mapRef.current?.getContainer().clientHeight
+      } : null
+    });
     
-  //   if (!allBusinesses || allBusinesses.length === 0) {
-  //     console.log('❌ No businesses available for DeckGL layers (cache + hook)');
-  //     return [];
-  //   }
+    if (!allBusinesses || allBusinesses.length === 0) {
+      console.log('❌ No businesses available for DeckGL layers (cache + hook)');
+      return [];
+    }
 
-  //   try {
-  //     let businessesToRender = allBusinesses;
+    try {
+      let businessesToRender = allBusinesses;
       
-  //     // Handle clustered data efficiently
-  //     if (isClusteredData && Array.isArray(businesses) && businesses.length > 0) {
-  //       const flattenedBusinesses: Business[] = [];
-  //       businesses.forEach((item: any) => {
-  //         if (item?.type === 'cluster' && Array.isArray(item.businesses)) {
-  //           item.businesses.forEach((b: Business) => {
-  //             if (b?.position) flattenedBusinesses.push(b);
-  //           });
-  //         } else if (item?.type !== 'cluster' && item?.position) {
-  //           flattenedBusinesses.push(item);
-  //         }
-  //       });
-  //       businessesToRender = flattenedBusinesses;
-  //     }
+      // Handle clustered data efficiently
+      if (isClusteredData && Array.isArray(businesses) && businesses.length > 0) {
+        const flattenedBusinesses: Business[] = [];
+        businesses.forEach((item: any) => {
+          if (item?.type === 'cluster' && Array.isArray(item.businesses)) {
+            item.businesses.forEach((b: Business) => {
+              if (b?.position) flattenedBusinesses.push(b);
+            });
+          } else if (item?.type !== 'cluster' && item?.position) {
+            flattenedBusinesses.push(item);
+          }
+        });
+        businessesToRender = flattenedBusinesses;
+      }
 
-  //     // Filter businesses to current viewport if map is loaded
-  //     if (mapRef.current && mapLoaded) {
-  //       const currentBounds = mapRef.current.getBounds();
-  //       const visibleBusinesses = businessesToRender.filter(business => {
-  //         if (!business?.position?.lat || !business?.position?.lng) return false;
+      // Filter businesses to current viewport if map is loaded
+      if (mapRef.current && mapLoaded) {
+        const currentBounds = mapRef.current.getBounds();
+        const visibleBusinesses = businessesToRender.filter(business => {
+          if (!business?.position?.lat || !business?.position?.lng) return false;
           
-  //         return business.position.lat <= currentBounds.getNorth() &&
-  //                business.position.lat >= currentBounds.getSouth() &&
-  //                business.position.lng <= currentBounds.getEast() &&
-  //                business.position.lng >= currentBounds.getWest();
-  //       });
+          return business.position.lat <= currentBounds.getNorth() &&
+                 business.position.lat >= currentBounds.getSouth() &&
+                 business.position.lng <= currentBounds.getEast() &&
+                 business.position.lng >= currentBounds.getWest();
+        });
         
-  //       // Combine visible businesses with some cached ones for smooth scrolling
-  //       const bufferBusinesses = businessesToRender.filter(business => {
-  //         if (!business?.position?.lat || !business?.position?.lng) return false;
+        // Combine visible businesses with some cached ones for smooth scrolling
+        const bufferBusinesses = businessesToRender.filter(business => {
+          if (!business?.position?.lat || !business?.position?.lng) return false;
           
-  //         const latBuffer = (currentBounds.getNorth() - currentBounds.getSouth()) * 0.2;
-  //         const lngBuffer = (currentBounds.getEast() - currentBounds.getWest()) * 0.2;
+          const latBuffer = (currentBounds.getNorth() - currentBounds.getSouth()) * 0.2;
+          const lngBuffer = (currentBounds.getEast() - currentBounds.getWest()) * 0.2;
           
-  //         return business.position.lat <= currentBounds.getNorth() + latBuffer &&
-  //                business.position.lat >= currentBounds.getSouth() - latBuffer &&
-  //                business.position.lng <= currentBounds.getEast() + lngBuffer &&
-  //                business.position.lng >= currentBounds.getWest() - lngBuffer;
-  //       });
+          return business.position.lat <= currentBounds.getNorth() + latBuffer &&
+                 business.position.lat >= currentBounds.getSouth() - latBuffer &&
+                 business.position.lng <= currentBounds.getEast() + lngBuffer &&
+                 business.position.lng >= currentBounds.getWest() - lngBuffer;
+        });
         
-  //       // Prioritize visible businesses, add some buffer ones
-  //       businessesToRender = [...visibleBusinesses, ...bufferBusinesses.slice(0, 1000)];
+        // Prioritize visible businesses, add some buffer ones
+        businessesToRender = [...visibleBusinesses, ...bufferBusinesses.slice(0, 1000)];
         
-  //       // Remove duplicates
-  //       const seen = new Set();
-  //       businessesToRender = businessesToRender.filter(business => {
-  //         if (seen.has(business.id)) return false;
-  //         seen.add(business.id);
-  //         return true;
-  //       });
+        // Remove duplicates
+        const seen = new Set();
+        businessesToRender = businessesToRender.filter(business => {
+          if (seen.has(business.id)) return false;
+          seen.add(business.id);
+          return true;
+        });
         
-  //       console.log(`🎯 Rendering ${visibleBusinesses.length} visible + ${bufferBusinesses.length - visibleBusinesses.length} buffer businesses`);
-  //     }
+        console.log(`🎯 Rendering ${visibleBusinesses.length} visible + ${bufferBusinesses.length - visibleBusinesses.length} buffer businesses`);
+      }
 
-  //     console.log(`✅ Creating DeckGL layer with ${businessesToRender.length} businesses`);
+      console.log(`✅ Creating DeckGL layer with ${businessesToRender.length} businesses`);
       
-  //     return [createBusinessScatterplotLayer({
-  //       businesses: businessesToRender,
-  //       selectedBusinessId: selectedBusiness?.id,
-  //       onBusinessClick: handleBusinessClick,
-  //     })];
-  //   } catch (error) {
-  //     console.error('Error creating DeckGL layers:', error);
-  //     return [];
-  //   }
-  // }, [businesses, selectedBusiness?.id, isClusteredData, handleBusinessClick, mapLoaded]);
+      return [createBusinessScatterplotLayer({
+        businesses: businessesToRender,
+        selectedBusinessId: selectedBusiness?.id,
+        onBusinessClick: handleBusinessClick,
+      })];
+    } catch (error) {
+      console.error('Error creating DeckGL layers:', error);
+      return [];
+    }
+  }, [businesses, selectedBusiness?.id, isClusteredData, handleBusinessClick, mapLoaded]);
 
   // // Handle container resize
   // useEffect(() => {
@@ -1029,53 +1029,53 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     setTimeout(loadNeighborhoodBusinesses, 500);
   }, [mapLoaded, searchFilters?.neighborhoodFilter, loadBusinessesInViewport, getBusinessLimitForViewport]);
 
-  // // Initialize DeckGL overlay
-  // useEffect(() => {
-  //   if (!mapRef.current || !mapLoaded || deckOverlay) return;
+  // Initialize DeckGL overlay
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded || deckOverlay) return;
     
-  //   let overlay = overlayInstance;
-  //   if (!overlay) {
-  //     overlay = new MapboxOverlay({
-  //       interleaved: true,
-  //       layers: []
-  //     });
-  //     overlayInstance = overlay;
-  //   }
+    let overlay = overlayInstance;
+    if (!overlay) {
+      overlay = new MapboxOverlay({
+        interleaved: true,
+        layers: []
+      });
+      overlayInstance = overlay;
+    }
     
-  //   try {
-  //     mapRef.current.addControl(overlay as any);
-  //     setDeckOverlay(overlay);
-  //     setOverlayReady(true);
-  //   } catch (e) {
-  //     console.log('DeckGL overlay already added:', e);
-  //     setOverlayReady(true);
-  //   }
-  // }, [mapLoaded]);
+    try {
+      mapRef.current.addControl(overlay as any);
+      setDeckOverlay(overlay);
+      setOverlayReady(true);
+    } catch (e) {
+      console.log('DeckGL overlay already added:', e);
+      setOverlayReady(true);
+    }
+  }, [mapLoaded]);
 
-  // // Update DeckGL layers with throttling and immediate visible area updates
-  // useEffect(() => {
-  //   if (!deckOverlay || !overlayReady) return;
+  // Update DeckGL layers with throttling and immediate visible area updates
+  useEffect(() => {
+    if (!deckOverlay || !overlayReady) return;
     
-  //   if (updateTimeoutRef.current) clearTimeout(updateTimeoutRef.current);
+    if (updateTimeoutRef.current) clearTimeout(updateTimeoutRef.current);
     
-  //   // Update immediately for visible area, then throttle for performance
-  //   const updateLayers = () => {
-  //     try {
-  //       deckOverlay.setProps({ layers: deckGLLayers });
-  //       console.log(`🎯 Updated DeckGL with ${deckGLLayers?.length || 0} layers`);
-  //     } catch (error) {
-  //       console.error('Error updating DeckGL:', error);
-  //     }
-  //   };
+    // Update immediately for visible area, then throttle for performance
+    const updateLayers = () => {
+      try {
+        deckOverlay.setProps({ layers: deckGLLayers });
+        console.log(`🎯 Updated DeckGL with ${deckGLLayers?.length || 0} layers`);
+      } catch (error) {
+        console.error('Error updating DeckGL:', error);
+      }
+    };
     
-  //   // Update immediately if we have visible businesses
-  //   if (mapRef.current && mapLoaded && deckGLLayers.length > 0) {
-  //     updateLayers();
-  //   } else {
-  //     // Throttle updates for other cases
-  //     updateTimeoutRef.current = setTimeout(updateLayers, 50);
-  //   }
-  // }, [deckOverlay, overlayReady, deckGLLayers, mapLoaded]);
+    // Update immediately if we have visible businesses
+    if (mapRef.current && mapLoaded && deckGLLayers.length > 0) {
+      updateLayers();
+    } else {
+      // Throttle updates for other cases
+      updateTimeoutRef.current = setTimeout(updateLayers, 50);
+    }
+  }, [deckOverlay, overlayReady, deckGLLayers, mapLoaded]);
 
   // Handle search filter changes
   useEffect(() => {
