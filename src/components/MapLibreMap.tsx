@@ -763,8 +763,34 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     });
 
     let mapInstance: maplibregl.Map;
+
+    const tileUrls = await Promise.all(urls.map(url => createTileBlobUrl(url)));
     
     try {
+      // 1️⃣ Wait for all tile URLs
+      const tileUrls = await Promise.all(
+        urls.map(url => createTileBlobUrl(url)) // createTileBlobUrl returns Promise<string>
+      );
+      
+      // 2️⃣ Build the style
+      const mapStyle: maplibregl.StyleSpecification = {
+        version: 8,
+        sources: {
+          'nyc-tiles': {
+            type: 'vector',
+            tiles: tileUrls, // ✅ string[]
+            minzoom: 0,
+            maxzoom: 22,
+            scheme: 'xyz',
+          }
+        },
+        glyphs: 'https://example.com/fonts/{fontstack}/{range}.pbf',
+        layers: [
+          // your layers here
+        ]
+      };
+      
+      // 3️⃣ Create the map AFTER tiles are ready
       mapInstance = new maplibregl.Map({
         container: mapContainerRef.current!,
         style: mapStyle,
@@ -775,21 +801,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         renderWorldCopies: false,
         attributionControl: false,
         transformRequest: (url, resourceType) => {
-          // Enhanced logging for all environments
           if (resourceType === 'Tile') {
             console.log('🔧 Tile request:', { url, resourceType, isCapacitor: isCapacitor() });
           }
-          
-          // For Capacitor, ensure HTTPS requests
+      
           if (isCapacitor() && url.startsWith('http://')) {
             const httpsUrl = url.replace('http://', 'https://');
             console.log('🔒 Converting to HTTPS for Capacitor:', httpsUrl);
             return { url: httpsUrl };
           }
-          
+      
           return { url };
         }
       });
+
     } catch (error) {
       console.error('Failed to create MapLibre instance:', error);
       return;
