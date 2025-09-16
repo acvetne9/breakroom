@@ -53,7 +53,7 @@ export const usePosts = () => {
     salary?: number
   ): Promise<boolean> => {
     try {
-      const postType = isJobUpdate ? 'job_update' : businessId ? 'story' : 'general';
+      const postType = isJobUpdate ? 'job_update' : 'story';
       
       const { data, error } = await createPost(
         text,
