@@ -487,7 +487,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       // Filter businesses to current viewport if map is loaded
       if (mapRef.current && mapLoaded) {
-        const currentBounds = mapRef.current?.getBounds();
+        const currentBounds = mapRef.current.getBounds();
         const visibleBusinesses = businessesToRender.filter(business => {
           if (!business?.position?.lat || !business?.position?.lng) return false;
           
@@ -697,50 +697,50 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       hasGlyphs: !!mapStyle.glyphs
     });
 
-    // const mapInstance = new maplibregl.Map({
-    //   container: mapContainerRef.current!,
-    //   style: mapStyle,
-    //   center: [-73.986104, 40.715245],
-    //   zoom: 12.77,
-    //   maxZoom: isCapacitor() ? 19 : 18,
-    //   minZoom: 9,
-    //   renderWorldCopies: false,
-    //   attributionControl: false,
-    //   transformRequest: (url, resourceType) => {
-    //     // Enhanced logging for all environments
-    //     if (resourceType === 'Tile') {
-    //       console.log('🔧 Tile request:', { url, resourceType, isCapacitor: isCapacitor() });
-    //     }
+    const mapInstance = new maplibregl.Map({
+      container: mapContainerRef.current!,
+      style: mapStyle,
+      center: [-73.986104, 40.715245],
+      zoom: 12.77,
+      maxZoom: isCapacitor() ? 19 : 18,
+      minZoom: 9,
+      renderWorldCopies: false,
+      attributionControl: false,
+      transformRequest: (url, resourceType) => {
+        // Enhanced logging for all environments
+        if (resourceType === 'Tile') {
+          console.log('🔧 Tile request:', { url, resourceType, isCapacitor: isCapacitor() });
+        }
         
-    //     // For Capacitor, ensure HTTPS requests
-    //     if (isCapacitor() && url.startsWith('http://')) {
-    //       const httpsUrl = url.replace('http://', 'https://');
-    //       console.log('🔒 Converting to HTTPS for Capacitor:', httpsUrl);
-    //       return { url: httpsUrl };
-    //     }
+        // For Capacitor, ensure HTTPS requests
+        if (isCapacitor() && url.startsWith('http://')) {
+          const httpsUrl = url.replace('http://', 'https://');
+          console.log('🔒 Converting to HTTPS for Capacitor:', httpsUrl);
+          return { url: httpsUrl };
+        }
         
-    //     return { url };
-    //   }
-    // });
+        return { url };
+      }
+    });
     
     console.log('✅ MapLibre instance created successfully');
     
     // Immediately set bounds after creation
     console.log('🗺️ Setting map bounds for NYC region...');
-    mapRef.current?.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
+    mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
     
     // Test basic map functionality
     console.log('🧪 Testing map methods:', {
-      getZoom: mapRef.current?.getZoom(),
-      getCenter: mapRef.current?.getCenter(),
-      isStyleLoaded: mapRef.current?.isStyleLoaded()
+      getZoom: mapInstance.getZoom(),
+      getCenter: mapInstance.getCenter(),
+      isStyleLoaded: mapInstance.isStyleLoaded()
     });
 
     // Store map instance in ref
-    mapRef.current = mapRef;
+    mapRef.current = mapInstance;
 
     // Enhanced error handling and loading
-    mapRef.current?.on('error', (e) => {
+    mapInstance.on('error', (e) => {
       console.error('🚨 Map error:', e.error);
     });
 
@@ -753,7 +753,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     }, 2000); // 2 second fallback
 
-    mapRef.current?.on('load', () => {
+    mapInstance.on('load', () => {
       console.log('🗺️ Map loaded successfully via load event');
       clearTimeout(loadFallbackTimer);
       setMapLoaded(true);
@@ -894,12 +894,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       };
     })();
 
-    mapRef.current?.on('moveend', callViewportChange);
-    mapRef.current?.on('zoomend', callViewportChange);
-    mapRef.current?.on('move', debouncedMoveHandler);
+    mapInstance.on('moveend', callViewportChange);
+    mapInstance.on('zoomend', callViewportChange);
+    mapInstance.on('move', debouncedMoveHandler);
 
     // Add map layers when ready with environment-specific handling
-    mapRef.current?.on('sourcedata', (e) => {
+    mapInstance.on('sourcedata', (e) => {
       if (isCapacitor()) {
         // For Capacitor with raster tiles
         if (e.sourceId === 'osm' && e.isSourceLoaded && !layersAddedRef.current) {
@@ -918,7 +918,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       // For web environment with vector tiles
       if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
         console.log('🔄 NYC tiles source loaded, adding vector layers via sourcedata event...');
-        addVectorLayers(mapRef);
+        addVectorLayers(mapInstance);
       } else if (e.sourceId === 'nyc-tiles') {
         console.log('🔄 NYC tiles sourcedata event:', {
           sourceId: e.sourceId,
@@ -930,7 +930,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     // Additional mobile-specific event handlers
     if (isCapacitor()) {
-      mapRef.current?.on('data', (e: any) => {
+      mapInstance.on('data', (e: any) => {
         if (e.dataType === 'source' && e.sourceId === 'osm') {
           console.log('📊 OSM data event:', {
             dataType: e.dataType,
@@ -940,7 +940,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         }
       });
 
-      mapRef.current?.on('dataloading', (e: any) => {
+      mapInstance.on('dataloading', (e: any) => {
         if (e.dataType === 'source' && e.sourceId === 'osm') {
           console.log('⏳ OSM data loading:', e.sourceId);
         }
@@ -964,7 +964,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
       
       try {
-        mapRef.current?.remove();
+        mapInstance.remove();
       } catch (error) {
         console.error('Error removing map:', error);
       }
@@ -981,7 +981,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (!mapRef.current || !neighborhoodCenter) return;
     
     console.log('🏙️ Centering map on neighborhood:', neighborhoodCenter);
-    mapRef.current?.flyTo({
+    mapRef.current.flyTo({
       center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
       zoom: 14, // Good zoom level for neighborhood view
       duration: 2000
@@ -1053,7 +1053,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
     
     try {
-      mapRef.current?.addControl(overlay as any);
+      mapRef.current.addControl(overlay as any);
       setDeckOverlay(overlay);
       setOverlayReady(true);
     } catch (e) {
@@ -1112,9 +1112,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (!mapRef.current || !mapLoaded || !selectedBusiness?.position) return;
     
-    mapRef.current?.easeTo({
+    mapRef.current.easeTo({
       center: [selectedBusiness.position.lng, selectedBusiness.position.lat],
-      zoom: Math.max(mapRef.current?.getZoom(), 16),
+      zoom: Math.max(mapRef.current.getZoom(), 16),
       duration: 600
     });
   }, [selectedBusiness?.id, mapLoaded]);
@@ -1129,7 +1129,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     });
     landmarkMarkersRef.current = [];
 
-    const zoom = mapRef.current?.getZoom();
+    const zoom = mapRef.current.getZoom();
     const size = Math.max(12, Math.min(32, 16 * Math.pow(1.15, zoom - 10)));
 
     const markers = landmarks.map(landmark => {
@@ -1177,7 +1177,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
     };
 
-    mapRef.current?.on('zoom', handleZoomChange);
+    mapRef.current.on('zoom', handleZoomChange);
 
     return () => {
       try { mapRef.current?.off('zoom', handleZoomChange); } catch {}
