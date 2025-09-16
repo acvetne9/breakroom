@@ -235,7 +235,7 @@ const HomePage: React.FC<HomePageProps> = ({
   }, []);
   
   return (
-    <div className="w-full h-full min-w-[200px] min-h-[200px]">
+    <div className="absolute inset-0 w-full h-full min-w-[200px] min-h-[200px]">
       {showLoading && (
         <BreakroomLoading onComplete={handleLoadingComplete} />
       )}
