@@ -1223,9 +1223,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [mapLoaded, map]);
 
   return (
-    <div ref={mapContainerRef} className="map-container"
+    <div ref={mapContainerRef} className="map-container maplibre-map"
       ref={mapRef}
-      className="maplibre-map"
       style={{
         position: 'absolute',
         top: 0,
