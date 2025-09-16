@@ -215,7 +215,7 @@ const HomePage: React.FC<HomePageProps> = ({
   const showClearButton = searchCompleted && hasActiveSearch;
 
   return (
-    <div className="relative w-full h-full">
+    <div className="w-full h-full min-w-[200px] min-h-[200px]">
       {showLoading && (
         <BreakroomLoading onComplete={handleLoadingComplete} />
       )}
