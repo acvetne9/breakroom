@@ -203,15 +203,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const mapRef = useRef<maplibregl.Map | null>(null);
 
   useEffect(() => {
-    if (mapRef.current) return; // prevent re-init
-
+    if (mapRef.current) return;
+  
     mapRef.current = new maplibregl.Map({
-      container: mapContainerRef.current!,
-      style: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', // your style
+      container: mapContainerRef.current!, // ✅ HTMLDivElement
+      style: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
       center: [-73.9857, 40.7484],
       zoom: 11
     });
-
+  
     return () => {
       mapRef.current?.remove();
       mapRef.current = null;
@@ -1223,7 +1223,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [mapLoaded, map]);
 
   return (
-    <div ref={mapContainerRef} className="absolute inset-0 w-full h-full min-w-[200px] min-h-[200px]" 
+    <div ref={mapContainerRef} className="map-container"
       ref={mapRef}
       className="maplibre-map"
       style={{
