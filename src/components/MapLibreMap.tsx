@@ -1178,41 +1178,41 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   
   // 2. Initialize the map once we have a valid string tileUrl
-  useEffect(() => {
-    if (!mapContainerRef.current) return;
+  // useEffect(() => {
+  //   if (!mapContainerRef.current) return;
   
-    const initializeMap = async () => {
-      const urls = ['/data/tiles/{z}/{x}/{y}.pbf']; // or dynamic list of tile files
-      cconst tileUrls: string[] = await Promise.all(urls.map(url => createTileBlobUrl(url)));
+  //   const initializeMap = async () => {
+  //     const urls = ['/data/tiles/{z}/{x}/{y}.pbf']; // or dynamic list of tile files
+  //     cconst tileUrls: string[] = await Promise.all(urls.map(url => createTileBlobUrl(url)));
 
-      const mapStyle: maplibregl.StyleSpecification = {
-        version: 8,
-        sources: {
-          'nyc-tiles': {
-            type: 'vector',
-            tiles: tileUrls, // now string[], not Promise<string>[]
-            minzoom: 10,
-            maxzoom: 16,
-            scheme: 'xyz'
-          }
-        },
-        glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-        layers: [] // add your layers here
-      };
+  //     const mapStyle: maplibregl.StyleSpecification = {
+  //       version: 8,
+  //       sources: {
+  //         'nyc-tiles': {
+  //           type: 'vector',
+  //           tiles: tileUrls, // now string[], not Promise<string>[]
+  //           minzoom: 10,
+  //           maxzoom: 16,
+  //           scheme: 'xyz'
+  //         }
+  //       },
+  //       glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+  //       layers: [] // add your layers here
+  //     };
 
   
-      const mapInstance = new maplibregl.Map({
-        container: mapContainerRef.current!,
-        style: mapStyle,
-        center: [-73.986104, 40.715245],
-        zoom: 12.77,
-      });
+  //     const mapInstance = new maplibregl.Map({
+  //       container: mapContainerRef.current!,
+  //       style: mapStyle,
+  //       center: [-73.986104, 40.715245],
+  //       zoom: 12.77,
+  //     });
   
-      mapRef.current = mapInstance;
-    };
+  //     mapRef.current = mapInstance;
+  //   };
   
-    initializeMap();
-  }, []);
+  //   initializeMap();
+  // }, []);
 
 
   return (
