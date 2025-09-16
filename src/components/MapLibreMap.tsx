@@ -812,64 +812,64 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       hasGlyphs: !!mapStyle.glyphs
     });
 
-    //let mapInstance: maplibregl.Map;
+    let mapInstance: maplibregl.Map;
     
-    // try {
-    //   mapInstance = new maplibregl.Map({
-    //     container: mapContainerRef.current!,
-    //     style: mapStyle,
-    //     center: [-73.986104, 40.715245],
-    //     zoom: 12.77,
-    //     maxZoom: isCapacitor() ? 19 : 18,
-    //     minZoom: 9,
-    //     renderWorldCopies: false,
-    //     attributionControl: false,
-    //     transformRequest: (url, resourceType) => {
-    //       // Enhanced logging for all environments
-    //       if (resourceType === 'Tile') {
-    //         console.log('🔧 Tile request:', { url, resourceType, isCapacitor: isCapacitor() });
-    //       }
+    try {
+      mapInstance = new maplibregl.Map({
+        container: mapContainerRef.current!,
+        style: mapStyle,
+        center: [-73.986104, 40.715245],
+        zoom: 12.77,
+        maxZoom: isCapacitor() ? 19 : 18,
+        minZoom: 9,
+        renderWorldCopies: false,
+        attributionControl: false,
+        transformRequest: (url, resourceType) => {
+          // Enhanced logging for all environments
+          if (resourceType === 'Tile') {
+            console.log('🔧 Tile request:', { url, resourceType, isCapacitor: isCapacitor() });
+          }
           
-    //       // For Capacitor, ensure HTTPS requests
-    //       if (isCapacitor() && url.startsWith('http://')) {
-    //         const httpsUrl = url.replace('http://', 'https://');
-    //         console.log('🔒 Converting to HTTPS for Capacitor:', httpsUrl);
-    //         return { url: httpsUrl };
-    //       }
+          // For Capacitor, ensure HTTPS requests
+          if (isCapacitor() && url.startsWith('http://')) {
+            const httpsUrl = url.replace('http://', 'https://');
+            console.log('🔒 Converting to HTTPS for Capacitor:', httpsUrl);
+            return { url: httpsUrl };
+          }
           
-    //       return { url };
-    //     }
-    //   });
-    // } catch (error) {
-    //   console.error('Failed to create MapLibre instance:', error);
-    //   return;
-    // }
+          return { url };
+        }
+      });
+    } catch (error) {
+      console.error('Failed to create MapLibre instance:', error);
+      return;
+    }
     
-    // Verify the map instance is valid before proceeding
-    // if (!mapInstance || typeof mapInstance.on !== 'function') {
-    //   console.error('Invalid MapLibre instance created');
-    //   return;
-    // }
+    Verify the map instance is valid before proceeding
+    if (!mapInstance || typeof mapInstance.on !== 'function') {
+      console.error('Invalid MapLibre instance created');
+      return;
+    }
     
-    // console.log('✅ MapLibre instance created successfully');
+    console.log('✅ MapLibre instance created successfully');
     
-    // // Store map instance in ref immediately after creation
-    // mapRef.current = mapInstance;
+    // Store map instance in ref immediately after creation
+    mapRef.current = mapInstance;
     
-    // // Set bounds after storing in ref
-    // try {
-    //   console.log('🗺️ Setting map bounds for NYC region...');
-    //   mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
+    // Set bounds after storing in ref
+    try {
+      console.log('🗺️ Setting map bounds for NYC region...');
+      mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
       
-    //   // Test basic map functionality
-    //   console.log('🧪 Testing map methods:', {
-    //     getZoom: mapInstance.getZoom(),
-    //     getCenter: mapInstance.getCenter(),
-    //     isStyleLoaded: mapInstance.isStyleLoaded()
-    //   });
-    // } catch (error) {
-    //   console.error('Error setting up map:', error);
-    // }
+      // Test basic map functionality
+      console.log('🧪 Testing map methods:', {
+        getZoom: mapInstance.getZoom(),
+        getCenter: mapInstance.getCenter(),
+        isStyleLoaded: mapInstance.isStyleLoaded()
+      });
+    } catch (error) {
+      console.error('Error setting up map:', error);
+    }
 
     // Enhanced error handling and loading with validation
     const setupMapEventListeners = (map: maplibregl.Map) => {
