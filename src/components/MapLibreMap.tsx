@@ -795,7 +795,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return;
     }
     
-    Verify the map instance is valid before proceeding
+    // Verify the map instance is valid before proceeding
     if (!mapInstance || typeof mapInstance.on !== 'function') {
       console.error('Invalid MapLibre instance created');
       return;
