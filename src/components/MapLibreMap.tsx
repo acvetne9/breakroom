@@ -661,113 +661,43 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Initialize map with optimized configuration
+    
+  // 2. Initialize the map once we have a valid string tileUrl
   useEffect(() => {
-    console.log('🔄 MapLibre useEffect triggered', { 
-      hasContainer: !!mapContainerRef.current, 
-      hasMap: !!mapRef.current,
-      isCapacitor: isCapacitor(),
-      containerDimensions: mapContainerRef.current ? {
-        width: mapContainerRef.current.clientWidth,
-        height: mapContainerRef.current.clientHeight
-      } : null
-    });
-    
     if (!mapContainerRef.current || mapRef.current) return;
-
-    // Ensure container has minimum dimensions before creating map
-    const container = mapContainerRef.current;
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
-    
-    console.log('🔧 Container dimensions check:', { containerWidth, containerHeight });
-    
-    if (containerWidth < 100 || containerHeight < 100) {
-      console.warn('⚠️ Container too small, waiting for proper sizing:', { containerWidth, containerHeight });
-      // Retry after a brief delay to allow layout to complete
-      const retryTimer = setTimeout(() => {
-        if (mapContainerRef.current && !mapRef.current) {
-          const newWidth = mapContainerRef.current.clientWidth;
-          const newHeight = mapContainerRef.current.clientHeight;
-          console.log('🔄 Retrying map creation with dimensions:', { newWidth, newHeight });
-          // Trigger a re-render by updating a dummy state
-          setMapLoaded(false);
-        }
-      }, 100);
-      return () => clearTimeout(retryTimer);
-    }
-
-    // Comprehensive tile configuration for different environments
-    const createTileSource = () => {
-      if (isCapacitor()) {
-        console.log('🔧 Using blob URLs for Capacitor tiles');
-        return {
-          type: 'vector' as const,
-          tiles: [
-            createTileBlobUrl('/data/tiles/{z}/{x}/{y}.pbf')
-          ],
-          minzoom: 10,
-          maxzoom: 16,
-          scheme: 'xyz' as const
-        };
-      }
-    
-      // Web
-      const fullUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-      console.log('🔧 Using web vector tiles:', fullUrl);
-      return {
-        type: 'vector' as const,
-        tiles: [fullUrl],
-        minzoom: 10,
-        maxzoom: 16,
-        scheme: 'xyz' as const
-      };
-    };
-
-    const createMapStyle = () => {
-      const vectorSource = createTileSource();
-    
-      return {
-        version: 8 as const,
+  
+    const initializeMap = async () => {
+      // Generate blob URLs for tiles
+      const urls = ['/data/tiles/{z}/{x}/{y}.pbf'];
+      const tileUrls: string[] = await Promise.all(
+        urls.map(url => createTileBlobUrl(url))
+      );
+  
+      // Build style
+      const mapStyle: maplibregl.StyleSpecification = {
+        version: 8,
         sources: {
-          'nyc-tiles': vectorSource
+          'nyc-tiles': {
+            type: 'vector',
+            tiles: tileUrls, // ✅ string[]
+            minzoom: 9,
+            maxzoom: 19,
+            scheme: 'xyz',
+          },
         },
         glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
         layers: [
           {
             id: 'background',
-            type: 'background' as const,
-            paint: { 'background-color': '#F5F5DC' }
-          }
-        ]
+            type: 'background',
+            paint: { 'background-color': '#fff' },
+          },
+          // add your layers here...
+        ],
       };
-    };
-    
-    const mapStyle = createMapStyle();
-
-    // Log the tile configuration for debugging
-    console.log('🗺️ Map initialization - Style sources:', Object.keys(mapStyle.sources));
-    console.log('🗺️ Environment check - isCapacitor:', isCapacitor(), 'isMobile:', isMobile);
-    console.log('🗺️ Current location:', {
-      protocol: window.location.protocol,
-      origin: window.location.origin,
-      href: window.location.href
-    });
-
-    console.log('🗺️ Creating MapLibre instance with style:', {
-      version: mapStyle.version,
-      sourceCount: Object.keys(mapStyle.sources).length,
-      sources: Object.keys(mapStyle.sources),
-      layerCount: mapStyle.layers.length,
-      hasGlyphs: !!mapStyle.glyphs
-    });
-
-    let mapInstance: maplibregl.Map;
-
-    try {
-
-      // 3️⃣ Create the map AFTER tiles are ready
-      mapInstance = new maplibregl.Map({
+  
+      // Create map (with second-map config merged in)
+      const mapInstance = new maplibregl.Map({
         container: mapContainerRef.current!,
         style: mapStyle,
         center: [-73.986104, 40.715245],
@@ -778,194 +708,227 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         attributionControl: false,
         transformRequest: (url, resourceType) => {
           if (resourceType === 'Tile') {
-            console.log('🔧 Tile request:', { url, resourceType, isCapacitor: isCapacitor() });
+            console.log('🔧 Tile request:', {
+              url,
+              resourceType,
+              isCapacitor: isCapacitor(),
+            });
           }
-      
+  
+          // Force HTTPS in Capacitor
           if (isCapacitor() && url.startsWith('http://')) {
             const httpsUrl = url.replace('http://', 'https://');
             console.log('🔒 Converting to HTTPS for Capacitor:', httpsUrl);
             return { url: httpsUrl };
           }
-      
+  
           return { url };
-        }
+        },
       });
+  
+      mapRef.current = mapInstance;
+    };
+  
+    initializeMap();
+  }, []);
 
-    } catch (error) {
-      console.error('Failed to create MapLibre instance:', error);
-      return;
-    }
+  // useEffect(() => {
+  //   console.log('🔄 MapLibre useEffect triggered', { 
+  //     hasContainer: !!mapContainerRef.current, 
+  //     hasMap: !!mapRef.current,
+  //     isCapacitor: isCapacitor(),
+  //     containerDimensions: mapContainerRef.current ? {
+  //       width: mapContainerRef.current.clientWidth,
+  //       height: mapContainerRef.current.clientHeight
+  //     } : null
+  //   });
     
-    // Verify the map instance is valid before proceeding
-    if (!mapInstance || typeof mapInstance.on !== 'function') {
-      console.error('Invalid MapLibre instance created');
-      return;
-    }
+  //   if (!mapContainerRef.current || mapRef.current) return;
+
+  //   // Ensure container has minimum dimensions before creating map
+  //   const container = mapContainerRef.current;
+  //   const containerWidth = container.clientWidth;
+  //   const containerHeight = container.clientHeight;
     
-    console.log('✅ MapLibre instance created successfully');
+  //   console.log('🔧 Container dimensions check:', { containerWidth, containerHeight });
     
-    // Store map instance in ref immediately after creation
-    mapRef.current = mapInstance;
+  //   if (containerWidth < 100 || containerHeight < 100) {
+  //     console.warn('⚠️ Container too small, waiting for proper sizing:', { containerWidth, containerHeight });
+  //     // Retry after a brief delay to allow layout to complete
+  //     const retryTimer = setTimeout(() => {
+  //       if (mapContainerRef.current && !mapRef.current) {
+  //         const newWidth = mapContainerRef.current.clientWidth;
+  //         const newHeight = mapContainerRef.current.clientHeight;
+  //         console.log('🔄 Retrying map creation with dimensions:', { newWidth, newHeight });
+  //         // Trigger a re-render by updating a dummy state
+  //         setMapLoaded(false);
+  //       }
+  //     }, 100);
+  //     return () => clearTimeout(retryTimer);
+  //   }
     
-    // Set bounds after storing in ref
-    try {
-      console.log('🗺️ Setting map bounds for NYC region...');
-      mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
+  //   // Store map instance in ref immediately after creation
+  //   mapInstance = mapRef.current;
+    
+  //   // Set bounds after storing in ref
+  //   try {
+  //     console.log('🗺️ Setting map bounds for NYC region...');
+  //     mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
       
-      // Test basic map functionality
-      console.log('🧪 Testing map methods:', {
-        getZoom: mapInstance.getZoom(),
-        getCenter: mapInstance.getCenter(),
-        isStyleLoaded: mapInstance.isStyleLoaded()
-      });
-    } catch (error) {
-      console.error('Error setting up map:', error);
-    }
+  //     // Test basic map functionality
+  //     console.log('🧪 Testing map methods:', {
+  //       getZoom: mapInstance.getZoom(),
+  //       getCenter: mapInstance.getCenter(),
+  //       isStyleLoaded: mapInstance.isStyleLoaded()
+  //     });
+  //   } catch (error) {
+  //     console.error('Error setting up map:', error);
+  //   }
 
-    // Enhanced error handling and loading with validation
-    const setupMapEventListeners = (map: maplibregl.Map) => {
-      try {
-        // Verify map instance has required methods before adding listeners
-        if (!map || typeof map.on !== 'function') {
-          console.error('Invalid map instance - missing event methods');
-          return;
-        }
+  //   // Enhanced error handling and loading with validation
+  //   const setupMapEventListeners = (map: maplibregl.Map) => {
+  //     try {
+  //       // Verify map instance has required methods before adding listeners
+  //       if (!map || typeof map.on !== 'function') {
+  //         console.error('Invalid map instance - missing event methods');
+  //         return;
+  //       }
 
-        map.on('error', (e) => {
-          console.error('Map error:', e.error);
-        });
+  //       map.on('error', (e) => {
+  //         console.error('Map error:', e.error);
+  //       });
 
-        // Add fallback timer to ensure map loads even if 'load' event doesn't fire
-        const loadFallbackTimer = setTimeout(() => {
-          if (!mapLoaded) {
-            console.log('Map load fallback timer - forcing mapLoaded to true');
-            setMapLoaded(true);
-            callbackRefs.current.onMapLoaded?.();
-          }
-        }, 2000); // 2 second fallback
+  //       // Add fallback timer to ensure map loads even if 'load' event doesn't fire
+  //       const loadFallbackTimer = setTimeout(() => {
+  //         if (!mapLoaded) {
+  //           console.log('Map load fallback timer - forcing mapLoaded to true');
+  //           setMapLoaded(true);
+  //           callbackRefs.current.onMapLoaded?.();
+  //         }
+  //       }, 2000); // 2 second fallback
 
-        map.on('load', () => {
-          console.log('Map loaded successfully via load event');
-          clearTimeout(loadFallbackTimer);
-          setMapLoaded(true);
-          callbackRefs.current.onMapLoaded?.();
+  //       map.on('load', () => {
+  //         console.log('Map loaded successfully via load event');
+  //         clearTimeout(loadFallbackTimer);
+  //         setMapLoaded(true);
+  //         callbackRefs.current.onMapLoaded?.();
           
-          // For desktop, manually add layers after map loads if sourcedata doesn't fire
-          if (!isCapacitor() && !layersAddedRef.current) {
-            console.log('Manually adding vector layers after map load...');
-            setTimeout(() => {
-              if (!layersAddedRef.current && mapRef.current) {
-                addVectorLayers(mapRef.current);
-              }
-            }, 1000);
-          }
-        });
+  //         // For desktop, manually add layers after map loads if sourcedata doesn't fire
+  //         if (!isCapacitor() && !layersAddedRef.current) {
+  //           console.log('Manually adding vector layers after map load...');
+  //           setTimeout(() => {
+  //             if (!layersAddedRef.current && mapRef.current) {
+  //               addVectorLayers(mapRef.current);
+  //             }
+  //           }, 1000);
+  //         }
+  //       });
 
-        // Optimized move handlers with validation
-        const callViewportChange = () => {
-          if (mapRef.current && typeof mapRef.current.getBounds === 'function') {
-            handleViewportChangeRef.current();
-          }
-        };
+  //       // Optimized move handlers with validation
+  //       const callViewportChange = () => {
+  //         if (mapRef.current && typeof mapRef.current.getBounds === 'function') {
+  //           handleViewportChangeRef.current();
+  //         }
+  //       };
         
-        const debouncedMoveHandler = (() => {
-          let timeout: NodeJS.Timeout;
-          return () => {
-            clearTimeout(timeout);
-            timeout = setTimeout(callViewportChange, 150);
-          };
-        })();
+  //       const debouncedMoveHandler = (() => {
+  //         let timeout: NodeJS.Timeout;
+  //         return () => {
+  //           clearTimeout(timeout);
+  //           timeout = setTimeout(callViewportChange, 150);
+  //         };
+  //       })();
 
-        map.on('moveend', callViewportChange);
-        map.on('zoomend', callViewportChange);
-        map.on('move', debouncedMoveHandler);
+  //       map.on('moveend', callViewportChange);
+  //       map.on('zoomend', callViewportChange);
+  //       map.on('move', debouncedMoveHandler);
 
-        // Add map layers when ready with environment-specific handling
-        map.on('sourcedata', (e) => {
-          if (isCapacitor()) {
-            // For Capacitor with raster tiles
-            if (e.sourceId === 'osm' && e.isSourceLoaded && !layersAddedRef.current) {
-              console.log('Capacitor raster tiles loaded successfully');
-              layersAddedRef.current = true;
-            } else if (e.sourceId === 'osm') {
-              console.log('OSM source event:', {
-                sourceId: e.sourceId,
-                isSourceLoaded: e.isSourceLoaded,
-                layersAdded: layersAddedRef.current
-              });
-            }
-            return;
-          }
+  //       // Add map layers when ready with environment-specific handling
+  //       map.on('sourcedata', (e) => {
+  //         if (isCapacitor()) {
+  //           // For Capacitor with raster tiles
+  //           if (e.sourceId === 'osm' && e.isSourceLoaded && !layersAddedRef.current) {
+  //             console.log('Capacitor raster tiles loaded successfully');
+  //             layersAddedRef.current = true;
+  //           } else if (e.sourceId === 'osm') {
+  //             console.log('OSM source event:', {
+  //               sourceId: e.sourceId,
+  //               isSourceLoaded: e.isSourceLoaded,
+  //               layersAdded: layersAddedRef.current
+  //             });
+  //           }
+  //           return;
+  //         }
           
-          // For web environment with vector tiles
-          if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
-            console.log('NYC tiles source loaded, adding vector layers via sourcedata event...');
-            addVectorLayers(mapInstance);
-          } else if (e.sourceId === 'nyc-tiles') {
-            console.log('NYC tiles sourcedata event:', {
-              sourceId: e.sourceId,
-              isSourceLoaded: e.isSourceLoaded,
-              layersAdded: layersAddedRef.current
-            });
-          }
-        });
+  //         // For web environment with vector tiles
+  //         if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
+  //           console.log('NYC tiles source loaded, adding vector layers via sourcedata event...');
+  //           addVectorLayers(mapInstance);
+  //         } else if (e.sourceId === 'nyc-tiles') {
+  //           console.log('NYC tiles sourcedata event:', {
+  //             sourceId: e.sourceId,
+  //             isSourceLoaded: e.isSourceLoaded,
+  //             layersAdded: layersAddedRef.current
+  //           });
+  //         }
+  //       });
 
-        // Additional mobile-specific event handlers
-        if (isCapacitor()) {
-          map.on('data', (e: any) => {
-            if (e.dataType === 'source' && e.sourceId === 'osm') {
-              console.log('OSM data event:', {
-                dataType: e.dataType,
-                sourceId: e.sourceId,
-                isSourceLoaded: e.isSourceLoaded
-              });
-            }
-          });
+  //       // Additional mobile-specific event handlers
+  //       if (isCapacitor()) {
+  //         map.on('data', (e: any) => {
+  //           if (e.dataType === 'source' && e.sourceId === 'osm') {
+  //             console.log('OSM data event:', {
+  //               dataType: e.dataType,
+  //               sourceId: e.sourceId,
+  //               isSourceLoaded: e.isSourceLoaded
+  //             });
+  //           }
+  //         });
 
-          map.on('dataloading', (e: any) => {
-            if (e.dataType === 'source' && e.sourceId === 'osm') {
-              console.log('OSM data loading:', e.sourceId);
-            }
-          });
-        }
+  //         map.on('dataloading', (e: any) => {
+  //           if (e.dataType === 'source' && e.sourceId === 'osm') {
+  //             console.log('OSM data loading:', e.sourceId);
+  //           }
+  //         });
+  //       }
 
-        console.log('Map event listeners set up successfully');
-      } catch (error) {
-        console.error('Error setting up map event listeners:', error);
-      }
-    };
+  //       console.log('Map event listeners set up successfully');
+  //     } catch (error) {
+  //       console.error('Error setting up map event listeners:', error);
+  //     }
+  //   };
 
-    // Setup event listeners
-    setupMapEventListeners(mapInstance);
+  //   // Setup event listeners
+  //   setupMapEventListeners(mapInstance);
 
-    console.log('Map instance created, setting up event listeners...');
-    console.log('Map container dimensions:', {
-      width: mapContainerRef.current?.clientWidth,
-      height: mapContainerRef.current?.clientHeight
-    });
+  //   console.log('Map instance created, setting up event listeners...');
+  //   console.log('Map container dimensions:', {
+  //     width: mapContainerRef.current?.clientWidth,
+  //     height: mapContainerRef.current?.clientHeight
+  //   });
 
-    return () => {
-      // Cleanup
-      [updateTimeoutRef, moveTimeoutRef, debounceTimeoutRef].forEach(ref => {
-        if (ref.current) clearTimeout(ref.current);
-      });
+  //   return () => {
+  //     // Cleanup
+  //     [updateTimeoutRef, moveTimeoutRef, debounceTimeoutRef].forEach(ref => {
+  //       if (ref.current) clearTimeout(ref.current);
+  //     });
       
-      landmarkMarkersRef.current.forEach(marker => {
-        try { marker.remove(); } catch {}
-      });
+  //     landmarkMarkersRef.current.forEach(marker => {
+  //       try { marker.remove(); } catch {}
+  //     });
       
-      try {
-        mapInstance.remove();
-      } catch (error) {
-        console.error('Error removing map:', error);
-      }
+  //     try {
+  //       mapInstance.remove();
+  //     } catch (error) {
+  //       console.error('Error removing map:', error);
+  //     }
       
-      businessCacheRef.current.clear();
-      layersAddedRef.current = false;
-      setMapLoaded(false);
-      mapRef.current = null;
-    };
-  }, [isMobile, addVectorLayers]);
+  //     businessCacheRef.current.clear();
+  //     layersAddedRef.current = false;
+  //     setMapLoaded(false);
+  //     mapRef.current = null;
+  //   };
+  // }, [isMobile, addVectorLayers]);
 
 
   // // Center map on neighborhood when neighborhoodCenter changes
@@ -1175,44 +1138,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       try { mapRef.current?.off('zoom', handleZoomChange); } catch {}
     };
   }, [mapLoaded, landmarks]);
-
-  
-  // 2. Initialize the map once we have a valid string tileUrl
-  // useEffect(() => {
-  //   if (!mapContainerRef.current) return;
-  
-  //   const initializeMap = async () => {
-  //     const urls = ['/data/tiles/{z}/{x}/{y}.pbf']; // or dynamic list of tile files
-  //     cconst tileUrls: string[] = await Promise.all(urls.map(url => createTileBlobUrl(url)));
-
-  //     const mapStyle: maplibregl.StyleSpecification = {
-  //       version: 8,
-  //       sources: {
-  //         'nyc-tiles': {
-  //           type: 'vector',
-  //           tiles: tileUrls, // now string[], not Promise<string>[]
-  //           minzoom: 10,
-  //           maxzoom: 16,
-  //           scheme: 'xyz'
-  //         }
-  //       },
-  //       glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-  //       layers: [] // add your layers here
-  //     };
-
-  
-  //     const mapInstance = new maplibregl.Map({
-  //       container: mapContainerRef.current!,
-  //       style: mapStyle,
-  //       center: [-73.986104, 40.715245],
-  //       zoom: 12.77,
-  //     });
-  
-  //     mapRef.current = mapInstance;
-  //   };
-  
-  //   initializeMap();
-  // }, []);
 
 
   return (
