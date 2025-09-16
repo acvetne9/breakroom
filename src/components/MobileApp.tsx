@@ -50,28 +50,7 @@ const MobileApp: React.FC = () => {
   const constraintsRef = useRef(null);
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
 
-  const [posts, setPosts] = useState<Post[]>([
-    {
-      id: '1',
-      author: 'BaristaBoss',
-      text: 'Guess what!! I never thought this would happen but my boss brought in donuts today!',
-      isStory: false,
-      upvotes: 0,
-      downvotes: 0,
-      userVote: null,
-      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000) // 2 hours ago
-    },
-    {
-      id: '2',
-      author: 'Cook52345234',
-      text: 'My old manager would always refuse to approve my sick leave :(',
-      isStory: false,
-      upvotes: 0,
-      downvotes: 0,
-      userVote: null,
-      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000) // 1 day ago
-    }
-  ]);
+  // Remove local posts state - now handled by backend
 
   const handleInitiationComplete = async (data: UserData) => {
     setUserData(data);
@@ -82,25 +61,22 @@ const MobileApp: React.FC = () => {
       const { createOrUpdateBusinessRole } = await import('../services/businesses');
       await createOrUpdateBusinessRole(data.location, data.role, data.salary);
       console.log('Job role saved to database:', { location: data.location, role: data.role, salary: data.salary });
+      
+      // Create job update post in backend
+      const { createPost } = await import('../services/posts');
+      const salary = parseInt(data.salary.replace(/[^0-9]/g, '')) || 0;
+      await createPost(
+        `New Job Update! ${data.salary}/${data.timePeriod || 'HR'} for ${data.role} 😳`,
+        'job_update',
+        undefined,
+        data.role,
+        data.timePeriod,
+        salary
+      );
     } catch (error) {
-      console.warn('Could not save job role to database (user not authenticated):', error);
+      console.warn('Could not save job data to database (user not authenticated):', error);
       // Continue without showing error to user since this is optional functionality
     }
-    
-    // Create automatic job update post
-    const jobUpdatePost: Post = {
-      id: `job-update-${Date.now()}`,
-      author: 'You',
-      text: `New Job Update! ${data.salary}/${data.timePeriod || 'HR'} for ${data.role} 😳`,
-      isJobUpdate: true,
-      isStory: false,
-      linkedLocation: data.fullLocation || data.location,
-      upvotes: 0,
-      downvotes: 0,
-      userVote: null,
-      createdAt: new Date()
-    };
-    setPosts(prevPosts => [jobUpdatePost, ...prevPosts]);
   };
 
   const handleJobUpdate = async (jobData: { salary: string; role: string; location: string; timePeriod: string }) => {
@@ -109,23 +85,21 @@ const MobileApp: React.FC = () => {
       const { createOrUpdateBusinessRole } = await import('../services/businesses');
       await createOrUpdateBusinessRole(jobData.location, jobData.role, jobData.salary);
       console.log('Job role updated in database:', jobData);
+      
+      // Create job update post in backend
+      const { createPost } = await import('../services/posts');
+      const salary = parseInt(jobData.salary.replace(/[^0-9]/g, '')) || 0;
+      await createPost(
+        `New Job Update! ${jobData.salary}/${jobData.timePeriod} for ${jobData.role} 😳`,
+        'job_update',
+        undefined,
+        jobData.role,
+        jobData.timePeriod,
+        salary
+      );
     } catch (error) {
       console.error('Error updating job role in database:', error);
     }
-    
-    const jobUpdatePost: Post = {
-      id: `job-update-${Date.now()}`,
-      author: 'You',
-      text: `New Job Update! ${jobData.salary}/${jobData.timePeriod} for ${jobData.role} 😳`,
-      isJobUpdate: true,
-      isStory: false,
-      linkedLocation: jobData.location,
-      upvotes: 0,
-      downvotes: 0,
-      userVote: null,
-      createdAt: new Date()
-    };
-    setPosts(prevPosts => [jobUpdatePost, ...prevPosts]);
   };
 
   // NEW: Handle saving location when user clicks on a business
@@ -143,27 +117,7 @@ const MobileApp: React.FC = () => {
     });
   };
 
-  const handlePostSubmit = (text: string, businessId?: string) => {
-    const business = businessId ? businesses.find(b => b.id === businessId) : undefined;
-    
-    // Only create business stories when specifically viewing filtered posts for that business
-    // Otherwise, create regular posts
-    const shouldBeStory = filteredBusinessId && businessId === filteredBusinessId;
-    
-    const newPost: Post = {
-      id: String(posts.length + 1),
-      author: 'You',
-      text,
-      businessId: shouldBeStory ? businessId : undefined,
-      businessName: shouldBeStory ? business?.name : undefined,
-      isStory: shouldBeStory,
-      upvotes: 0,
-      downvotes: 0,
-      userVote: null,
-      createdAt: new Date()
-    };
-    setPosts([newPost, ...posts]);
-  };
+  // Remove handlePostSubmit - now handled by ExplorePage directly
 
   const handleBusinessClick = async (business: any) => {
     // Handle null business (close action)
@@ -213,64 +167,7 @@ const MobileApp: React.FC = () => {
     setFilteredUserStories(false);
   };
 
-  const handlePostVote = (postId: string, voteType: 'up' | 'down') => {
-    setPosts(prevPosts => {
-      const updatedPosts = prevPosts.map(post => {
-        if (post.id === postId) {
-          let newUpvotes = post.upvotes;
-          let newDownvotes = post.downvotes;
-          let newUserVote: 'up' | 'down' | null = post.userVote;
-
-          if (voteType === 'up') {
-            if (post.userVote === 'up') {
-              // Remove upvote
-              newUpvotes--;
-              newUserVote = null;
-            } else if (post.userVote === 'down') {
-              // Switch from downvote to upvote
-              newDownvotes--;
-              newUpvotes++;
-              newUserVote = 'up';
-            } else {
-              // Add upvote
-              newUpvotes++;
-              newUserVote = 'up';
-            }
-          } else {
-            if (post.userVote === 'down') {
-              // Remove downvote
-              newDownvotes--;
-              newUserVote = null;
-            } else if (post.userVote === 'up') {
-              // Switch from upvote to downvote
-              newUpvotes--;
-              newDownvotes++;
-              newUserVote = 'down';
-            } else {
-              // Add downvote
-              newDownvotes++;
-              newUserVote = 'down';
-            }
-          }
-
-          return {
-            ...post,
-            upvotes: newUpvotes,
-            downvotes: newDownvotes,
-            userVote: newUserVote
-          };
-        }
-        return post;
-      });
-
-      // Auto-delete posts with score <= -3
-      return updatedPosts.filter(post => (post.upvotes - post.downvotes) > -3);
-    });
-  };
-
-  const handlePostDelete = (postId: string) => {
-    setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
-  };
+  // Remove handlePostVote and handlePostDelete - now handled by ExplorePage directly
 
   const handleRoleVote = async (businessId: string, roleIndex: number, voteType: 'up' | 'down') => {
     // Find the role ID from the business
@@ -468,7 +365,6 @@ const MobileApp: React.FC = () => {
           currentView={currentView}
           selectedBusiness={selectedBusiness}
           onBusinessSelect={handleBusinessClick}
-          posts={posts}
           onBusinessStoriesClick={handleBusinessStoriesClick}
           onPostClick={(post) => {
             setExpandedPost(post.id);
@@ -503,7 +399,6 @@ const MobileApp: React.FC = () => {
           <Suspense fallback={<Skeleton className="w-full h-full" />}>
             <SettingsPage 
               initialData={userData} 
-              userPosts={posts.filter(post => post.author === 'You')}
               onStoriesClick={handleUserStoriesClick}
               onPostClick={(post) => {
                 setExpandedPost(post.id);
@@ -543,7 +438,6 @@ const MobileApp: React.FC = () => {
         >
           <Suspense fallback={<Skeleton className="w-full h-full" />}>
             <ExplorePage 
-              posts={posts}
               filteredBusinessId={filteredBusinessId || undefined}
               filteredUserStories={filteredUserStories}
               onBusinessView={(businessId) => {
@@ -581,10 +475,7 @@ const MobileApp: React.FC = () => {
                   [postId]: [...(comments[postId] || []), comment]
                 });
               }}
-              onPostSubmit={handlePostSubmit}
               onBackToAllPosts={handleBackToAllPosts}
-              onPostVote={handlePostVote}
-              onPostDelete={handlePostDelete}
             />
           </Suspense>
         </motion.div>

@@ -25,7 +25,7 @@ interface HomePageProps {
   currentView?: 'initiation' | 'main';
   selectedBusiness?: any;
   onBusinessSelect?: (business: any) => void;
-  posts: Post[];
+  posts?: Post[];
   onBusinessStoriesClick?: (businessId: string) => void;
   onPostClick?: (post: Post) => void;
   onRoleVote?: (businessId: string, roleIndex: number, voteType: 'up' | 'down') => void;
@@ -37,7 +37,7 @@ const HomePage: React.FC<HomePageProps> = ({
   currentView = 'main',
   selectedBusiness: propSelectedBusiness,
   onBusinessSelect,
-  posts,
+  posts = [],
   onBusinessStoriesClick,
   onPostClick,
   onRoleVote,
