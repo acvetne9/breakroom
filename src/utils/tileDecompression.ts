@@ -53,12 +53,15 @@ export const decompressTile = async (url: string): Promise<ArrayBuffer> => {
 /**
  * Create a blob URL for a tile that can be used by MapLibre
  */
-// export const createTileBlobUrl = async (url: string): Promise<string> => {
-//   const buffer = await decompressTile(url);
-//   const blob = new Blob([buffer], { type: 'application/x-protobuf' });
-//   return URL.createObjectURL(blob);
-// };
-export const createTileBlobUrl = (buffer: ArrayBuffer): string => {
+export const createTileBlobUrl = async (url: string): Promise<string> => {
+  // Fetch the raw tile file
+  const response = await fetch(url);
+  const arrayBuffer = await response.arrayBuffer();
+
+  // Decompress it
+  const buffer = await decompressTile(arrayBuffer);
+
+  // Wrap it in a blob URL
   const blob = new Blob([buffer], { type: 'application/x-protobuf' });
   return URL.createObjectURL(blob);
 };
