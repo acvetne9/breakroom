@@ -745,7 +745,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     
     const mapStyle = createMapStyle();
 
-    Log the tile configuration for debugging
+    // Log the tile configuration for debugging
     console.log('🗺️ Map initialization - Style sources:', Object.keys(mapStyle.sources));
     console.log('🗺️ Environment check - isCapacitor:', isCapacitor(), 'isMobile:', isMobile);
     console.log('🗺️ Current location:', {
