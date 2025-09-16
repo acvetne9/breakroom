@@ -35,7 +35,7 @@ interface ViewportState {
   timestamp: number;
 }
 
-// Singleton overlay for performance
+// Singleton ovxerlay for performance
 let overlayInstance: MapboxOverlay | null = null;
 
 // Optimized grid sampling with visible area priority
@@ -699,8 +699,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     // Comprehensive tile configuration for different environments
     const createTileSource = () => {
+      if (isCapacitor()) {
+        console.log('🔧 Using blob URLs for Capacitor tiles');
+        return {
+          type: 'vector' as const,
+          tiles: [
+            createTileBlobUrl('/data/tiles/{z}/{x}/{y}.pbf')
+          ],
+          minzoom: 10,
+          maxzoom: 16,
+          scheme: 'xyz' as const
+        };
+      }
+    
+      // Web
       const fullUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-      console.log('🔧 Using vector tiles everywhere:', fullUrl);
+      console.log('🔧 Using web vector tiles:', fullUrl);
       return {
         type: 'vector' as const,
         tiles: [fullUrl],
@@ -728,84 +742,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         ]
       };
     };
-
-    // Create appropriate map style based on environment
-    // const createMapStyle = () => {
-    //   if (isCapacitor()) {
-    //     // For Capacitor, use a more reliable raster-based style with better error handling
-    //     console.log('🔧 Creating Capacitor raster map style');
-    //     return {
-    //       version: 8 as const,
-    //       sources: {
-    //         'osm': {
-    //           type: 'raster' as const,
-    //           tiles: [
-    //             'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-    //           ],
-    //           tileSize: 256,
-    //           attribution: '© OpenStreetMap contributors',
-    //           maxzoom: 19
-    //         }
-    //       },
-    //       layers: [
-    //         {
-    //           id: 'background',
-    //           type: 'background' as const,
-    //           paint: { 'background-color': '#B3E5FC' }
-    //         },
-    //         {
-    //           id: 'osm',
-    //           type: 'raster' as const,
-    //           source: 'osm',
-    //           minzoom: 0,
-    //           maxzoom: 19
-    //         }
-    //       ]
-    //     };
-    //   } else {
-    //     // For web, use vector tiles with full styling
-    //     const vectorSource = createTileSource();
-    //     if (!vectorSource) {
-    //       throw new Error('Vector source creation failed');
-    //     }
-        
-    //     return {
-    //       version: 8 as const,
-    //       sources: {
-    //         'nyc-tiles': vectorSource,
-    //         // Add fallback raster source for reliability
-    //         'fallback-raster': {
-    //           type: 'raster' as const,
-    //           tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-    //           tileSize: 256,
-    //           attribution: '© OpenStreetMap contributors',
-    //           maxzoom: 19
-    //         }
-    //       },
-    //       glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-    //       layers: [
-    //         {
-    //           id: 'background',
-    //           type: 'background' as const,
-    //           paint: { 'background-color': '#F5F5DC' }
-    //         },
-    //         // Add a fallback raster layer that's initially invisible
-    //         {
-    //           id: 'fallback-base',
-    //           type: 'raster' as const,
-    //           source: 'fallback-raster',
-    //           layout: { visibility: 'none' as const }, // Hidden by default
-    //           minzoom: 0,
-    //           maxzoom: 19
-    //         }
-    //       ]
-    //     };
-    //   }
-    // };
-
+    
     const mapStyle = createMapStyle();
 
-    // Log the tile configuration for debugging
+    Log the tile configuration for debugging
     console.log('🗺️ Map initialization - Style sources:', Object.keys(mapStyle.sources));
     console.log('🗺️ Environment check - isCapacitor:', isCapacitor(), 'isMobile:', isMobile);
     console.log('🗺️ Current location:', {
@@ -855,7 +795,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return;
     }
     
-    // Verify the map instance is valid before proceeding
+    Verify the map instance is valid before proceeding
     if (!mapInstance || typeof mapInstance.on !== 'function') {
       console.error('Invalid MapLibre instance created');
       return;

@@ -13,7 +13,7 @@ export const isCapacitor = () => {
 /**
  * Decompress a gzipped tile if needed
  */
-export const decompressTile = async (url: string): Promise<ArrayBuffer> => {
+export async function decompressTile(data: ArrayBuffer): Promise<ArrayBuffer> {
   try {
     const response = await fetch(url, {
       headers: {
@@ -54,7 +54,9 @@ export const decompressTile = async (url: string): Promise<ArrayBuffer> => {
  * Create a blob URL for a tile that can be used by MapLibre
  */
 export const createTileBlobUrl = async (url: string): Promise<string> => {
-  const buffer = await decompressTile(url);
+  const response = await fetch(url);
+  const arrayBuffer = await response.arrayBuffer();
+  const buffer = await decompressTile(arrayBuffer); // ✅ matches new signature
   const blob = new Blob([buffer], { type: 'application/x-protobuf' });
   return URL.createObjectURL(blob);
 };
