@@ -227,55 +227,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     isSearching
   } = businessesHook;
 
-  const [tileUrl, setTileUrl] = useState<string | null>(null);
-
-  // 1. Load the tile URL (async)
-  useEffect(() => {
-    let active = true;
-  
-    const initTiles = async () => {
-      if (isCapacitor()) {
-        const blobUrl = await createTileBlobUrl('/data/tiles/{z}/{x}/{y}.pbf');
-        if (active) setTileUrl(blobUrl);
-      } else {
-        setTileUrl(`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`);
-      }
-    };
-  
-    initTiles();
-    return () => { active = false; };
-  }, []);
-  
-  // 2. Initialize the map once we have a valid string tileUrl
-  useEffect(() => {
-    if (!mapContainerRef.current || !tileUrl) return;
-  
-    const map = new maplibregl.Map({
-      container: mapContainerRef.current,
-      style: {
-        version: 8,
-        sources: {
-          'nyc-tiles': {
-            type: 'vector',
-            tiles: [tileUrl], // ✅ string only now
-            minzoom: 10,
-            maxzoom: 16,
-            scheme: 'xyz'
-          }
-        },
-        glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-        layers: [
-          { id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } }
-        ]
-      },
-      center: [-73.986104, 40.715245],
-      zoom: 12.77
-    });
-  
-    mapRef.current = map;
-    return () => map.remove();
-  }, [tileUrl]);
-
   // Ensure businesses is always an array to prevent dependency array crashes
   const businesses = Array.isArray(rawBusinesses) ? rawBusinesses : [];
   
