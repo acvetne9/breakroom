@@ -765,6 +765,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     let mapInstance: maplibregl.Map;
 
     try {
+      const urls = ['/data/tiles/{z}/{x}/{y}.pbf'];
       const tileUrls: string[] = await Promise.all(urls.map(url => createTileBlobUrl(url)));
       const mapStyle: maplibregl.StyleSpecification = {
         version: 8,
