@@ -6,10 +6,9 @@ import { createBusinessScatterplotLayer, createBusinessClusterLayer } from '@/ut
 import { useViewportMapData } from '../hooks/useViewportMapData';
 import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
 import { useIsMobile } from '../hooks/use-mobile';
-// import { isCapacitor, createTileBlobUrl } from '@/utils/tileDecompression';
+import { isCapacitor, createTileBlobUrl } from '@/utils/tileDecompression';
 import type { GeoJSONFeature } from 'maplibre-gl';
 import type { Business } from '@/types/business';
-import { createTileBlobUrl } from '@/utils/createTileBlobUrl';
 
 interface MapLibreMapProps {
   onBusinessClick?: (business: any) => void;
