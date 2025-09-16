@@ -698,13 +698,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
 
     // Comprehensive tile configuration for different environments
-    const createTileSource = async () => {
+    const createTileSource = () => {
       if (isCapacitor()) {
         console.log('🔧 Using blob URLs for Capacitor tiles');
-        const tileUrl = await createTileBlobUrl('/data/tiles/{z}/{x}/{y}.pbf');
         return {
           type: 'vector' as const,
-          tiles: [tileUrl],
+          tiles: [
+            createTileBlobUrl('/data/tiles/{z}/{x}/{y}.pbf')
+          ],
           minzoom: 10,
           maxzoom: 16,
           scheme: 'xyz' as const
@@ -723,8 +724,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       };
     };
 
-    const createMapStyle = async () => {
-      const vectorSource = await createTileSource();
+    const createMapStyle = () => {
+      const vectorSource = createTileSource();
     
       return {
         version: 8 as const,
@@ -739,11 +740,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             paint: { 'background-color': '#F5F5DC' }
           }
         ]
+      };
     };
     
-    // Define and call async initialization function
-    const initializeMap = async () => {
-      const mapStyle = await createMapStyle();
+    const mapStyle = createMapStyle();
 
     // Log the tile configuration for debugging
     console.log('🗺️ Map initialization - Style sources:', Object.keys(mapStyle.sources));
@@ -935,24 +935,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     };
 
-        try {
-          // Setup event listeners
-          setupMapEventListeners(mapInstance);
+    // Setup event listeners
+    setupMapEventListeners(mapInstance);
 
-          console.log('Map instance created, setting up event listeners...');
-          console.log('Map container dimensions:', {
-            width: mapContainerRef.current?.clientWidth,
-            height: mapContainerRef.current?.clientHeight
-          });
+    console.log('Map instance created, setting up event listeners...');
+    console.log('Map container dimensions:', {
+      width: mapContainerRef.current?.clientWidth,
+      height: mapContainerRef.current?.clientHeight
+    });
 
-        } catch (error) {
-          console.error('Failed to create MapLibre instance:', error);
-        }
-      }; // Close initializeMap function
-
-      // Start async initialization  
-      initializeMap();
-  
     return () => {
       // Cleanup
       [updateTimeoutRef, moveTimeoutRef, debounceTimeoutRef].forEach(ref => {
@@ -964,9 +955,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
       
       try {
-        if (mapInstanceRef) {
-          mapInstanceRef.remove();
-        }
+        mapInstance.remove();
       } catch (error) {
         console.error('Error removing map:', error);
       }
@@ -976,7 +965,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       setMapLoaded(false);
       mapRef.current = null;
     };
-  }, []);
+  }, [isMobile, addVectorLayers]);
 
 
   // // Center map on neighborhood when neighborhoodCenter changes
