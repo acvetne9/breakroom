@@ -775,31 +775,31 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       hasGlyphs: !!mapStyle.glyphs
     });
 
-    const mapInstance = new maplibregl.Map({
-      container: mapRef.current!,
-      style: mapStyle,
-      center: [-73.986104, 40.715245],
-      zoom: 12.77,
-      maxZoom: isCapacitor() ? 19 : 18,
-      minZoom: 9,
-      renderWorldCopies: false,
-      attributionControl: false,
-      transformRequest: (url, resourceType) => {
-        // Enhanced logging for all environments
-        if (resourceType === 'Tile') {
-          console.log('🔧 Tile request:', { url, resourceType, isCapacitor: isCapacitor() });
-        }
+    // const mapInstance = new maplibregl.Map({
+    //   container: mapRef.current!,
+    //   style: mapStyle,
+    //   center: [-73.986104, 40.715245],
+    //   zoom: 12.77,
+    //   maxZoom: isCapacitor() ? 19 : 18,
+    //   minZoom: 9,
+    //   renderWorldCopies: false,
+    //   attributionControl: false,
+    //   transformRequest: (url, resourceType) => {
+    //     // Enhanced logging for all environments
+    //     if (resourceType === 'Tile') {
+    //       console.log('🔧 Tile request:', { url, resourceType, isCapacitor: isCapacitor() });
+    //     }
         
-        // For Capacitor, ensure HTTPS requests
-        if (isCapacitor() && url.startsWith('http://')) {
-          const httpsUrl = url.replace('http://', 'https://');
-          console.log('🔒 Converting to HTTPS for Capacitor:', httpsUrl);
-          return { url: httpsUrl };
-        }
+    //     // For Capacitor, ensure HTTPS requests
+    //     if (isCapacitor() && url.startsWith('http://')) {
+    //       const httpsUrl = url.replace('http://', 'https://');
+    //       console.log('🔒 Converting to HTTPS for Capacitor:', httpsUrl);
+    //       return { url: httpsUrl };
+    //     }
         
-        return { url };
-      }
-    });
+    //     return { url };
+    //   }
+    // });
     
     console.log('✅ MapLibre instance created successfully');
     
