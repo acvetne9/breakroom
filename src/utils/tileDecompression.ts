@@ -15,7 +15,7 @@ export const isCapacitor = () => {
  */
 export async function decompressTile(data: ArrayBuffer): Promise<ArrayBuffer> {
   try {
-    const response = await fetch(URL, {
+    const response = await fetch(url, {
       headers: {
         'Accept': 'application/x-protobuf',
         'Cache-Control': 'no-cache'
@@ -33,7 +33,7 @@ export async function decompressTile(data: ArrayBuffer): Promise<ArrayBuffer> {
     const isGzip = bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
     
     if (isGzip) {
-      console.log('🔧 Decompressing gzipped tile:', URL);
+      console.log('🔧 Decompressing gzipped tile:', url);
       try {
         const decompressed = pako.ungzip(bytes);
         return decompressed.buffer;
@@ -53,8 +53,8 @@ export async function decompressTile(data: ArrayBuffer): Promise<ArrayBuffer> {
 /**
  * Create a blob URL for a tile that can be used by MapLibre
  */
-export const createTileBlobUrl = async (URL: string): Promise<string> => {
-  const response = await fetch(URL);
+export const createTileBlobUrl = async (url: string): Promise<string> => {
+  const response = await fetch(url);
   const arrayBuffer = await response.arrayBuffer();
   const buffer = await decompressTile(arrayBuffer); // ✅ matches new signature
   const blob = new Blob([buffer], { type: 'application/x-protobuf' });
