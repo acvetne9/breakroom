@@ -745,20 +745,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   
     initializeMap();
-  }, []);
-
-  useEffect(() => {
-    console.log('🔄 MapLibre useEffect triggered', { 
-      hasContainer: !!mapContainerRef.current, 
-      hasMap: !!mapRef.current,
-      isCapacitor: isCapacitor(),
-      containerDimensions: mapContainerRef.current ? {
-        width: mapContainerRef.current.clientWidth,
-        height: mapContainerRef.current.clientHeight
-      } : null
-    });
-    
-    if (!mapContainerRef.current || mapRef.current) return;
 
     // Ensure container has minimum dimensions before creating map
     const container = mapContainerRef.current;
