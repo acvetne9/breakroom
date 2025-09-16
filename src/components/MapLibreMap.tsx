@@ -699,98 +699,109 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     // Comprehensive tile configuration for different environments
     const createTileSource = () => {
-      if (isCapacitor()) {
-        // For Capacitor, use OpenStreetMap raster tiles as fallback
-        // since vector tiles from capacitor://localhost don't work reliably
-        console.log('🔧 Using Capacitor raster tile fallback');
-        return null; // We'll create a raster source instead
-      } else {
-        // For web, use vector tiles
-        const fullUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-        console.log('🔧 Using web vector tiles:', fullUrl);
-        return {
-          type: 'vector' as const,
-          tiles: [fullUrl],
-          minzoom: 10,
-          maxzoom: 16,
-          scheme: 'xyz' as const
-        };
-      }
+      const fullUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+      console.log('🔧 Using vector tiles everywhere:', fullUrl);
+      return {
+        type: 'vector' as const,
+        tiles: [fullUrl],
+        minzoom: 10,
+        maxzoom: 16,
+        scheme: 'xyz' as const
+      };
+    };
+
+    const createMapStyle = () => {
+      const vectorSource = createTileSource();
+    
+      return {
+        version: 8 as const,
+        sources: {
+          'nyc-tiles': vectorSource
+        },
+        glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+        layers: [
+          {
+            id: 'background',
+            type: 'background' as const,
+            paint: { 'background-color': '#F5F5DC' }
+          }
+        ]
+      };
     };
 
     // Create appropriate map style based on environment
-    const createMapStyle = () => {
-      if (isCapacitor()) {
-        // For Capacitor, use a more reliable raster-based style with better error handling
-        console.log('🔧 Creating Capacitor raster map style');
-        return {
-          version: 8 as const,
-          sources: {
-            'osm': {
-              type: 'raster' as const,
-              tiles: [
-                'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-              ],
-              tileSize: 256,
-              attribution: '© OpenStreetMap contributors',
-              maxzoom: 19
-            }
-          },
-          layers: [
-            {
-              id: 'background',
-              type: 'background' as const,
-              paint: { 'background-color': '#B3E5FC' }
-            },
-            {
-              id: 'osm',
-              type: 'raster' as const,
-              source: 'osm',
-              minzoom: 0,
-              maxzoom: 19
-            }
-          ]
-        };
-      } else {
-        // For web, use vector tiles with full styling
-        const vectorSource = createTileSource();
-        if (!vectorSource) {
-          throw new Error('Vector source creation failed');
-        }
+    // const createMapStyle = () => {
+    //   if (isCapacitor()) {
+    //     // For Capacitor, use a more reliable raster-based style with better error handling
+    //     console.log('🔧 Creating Capacitor raster map style');
+    //     return {
+    //       version: 8 as const,
+    //       sources: {
+    //         'osm': {
+    //           type: 'raster' as const,
+    //           tiles: [
+    //             'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+    //           ],
+    //           tileSize: 256,
+    //           attribution: '© OpenStreetMap contributors',
+    //           maxzoom: 19
+    //         }
+    //       },
+    //       layers: [
+    //         {
+    //           id: 'background',
+    //           type: 'background' as const,
+    //           paint: { 'background-color': '#B3E5FC' }
+    //         },
+    //         {
+    //           id: 'osm',
+    //           type: 'raster' as const,
+    //           source: 'osm',
+    //           minzoom: 0,
+    //           maxzoom: 19
+    //         }
+    //       ]
+    //     };
+    //   } else {
+    //     // For web, use vector tiles with full styling
+    //     const vectorSource = createTileSource();
+    //     if (!vectorSource) {
+    //       throw new Error('Vector source creation failed');
+    //     }
         
-        return {
-          version: 8 as const,
-          sources: {
-            'nyc-tiles': vectorSource,
-            // Add fallback raster source for reliability
-            'fallback-raster': {
-              type: 'raster' as const,
-              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-              tileSize: 256,
-              attribution: '© OpenStreetMap contributors',
-              maxzoom: 19
-            }
-          },
-          glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-          layers: [
-            {
-              id: 'background',
-              type: 'background' as const,
-              paint: { 'background-color': '#F5F5DC' }
-            },
-            // Add a fallback raster layer that's initially invisible
-            {
-              id: 'fallback-base',
-              type: 'raster' as const,
-              source: 'fallback-raster',
-              layout: { visibility: 'none' as const }, // Hidden by default
-              minzoom: 0,
-              maxzoom: 19
-            }
-          ]
-        };
-      }
-    };
+    //     return {
+    //       version: 8 as const,
+    //       sources: {
+    //         'nyc-tiles': vectorSource,
+    //         // Add fallback raster source for reliability
+    //         'fallback-raster': {
+    //           type: 'raster' as const,
+    //           tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+    //           tileSize: 256,
+    //           attribution: '© OpenStreetMap contributors',
+    //           maxzoom: 19
+    //         }
+    //       },
+    //       glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+    //       layers: [
+    //         {
+    //           id: 'background',
+    //           type: 'background' as const,
+    //           paint: { 'background-color': '#F5F5DC' }
+    //         },
+    //         // Add a fallback raster layer that's initially invisible
+    //         {
+    //           id: 'fallback-base',
+    //           type: 'raster' as const,
+    //           source: 'fallback-raster',
+    //           layout: { visibility: 'none' as const }, // Hidden by default
+    //           minzoom: 0,
+    //           maxzoom: 19
+    //         }
+    //       ]
+    //     };
+    //   }
+    // };
 
     const mapStyle = createMapStyle();
 
