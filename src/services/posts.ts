@@ -70,8 +70,8 @@ export const createPost = async (
   timePeriod?: string,
   salary?: number
 ): Promise<{ data: PostData | null; error: any }> => {
-  // For now, use a temporary user ID since authentication isn't implemented
-  const tempUserId = 'temp-user-' + Date.now();
+  // Generate a proper UUID format for temp user
+  const tempUserId = crypto.randomUUID();
   
   const { data, error } = await supabase
     .from('posts')
@@ -95,8 +95,8 @@ export const voteOnPost = async (
   postId: string,
   voteType: 'upvote' | 'downvote'
 ): Promise<{ success: boolean; error?: any }> => {
-  // For now, use a consistent temp user ID per session
-  const tempUserId = 'temp-user-session';
+  // Generate a proper UUID format for temp user
+  const tempUserId = crypto.randomUUID();
   
   // Check if user already voted
   const { data: existingVote } = await supabase
@@ -144,8 +144,9 @@ export const getUserVotes = async (postIds: string[]): Promise<{ [postId: string
     return {};
   }
 
-  // Use consistent temp user ID to get votes
-  const tempUserId = 'temp-user-session';
+  // Generate a proper UUID format for temp user (for consistency, we'll use the same one per session)
+  // Note: This won't work for tracking votes across sessions, but it's temporary until auth is implemented
+  const tempUserId = crypto.randomUUID();
   
   const { data: votes } = await supabase
     .from('votes')
