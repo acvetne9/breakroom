@@ -105,19 +105,16 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
     }
     
     const success = await submitPost(postText, filteredBusinessId);
-    if (success) {
-      setPostText('');
-      toast({
-        title: "Post created",
-        description: "Your post has been shared successfully",
-      });
-    } else {
-      toast({
-        title: "Error",
-        description: "Failed to create post. Please try again.",
-        variant: "destructive"
-      });
-    }
+    // if (success) {
+    //   setPostText('');
+      
+    // } else {
+    //   toast({
+    //     title: "Error",
+    //     description: "Failed to create post. Please try again.",
+    //     variant: "destructive"
+    //   });
+    // }
   };
 
   const handleCommentSubmit = () => {
