@@ -20,6 +20,7 @@ export type Database = {
           created_at: string
           downvotes: number | null
           id: string
+          pay_period: string | null
           role: string
           salary: string
           updated_at: string
@@ -30,6 +31,7 @@ export type Database = {
           created_at?: string
           downvotes?: number | null
           id?: string
+          pay_period?: string | null
           role: string
           salary: string
           updated_at?: string
@@ -40,6 +42,7 @@ export type Database = {
           created_at?: string
           downvotes?: number | null
           id?: string
+          pay_period?: string | null
           role?: string
           salary?: string
           updated_at?: string
@@ -165,12 +168,12 @@ export type Database = {
       }
       posts: {
         Row: {
+          bussiness_id: string | null
           content: string
           created_at: string | null
           downvotes: number | null
           id: string
           job_role: string | null
-          location: string | null
           post_type: string
           salary: number | null
           time_period: string | null
@@ -179,12 +182,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          bussiness_id?: string | null
           content: string
           created_at?: string | null
           downvotes?: number | null
           id?: string
           job_role?: string | null
-          location?: string | null
           post_type: string
           salary?: number | null
           time_period?: string | null
@@ -193,12 +196,12 @@ export type Database = {
           user_id: string
         }
         Update: {
+          bussiness_id?: string | null
           content?: string
           created_at?: string | null
           downvotes?: number | null
           id?: string
           job_role?: string | null
-          location?: string | null
           post_type?: string
           salary?: number | null
           time_period?: string | null
