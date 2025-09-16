@@ -214,6 +214,26 @@ const HomePage: React.FC<HomePageProps> = ({
   const hasActiveSearch = searchValue.trim() !== '' || searchFilters !== null;
   const showClearButton = searchCompleted && hasActiveSearch;
 
+  useEffect(() => {
+    const handleResize = () => {
+      const mapContainer = document.querySelector('.maplibregl-map') as HTMLElement;
+      if (mapContainer) {
+        // MapLibre attaches the map instance to the container
+        // @ts-ignore
+        const map = mapContainer?.__map__ || mapContainer?.map;
+        if (map && typeof map.resize === 'function') {
+          map.resize();
+        }
+      }
+    };
+  
+    window.addEventListener('resize', handleResize);
+    // Call once on mount in case initial width < 768px
+    handleResize();
+  
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
   return (
     <div className="w-full h-full min-w-[200px] min-h-[200px]">
       {showLoading && (
