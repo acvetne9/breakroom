@@ -69,121 +69,7 @@ const createOptimizedGridSampling = (bounds: Bounds, businesses: Business[], max
       );
 
       grid[latIndex][lngIndex].push(business);
-    }
-    
-    // Function to add vector layers - must be defined before setupMapEventListeners
-    const addVectorLayers = (map: maplibregl.Map) => {
-      try {
-        const layers = [
-          {
-            id: 'nyc-land',
-            type: 'fill' as const,
-            source: 'nyc-tiles',
-            'source-layer': 'examplepoints',
-            layout: {},
-            paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
-            filter: ['==', ['geometry-type'], 'Polygon'] as any
-          },
-          {
-            id: 'nyc-green-spaces',
-            type: 'fill' as const,
-            source: 'nyc-tiles',
-            'source-layer': 'examplepoints',
-            layout: {},
-            paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
-            filter: [
-              'all',
-              ['==', ['geometry-type'], 'Polygon'],
-              ['any',
-                ['==', ['get', 'leisure'], 'park'],
-                ['==', ['get', 'landuse'], 'cemetery'],
-                ['==', ['get', 'amenity'], 'cemetery'],
-                ['==', ['get', 'amenity'], 'grave_yard'],
-                ['==', ['get', 'landuse'], 'recreation_ground'],
-                ['==', ['get', 'leisure'], 'recreation_ground'],
-                ['in', 'cemetery', ['get', 'name']],
-                ['in', 'Cemetery', ['get', 'name']],
-                ['in', 'Graveyard', ['get', 'name']],
-                ['in', 'graveyard', ['get', 'name']],
-                ['==', ['get', 'place'], 'cemetery'],
-                ['==', ['get', 'historic'], 'cemetery']
-              ]
-            ] as any
-          },
-          {
-            id: 'nyc-water',
-            type: 'fill' as const,
-            source: 'nyc-tiles',
-            'source-layer': 'examplepoints',
-            layout: {},
-            paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
-            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']] as any
-          },
-          {
-            id: 'nyc-roads',
-            type: 'line' as const,
-            source: 'nyc-tiles',
-            'source-layer': 'examplepoints',
-            layout: {},
-            paint: {
-              'line-color': '#666666',
-              'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
-              'line-opacity': 0.8
-            },
-            filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']] as any
-          },
-          {
-            id: 'nyc-road-labels',
-            type: 'symbol' as const,
-            source: 'nyc-tiles',
-            'source-layer': 'examplepoints',
-            layout: {
-              'text-field': ['get', 'name'],
-              'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
-              'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
-              'text-max-width': 8,
-              'text-line-height': 1.2,
-              'symbol-placement': 'line',
-              'text-rotation-alignment': 'map',
-              'text-allow-overlap': false,
-              'text-ignore-placement': false
-            },
-            paint: {
-              'text-color': '#333333',
-              'text-halo-color': '#FFFFFF',
-              'text-halo-width': 1.5,
-              'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 1]
-            },
-            filter: [
-              'all', 
-              ['==', ['geometry-type'], 'LineString'], 
-              ['has', 'name'],
-              ['has', 'highway'],
-              ['!=', ['get', 'name'], '']
-            ] as any,
-            minzoom: 12
-          }
-        ];
-
-        console.log('Adding', layers.length, 'vector layers...');
-        
-        layers.forEach((layer, index) => {
-          try {
-            if (!map.getLayer(layer.id)) {
-              map.addLayer(layer as any);
-              console.log(`Added layer ${index + 1}/${layers.length}: ${layer.id}`);
-            }
-          } catch (error) {
-            console.error('Error adding layer:', layer.id, error);
-          }
-        });
-
-        layersAddedRef.current = true;
-        console.log('All vector layers added successfully');
-      } catch (error) {
-        console.error('Error in addVectorLayers:', error);
-      }
-    };);
+    });
 
     // Sample more generously from each cell for visible area
     const businessesPerCell = Math.ceil(maxBusinesses / (gridSize * gridSize * 0.7)); // More per cell
@@ -359,6 +245,120 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.log(`💾 Cache now contains ${businessCacheRef.current.getAll().length} businesses`);
     }
   }, [businesses, searchFilters]);
+
+  // Function to add vector layers - must be defined before setupMapEventListeners
+  const addVectorLayers = useCallback((map: maplibregl.Map) => {
+    try {
+      const layers = [
+        {
+          id: 'nyc-land',
+          type: 'fill' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'examplepoints',
+          layout: {},
+          paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
+          filter: ['==', ['geometry-type'], 'Polygon'] as any
+        },
+        {
+          id: 'nyc-green-spaces',
+          type: 'fill' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'examplepoints',
+          layout: {},
+          paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
+          filter: [
+            'all',
+            ['==', ['geometry-type'], 'Polygon'],
+            ['any',
+              ['==', ['get', 'leisure'], 'park'],
+              ['==', ['get', 'landuse'], 'cemetery'],
+              ['==', ['get', 'amenity'], 'cemetery'],
+              ['==', ['get', 'amenity'], 'grave_yard'],
+              ['==', ['get', 'landuse'], 'recreation_ground'],
+              ['==', ['get', 'leisure'], 'recreation_ground'],
+              ['in', 'cemetery', ['get', 'name']],
+              ['in', 'Cemetery', ['get', 'name']],
+              ['in', 'Graveyard', ['get', 'name']],
+              ['in', 'graveyard', ['get', 'name']],
+              ['==', ['get', 'place'], 'cemetery'],
+              ['==', ['get', 'historic'], 'cemetery']
+            ]
+          ] as any
+        },
+        {
+          id: 'nyc-water',
+          type: 'fill' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'examplepoints',
+          layout: {},
+          paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
+          filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']] as any
+        },
+        {
+          id: 'nyc-roads',
+          type: 'line' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'examplepoints',
+          layout: {},
+          paint: {
+            'line-color': '#666666',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
+            'line-opacity': 0.8
+          },
+          filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']] as any
+        },
+        {
+          id: 'nyc-road-labels',
+          type: 'symbol' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'examplepoints',
+          layout: {
+            'text-field': ['get', 'name'],
+            'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+            'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
+            'text-max-width': 8,
+            'text-line-height': 1.2,
+            'symbol-placement': 'line',
+            'text-rotation-alignment': 'map',
+            'text-allow-overlap': false,
+            'text-ignore-placement': false
+          },
+          paint: {
+            'text-color': '#333333',
+            'text-halo-color': '#FFFFFF',
+            'text-halo-width': 1.5,
+            'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 1]
+          },
+          filter: [
+            'all', 
+            ['==', ['geometry-type'], 'LineString'], 
+            ['has', 'name'],
+            ['has', 'highway'],
+            ['!=', ['get', 'name'], '']
+          ] as any,
+          minzoom: 12
+        }
+      ];
+
+      console.log('Adding', layers.length, 'vector layers...');
+      
+      layers.forEach((layer, index) => {
+        try {
+          if (!map.getLayer(layer.id)) {
+            map.addLayer(layer as any);
+            console.log(`Added layer ${index + 1}/${layers.length}: ${layer.id}`);
+          }
+        } catch (error) {
+          console.error('Error adding layer:', layer.id, error);
+        }
+      });
+
+      layersAddedRef.current = true;
+      console.log('All vector layers added successfully');
+    } catch (error) {
+      console.error('Error in addVectorLayers:', error);
+    }
+  }, []);
 
   // Optimized business limit calculation
   const getBusinessLimitForViewport = useCallback((zoom: number, bounds: Bounds): number => {
@@ -1013,7 +1013,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       setMapLoaded(false);
       mapRef.current = null;
     };
-  }, [isMobile]);
+  }, [isMobile, addVectorLayers]);
 
   // Center map on neighborhood when neighborhoodCenter changes
   useEffect(() => {
