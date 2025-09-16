@@ -967,8 +967,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // }, [isMobile, addVectorLayers]);
 
   // // Center map on neighborhood when neighborhoodCenter changes
-  // useEffect(() => {
-  //   if (!mapRef.current || !neighborhoodCenter) return;
+  useEffect(() => {
+    if (!mapRef.current || !neighborhoodCenter) return;
     
     console.log('🏙️ Centering map on neighborhood:', neighborhoodCenter);
     mapRef.current.flyTo({
