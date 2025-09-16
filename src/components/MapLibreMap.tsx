@@ -422,7 +422,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [fetchFullBusinessDetails]);
 
-  // Debounced viewport change handler
+  // // Debounced viewport change handler
   const handleViewportChange = useCallback(async () => {
     console.log('🔍 DEBUG: handleViewportChange deps check', { 
       mapRef: typeof mapRef.current,
@@ -431,755 +431,755 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       getBusinessLimitForViewport: typeof getBusinessLimitForViewport 
     });
     
-    if (!mapRef.current || !mapLoaded || !loadBusinessesInViewport || isLoadingRef.current) return;
+  //   if (!mapRef.current || !mapLoaded || !loadBusinessesInViewport || isLoadingRef.current) return;
 
-    const map = mapRef.current;
+  //   const map = mapRef.current;
 
-    // If neighborhood search is active, load businesses within neighborhood bounds
-    if (searchFilters?.neighborhoodFilter) {
-      console.log('🏙️ Neighborhood filter active, loading businesses within neighborhood bounds');
+  //   // If neighborhood search is active, load businesses within neighborhood bounds
+  //   if (searchFilters?.neighborhoodFilter) {
+  //     console.log('🏙️ Neighborhood filter active, loading businesses within neighborhood bounds');
       
-      // Create neighborhood bounds from the boundary points with padding
-      const boundary = searchFilters.neighborhoodFilter.boundary;
-      const lats = boundary.map(p => p.lat);
-      const lons = boundary.map(p => p.lon);
+  //     // Create neighborhood bounds from the boundary points with padding
+  //     const boundary = searchFilters.neighborhoodFilter.boundary;
+  //     const lats = boundary.map(p => p.lat);
+  //     const lons = boundary.map(p => p.lon);
       
-      // Add padding to ensure we capture all businesses in the area
-      const latPadding = 0.015; // ~1.5km padding
-      const lonPadding = 0.020; // ~1.5km padding (adjusted for longitude)
+  //     // Add padding to ensure we capture all businesses in the area
+  //     const latPadding = 0.015; // ~1.5km padding
+  //     const lonPadding = 0.020; // ~1.5km padding (adjusted for longitude)
       
-      const neighborhoodBounds: Bounds = {
-        north: Math.max(...lats) + latPadding,
-        south: Math.min(...lats) - latPadding,
-        east: Math.max(...lons) + lonPadding,
-        west: Math.min(...lons) - lonPadding
-      };
+  //     const neighborhoodBounds: Bounds = {
+  //       north: Math.max(...lats) + latPadding,
+  //       south: Math.min(...lats) - latPadding,
+  //       east: Math.max(...lons) + lonPadding,
+  //       west: Math.min(...lons) - lonPadding
+  //     };
       
-      try {
-        isLoadingRef.current = true;
-        const zoom = map.getZoom();
-        const businessLimit = getBusinessLimitForViewport(zoom, neighborhoodBounds);
+  //     try {
+  //       isLoadingRef.current = true;
+  //       const zoom = map.getZoom();
+  //       const businessLimit = getBusinessLimitForViewport(zoom, neighborhoodBounds);
         
-        console.log('🏙️ Loading neighborhood businesses:', {
-          neighborhood: searchFilters.neighborhoodFilter.name,
-          bounds: neighborhoodBounds,
-          businessLimit
-        });
+  //       console.log('🏙️ Loading neighborhood businesses:', {
+  //         neighborhood: searchFilters.neighborhoodFilter.name,
+  //         bounds: neighborhoodBounds,
+  //         businessLimit
+  //       });
         
-        const neighborhoodBusinesses = await loadBusinessesInViewport(neighborhoodBounds, businessLimit);
+  //       const neighborhoodBusinesses = await loadBusinessesInViewport(neighborhoodBounds, businessLimit);
         
-        if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length > 0) {
-          console.log(`✅ Loaded ${neighborhoodBusinesses.length} businesses for ${searchFilters.neighborhoodFilter.name}`);
-          businessCacheRef.current.addMultiple(neighborhoodBusinesses);
-        }
+  //       if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length > 0) {
+  //         console.log(`✅ Loaded ${neighborhoodBusinesses.length} businesses for ${searchFilters.neighborhoodFilter.name}`);
+  //         businessCacheRef.current.addMultiple(neighborhoodBusinesses);
+  //       }
         
-      } catch (error) {
-        console.error('❌ Error loading neighborhood businesses:', error);
-      } finally {
-        isLoadingRef.current = false;
-      }
-      return;
-    }
+  //     } catch (error) {
+  //       console.error('❌ Error loading neighborhood businesses:', error);
+  //     } finally {
+  //       isLoadingRef.current = false;
+  //     }
+  //     return;
+  //   }
 
-    // Get current visible bounds - this is the key fix
-    const currentBounds = map.getBounds();
-    const currentZoom = map.getZoom();
+  //   // Get current visible bounds - this is the key fix
+  //   const currentBounds = map.getBounds();
+  //   const currentZoom = map.getZoom();
     
-    // Create tight bounds for the visible area FIRST
-    const visibleBounds: Bounds = {
-      north: currentBounds.getNorth(),
-      south: currentBounds.getSouth(),
-      east: currentBounds.getEast(),
-      west: currentBounds.getWest(),
-    };
+  //   // Create tight bounds for the visible area FIRST
+  //   const visibleBounds: Bounds = {
+  //     north: currentBounds.getNorth(),
+  //     south: currentBounds.getSouth(),
+  //     east: currentBounds.getEast(),
+  //     west: currentBounds.getWest(),
+  //   };
     
-    console.log('🗺️ Current visible bounds:', visibleBounds);
+  //   console.log('🗺️ Current visible bounds:', visibleBounds);
     
-    // Load businesses for the EXACT visible area first
-    try {
-      isLoadingRef.current = true;
-      const visibleBusinessLimit = Math.floor(getBusinessLimitForViewport(currentZoom, visibleBounds) * 0.8);
+  //   // Load businesses for the EXACT visible area first
+  //   try {
+  //     isLoadingRef.current = true;
+  //     const visibleBusinessLimit = Math.floor(getBusinessLimitForViewport(currentZoom, visibleBounds) * 0.8);
       
-      console.log('🎯 Loading businesses for VISIBLE area:', {
-        zoom: currentZoom.toFixed(2),
-        businessLimit: visibleBusinessLimit,
-        bounds: visibleBounds
-      });
+  //     console.log('🎯 Loading businesses for VISIBLE area:', {
+  //       zoom: currentZoom.toFixed(2),
+  //       businessLimit: visibleBusinessLimit,
+  //       bounds: visibleBounds
+  //     });
       
-      const visibleBusinesses = await loadBusinessesInViewport(visibleBounds, visibleBusinessLimit);
+  //     const visibleBusinesses = await loadBusinessesInViewport(visibleBounds, visibleBusinessLimit);
       
-      if (Array.isArray(visibleBusinesses) && visibleBusinesses.length > 0) {
-        console.log(`✅ Loaded ${visibleBusinesses.length} businesses for VISIBLE viewport`);
-        businessCacheRef.current.addMultiple(visibleBusinesses);
-      } else {
-        console.log('❌ No businesses loaded for visible viewport');
-      }
+  //     if (Array.isArray(visibleBusinesses) && visibleBusinesses.length > 0) {
+  //       console.log(`✅ Loaded ${visibleBusinesses.length} businesses for VISIBLE viewport`);
+  //       businessCacheRef.current.addMultiple(visibleBusinesses);
+  //     } else {
+  //       console.log('❌ No businesses loaded for visible viewport');
+  //     }
       
-      // Then load buffer area (don't wait for this)
-      setTimeout(async () => {
-        const latDiff = visibleBounds.north - visibleBounds.south;
-        const lngDiff = visibleBounds.east - visibleBounds.west;
-        const expansion = 0.3; // 30% expansion for buffer
+  //     // Then load buffer area (don't wait for this)
+  //     setTimeout(async () => {
+  //       const latDiff = visibleBounds.north - visibleBounds.south;
+  //       const lngDiff = visibleBounds.east - visibleBounds.west;
+  //       const expansion = 0.3; // 30% expansion for buffer
         
-        const bufferBounds: Bounds = {
-          north: visibleBounds.north + latDiff * expansion,
-          south: visibleBounds.south - latDiff * expansion,
-          east: visibleBounds.east + lngDiff * expansion,
-          west: visibleBounds.west - lngDiff * expansion,
-        };
+  //       const bufferBounds: Bounds = {
+  //         north: visibleBounds.north + latDiff * expansion,
+  //         south: visibleBounds.south - latDiff * expansion,
+  //         east: visibleBounds.east + lngDiff * expansion,
+  //         west: visibleBounds.west - lngDiff * expansion,
+  //       };
         
-        const bufferBusinessLimit = Math.floor(getBusinessLimitForViewport(currentZoom, bufferBounds) * 0.3);
+  //       const bufferBusinessLimit = Math.floor(getBusinessLimitForViewport(currentZoom, bufferBounds) * 0.3);
         
-        console.log('🔮 Loading buffer businesses:', {
-          businessLimit: bufferBusinessLimit,
-          bounds: bufferBounds
-        });
+  //       console.log('🔮 Loading buffer businesses:', {
+  //         businessLimit: bufferBusinessLimit,
+  //         bounds: bufferBounds
+  //       });
         
-        const bufferBusinesses = await loadBusinessesInViewport(bufferBounds, bufferBusinessLimit);
-        if (Array.isArray(bufferBusinesses) && bufferBusinesses.length > 0) {
-          console.log(`🔮 Loaded ${bufferBusinesses.length} buffer businesses`);
-          businessCacheRef.current.addMultiple(bufferBusinesses);
-        }
-      }, 100);
+  //       const bufferBusinesses = await loadBusinessesInViewport(bufferBounds, bufferBusinessLimit);
+  //       if (Array.isArray(bufferBusinesses) && bufferBusinesses.length > 0) {
+  //         console.log(`🔮 Loaded ${bufferBusinesses.length} buffer businesses`);
+  //         businessCacheRef.current.addMultiple(bufferBusinesses);
+  //       }
+  //     }, 100);
       
-    } catch (error) {
-      console.error('❌ Error in handleViewportChange:', error);
-    } finally {
-      setTimeout(() => {
-        isLoadingRef.current = false;
-      }, 200);
-    }
+  //   } catch (error) {
+  //     console.error('❌ Error in handleViewportChange:', error);
+  //   } finally {
+  //     setTimeout(() => {
+  //       isLoadingRef.current = false;
+  //     }, 200);
+  //   }
 
-  }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters]);
+  // }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters]);
 
-  // Keep a ref to latest handler for stable listeners
-  useEffect(() => {
-    handleViewportChangeRef.current = handleViewportChange;
-  }, [handleViewportChange]);
+  // // Keep a ref to latest handler for stable listeners
+  // useEffect(() => {
+  //   handleViewportChangeRef.current = handleViewportChange;
+  // }, [handleViewportChange]);
 
-  // Memoized DeckGL layers with better caching and visible area focus
-  const deckGLLayers = useMemo(() => {
-    const cachedBusinesses = businessCacheRef.current.getAll();
+  // // Memoized DeckGL layers with better caching and visible area focus
+  // const deckGLLayers = useMemo(() => {
+  //   const cachedBusinesses = businessCacheRef.current.getAll();
     
-    // Also consider businesses from hook state as fallback/supplement
-    const allBusinesses = cachedBusinesses.length > 0 ? cachedBusinesses : businesses;
+  //   // Also consider businesses from hook state as fallback/supplement
+  //   const allBusinesses = cachedBusinesses.length > 0 ? cachedBusinesses : businesses;
     
-    console.log('🎯 DeckGL layers calculation:', {
-      cachedBusinessesCount: cachedBusinesses?.length || 0,
-      hookBusinessesCount: businesses?.length || 0,
-      finalBusinessesCount: allBusinesses?.length || 0,
-      mapLoaded,
-      hasMap: !!mapRef.current,
-      containerDimensions: mapRef.current ? {
-        width: mapRef.current?.getContainer().clientWidth,
-        height: mapRef.current?.getContainer().clientHeight
-      } : null
-    });
+  //   console.log('🎯 DeckGL layers calculation:', {
+  //     cachedBusinessesCount: cachedBusinesses?.length || 0,
+  //     hookBusinessesCount: businesses?.length || 0,
+  //     finalBusinessesCount: allBusinesses?.length || 0,
+  //     mapLoaded,
+  //     hasMap: !!mapRef.current,
+  //     containerDimensions: mapRef.current ? {
+  //       width: mapRef.current?.getContainer().clientWidth,
+  //       height: mapRef.current?.getContainer().clientHeight
+  //     } : null
+  //   });
     
-    if (!allBusinesses || allBusinesses.length === 0) {
-      console.log('❌ No businesses available for DeckGL layers (cache + hook)');
-      return [];
-    }
+  //   if (!allBusinesses || allBusinesses.length === 0) {
+  //     console.log('❌ No businesses available for DeckGL layers (cache + hook)');
+  //     return [];
+  //   }
 
-    try {
-      let businessesToRender = allBusinesses;
+  //   try {
+  //     let businessesToRender = allBusinesses;
       
-      // Handle clustered data efficiently
-      if (isClusteredData && Array.isArray(businesses) && businesses.length > 0) {
-        const flattenedBusinesses: Business[] = [];
-        businesses.forEach((item: any) => {
-          if (item?.type === 'cluster' && Array.isArray(item.businesses)) {
-            item.businesses.forEach((b: Business) => {
-              if (b?.position) flattenedBusinesses.push(b);
-            });
-          } else if (item?.type !== 'cluster' && item?.position) {
-            flattenedBusinesses.push(item);
-          }
-        });
-        businessesToRender = flattenedBusinesses;
-      }
+  //     // Handle clustered data efficiently
+  //     if (isClusteredData && Array.isArray(businesses) && businesses.length > 0) {
+  //       const flattenedBusinesses: Business[] = [];
+  //       businesses.forEach((item: any) => {
+  //         if (item?.type === 'cluster' && Array.isArray(item.businesses)) {
+  //           item.businesses.forEach((b: Business) => {
+  //             if (b?.position) flattenedBusinesses.push(b);
+  //           });
+  //         } else if (item?.type !== 'cluster' && item?.position) {
+  //           flattenedBusinesses.push(item);
+  //         }
+  //       });
+  //       businessesToRender = flattenedBusinesses;
+  //     }
 
-      // Filter businesses to current viewport if map is loaded
-      if (mapRef.current && mapLoaded) {
-        const currentBounds = mapRef.current.getBounds();
-        const visibleBusinesses = businessesToRender.filter(business => {
-          if (!business?.position?.lat || !business?.position?.lng) return false;
+  //     // Filter businesses to current viewport if map is loaded
+  //     if (mapRef.current && mapLoaded) {
+  //       const currentBounds = mapRef.current.getBounds();
+  //       const visibleBusinesses = businessesToRender.filter(business => {
+  //         if (!business?.position?.lat || !business?.position?.lng) return false;
           
-          return business.position.lat <= currentBounds.getNorth() &&
-                 business.position.lat >= currentBounds.getSouth() &&
-                 business.position.lng <= currentBounds.getEast() &&
-                 business.position.lng >= currentBounds.getWest();
-        });
+  //         return business.position.lat <= currentBounds.getNorth() &&
+  //                business.position.lat >= currentBounds.getSouth() &&
+  //                business.position.lng <= currentBounds.getEast() &&
+  //                business.position.lng >= currentBounds.getWest();
+  //       });
         
-        // Combine visible businesses with some cached ones for smooth scrolling
-        const bufferBusinesses = businessesToRender.filter(business => {
-          if (!business?.position?.lat || !business?.position?.lng) return false;
+  //       // Combine visible businesses with some cached ones for smooth scrolling
+  //       const bufferBusinesses = businessesToRender.filter(business => {
+  //         if (!business?.position?.lat || !business?.position?.lng) return false;
           
-          const latBuffer = (currentBounds.getNorth() - currentBounds.getSouth()) * 0.2;
-          const lngBuffer = (currentBounds.getEast() - currentBounds.getWest()) * 0.2;
+  //         const latBuffer = (currentBounds.getNorth() - currentBounds.getSouth()) * 0.2;
+  //         const lngBuffer = (currentBounds.getEast() - currentBounds.getWest()) * 0.2;
           
-          return business.position.lat <= currentBounds.getNorth() + latBuffer &&
-                 business.position.lat >= currentBounds.getSouth() - latBuffer &&
-                 business.position.lng <= currentBounds.getEast() + lngBuffer &&
-                 business.position.lng >= currentBounds.getWest() - lngBuffer;
-        });
+  //         return business.position.lat <= currentBounds.getNorth() + latBuffer &&
+  //                business.position.lat >= currentBounds.getSouth() - latBuffer &&
+  //                business.position.lng <= currentBounds.getEast() + lngBuffer &&
+  //                business.position.lng >= currentBounds.getWest() - lngBuffer;
+  //       });
         
-        // Prioritize visible businesses, add some buffer ones
-        businessesToRender = [...visibleBusinesses, ...bufferBusinesses.slice(0, 1000)];
+  //       // Prioritize visible businesses, add some buffer ones
+  //       businessesToRender = [...visibleBusinesses, ...bufferBusinesses.slice(0, 1000)];
         
-        // Remove duplicates
-        const seen = new Set();
-        businessesToRender = businessesToRender.filter(business => {
-          if (seen.has(business.id)) return false;
-          seen.add(business.id);
-          return true;
-        });
+  //       // Remove duplicates
+  //       const seen = new Set();
+  //       businessesToRender = businessesToRender.filter(business => {
+  //         if (seen.has(business.id)) return false;
+  //         seen.add(business.id);
+  //         return true;
+  //       });
         
-        console.log(`🎯 Rendering ${visibleBusinesses.length} visible + ${bufferBusinesses.length - visibleBusinesses.length} buffer businesses`);
-      }
+  //       console.log(`🎯 Rendering ${visibleBusinesses.length} visible + ${bufferBusinesses.length - visibleBusinesses.length} buffer businesses`);
+  //     }
 
-      console.log(`✅ Creating DeckGL layer with ${businessesToRender.length} businesses`);
+  //     console.log(`✅ Creating DeckGL layer with ${businessesToRender.length} businesses`);
       
-      return [createBusinessScatterplotLayer({
-        businesses: businessesToRender,
-        selectedBusinessId: selectedBusiness?.id,
-        onBusinessClick: handleBusinessClick,
-      })];
-    } catch (error) {
-      console.error('Error creating DeckGL layers:', error);
-      return [];
-    }
-  }, [businesses, selectedBusiness?.id, isClusteredData, handleBusinessClick, mapLoaded]);
+  //     return [createBusinessScatterplotLayer({
+  //       businesses: businessesToRender,
+  //       selectedBusinessId: selectedBusiness?.id,
+  //       onBusinessClick: handleBusinessClick,
+  //     })];
+  //   } catch (error) {
+  //     console.error('Error creating DeckGL layers:', error);
+  //     return [];
+  //   }
+  // }, [businesses, selectedBusiness?.id, isClusteredData, handleBusinessClick, mapLoaded]);
 
-  // Handle container resize
-  useEffect(() => {
-    const handleResize = () => {
-      mapRef.current?.resize();
-    };
-    window.addEventListener('resize', handleResize);
-    handleResize(); // run once
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  // // Handle container resize
+  // useEffect(() => {
+  //   const handleResize = () => {
+  //     mapRef.current?.resize();
+  //   };
+  //   window.addEventListener('resize', handleResize);
+  //   handleResize(); // run once
+  //   return () => window.removeEventListener('resize', handleResize);
+  // }, []);
 
-  // Initialize map with optimized configuration
-  useEffect(() => {
-    console.log('🔄 MapLibre useEffect triggered', { 
-      hasContainer: !!mapContainerRef.current, 
-      hasMap: !!mapRef.current,
-      isCapacitor: isCapacitor(),
-      containerDimensions: mapContainerRef.current ? {
-        width: mapContainerRef.current.clientWidth,
-        height: mapContainerRef.current.clientHeight
-      } : null
-    });
+  // // Initialize map with optimized configuration
+  // useEffect(() => {
+  //   console.log('🔄 MapLibre useEffect triggered', { 
+  //     hasContainer: !!mapContainerRef.current, 
+  //     hasMap: !!mapRef.current,
+  //     isCapacitor: isCapacitor(),
+  //     containerDimensions: mapContainerRef.current ? {
+  //       width: mapContainerRef.current.clientWidth,
+  //       height: mapContainerRef.current.clientHeight
+  //     } : null
+  //   });
     
-    if (!mapContainerRef.current || mapRef.current) return;
+  //   if (!mapContainerRef.current || mapRef.current) return;
 
-    // Ensure container has minimum dimensions before creating map
-    const container = mapContainerRef.current;
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
+  //   // Ensure container has minimum dimensions before creating map
+  //   const container = mapContainerRef.current;
+  //   const containerWidth = container.clientWidth;
+  //   const containerHeight = container.clientHeight;
     
-    console.log('🔧 Container dimensions check:', { containerWidth, containerHeight });
+  //   console.log('🔧 Container dimensions check:', { containerWidth, containerHeight });
     
-    if (containerWidth < 100 || containerHeight < 100) {
-      console.warn('⚠️ Container too small, waiting for proper sizing:', { containerWidth, containerHeight });
-      // Retry after a brief delay to allow layout to complete
-      const retryTimer = setTimeout(() => {
-        if (mapContainerRef.current && !mapRef.current) {
-          const newWidth = mapContainerRef.current.clientWidth;
-          const newHeight = mapContainerRef.current.clientHeight;
-          console.log('🔄 Retrying map creation with dimensions:', { newWidth, newHeight });
-          // Trigger a re-render by updating a dummy state
-          setMapLoaded(false);
-        }
-      }, 100);
-      return () => clearTimeout(retryTimer);
-    }
+  //   if (containerWidth < 100 || containerHeight < 100) {
+  //     console.warn('⚠️ Container too small, waiting for proper sizing:', { containerWidth, containerHeight });
+  //     // Retry after a brief delay to allow layout to complete
+  //     const retryTimer = setTimeout(() => {
+  //       if (mapContainerRef.current && !mapRef.current) {
+  //         const newWidth = mapContainerRef.current.clientWidth;
+  //         const newHeight = mapContainerRef.current.clientHeight;
+  //         console.log('🔄 Retrying map creation with dimensions:', { newWidth, newHeight });
+  //         // Trigger a re-render by updating a dummy state
+  //         setMapLoaded(false);
+  //       }
+  //     }, 100);
+  //     return () => clearTimeout(retryTimer);
+  //   }
 
-    // Comprehensive tile configuration for different environments
-    const createTileSource = () => {
-      if (isCapacitor()) {
-        console.log('🔧 Using blob URLs for Capacitor tiles');
-        return {
-          type: 'vector' as const,
-          tiles: [
-            createTileBlobUrl('/data/tiles/{z}/{x}/{y}.pbf')
-          ],
-          minzoom: 10,
-          maxzoom: 16,
-          scheme: 'xyz' as const
-        };
-      }
+  //   // Comprehensive tile configuration for different environments
+  //   const createTileSource = () => {
+  //     if (isCapacitor()) {
+  //       console.log('🔧 Using blob URLs for Capacitor tiles');
+  //       return {
+  //         type: 'vector' as const,
+  //         tiles: [
+  //           createTileBlobUrl('/data/tiles/{z}/{x}/{y}.pbf')
+  //         ],
+  //         minzoom: 10,
+  //         maxzoom: 16,
+  //         scheme: 'xyz' as const
+  //       };
+  //     }
     
-      // Web
-      const fullUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-      console.log('🔧 Using web vector tiles:', fullUrl);
-      return {
-        type: 'vector' as const,
-        tiles: [fullUrl],
-        minzoom: 10,
-        maxzoom: 16,
-        scheme: 'xyz' as const
-      };
-    };
+  //     // Web
+  //     const fullUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+  //     console.log('🔧 Using web vector tiles:', fullUrl);
+  //     return {
+  //       type: 'vector' as const,
+  //       tiles: [fullUrl],
+  //       minzoom: 10,
+  //       maxzoom: 16,
+  //       scheme: 'xyz' as const
+  //     };
+  //   };
 
-    const createMapStyle = () => {
-      const vectorSource = createTileSource();
+  //   const createMapStyle = () => {
+  //     const vectorSource = createTileSource();
     
-      return {
-        version: 8 as const,
-        sources: {
-          'nyc-tiles': vectorSource
-        },
-        glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-        layers: [
-          {
-            id: 'background',
-            type: 'background' as const,
-            paint: { 'background-color': '#F5F5DC' }
-          }
-        ]
-      };
-    };
+  //     return {
+  //       version: 8 as const,
+  //       sources: {
+  //         'nyc-tiles': vectorSource
+  //       },
+  //       glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+  //       layers: [
+  //         {
+  //           id: 'background',
+  //           type: 'background' as const,
+  //           paint: { 'background-color': '#F5F5DC' }
+  //         }
+  //       ]
+  //     };
+  //   };
     
-    const mapStyle = createMapStyle();
+  //   const mapStyle = createMapStyle();
 
-    Log the tile configuration for debugging
-    console.log('🗺️ Map initialization - Style sources:', Object.keys(mapStyle.sources));
-    console.log('🗺️ Environment check - isCapacitor:', isCapacitor(), 'isMobile:', isMobile);
-    console.log('🗺️ Current location:', {
-      protocol: window.location.protocol,
-      origin: window.location.origin,
-      href: window.location.href
-    });
+  //   Log the tile configuration for debugging
+  //   console.log('🗺️ Map initialization - Style sources:', Object.keys(mapStyle.sources));
+  //   console.log('🗺️ Environment check - isCapacitor:', isCapacitor(), 'isMobile:', isMobile);
+  //   console.log('🗺️ Current location:', {
+  //     protocol: window.location.protocol,
+  //     origin: window.location.origin,
+  //     href: window.location.href
+  //   });
 
-    console.log('🗺️ Creating MapLibre instance with style:', {
-      version: mapStyle.version,
-      sourceCount: Object.keys(mapStyle.sources).length,
-      sources: Object.keys(mapStyle.sources),
-      layerCount: mapStyle.layers.length,
-      hasGlyphs: !!mapStyle.glyphs
-    });
+  //   console.log('🗺️ Creating MapLibre instance with style:', {
+  //     version: mapStyle.version,
+  //     sourceCount: Object.keys(mapStyle.sources).length,
+  //     sources: Object.keys(mapStyle.sources),
+  //     layerCount: mapStyle.layers.length,
+  //     hasGlyphs: !!mapStyle.glyphs
+  //   });
 
-    let mapInstance: maplibregl.Map;
+  //   let mapInstance: maplibregl.Map;
     
-    try {
-      mapInstance = new maplibregl.Map({
-        container: mapContainerRef.current!,
-        style: mapStyle,
-        center: [-73.986104, 40.715245],
-        zoom: 12.77,
-        maxZoom: isCapacitor() ? 19 : 18,
-        minZoom: 9,
-        renderWorldCopies: false,
-        attributionControl: false,
-        transformRequest: (url, resourceType) => {
-          // Enhanced logging for all environments
-          if (resourceType === 'Tile') {
-            console.log('🔧 Tile request:', { url, resourceType, isCapacitor: isCapacitor() });
-          }
+  //   try {
+  //     mapInstance = new maplibregl.Map({
+  //       container: mapContainerRef.current!,
+  //       style: mapStyle,
+  //       center: [-73.986104, 40.715245],
+  //       zoom: 12.77,
+  //       maxZoom: isCapacitor() ? 19 : 18,
+  //       minZoom: 9,
+  //       renderWorldCopies: false,
+  //       attributionControl: false,
+  //       transformRequest: (url, resourceType) => {
+  //         // Enhanced logging for all environments
+  //         if (resourceType === 'Tile') {
+  //           console.log('🔧 Tile request:', { url, resourceType, isCapacitor: isCapacitor() });
+  //         }
           
-          // For Capacitor, ensure HTTPS requests
-          if (isCapacitor() && url.startsWith('http://')) {
-            const httpsUrl = url.replace('http://', 'https://');
-            console.log('🔒 Converting to HTTPS for Capacitor:', httpsUrl);
-            return { url: httpsUrl };
-          }
+  //         // For Capacitor, ensure HTTPS requests
+  //         if (isCapacitor() && url.startsWith('http://')) {
+  //           const httpsUrl = url.replace('http://', 'https://');
+  //           console.log('🔒 Converting to HTTPS for Capacitor:', httpsUrl);
+  //           return { url: httpsUrl };
+  //         }
           
-          return { url };
-        }
-      });
-    } catch (error) {
-      console.error('Failed to create MapLibre instance:', error);
-      return;
-    }
+  //         return { url };
+  //       }
+  //     });
+  //   } catch (error) {
+  //     console.error('Failed to create MapLibre instance:', error);
+  //     return;
+  //   }
     
-    Verify the map instance is valid before proceeding
-    if (!mapInstance || typeof mapInstance.on !== 'function') {
-      console.error('Invalid MapLibre instance created');
-      return;
-    }
+  //   Verify the map instance is valid before proceeding
+  //   if (!mapInstance || typeof mapInstance.on !== 'function') {
+  //     console.error('Invalid MapLibre instance created');
+  //     return;
+  //   }
     
-    console.log('✅ MapLibre instance created successfully');
+  //   console.log('✅ MapLibre instance created successfully');
     
-    // Store map instance in ref immediately after creation
-    mapRef.current = mapInstance;
+  //   // Store map instance in ref immediately after creation
+  //   mapRef.current = mapInstance;
     
-    // Set bounds after storing in ref
-    try {
-      console.log('🗺️ Setting map bounds for NYC region...');
-      mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
+  //   // Set bounds after storing in ref
+  //   try {
+  //     console.log('🗺️ Setting map bounds for NYC region...');
+  //     mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
       
-      // Test basic map functionality
-      console.log('🧪 Testing map methods:', {
-        getZoom: mapInstance.getZoom(),
-        getCenter: mapInstance.getCenter(),
-        isStyleLoaded: mapInstance.isStyleLoaded()
-      });
-    } catch (error) {
-      console.error('Error setting up map:', error);
-    }
+  //     // Test basic map functionality
+  //     console.log('🧪 Testing map methods:', {
+  //       getZoom: mapInstance.getZoom(),
+  //       getCenter: mapInstance.getCenter(),
+  //       isStyleLoaded: mapInstance.isStyleLoaded()
+  //     });
+  //   } catch (error) {
+  //     console.error('Error setting up map:', error);
+  //   }
 
-    // Enhanced error handling and loading with validation
-    const setupMapEventListeners = (map: maplibregl.Map) => {
-      try {
-        // Verify map instance has required methods before adding listeners
-        if (!map || typeof map.on !== 'function') {
-          console.error('Invalid map instance - missing event methods');
-          return;
-        }
+  //   // Enhanced error handling and loading with validation
+  //   const setupMapEventListeners = (map: maplibregl.Map) => {
+  //     try {
+  //       // Verify map instance has required methods before adding listeners
+  //       if (!map || typeof map.on !== 'function') {
+  //         console.error('Invalid map instance - missing event methods');
+  //         return;
+  //       }
 
-        map.on('error', (e) => {
-          console.error('Map error:', e.error);
-        });
+  //       map.on('error', (e) => {
+  //         console.error('Map error:', e.error);
+  //       });
 
-        // Add fallback timer to ensure map loads even if 'load' event doesn't fire
-        const loadFallbackTimer = setTimeout(() => {
-          if (!mapLoaded) {
-            console.log('Map load fallback timer - forcing mapLoaded to true');
-            setMapLoaded(true);
-            callbackRefs.current.onMapLoaded?.();
-          }
-        }, 2000); // 2 second fallback
+  //       // Add fallback timer to ensure map loads even if 'load' event doesn't fire
+  //       const loadFallbackTimer = setTimeout(() => {
+  //         if (!mapLoaded) {
+  //           console.log('Map load fallback timer - forcing mapLoaded to true');
+  //           setMapLoaded(true);
+  //           callbackRefs.current.onMapLoaded?.();
+  //         }
+  //       }, 2000); // 2 second fallback
 
-        map.on('load', () => {
-          console.log('Map loaded successfully via load event');
-          clearTimeout(loadFallbackTimer);
-          setMapLoaded(true);
-          callbackRefs.current.onMapLoaded?.();
+  //       map.on('load', () => {
+  //         console.log('Map loaded successfully via load event');
+  //         clearTimeout(loadFallbackTimer);
+  //         setMapLoaded(true);
+  //         callbackRefs.current.onMapLoaded?.();
           
-          // For desktop, manually add layers after map loads if sourcedata doesn't fire
-          if (!isCapacitor() && !layersAddedRef.current) {
-            console.log('Manually adding vector layers after map load...');
-            setTimeout(() => {
-              if (!layersAddedRef.current && mapRef.current) {
-                addVectorLayers(mapRef.current);
-              }
-            }, 1000);
-          }
-        });
+  //         // For desktop, manually add layers after map loads if sourcedata doesn't fire
+  //         if (!isCapacitor() && !layersAddedRef.current) {
+  //           console.log('Manually adding vector layers after map load...');
+  //           setTimeout(() => {
+  //             if (!layersAddedRef.current && mapRef.current) {
+  //               addVectorLayers(mapRef.current);
+  //             }
+  //           }, 1000);
+  //         }
+  //       });
 
-        // Optimized move handlers with validation
-        const callViewportChange = () => {
-          if (mapRef.current && typeof mapRef.current.getBounds === 'function') {
-            handleViewportChangeRef.current();
-          }
-        };
+  //       // Optimized move handlers with validation
+  //       const callViewportChange = () => {
+  //         if (mapRef.current && typeof mapRef.current.getBounds === 'function') {
+  //           handleViewportChangeRef.current();
+  //         }
+  //       };
         
-        const debouncedMoveHandler = (() => {
-          let timeout: NodeJS.Timeout;
-          return () => {
-            clearTimeout(timeout);
-            timeout = setTimeout(callViewportChange, 150);
-          };
-        })();
+  //       const debouncedMoveHandler = (() => {
+  //         let timeout: NodeJS.Timeout;
+  //         return () => {
+  //           clearTimeout(timeout);
+  //           timeout = setTimeout(callViewportChange, 150);
+  //         };
+  //       })();
 
-        map.on('moveend', callViewportChange);
-        map.on('zoomend', callViewportChange);
-        map.on('move', debouncedMoveHandler);
+  //       map.on('moveend', callViewportChange);
+  //       map.on('zoomend', callViewportChange);
+  //       map.on('move', debouncedMoveHandler);
 
-        // Add map layers when ready with environment-specific handling
-        map.on('sourcedata', (e) => {
-          if (isCapacitor()) {
-            // For Capacitor with raster tiles
-            if (e.sourceId === 'osm' && e.isSourceLoaded && !layersAddedRef.current) {
-              console.log('Capacitor raster tiles loaded successfully');
-              layersAddedRef.current = true;
-            } else if (e.sourceId === 'osm') {
-              console.log('OSM source event:', {
-                sourceId: e.sourceId,
-                isSourceLoaded: e.isSourceLoaded,
-                layersAdded: layersAddedRef.current
-              });
-            }
-            return;
-          }
+  //       // Add map layers when ready with environment-specific handling
+  //       map.on('sourcedata', (e) => {
+  //         if (isCapacitor()) {
+  //           // For Capacitor with raster tiles
+  //           if (e.sourceId === 'osm' && e.isSourceLoaded && !layersAddedRef.current) {
+  //             console.log('Capacitor raster tiles loaded successfully');
+  //             layersAddedRef.current = true;
+  //           } else if (e.sourceId === 'osm') {
+  //             console.log('OSM source event:', {
+  //               sourceId: e.sourceId,
+  //               isSourceLoaded: e.isSourceLoaded,
+  //               layersAdded: layersAddedRef.current
+  //             });
+  //           }
+  //           return;
+  //         }
           
-          // For web environment with vector tiles
-          if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
-            console.log('NYC tiles source loaded, adding vector layers via sourcedata event...');
-            addVectorLayers(mapInstance);
-          } else if (e.sourceId === 'nyc-tiles') {
-            console.log('NYC tiles sourcedata event:', {
-              sourceId: e.sourceId,
-              isSourceLoaded: e.isSourceLoaded,
-              layersAdded: layersAddedRef.current
-            });
-          }
-        });
+  //         // For web environment with vector tiles
+  //         if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
+  //           console.log('NYC tiles source loaded, adding vector layers via sourcedata event...');
+  //           addVectorLayers(mapInstance);
+  //         } else if (e.sourceId === 'nyc-tiles') {
+  //           console.log('NYC tiles sourcedata event:', {
+  //             sourceId: e.sourceId,
+  //             isSourceLoaded: e.isSourceLoaded,
+  //             layersAdded: layersAddedRef.current
+  //           });
+  //         }
+  //       });
 
-        // Additional mobile-specific event handlers
-        if (isCapacitor()) {
-          map.on('data', (e: any) => {
-            if (e.dataType === 'source' && e.sourceId === 'osm') {
-              console.log('OSM data event:', {
-                dataType: e.dataType,
-                sourceId: e.sourceId,
-                isSourceLoaded: e.isSourceLoaded
-              });
-            }
-          });
+  //       // Additional mobile-specific event handlers
+  //       if (isCapacitor()) {
+  //         map.on('data', (e: any) => {
+  //           if (e.dataType === 'source' && e.sourceId === 'osm') {
+  //             console.log('OSM data event:', {
+  //               dataType: e.dataType,
+  //               sourceId: e.sourceId,
+  //               isSourceLoaded: e.isSourceLoaded
+  //             });
+  //           }
+  //         });
 
-          map.on('dataloading', (e: any) => {
-            if (e.dataType === 'source' && e.sourceId === 'osm') {
-              console.log('OSM data loading:', e.sourceId);
-            }
-          });
-        }
+  //         map.on('dataloading', (e: any) => {
+  //           if (e.dataType === 'source' && e.sourceId === 'osm') {
+  //             console.log('OSM data loading:', e.sourceId);
+  //           }
+  //         });
+  //       }
 
-        console.log('Map event listeners set up successfully');
-      } catch (error) {
-        console.error('Error setting up map event listeners:', error);
-      }
-    };
+  //       console.log('Map event listeners set up successfully');
+  //     } catch (error) {
+  //       console.error('Error setting up map event listeners:', error);
+  //     }
+  //   };
 
-    // Setup event listeners
-    setupMapEventListeners(mapInstance);
+  //   // Setup event listeners
+  //   setupMapEventListeners(mapInstance);
 
-    console.log('Map instance created, setting up event listeners...');
-    console.log('Map container dimensions:', {
-      width: mapContainerRef.current?.clientWidth,
-      height: mapContainerRef.current?.clientHeight
-    });
+  //   console.log('Map instance created, setting up event listeners...');
+  //   console.log('Map container dimensions:', {
+  //     width: mapContainerRef.current?.clientWidth,
+  //     height: mapContainerRef.current?.clientHeight
+  //   });
 
-    return () => {
-      // Cleanup
-      [updateTimeoutRef, moveTimeoutRef, debounceTimeoutRef].forEach(ref => {
-        if (ref.current) clearTimeout(ref.current);
-      });
+  //   return () => {
+  //     // Cleanup
+  //     [updateTimeoutRef, moveTimeoutRef, debounceTimeoutRef].forEach(ref => {
+  //       if (ref.current) clearTimeout(ref.current);
+  //     });
       
-      landmarkMarkersRef.current.forEach(marker => {
-        try { marker.remove(); } catch {}
-      });
+  //     landmarkMarkersRef.current.forEach(marker => {
+  //       try { marker.remove(); } catch {}
+  //     });
       
-      try {
-        mapInstance.remove();
-      } catch (error) {
-        console.error('Error removing map:', error);
-      }
+  //     try {
+  //       mapInstance.remove();
+  //     } catch (error) {
+  //       console.error('Error removing map:', error);
+  //     }
       
-      businessCacheRef.current.clear();
-      layersAddedRef.current = false;
-      setMapLoaded(false);
-      mapRef.current = null;
-    };
-  }, [isMobile, addVectorLayers]);
+  //     businessCacheRef.current.clear();
+  //     layersAddedRef.current = false;
+  //     setMapLoaded(false);
+  //     mapRef.current = null;
+  //   };
+  // }, [isMobile, addVectorLayers]);
 
-  // Center map on neighborhood when neighborhoodCenter changes
-  useEffect(() => {
-    if (!mapRef.current || !neighborhoodCenter) return;
+  // // Center map on neighborhood when neighborhoodCenter changes
+  // useEffect(() => {
+  //   if (!mapRef.current || !neighborhoodCenter) return;
     
-    console.log('🏙️ Centering map on neighborhood:', neighborhoodCenter);
-    mapRef.current.flyTo({
-      center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
-      zoom: 14, // Good zoom level for neighborhood view
-      duration: 2000
-    });
-  }, [neighborhoodCenter]);
+  //   console.log('🏙️ Centering map on neighborhood:', neighborhoodCenter);
+  //   mapRef.current.flyTo({
+  //     center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
+  //     zoom: 14, // Good zoom level for neighborhood view
+  //     duration: 2000
+  //   });
+  // }, [neighborhoodCenter]);
 
-  // Load neighborhood businesses when search filters change
-  useEffect(() => {
-    if (!mapRef.current || !mapLoaded || !searchFilters?.neighborhoodFilter || !loadBusinessesInViewport) return;
+  // // Load neighborhood businesses when search filters change
+  // useEffect(() => {
+  //   if (!mapRef.current || !mapLoaded || !searchFilters?.neighborhoodFilter || !loadBusinessesInViewport) return;
     
-    const loadNeighborhoodBusinesses = async () => {
-      console.log('🏙️ Search filters changed, loading neighborhood businesses');
+  //   const loadNeighborhoodBusinesses = async () => {
+  //     console.log('🏙️ Search filters changed, loading neighborhood businesses');
       
-      // Create neighborhood bounds from the boundary points with padding
-      const boundary = searchFilters.neighborhoodFilter.boundary;
-      const lats = boundary.map(p => p.lat);
-      const lons = boundary.map(p => p.lon);
+  //     // Create neighborhood bounds from the boundary points with padding
+  //     const boundary = searchFilters.neighborhoodFilter.boundary;
+  //     const lats = boundary.map(p => p.lat);
+  //     const lons = boundary.map(p => p.lon);
       
-      // Add padding to ensure we capture all businesses in the area
-      const latPadding = 0.015; // ~1.5km padding
-      const lonPadding = 0.020; // ~1.5km padding (adjusted for longitude)
+  //     // Add padding to ensure we capture all businesses in the area
+  //     const latPadding = 0.015; // ~1.5km padding
+  //     const lonPadding = 0.020; // ~1.5km padding (adjusted for longitude)
       
-      const neighborhoodBounds: Bounds = {
-        north: Math.max(...lats) + latPadding,
-        south: Math.min(...lats) - latPadding,
-        east: Math.max(...lons) + lonPadding,
-        west: Math.min(...lons) - lonPadding
-      };
+  //     const neighborhoodBounds: Bounds = {
+  //       north: Math.max(...lats) + latPadding,
+  //       south: Math.min(...lats) - latPadding,
+  //       east: Math.max(...lons) + lonPadding,
+  //       west: Math.min(...lons) - lonPadding
+  //     };
       
-      try {
-        const zoom = mapRef.current!.getZoom();
-        const businessLimit = getBusinessLimitForViewport(zoom, neighborhoodBounds);
+  //     try {
+  //       const zoom = mapRef.current!.getZoom();
+  //       const businessLimit = getBusinessLimitForViewport(zoom, neighborhoodBounds);
         
-        console.log('🏙️ Initial neighborhood business load:', {
-          neighborhood: searchFilters.neighborhoodFilter.name,
-          bounds: neighborhoodBounds,
-          businessLimit
-        });
+  //       console.log('🏙️ Initial neighborhood business load:', {
+  //         neighborhood: searchFilters.neighborhoodFilter.name,
+  //         bounds: neighborhoodBounds,
+  //         businessLimit
+  //       });
         
-        const neighborhoodBusinesses = await loadBusinessesInViewport(neighborhoodBounds, businessLimit);
+  //       const neighborhoodBusinesses = await loadBusinessesInViewport(neighborhoodBounds, businessLimit);
         
-        if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length > 0) {
-          console.log(`✅ Initially loaded ${neighborhoodBusinesses.length} businesses for ${searchFilters.neighborhoodFilter.name}`);
-          businessCacheRef.current.addMultiple(neighborhoodBusinesses);
-        } else {
-          console.log('❌ No businesses found for neighborhood:', searchFilters.neighborhoodFilter.name);
-        }
+  //       if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length > 0) {
+  //         console.log(`✅ Initially loaded ${neighborhoodBusinesses.length} businesses for ${searchFilters.neighborhoodFilter.name}`);
+  //         businessCacheRef.current.addMultiple(neighborhoodBusinesses);
+  //       } else {
+  //         console.log('❌ No businesses found for neighborhood:', searchFilters.neighborhoodFilter.name);
+  //       }
         
-      } catch (error) {
-        console.error('❌ Error loading initial neighborhood businesses:', error);
-      }
-    };
+  //     } catch (error) {
+  //       console.error('❌ Error loading initial neighborhood businesses:', error);
+  //     }
+  //   };
     
-    // Small delay to ensure map is ready
-    setTimeout(loadNeighborhoodBusinesses, 500);
-  }, [mapLoaded, searchFilters?.neighborhoodFilter, loadBusinessesInViewport, getBusinessLimitForViewport]);
+  //   // Small delay to ensure map is ready
+  //   setTimeout(loadNeighborhoodBusinesses, 500);
+  // }, [mapLoaded, searchFilters?.neighborhoodFilter, loadBusinessesInViewport, getBusinessLimitForViewport]);
 
-  // Initialize DeckGL overlay
-  useEffect(() => {
-    if (!mapRef.current || !mapLoaded || deckOverlay) return;
+  // // Initialize DeckGL overlay
+  // useEffect(() => {
+  //   if (!mapRef.current || !mapLoaded || deckOverlay) return;
     
-    let overlay = overlayInstance;
-    if (!overlay) {
-      overlay = new MapboxOverlay({
-        interleaved: true,
-        layers: []
-      });
-      overlayInstance = overlay;
-    }
+  //   let overlay = overlayInstance;
+  //   if (!overlay) {
+  //     overlay = new MapboxOverlay({
+  //       interleaved: true,
+  //       layers: []
+  //     });
+  //     overlayInstance = overlay;
+  //   }
     
-    try {
-      mapRef.current.addControl(overlay as any);
-      setDeckOverlay(overlay);
-      setOverlayReady(true);
-    } catch (e) {
-      console.log('DeckGL overlay already added:', e);
-      setOverlayReady(true);
-    }
-  }, [mapLoaded]);
+  //   try {
+  //     mapRef.current.addControl(overlay as any);
+  //     setDeckOverlay(overlay);
+  //     setOverlayReady(true);
+  //   } catch (e) {
+  //     console.log('DeckGL overlay already added:', e);
+  //     setOverlayReady(true);
+  //   }
+  // }, [mapLoaded]);
 
-  // Update DeckGL layers with throttling and immediate visible area updates
-  useEffect(() => {
-    if (!deckOverlay || !overlayReady) return;
+  // // Update DeckGL layers with throttling and immediate visible area updates
+  // useEffect(() => {
+  //   if (!deckOverlay || !overlayReady) return;
     
-    if (updateTimeoutRef.current) clearTimeout(updateTimeoutRef.current);
+  //   if (updateTimeoutRef.current) clearTimeout(updateTimeoutRef.current);
     
-    // Update immediately for visible area, then throttle for performance
-    const updateLayers = () => {
-      try {
-        deckOverlay.setProps({ layers: deckGLLayers });
-        console.log(`🎯 Updated DeckGL with ${deckGLLayers?.length || 0} layers`);
-      } catch (error) {
-        console.error('Error updating DeckGL:', error);
-      }
-    };
+  //   // Update immediately for visible area, then throttle for performance
+  //   const updateLayers = () => {
+  //     try {
+  //       deckOverlay.setProps({ layers: deckGLLayers });
+  //       console.log(`🎯 Updated DeckGL with ${deckGLLayers?.length || 0} layers`);
+  //     } catch (error) {
+  //       console.error('Error updating DeckGL:', error);
+  //     }
+  //   };
     
-    // Update immediately if we have visible businesses
-    if (mapRef.current && mapLoaded && deckGLLayers.length > 0) {
-      updateLayers();
-    } else {
-      // Throttle updates for other cases
-      updateTimeoutRef.current = setTimeout(updateLayers, 50);
-    }
-  }, [deckOverlay, overlayReady, deckGLLayers, mapLoaded]);
+  //   // Update immediately if we have visible businesses
+  //   if (mapRef.current && mapLoaded && deckGLLayers.length > 0) {
+  //     updateLayers();
+  //   } else {
+  //     // Throttle updates for other cases
+  //     updateTimeoutRef.current = setTimeout(updateLayers, 50);
+  //   }
+  // }, [deckOverlay, overlayReady, deckGLLayers, mapLoaded]);
 
-  // Handle search filter changes
-  useEffect(() => {
-    const filtersChanged = JSON.stringify(lastSearchFiltersRef.current) !== JSON.stringify(searchFilters);
-    if (!filtersChanged || !mapRef.current || !mapLoaded) return;
+  // // Handle search filter changes
+  // useEffect(() => {
+  //   const filtersChanged = JSON.stringify(lastSearchFiltersRef.current) !== JSON.stringify(searchFilters);
+  //   if (!filtersChanged || !mapRef.current || !mapLoaded) return;
     
-    console.log('🔍 Search filters changed, clearing cache');
-    lastSearchFiltersRef.current = searchFilters;
-    businessCacheRef.current.clear();
-    isLoadingRef.current = false;
+  //   console.log('🔍 Search filters changed, clearing cache');
+  //   lastSearchFiltersRef.current = searchFilters;
+  //   businessCacheRef.current.clear();
+  //   isLoadingRef.current = false;
     
-    setTimeout(() => handleViewportChangeRef.current(), 100);
-  }, [searchFilters, mapLoaded]);
+  //   setTimeout(() => handleViewportChangeRef.current(), 100);
+  // }, [searchFilters, mapLoaded]);
 
-  // Handle business updates
-  useEffect(() => {
-    if (businesses && Array.isArray(businesses) && businesses.length > 0) {
-      businessCacheRef.current.addMultiple(businesses);
-      callbackRefs.current.onBusinessesLoaded?.();
-    }
-  }, [businesses]);
+  // // Handle business updates
+  // useEffect(() => {
+  //   if (businesses && Array.isArray(businesses) && businesses.length > 0) {
+  //     businessCacheRef.current.addMultiple(businesses);
+  //     callbackRefs.current.onBusinessesLoaded?.();
+  //   }
+  // }, [businesses]);
 
-  // Zoom to selected business
-  useEffect(() => {
-    if (!mapRef.current || !mapLoaded || !selectedBusiness?.position) return;
+  // // Zoom to selected business
+  // useEffect(() => {
+  //   if (!mapRef.current || !mapLoaded || !selectedBusiness?.position) return;
     
-    mapRef.current.easeTo({
-      center: [selectedBusiness.position.lng, selectedBusiness.position.lat],
-      zoom: Math.max(mapRef.current.getZoom(), 16),
-      duration: 600
-    });
-  }, [selectedBusiness?.id, mapLoaded]);
+  //   mapRef.current.easeTo({
+  //     center: [selectedBusiness.position.lng, selectedBusiness.position.lat],
+  //     zoom: Math.max(mapRef.current.getZoom(), 16),
+  //     duration: 600
+  //   });
+  // }, [selectedBusiness?.id, mapLoaded]);
 
-  // Handle landmarks with performance optimization
-  useEffect(() => {
-    if (!mapLoaded || !Array.isArray(landmarks) || landmarks.length === 0 || !mapRef.current) return;
+  // // Handle landmarks with performance optimization
+  // useEffect(() => {
+  //   if (!mapLoaded || !Array.isArray(landmarks) || landmarks.length === 0 || !mapRef.current) return;
 
-    // Clear existing markers
-    landmarkMarkersRef.current.forEach(marker => {
-      try { marker.remove(); } catch {}
-    });
-    landmarkMarkersRef.current = [];
+  //   // Clear existing markers
+  //   landmarkMarkersRef.current.forEach(marker => {
+  //     try { marker.remove(); } catch {}
+  //   });
+  //   landmarkMarkersRef.current = [];
 
-    const zoom = mapRef.current.getZoom();
-    const size = Math.max(12, Math.min(32, 16 * Math.pow(1.15, zoom - 10)));
+  //   const zoom = mapRef.current.getZoom();
+  //   const size = Math.max(12, Math.min(32, 16 * Math.pow(1.15, zoom - 10)));
 
-    const markers = landmarks.map(landmark => {
-      const el = document.createElement('div');
-      el.textContent = landmark.emoji;
-      el.style.cssText = `
-        font-size: ${size}px;
-        line-height: ${size}px;
-        width: ${size}px;
-        height: ${size}px;
-        user-select: none;
-        pointer-events: none;
-        text-shadow: 0 0 3px rgba(255,255,255,0.9);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 0;
-      `;
+  //   const markers = landmarks.map(landmark => {
+  //     const el = document.createElement('div');
+  //     el.textContent = landmark.emoji;
+  //     el.style.cssText = `
+  //       font-size: ${size}px;
+  //       line-height: ${size}px;
+  //       width: ${size}px;
+  //       height: ${size}px;
+  //       user-select: none;
+  //       pointer-events: none;
+  //       text-shadow: 0 0 3px rgba(255,255,255,0.9);
+  //       display: flex;
+  //       align-items: center;
+  //       justify-content: center;
+  //       z-index: 0;
+  //     `;
 
-      try {
-        return new maplibregl.Marker({ element: el, anchor: 'center' })
-          .setLngLat([landmark.lng, landmark.lat])
-          .addTo(mapRef.current!);
-      } catch (error) {
-        console.error('Error creating marker:', error);
-        return null;
-      }
-    }).filter(Boolean) as maplibregl.Marker[];
+  //     try {
+  //       return new maplibregl.Marker({ element: el, anchor: 'center' })
+  //         .setLngLat([landmark.lng, landmark.lat])
+  //         .addTo(mapRef.current!);
+  //     } catch (error) {
+  //       console.error('Error creating marker:', error);
+  //       return null;
+  //     }
+  //   }).filter(Boolean) as maplibregl.Marker[];
 
-    landmarkMarkersRef.current = markers;
+  //   landmarkMarkersRef.current = markers;
 
-    // Optimized zoom handler for emoji sizing
-    const handleZoomChange = () => {
-      const newZoom = mapRef.current!.getZoom();
-      const newSize = Math.max(12, Math.min(32, 16 * Math.pow(1.15, newZoom - 10)));
+  //   // Optimized zoom handler for emoji sizing
+  //   const handleZoomChange = () => {
+  //     const newZoom = mapRef.current!.getZoom();
+  //     const newSize = Math.max(12, Math.min(32, 16 * Math.pow(1.15, newZoom - 10)));
       
-      markers.forEach(marker => {
-        const element = marker.getElement();
-        if (element) {
-          element.style.fontSize = `${newSize}px`;
-          element.style.lineHeight = `${newSize}px`;
-          element.style.width = `${newSize}px`;
-          element.style.height = `${newSize}px`;
-        }
-      });
-    };
+  //     markers.forEach(marker => {
+  //       const element = marker.getElement();
+  //       if (element) {
+  //         element.style.fontSize = `${newSize}px`;
+  //         element.style.lineHeight = `${newSize}px`;
+  //         element.style.width = `${newSize}px`;
+  //         element.style.height = `${newSize}px`;
+  //       }
+  //     });
+  //   };
 
-    mapRef.current.on('zoom', handleZoomChange);
+  //   mapRef.current.on('zoom', handleZoomChange);
 
-    return () => {
-      try { mapRef.current?.off('zoom', handleZoomChange); } catch {}
-    };
-  }, [mapLoaded, landmarks]);
+  //   return () => {
+  //     try { mapRef.current?.off('zoom', handleZoomChange); } catch {}
+  //   };
+  // }, [mapLoaded, landmarks]);
 
-  // Initial viewport load
-  useEffect(() => {
-    if (mapLoaded && mapRef.current) {
-      setTimeout(() => handleViewportChangeRef.current(), 800);
-    }
-  }, [mapLoaded]);
+  // // Initial viewport load
+  // useEffect(() => {
+  //   if (mapLoaded && mapRef.current) {
+  //     setTimeout(() => handleViewportChangeRef.current(), 800);
+  //   }
+  // }, [mapLoaded]);
 
   const [tileUrl, setTileUrl] = useState<string | null>(null);
 
