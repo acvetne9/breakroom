@@ -370,7 +370,7 @@ const MobileApp: React.FC = () => {
             setExpandedPost(post.id);
           }}
           onRoleVote={handleRoleVote}
-          onLocationSave={handleLocationSave} // NEW: Pass the location save handler
+          onLocationSave={handleLocationSave}
         />
       </Suspense>
       
