@@ -767,29 +767,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const tileUrls = await Promise.all(urls.map(url => createTileBlobUrl(url)));
     
     try {
-      // 1️⃣ Wait for all tile URLs
-      const tileUrls = await Promise.all(
-        urls.map(url => createTileBlobUrl(url)) // createTileBlobUrl returns Promise<string>
-      );
-      
-      // 2️⃣ Build the style
-      const mapStyle: maplibregl.StyleSpecification = {
-        version: 8,
-        sources: {
-          'nyc-tiles': {
-            type: 'vector',
-            tiles: tileUrls, // ✅ string[]
-            minzoom: 0,
-            maxzoom: 22,
-            scheme: 'xyz',
-          }
-        },
-        glyphs: 'https://example.com/fonts/{fontstack}/{range}.pbf',
-        layers: [
-          // your layers here
-        ]
-      };
-      
       // 3️⃣ Create the map AFTER tiles are ready
       mapInstance = new maplibregl.Map({
         container: mapContainerRef.current!,
@@ -990,6 +967,29 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       mapRef.current = null;
     };
   }, [isMobile, addVectorLayers]);
+
+  // 1️⃣ Wait for all tile URLs
+  const tileUrls = await Promise.all(
+    urls.map(url => createTileBlobUrl(url)) // createTileBlobUrl returns Promise<string>
+  );
+  
+  // 2️⃣ Build the style
+  const mapStyle: maplibregl.StyleSpecification = {
+    version: 8,
+    sources: {
+      'nyc-tiles': {
+        type: 'vector',
+        tiles: tileUrls, // ✅ string[]
+        minzoom: 0,
+        maxzoom: 22,
+        scheme: 'xyz',
+      }
+    },
+    glyphs: 'https://example.com/fonts/{fontstack}/{range}.pbf',
+    layers: [
+      // your layers here
+    ]
+  };
 
   // // Center map on neighborhood when neighborhoodCenter changes
   useEffect(() => {
