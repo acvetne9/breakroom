@@ -200,6 +200,35 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const lastSearchFiltersRef = useRef(searchFilters);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+
+  useEffect(() => {
+    if (mapRef.current) return; // prevent re-init
+
+    mapRef.current = new maplibregl.Map({
+      container: mapContainerRef.current!,
+      style: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', // your style
+      center: [-73.9857, 40.7484],
+      zoom: 11
+    });
+
+    return () => {
+      mapRef.current?.remove();
+      mapRef.current = null;
+    };
+  }, []);
+
+  // 🔑 Handle container resize
+  useEffect(() => {
+    const handleResize = () => {
+      mapRef.current?.resize();
+    };
+    window.addEventListener('resize', handleResize);
+    handleResize(); // run once
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Stable callback refs
   const callbackRefs = useRef({
     onBusinessClick,
@@ -1195,7 +1224,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [mapLoaded, map]);
 
   return (
-    <div
+    <div ref={mapContainerRef} className="absolute inset-0 w-full h-full min-w-[200px] min-h-[200px]" 
       ref={mapRef}
       className="maplibre-map"
       style={{
