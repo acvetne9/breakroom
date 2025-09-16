@@ -545,8 +545,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       mapLoaded,
       hasMap: !!map,
       containerDimensions: mapRef.current ? {
-        width: mapRef.current.clientWidth,
-        height: mapRef.current.clientHeight
+        width: mapRef.current?.getContainer().clientWidth,
+        height: mapRef.current?.getContainer().clientHeight
       } : null
     });
     
