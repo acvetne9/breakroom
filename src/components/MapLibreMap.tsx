@@ -183,12 +183,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   isClusteredData = false
 }) => {
   const isMobile = useIsMobile();
-  const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [deckOverlay, setDeckOverlay] = useState<MapboxOverlay | null>(null);
   const [overlayReady, setOverlayReady] = useState(false);
   
   // Refs for stable references and state tracking
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const businessCacheRef = useRef(new BusinessCache(isMobile ? 10000 : 20000));
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
   const layersAddedRef = useRef(false);
@@ -198,35 +199,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const lastViewportRef = useRef<ViewportState | null>(null);
   const lastSearchFiltersRef = useRef(searchFilters);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
-
-  useEffect(() => {
-    if (mapRef.current) return;
-  
-    mapRef.current = new maplibregl.Map({
-      container: mapContainerRef.current!, // ✅ HTMLDivElement
-      style: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-      center: [-73.9857, 40.7484],
-      zoom: 11
-    });
-  
-    return () => {
-      mapRef.current?.remove();
-      mapRef.current = null;
-    };
-  }, []);
-
-  // 🔑 Handle container resize
-  useEffect(() => {
-    const handleResize = () => {
-      mapRef.current?.resize();
-    };
-    window.addEventListener('resize', handleResize);
-    handleResize(); // run once
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   // Stable callback refs
   const callbackRefs = useRef({
@@ -241,18 +213,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     callbackRefs.current = { onBusinessClick, onMapLoaded, onBusinessesLoaded };
   }, [onBusinessClick, onMapLoaded, onBusinessesLoaded]);
-
-  // Center map on neighborhood when neighborhoodCenter changes
-  useEffect(() => {
-    if (!map || !neighborhoodCenter) return;
-    
-    console.log('🏙️ Centering map on neighborhood:', neighborhoodCenter);
-    map.flyTo({
-      center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
-      zoom: 14, // Good zoom level for neighborhood view
-      duration: 2000
-    });
-  }, [map, neighborhoodCenter]);
 
   // Initialize hooks (must be called unconditionally at top level)
   const mapDataHook = useViewportMapData();
@@ -348,66 +308,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [fetchFullBusinessDetails]);
 
-  // Load neighborhood businesses when search filters change
-  useEffect(() => {
-    if (!map || !mapLoaded || !searchFilters?.neighborhoodFilter || !loadBusinessesInViewport) return;
-    
-    const loadNeighborhoodBusinesses = async () => {
-      console.log('🏙️ Search filters changed, loading neighborhood businesses');
-      
-      // Create neighborhood bounds from the boundary points with padding
-      const boundary = searchFilters.neighborhoodFilter.boundary;
-      const lats = boundary.map(p => p.lat);
-      const lons = boundary.map(p => p.lon);
-      
-      // Add padding to ensure we capture all businesses in the area
-      const latPadding = 0.015; // ~1.5km padding
-      const lonPadding = 0.020; // ~1.5km padding (adjusted for longitude)
-      
-      const neighborhoodBounds: Bounds = {
-        north: Math.max(...lats) + latPadding,
-        south: Math.min(...lats) - latPadding,
-        east: Math.max(...lons) + lonPadding,
-        west: Math.min(...lons) - lonPadding
-      };
-      
-      try {
-        const zoom = map.getZoom();
-        const businessLimit = getBusinessLimitForViewport(zoom, neighborhoodBounds);
-        
-        console.log('🏙️ Initial neighborhood business load:', {
-          neighborhood: searchFilters.neighborhoodFilter.name,
-          bounds: neighborhoodBounds,
-          businessLimit
-        });
-        
-        const neighborhoodBusinesses = await loadBusinessesInViewport(neighborhoodBounds, businessLimit);
-        
-        if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length > 0) {
-          console.log(`✅ Initially loaded ${neighborhoodBusinesses.length} businesses for ${searchFilters.neighborhoodFilter.name}`);
-          businessCacheRef.current.addMultiple(neighborhoodBusinesses);
-        } else {
-          console.log('❌ No businesses found for neighborhood:', searchFilters.neighborhoodFilter.name);
-        }
-        
-      } catch (error) {
-        console.error('❌ Error loading initial neighborhood businesses:', error);
-      }
-    };
-    
-    // Small delay to ensure map is ready
-    setTimeout(loadNeighborhoodBusinesses, 500);
-  }, [map, mapLoaded, searchFilters?.neighborhoodFilter, loadBusinessesInViewport, getBusinessLimitForViewport]);
-
   // Debounced viewport change handler
   const handleViewportChange = useCallback(async () => {
     console.log('🔍 DEBUG: handleViewportChange deps check', { 
-      map: typeof map,
+      mapRef: typeof mapRef.current,
       mapLoaded: typeof mapLoaded,
       loadBusinessesInViewport: typeof loadBusinessesInViewport,
       getBusinessLimitForViewport: typeof getBusinessLimitForViewport 
     });
-    if (!map || !mapLoaded || !loadBusinessesInViewport || isLoadingRef.current) return;
+    
+    if (!mapRef.current || !mapLoaded || !loadBusinessesInViewport || isLoadingRef.current) return;
+
+    const map = mapRef.current;
 
     // If neighborhood search is active, load businesses within neighborhood bounds
     if (searchFilters?.neighborhoodFilter) {
@@ -524,7 +436,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }, 200);
     }
 
-  }, [map, mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters]);
+  }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters]);
 
   // Keep a ref to latest handler for stable listeners
   useEffect(() => {
@@ -543,7 +455,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       hookBusinessesCount: businesses?.length || 0,
       finalBusinessesCount: allBusinesses?.length || 0,
       mapLoaded,
-      hasMap: !!map,
+      hasMap: !!mapRef.current,
       containerDimensions: mapRef.current ? {
         width: mapRef.current?.getContainer().clientWidth,
         height: mapRef.current?.getContainer().clientHeight
@@ -574,8 +486,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
 
       // Filter businesses to current viewport if map is loaded
-      if (map && mapLoaded) {
-        const currentBounds = map.getBounds();
+      if (mapRef.current && mapLoaded) {
+        const currentBounds = mapRef.current.getBounds();
         const visibleBusinesses = businessesToRender.filter(business => {
           if (!business?.position?.lat || !business?.position?.lng) return false;
           
@@ -623,24 +535,34 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.error('Error creating DeckGL layers:', error);
       return [];
     }
-  }, [businesses, selectedBusiness?.id, isClusteredData, handleBusinessClick, map, mapLoaded]);
+  }, [businesses, selectedBusiness?.id, isClusteredData, handleBusinessClick, mapLoaded]);
+
+  // Handle container resize
+  useEffect(() => {
+    const handleResize = () => {
+      mapRef.current?.resize();
+    };
+    window.addEventListener('resize', handleResize);
+    handleResize(); // run once
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Initialize map with optimized configuration
   useEffect(() => {
     console.log('🔄 MapLibre useEffect triggered', { 
-      hasContainer: !!mapRef.current, 
-      hasMap: !!map,
+      hasContainer: !!mapContainerRef.current, 
+      hasMap: !!mapRef.current,
       isCapacitor: isCapacitor(),
-      containerDimensions: mapRef.current ? {
-        width: mapRef.current.clientWidth,
-        height: mapRef.current.clientHeight
+      containerDimensions: mapContainerRef.current ? {
+        width: mapContainerRef.current.clientWidth,
+        height: mapContainerRef.current.clientHeight
       } : null
     });
     
-    if (!mapRef.current || map) return;
+    if (!mapContainerRef.current || mapRef.current) return;
 
     // Ensure container has minimum dimensions before creating map
-    const container = mapRef.current;
+    const container = mapContainerRef.current;
     const containerWidth = container.clientWidth;
     const containerHeight = container.clientHeight;
     
@@ -650,9 +572,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.warn('⚠️ Container too small, waiting for proper sizing:', { containerWidth, containerHeight });
       // Retry after a brief delay to allow layout to complete
       const retryTimer = setTimeout(() => {
-        if (mapRef.current && !map) {
-          const newWidth = mapRef.current.clientWidth;
-          const newHeight = mapRef.current.clientHeight;
+        if (mapContainerRef.current && !mapRef.current) {
+          const newWidth = mapContainerRef.current.clientWidth;
+          const newHeight = mapContainerRef.current.clientHeight;
           console.log('🔄 Retrying map creation with dimensions:', { newWidth, newHeight });
           // Trigger a re-render by updating a dummy state
           setMapLoaded(false);
@@ -776,7 +698,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     });
 
     // const mapInstance = new maplibregl.Map({
-    //   container: mapRef.current!,
+    //   container: mapContainerRef.current!,
     //   style: mapStyle,
     //   center: [-73.986104, 40.715245],
     //   zoom: 12.77,
@@ -805,17 +727,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     
     // Immediately set bounds after creation
     console.log('🗺️ Setting map bounds for NYC region...');
-    mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
+    mapRef.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
     
     // Test basic map functionality
     console.log('🧪 Testing map methods:', {
-      getZoom: mapInstance.getZoom(),
-      getCenter: mapInstance.getCenter(),
-      isStyleLoaded: mapInstance.isStyleLoaded()
+      getZoom: mapRef.getZoom(),
+      getCenter: mapRef.getCenter(),
+      isStyleLoaded: mapRef.isStyleLoaded()
     });
 
+    // Store map instance in ref
+    mapRef.current = mapRef;
+
     // Enhanced error handling and loading
-    mapInstance.on('error', (e) => {
+    mapRef.on('error', (e) => {
       console.error('🚨 Map error:', e.error);
     });
 
@@ -828,7 +753,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     }, 2000); // 2 second fallback
 
-    mapInstance.on('load', () => {
+    mapRef.on('load', () => {
       console.log('🗺️ Map loaded successfully via load event');
       clearTimeout(loadFallbackTimer);
       setMapLoaded(true);
@@ -838,15 +763,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       if (!isCapacitor() && !layersAddedRef.current) {
         console.log('🔄 Manually adding vector layers after map load...');
         setTimeout(() => {
-          if (!layersAddedRef.current) {
-            addVectorLayers(mapInstance);
+          if (!layersAddedRef.current && mapRef.current) {
+            addVectorLayers(mapRef.current);
           }
         }, 1000);
       }
     });
 
     // Function to add vector layers
-    const addVectorLayers = (mapInstance: maplibregl.Map) => {
+    const addVectorLayers = (map: maplibregl.Map) => {
       try {
         const layers = [
           {
@@ -943,8 +868,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         
         layers.forEach((layer, index) => {
           try {
-            if (!mapInstance.getLayer(layer.id)) {
-              mapInstance.addLayer(layer as any);
+            if (!map.getLayer(layer.id)) {
+              map.addLayer(layer as any);
               console.log(`✅ Added layer ${index + 1}/${layers.length}: ${layer.id}`);
             }
           } catch (error) {
@@ -969,12 +894,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       };
     })();
 
-    mapInstance.on('moveend', callViewportChange);
-    mapInstance.on('zoomend', callViewportChange);
-    mapInstance.on('move', debouncedMoveHandler);
+    mapRef.on('moveend', callViewportChange);
+    mapRef.on('zoomend', callViewportChange);
+    mapRef.on('move', debouncedMoveHandler);
 
     // Add map layers when ready with environment-specific handling
-    mapInstance.on('sourcedata', (e) => {
+    mapRef.on('sourcedata', (e) => {
       if (isCapacitor()) {
         // For Capacitor with raster tiles
         if (e.sourceId === 'osm' && e.isSourceLoaded && !layersAddedRef.current) {
@@ -993,7 +918,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       // For web environment with vector tiles
       if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
         console.log('🔄 NYC tiles source loaded, adding vector layers via sourcedata event...');
-        addVectorLayers(mapInstance);
+        addVectorLayers(mapRef);
       } else if (e.sourceId === 'nyc-tiles') {
         console.log('🔄 NYC tiles sourcedata event:', {
           sourceId: e.sourceId,
@@ -1005,7 +930,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     // Additional mobile-specific event handlers
     if (isCapacitor()) {
-      mapInstance.on('data', (e: any) => {
+      mapRef.on('data', (e: any) => {
         if (e.dataType === 'source' && e.sourceId === 'osm') {
           console.log('📊 OSM data event:', {
             dataType: e.dataType,
@@ -1015,7 +940,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         }
       });
 
-      mapInstance.on('dataloading', (e: any) => {
+      mapRef.on('dataloading', (e: any) => {
         if (e.dataType === 'source' && e.sourceId === 'osm') {
           console.log('⏳ OSM data loading:', e.sourceId);
         }
@@ -1024,17 +949,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     console.log('🗺️ Map instance created, setting up event listeners...');
     console.log('🗺️ Map container dimensions:', {
-      width: mapRef.current?.clientWidth,
-      height: mapRef.current?.clientHeight
+      width: mapContainerRef.current?.clientWidth,
+      height: mapContainerRef.current?.clientHeight
     });
-    
-    console.log('🗺️ Map instance created, setting up event listeners...');
-    console.log('🗺️ Map container dimensions:', {
-      width: mapRef.current?.clientWidth,
-      height: mapRef.current?.clientHeight
-    });
-    
-    setMap(mapInstance);
 
     return () => {
       // Cleanup
@@ -1047,7 +964,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
       
       try {
-        mapInstance.remove();
+        mapRef.remove();
       } catch (error) {
         console.error('Error removing map:', error);
       }
@@ -1055,13 +972,76 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       businessCacheRef.current.clear();
       layersAddedRef.current = false;
       setMapLoaded(false);
-      setMap(null);
+      mapRef.current = null;
     };
   }, [isMobile]);
 
+  // Center map on neighborhood when neighborhoodCenter changes
+  useEffect(() => {
+    if (!mapRef.current || !neighborhoodCenter) return;
+    
+    console.log('🏙️ Centering map on neighborhood:', neighborhoodCenter);
+    mapRef.current.flyTo({
+      center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
+      zoom: 14, // Good zoom level for neighborhood view
+      duration: 2000
+    });
+  }, [neighborhoodCenter]);
+
+  // Load neighborhood businesses when search filters change
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded || !searchFilters?.neighborhoodFilter || !loadBusinessesInViewport) return;
+    
+    const loadNeighborhoodBusinesses = async () => {
+      console.log('🏙️ Search filters changed, loading neighborhood businesses');
+      
+      // Create neighborhood bounds from the boundary points with padding
+      const boundary = searchFilters.neighborhoodFilter.boundary;
+      const lats = boundary.map(p => p.lat);
+      const lons = boundary.map(p => p.lon);
+      
+      // Add padding to ensure we capture all businesses in the area
+      const latPadding = 0.015; // ~1.5km padding
+      const lonPadding = 0.020; // ~1.5km padding (adjusted for longitude)
+      
+      const neighborhoodBounds: Bounds = {
+        north: Math.max(...lats) + latPadding,
+        south: Math.min(...lats) - latPadding,
+        east: Math.max(...lons) + lonPadding,
+        west: Math.min(...lons) - lonPadding
+      };
+      
+      try {
+        const zoom = mapRef.current!.getZoom();
+        const businessLimit = getBusinessLimitForViewport(zoom, neighborhoodBounds);
+        
+        console.log('🏙️ Initial neighborhood business load:', {
+          neighborhood: searchFilters.neighborhoodFilter.name,
+          bounds: neighborhoodBounds,
+          businessLimit
+        });
+        
+        const neighborhoodBusinesses = await loadBusinessesInViewport(neighborhoodBounds, businessLimit);
+        
+        if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length > 0) {
+          console.log(`✅ Initially loaded ${neighborhoodBusinesses.length} businesses for ${searchFilters.neighborhoodFilter.name}`);
+          businessCacheRef.current.addMultiple(neighborhoodBusinesses);
+        } else {
+          console.log('❌ No businesses found for neighborhood:', searchFilters.neighborhoodFilter.name);
+        }
+        
+      } catch (error) {
+        console.error('❌ Error loading initial neighborhood businesses:', error);
+      }
+    };
+    
+    // Small delay to ensure map is ready
+    setTimeout(loadNeighborhoodBusinesses, 500);
+  }, [mapLoaded, searchFilters?.neighborhoodFilter, loadBusinessesInViewport, getBusinessLimitForViewport]);
+
   // Initialize DeckGL overlay
   useEffect(() => {
-    if (!map || !mapLoaded || deckOverlay) return;
+    if (!mapRef.current || !mapLoaded || deckOverlay) return;
     
     let overlay = overlayInstance;
     if (!overlay) {
@@ -1073,14 +1053,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
     
     try {
-      map.addControl(overlay as any);
+      mapRef.current.addControl(overlay as any);
       setDeckOverlay(overlay);
       setOverlayReady(true);
     } catch (e) {
       console.log('DeckGL overlay already added:', e);
       setOverlayReady(true);
     }
-  }, [map, mapLoaded]);
+  }, [mapLoaded]);
 
   // Update DeckGL layers with throttling and immediate visible area updates
   useEffect(() => {
@@ -1099,18 +1079,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
     
     // Update immediately if we have visible businesses
-    if (map && mapLoaded && deckGLLayers.length > 0) {
+    if (mapRef.current && mapLoaded && deckGLLayers.length > 0) {
       updateLayers();
     } else {
       // Throttle updates for other cases
       updateTimeoutRef.current = setTimeout(updateLayers, 50);
     }
-  }, [deckOverlay, overlayReady, deckGLLayers, map, mapLoaded]);
+  }, [deckOverlay, overlayReady, deckGLLayers, mapLoaded]);
 
   // Handle search filter changes
   useEffect(() => {
     const filtersChanged = JSON.stringify(lastSearchFiltersRef.current) !== JSON.stringify(searchFilters);
-    if (!filtersChanged || !map || !mapLoaded) return;
+    if (!filtersChanged || !mapRef.current || !mapLoaded) return;
     
     console.log('🔍 Search filters changed, clearing cache');
     lastSearchFiltersRef.current = searchFilters;
@@ -1118,7 +1098,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     isLoadingRef.current = false;
     
     setTimeout(() => handleViewportChangeRef.current(), 100);
-  }, [searchFilters, map, mapLoaded]);
+  }, [searchFilters, mapLoaded]);
 
   // Handle business updates
   useEffect(() => {
@@ -1130,29 +1110,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Zoom to selected business
   useEffect(() => {
-    if (!map || !mapLoaded || !selectedBusiness?.position) return;
+    if (!mapRef.current || !mapLoaded || !selectedBusiness?.position) return;
     
-    map.easeTo({
+    mapRef.current.easeTo({
       center: [selectedBusiness.position.lng, selectedBusiness.position.lat],
-      zoom: Math.max(map.getZoom(), 16),
+      zoom: Math.max(mapRef.current.getZoom(), 16),
       duration: 600
     });
-  }, [selectedBusiness?.id, map, mapLoaded]);
-
-  // Center on neighborhood
-  useEffect(() => {
-    if (!map || !mapLoaded || !neighborhoodCenter) return;
-    
-    map.easeTo({
-      center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
-      zoom: 14,
-      duration: 800
-    });
-  }, [neighborhoodCenter, map, mapLoaded]);
+  }, [selectedBusiness?.id, mapLoaded]);
 
   // Handle landmarks with performance optimization
   useEffect(() => {
-    if (!mapLoaded || !Array.isArray(landmarks) || landmarks.length === 0 || !map) return;
+    if (!mapLoaded || !Array.isArray(landmarks) || landmarks.length === 0 || !mapRef.current) return;
 
     // Clear existing markers
     landmarkMarkersRef.current.forEach(marker => {
@@ -1160,7 +1129,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     });
     landmarkMarkersRef.current = [];
 
-    const zoom = map.getZoom();
+    const zoom = mapRef.current.getZoom();
     const size = Math.max(12, Math.min(32, 16 * Math.pow(1.15, zoom - 10)));
 
     const markers = landmarks.map(landmark => {
@@ -1183,7 +1152,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       try {
         return new maplibregl.Marker({ element: el, anchor: 'center' })
           .setLngLat([landmark.lng, landmark.lat])
-          .addTo(map);
+          .addTo(mapRef.current!);
       } catch (error) {
         console.error('Error creating marker:', error);
         return null;
@@ -1194,7 +1163,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     // Optimized zoom handler for emoji sizing
     const handleZoomChange = () => {
-      const newZoom = map.getZoom();
+      const newZoom = mapRef.current!.getZoom();
       const newSize = Math.max(12, Math.min(32, 16 * Math.pow(1.15, newZoom - 10)));
       
       markers.forEach(marker => {
@@ -1208,23 +1177,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
     };
 
-    map.on('zoom', handleZoomChange);
+    mapRef.current.on('zoom', handleZoomChange);
 
     return () => {
-      try { map.off('zoom', handleZoomChange); } catch {}
+      try { mapRef.current?.off('zoom', handleZoomChange); } catch {}
     };
-  }, [mapLoaded, landmarks, map]);
+  }, [mapLoaded, landmarks]);
 
   // Initial viewport load
   useEffect(() => {
-    if (mapLoaded && map) {
+    if (mapLoaded && mapRef.current) {
       setTimeout(() => handleViewportChangeRef.current(), 800);
     }
-  }, [mapLoaded, map]);
+  }, [mapLoaded]);
 
   return (
-    <div ref={mapContainerRef} className="map-container maplibre-map"
-      ref={mapRef}
+    <div
+      ref={mapContainerRef}
+      className="map-container maplibre-map"
       style={{
         position: 'absolute',
         top: 0,
