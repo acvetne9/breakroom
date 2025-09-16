@@ -765,22 +765,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     let mapInstance: maplibregl.Map;
 
     try {
-      const urls = ['/data/tiles/{z}/{x}/{y}.pbf'];
-      const tileUrls: string[] = await Promise.all(urls.map(url => createTileBlobUrl(url)));
-      const mapStyle: maplibregl.StyleSpecification = {
-        version: 8,
-        sources: {
-          'nyc-tiles': {
-            type: 'vector',
-            tiles: tileUrls, // now string[], not Promise<string>[]
-            minzoom: 10,
-            maxzoom: 16,
-            scheme: 'xyz'
-          }
-        },
-        glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-        layers: [] // add your layers here
-      };
+
       // 3️⃣ Create the map AFTER tiles are ready
       mapInstance = new maplibregl.Map({
         container: mapContainerRef.current!,
@@ -982,28 +967,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, [isMobile, addVectorLayers]);
 
-  // 1️⃣ Wait for all tile URLs
-  const tileUrls = await Promise.all(
-    urls.map(url => createTileBlobUrl(url)) // createTileBlobUrl returns Promise<string>
-  );
-  
-  // 2️⃣ Build the style
-  const mapStyle: maplibregl.StyleSpecification = {
-    version: 8,
-    sources: {
-      'nyc-tiles': {
-        type: 'vector',
-        tiles: tileUrls, // ✅ string[]
-        minzoom: 0,
-        maxzoom: 22,
-        scheme: 'xyz',
-      }
-    },
-    glyphs: 'https://example.com/fonts/{fontstack}/{range}.pbf',
-    layers: [
-      // your layers here
-    ]
-  };
 
   // // Center map on neighborhood when neighborhoodCenter changes
   useEffect(() => {
@@ -1213,61 +1176,44 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, [mapLoaded, landmarks]);
 
-  // // Initial viewport load
-  // useEffect(() => {
-  //   if (mapLoaded && mapRef.current) {
-  //     setTimeout(() => handleViewportChangeRef.current(), 800);
-  //   }
-  // }, [mapLoaded]);
-
-  const [tileUrl, setTileUrl] = useState<string | null>(null);
-
-  // 1. Load the tile URL (async)
-  useEffect(() => {
-    let active = true;
-  
-    const initTiles = async () => {
-      if (isCapacitor()) {
-        const blobUrl = await createTileBlobUrl('/data/tiles/{z}/{x}/{y}.pbf');
-        if (active) setTileUrl(blobUrl);
-      } else {
-        setTileUrl(`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`);
-      }
-    };
-  
-    initTiles();
-    return () => { active = false; };
-  }, []);
   
   // 2. Initialize the map once we have a valid string tileUrl
   useEffect(() => {
-    if (!mapContainerRef.current || !tileUrl) return;
+    if (!mapContainerRef.current) return;
   
-    const map = new maplibregl.Map({
-      container: mapContainerRef.current,
-      style: {
+    const initializeMap = async () => {
+      const urls = ['/data/tiles/{z}/{x}/{y}.pbf']; // or dynamic list of tile files
+      cconst tileUrls: string[] = await Promise.all(urls.map(url => createTileBlobUrl(url)));
+
+      const mapStyle: maplibregl.StyleSpecification = {
         version: 8,
         sources: {
           'nyc-tiles': {
             type: 'vector',
-            tiles: [tileUrl], // ✅ string only now
+            tiles: tileUrls, // now string[], not Promise<string>[]
             minzoom: 10,
             maxzoom: 16,
             scheme: 'xyz'
           }
         },
         glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-        layers: [
-          { id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } }
-        ]
-      },
-      center: [-73.986104, 40.715245],
-      zoom: 12.77
-    });
+        layers: [] // add your layers here
+      };
+
   
-    mapRef.current = map;
-    return () => map.remove();
-  }, [tileUrl]);
+      const mapInstance = new maplibregl.Map({
+        container: mapContainerRef.current!,
+        style: mapStyle,
+        center: [-73.986104, 40.715245],
+        zoom: 12.77,
+      });
+  
+      mapRef.current = mapInstance;
+    };
+  
+    initializeMap();
+  }, []);
+
 
   return (
     <div
