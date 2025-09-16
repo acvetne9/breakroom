@@ -18,6 +18,55 @@ interface InitiationPageProps {
   }) => void;
 }
 
+// Address validation function
+const isValidAddress = (address: string): boolean => {
+  const trimmedAddress = address.trim();
+  
+  // Check minimum length
+  if (trimmedAddress.length < 10) {
+    return false;
+  }
+  
+  // Check for basic address components
+  const hasNumbers = /\d/.test(trimmedAddress);
+  const hasLetters = /[a-zA-Z]/.test(trimmedAddress);
+  const hasSpaces = /\s/.test(trimmedAddress);
+  
+  // Must have numbers (street number), letters, and spaces
+  if (!hasNumbers || !hasLetters || !hasSpaces) {
+    return false;
+  }
+  
+  // Common street types/suffixes
+  const streetTypes = [
+    'street', 'st', 'avenue', 'ave', 'road', 'rd', 'drive', 'dr', 'lane', 'ln',
+    'boulevard', 'blvd', 'court', 'ct', 'place', 'pl', 'way', 'circle', 'cir',
+    'plaza', 'square', 'sq', 'parkway', 'pkwy', 'trail', 'tr', 'terrace', 'ter',
+    'highway', 'hwy', 'loop', 'row', 'walk', 'alley', 'crescent', 'cres',
+    'grove', 'heights', 'hill', 'park', 'ridge', 'view', 'crossing', 'xing'
+  ];
+  
+  const addressLower = trimmedAddress.toLowerCase();
+  const hasStreetType = streetTypes.some(type => 
+    addressLower.includes(' ' + type + ' ') || 
+    addressLower.endsWith(' ' + type) ||
+    addressLower.includes(' ' + type + ',')
+  );
+  
+  // Check for common address patterns
+  const addressPatterns = [
+    // Pattern: number + street name + type (e.g., "123 Main St")
+    /^\d+\s+[a-zA-Z\s]+\s+(street|st|avenue|ave|road|rd|drive|dr|lane|ln|boulevard|blvd|court|ct|place|pl|way|circle|cir|plaza|square|sq|parkway|pkwy|trail|tr|terrace|ter|highway|hwy|loop|row|walk|alley|crescent|cres|grove|heights|hill|park|ridge|view|crossing|xing)\b/i,
+    // Pattern with apartment/unit numbers
+    /^\d+\s+[a-zA-Z\s]+\s+(street|st|avenue|ave|road|rd|drive|dr|lane|ln|boulevard|blvd|court|ct|place|pl|way|circle|cir|plaza|square|sq|parkway|pkwy|trail|tr|terrace|ter|highway|hwy|loop|row|walk|alley|crescent|cres|grove|heights|hill|park|ridge|view|crossing|xing)\b.*?(apt|apartment|unit|suite|ste)?\s*\#?\d*$/i
+  ];
+  
+  const matchesPattern = addressPatterns.some(pattern => pattern.test(trimmedAddress));
+  
+  // Address is valid if it has street type or matches common patterns
+  return hasStreetType || matchesPattern;
+};
+
 const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   const [salary, setSalary] = useState('');
   const [role, setRole] = useState('');
@@ -28,6 +77,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   const [showNewBusinessForm, setShowNewBusinessForm] = useState(false);
   const [newBusinessAddress, setNewBusinessAddress] = useState('');
   const [isCreatingBusiness, setIsCreatingBusiness] = useState(false);
+  const [addressError, setAddressError] = useState('');
   const { toast } = useToast();
 
   /** Format salary as $123.00 */
@@ -97,8 +147,11 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   const handleLocationChange = (value: string, fullLocation?: string) => {
     setLocation(value);
     setFullLocation(fullLocation || value);
-    setShowNewBusinessForm(value && value.length > 2);
+  
+    // Only show "new business form" if user typed free text (not from dropdown)
+    setShowNewBusinessForm(!fullLocation && value.length > 2);
   };
+
 
   const handleLocationBlur = () => {
     const value = location.trim();
@@ -118,6 +171,76 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
       return;
     }
     setTimeout(() => checkForCompletion(), 10);
+  };
+
+  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setNewBusinessAddress(value);
+    
+    // Clear previous error when user starts typing
+    if (addressError) {
+      setAddressError('');
+    }
+  };
+
+  const validateAndCreateBusiness = async () => {
+    const address = newBusinessAddress.trim();
+    
+    if (!address) {
+      setAddressError('Please enter a business address');
+      toast({
+        title: 'Address required',
+        description: 'Please enter the business address',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (isProfane(address)) {
+      setAddressError('Invalid address content');
+      toast({
+        title: 'Invalid address',
+        description: 'Inappropriate content detected in address',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!isValidAddress(address)) {
+      setAddressError('Please enter a valid street address (e.g., "123 Main St, City, State")');
+      return;
+    }
+
+    if (!salary || !role) {
+      toast({
+        title: 'Missing information',
+        description: 'Please fill in salary and role first',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsCreatingBusiness(true);
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      toast({
+        title: 'Business created!',
+        description: 'New business has been added to the map',
+      });
+      setShowNewBusinessForm(false);
+      setNewBusinessAddress('');
+      setAddressError('');
+      setTimeout(() => checkForCompletion(), 100);
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to create business. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCreatingBusiness(false);
+    }
   };
 
   return (
@@ -201,7 +324,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                 value={salary}
                 onChange={handleSalaryChange}
                 onBlur={checkForCompletion}
-                placeholder="$0.00"
+                placeholder="Earnings Est."
                 className="app-input text-center text-lg flex-1 !py-0 h-12"
               />
               <select
@@ -237,50 +360,20 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                 <input
                   type="text"
                   value={newBusinessAddress}
-                  onChange={(e) => setNewBusinessAddress(e.target.value)}
-                  placeholder="Enter business address..."
-                  className="app-input"
+                  onChange={handleAddressChange}
+                  placeholder="Enter business address (e.g., 123 Main St, City, State)..."
+                  className={`app-input ${addressError ? 'border-red-500 border-2' : ''}`}
                 />
+                {addressError && (
+                  <p className="text-red-500 text-sm mt-1 px-1">{addressError}</p>
+                )}
+                <p className="text-gray-500 text-xs mt-1 px-1">
+                  Please include street number, street name, and street type (e.g., St, Ave, Rd)
+                </p>
               </div>
               <div className="flex items-center space-x-3">
                 <button
-                  onClick={async () => {
-                    if (!newBusinessAddress.trim()) {
-                      toast({
-                        title: 'Address required',
-                        description: 'Please enter the business address',
-                        variant: 'destructive',
-                      });
-                      return;
-                    }
-                    if (!salary || !role) {
-                      toast({
-                        title: 'Missing information',
-                        description: 'Please fill in salary and role first',
-                        variant: 'destructive',
-                      });
-                      return;
-                    }
-                    setIsCreatingBusiness(true);
-                    try {
-                      await new Promise((resolve) => setTimeout(resolve, 500));
-                      toast({
-                        title: 'Business created!',
-                        description: 'New business has been added to the map',
-                      });
-                      setShowNewBusinessForm(false);
-                      setNewBusinessAddress('');
-                      setTimeout(() => checkForCompletion(), 100);
-                    } catch {
-                      toast({
-                        title: 'Error',
-                        description: 'Failed to create business. Please try again.',
-                        variant: 'destructive',
-                      });
-                    } finally {
-                      setIsCreatingBusiness(false);
-                    }
-                  }}
+                  onClick={validateAndCreateBusiness}
                   disabled={isCreatingBusiness}
                   className="app-input flex-1 bg-app-yellow text-app-black font-medium"
                 >
@@ -290,6 +383,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                   onClick={() => {
                     setShowNewBusinessForm(false);
                     setNewBusinessAddress('');
+                    setAddressError('');
                     setLocation('');
                   }}
                   className="app-input w-auto px-6 bg-gray-100 text-app-gray-dark"

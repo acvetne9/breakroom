@@ -242,13 +242,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // Ensure businesses is always an array to prevent dependency array crashes
   const businesses = Array.isArray(rawBusinesses) ? rawBusinesses : [];
   
-  // Log businesses for debugging
+  // Log businesses for debugging and ensure they get cached
   useEffect(() => {
     console.log(`🎯 MapLibreMap received ${businesses.length} businesses:`, {
       searchFilters: !!searchFilters,
       hasNeighborhoodFilter: !!searchFilters?.neighborhoodFilter,
       businessNames: businesses.slice(0, 5).map(b => b.name)
     });
+
+    // CRITICAL: Add businesses from hook to cache so DeckGL can render them
+    if (businesses && businesses.length > 0) {
+      console.log(`🏪 Adding ${businesses.length} businesses to cache for DeckGL rendering`);
+      businessCacheRef.current.addMultiple(businesses);
+      console.log(`💾 Cache now contains ${businessCacheRef.current.getAll().length} businesses`);
+    }
   }, [businesses, searchFilters]);
 
   // Optimized business limit calculation
@@ -500,10 +507,28 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const deckGLLayers = useMemo(() => {
     const cachedBusinesses = businessCacheRef.current.getAll();
     
-    if (!cachedBusinesses || cachedBusinesses.length === 0) return [];
+    // Also consider businesses from hook state as fallback/supplement
+    const allBusinesses = cachedBusinesses.length > 0 ? cachedBusinesses : businesses;
+    
+    console.log('🎯 DeckGL layers calculation:', {
+      cachedBusinessesCount: cachedBusinesses?.length || 0,
+      hookBusinessesCount: businesses?.length || 0,
+      finalBusinessesCount: allBusinesses?.length || 0,
+      mapLoaded,
+      hasMap: !!map,
+      containerDimensions: mapRef.current ? {
+        width: mapRef.current.clientWidth,
+        height: mapRef.current.clientHeight
+      } : null
+    });
+    
+    if (!allBusinesses || allBusinesses.length === 0) {
+      console.log('❌ No businesses available for DeckGL layers (cache + hook)');
+      return [];
+    }
 
     try {
-      let businessesToRender = cachedBusinesses;
+      let businessesToRender = allBusinesses;
       
       // Handle clustered data efficiently
       if (isClusteredData && Array.isArray(businesses) && businesses.length > 0) {
@@ -559,6 +584,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         console.log(`🎯 Rendering ${visibleBusinesses.length} visible + ${bufferBusinesses.length - visibleBusinesses.length} buffer businesses`);
       }
 
+      console.log(`✅ Creating DeckGL layer with ${businessesToRender.length} businesses`);
+      
       return [createBusinessScatterplotLayer({
         businesses: businessesToRender,
         selectedBusinessId: selectedBusiness?.id,
@@ -568,11 +595,43 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.error('Error creating DeckGL layers:', error);
       return [];
     }
-  }, [selectedBusiness?.id, isClusteredData, businesses, handleBusinessClick, map, mapLoaded]);
+  }, [businesses, selectedBusiness?.id, isClusteredData, handleBusinessClick, map, mapLoaded]);
 
   // Initialize map with optimized configuration
   useEffect(() => {
+    console.log('🔄 MapLibre useEffect triggered', { 
+      hasContainer: !!mapRef.current, 
+      hasMap: !!map,
+      isCapacitor: isCapacitor(),
+      containerDimensions: mapRef.current ? {
+        width: mapRef.current.clientWidth,
+        height: mapRef.current.clientHeight
+      } : null
+    });
+    
     if (!mapRef.current || map) return;
+
+    // Ensure container has minimum dimensions before creating map
+    const container = mapRef.current;
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+    
+    console.log('🔧 Container dimensions check:', { containerWidth, containerHeight });
+    
+    if (containerWidth < 100 || containerHeight < 100) {
+      console.warn('⚠️ Container too small, waiting for proper sizing:', { containerWidth, containerHeight });
+      // Retry after a brief delay to allow layout to complete
+      const retryTimer = setTimeout(() => {
+        if (mapRef.current && !map) {
+          const newWidth = mapRef.current.clientWidth;
+          const newHeight = mapRef.current.clientHeight;
+          console.log('🔄 Retrying map creation with dimensions:', { newWidth, newHeight });
+          // Trigger a re-render by updating a dummy state
+          setMapLoaded(false);
+        }
+      }, 100);
+      return () => clearTimeout(retryTimer);
+    }
 
     // Comprehensive tile configuration for different environments
     const createTileSource = () => {
@@ -598,19 +657,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     // Create appropriate map style based on environment
     const createMapStyle = () => {
       if (isCapacitor()) {
-        // For Capacitor, use a simple raster-based style
+        // For Capacitor, use a more reliable raster-based style with better error handling
+        console.log('🔧 Creating Capacitor raster map style');
         return {
           version: 8 as const,
           sources: {
             'osm': {
               type: 'raster' as const,
               tiles: [
-                'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
+                'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
               ],
               tileSize: 256,
-              attribution: '© OpenStreetMap contributors'
+              attribution: '© OpenStreetMap contributors',
+              maxzoom: 19
             }
           },
           layers: [
@@ -624,7 +683,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               type: 'raster' as const,
               source: 'osm',
               minzoom: 0,
-              maxzoom: 18
+              maxzoom: 19
             }
           ]
         };
@@ -638,7 +697,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         return {
           version: 8 as const,
           sources: {
-            'nyc-tiles': vectorSource
+            'nyc-tiles': vectorSource,
+            // Add fallback raster source for reliability
+            'fallback-raster': {
+              type: 'raster' as const,
+              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+              tileSize: 256,
+              attribution: '© OpenStreetMap contributors',
+              maxzoom: 19
+            }
           },
           glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
           layers: [
@@ -646,6 +713,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               id: 'background',
               type: 'background' as const,
               paint: { 'background-color': '#F5F5DC' }
+            },
+            // Add a fallback raster layer that's initially invisible
+            {
+              id: 'fallback-base',
+              type: 'raster' as const,
+              source: 'fallback-raster',
+              layout: { visibility: 'none' as const }, // Hidden by default
+              minzoom: 0,
+              maxzoom: 19
             }
           ]
         };
@@ -663,12 +739,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       href: window.location.href
     });
 
+    console.log('🗺️ Creating MapLibre instance with style:', {
+      version: mapStyle.version,
+      sourceCount: Object.keys(mapStyle.sources).length,
+      sources: Object.keys(mapStyle.sources),
+      layerCount: mapStyle.layers.length,
+      hasGlyphs: !!mapStyle.glyphs
+    });
+
     const mapInstance = new maplibregl.Map({
       container: mapRef.current!,
       style: mapStyle,
       center: [-73.986104, 40.715245],
       zoom: 12.77,
-      maxZoom: 18,
+      maxZoom: isCapacitor() ? 19 : 18,
       minZoom: 9,
       renderWorldCopies: false,
       attributionControl: false,
@@ -677,19 +761,48 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         if (resourceType === 'Tile') {
           console.log('🔧 Tile request:', { url, resourceType, isCapacitor: isCapacitor() });
         }
+        
+        // For Capacitor, ensure HTTPS requests
+        if (isCapacitor() && url.startsWith('http://')) {
+          const httpsUrl = url.replace('http://', 'https://');
+          console.log('🔒 Converting to HTTPS for Capacitor:', httpsUrl);
+          return { url: httpsUrl };
+        }
+        
         return { url };
       }
     });
     
+    console.log('✅ MapLibre instance created successfully');
+    
+    // Immediately set bounds after creation
+    console.log('🗺️ Setting map bounds for NYC region...');
     mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
+    
+    // Test basic map functionality
+    console.log('🧪 Testing map methods:', {
+      getZoom: mapInstance.getZoom(),
+      getCenter: mapInstance.getCenter(),
+      isStyleLoaded: mapInstance.isStyleLoaded()
+    });
 
     // Enhanced error handling and loading
     mapInstance.on('error', (e) => {
       console.error('🚨 Map error:', e.error);
     });
 
+    // Add fallback timer to ensure map loads even if 'load' event doesn't fire
+    const loadFallbackTimer = setTimeout(() => {
+      if (!mapLoaded) {
+        console.log('⏰ Map load fallback timer - forcing mapLoaded to true');
+        setMapLoaded(true);
+        callbackRefs.current.onMapLoaded?.();
+      }
+    }, 2000); // 2 second fallback
+
     mapInstance.on('load', () => {
-      console.log('🗺️ Map loaded successfully');
+      console.log('🗺️ Map loaded successfully via load event');
+      clearTimeout(loadFallbackTimer);
       setMapLoaded(true);
       callbackRefs.current.onMapLoaded?.();
       
@@ -835,24 +948,65 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     // Add map layers when ready with environment-specific handling
     mapInstance.on('sourcedata', (e) => {
       if (isCapacitor()) {
-        // For Capacitor with raster tiles, no additional layers needed
-        // The OSM raster layer provides the base map
+        // For Capacitor with raster tiles
         if (e.sourceId === 'osm' && e.isSourceLoaded && !layersAddedRef.current) {
           console.log('✅ Capacitor raster tiles loaded successfully');
           layersAddedRef.current = true;
+        } else if (e.sourceId === 'osm') {
+          console.log('🔄 OSM source event:', {
+            sourceId: e.sourceId,
+            isSourceLoaded: e.isSourceLoaded,
+            layersAdded: layersAddedRef.current
+          });
         }
         return;
       }
       
       // For web environment with vector tiles
       if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
-        console.log('🔄 Source data loaded, adding vector layers via sourcedata event...');
+        console.log('🔄 NYC tiles source loaded, adding vector layers via sourcedata event...');
         addVectorLayers(mapInstance);
+      } else if (e.sourceId === 'nyc-tiles') {
+        console.log('🔄 NYC tiles sourcedata event:', {
+          sourceId: e.sourceId,
+          isSourceLoaded: e.isSourceLoaded,
+          layersAdded: layersAddedRef.current
+        });
       }
     });
 
+    // Additional mobile-specific event handlers
+    if (isCapacitor()) {
+      mapInstance.on('data', (e: any) => {
+        if (e.dataType === 'source' && e.sourceId === 'osm') {
+          console.log('📊 OSM data event:', {
+            dataType: e.dataType,
+            sourceId: e.sourceId,
+            isSourceLoaded: e.isSourceLoaded
+          });
+        }
+      });
+
+      mapInstance.on('dataloading', (e: any) => {
+        if (e.dataType === 'source' && e.sourceId === 'osm') {
+          console.log('⏳ OSM data loading:', e.sourceId);
+        }
+      });
+    }
+
+    console.log('🗺️ Map instance created, setting up event listeners...');
+    console.log('🗺️ Map container dimensions:', {
+      width: mapRef.current?.clientWidth,
+      height: mapRef.current?.clientHeight
+    });
+    
+    console.log('🗺️ Map instance created, setting up event listeners...');
+    console.log('🗺️ Map container dimensions:', {
+      width: mapRef.current?.clientWidth,
+      height: mapRef.current?.clientHeight
+    });
+    
     setMap(mapInstance);
-    console.log('🗺️ Map instance created');
 
     return () => {
       // Cleanup
@@ -1052,8 +1206,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         right: 0,
         width: '100%',
         height: '100%',
+        minWidth: '250px', // Increased minimum width for mobile compatibility
+        minHeight: '300px', // Increased minimum height for mobile compatibility
         zIndex: 1,
-        backgroundColor: '#B3E5FC'
+        backgroundColor: '#B3E5FC',
+        overflow: 'hidden' // Prevent scrollbars on small screens
       }}
     />
   );

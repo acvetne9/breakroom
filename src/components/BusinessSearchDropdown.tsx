@@ -19,6 +19,7 @@ interface BusinessSearchDropdownProps {
   onAddressChange?: (address: string) => void;
   onCreateBusiness?: () => void;
   isCreatingBusiness?: boolean;
+  onSelect?: (business: any) => void;
 }
 
 const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
@@ -34,7 +35,8 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
   newBusinessAddress: externalAddress = "",
   onAddressChange,
   onCreateBusiness: externalCreateBusiness,
-  isCreatingBusiness: externalIsCreating = false
+  isCreatingBusiness: externalIsCreating = false,
+  onSelect
 }) => {
   const { businesses, setBusinesses } = useBusinessesData();
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -135,6 +137,7 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
     onChange(business.name, business.formatted_address || business.vicinity || business.name);
     setShowDropdown(false);
     setInternalShowAddForm(false);
+    onSelect?.(business);
   };
 
   const handleInputBlur = () => {
@@ -290,12 +293,12 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
         className={className}
       />
       
-      {/* Tiny text bottom left - only show when business not found */}
+      {/* Tiny text bottom left - only show when business not found 
       {businessNotFound && (
         <div className="absolute -bottom-5 left-0 text-xs text-muted-foreground">
           Business not found - fill address below
         </div>
-      )}
+      )} */}
 
       {/* Search Results Dropdown */}
       {showDropdown && searchResults.length > 0 && (
