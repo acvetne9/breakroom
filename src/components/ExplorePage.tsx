@@ -34,6 +34,7 @@ interface ExplorePageProps {
   onPostVote?: (postId: string, voteType: 'up' | 'down') => void;
   onPostDelete?: (postId: string) => void;
   onNavigateToHomeBusiness?: (businessId: string) => void; // New prop for navigation
+  onBusinessPreview?: (businessId: string) => void; // New prop for business preview
 }
 
 const ExplorePage: React.FC<ExplorePageProps> = memo(({
@@ -47,7 +48,8 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   onBackToAllPosts,
   onPostVote,
   onPostDelete,
-  onNavigateToHomeBusiness
+  onNavigateToHomeBusiness,
+  onBusinessPreview
 }) => {
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
@@ -259,18 +261,11 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                       }`}
                     />
                     <div className="flex-shrink-0 w-8 flex justify-center mt-1 my-0">
-                      {(post.businessId || post.isJobUpdate) && (
+                      {post.businessId && (
                         <button
                           onClick={e => {
                             e.stopPropagation();
-                            if (post.businessId) {
-                              handleBusinessView(post.businessId);
-                            } else if (post.linkedLocation) {
-                              toast({
-                                title: "Location",
-                                description: post.linkedLocation
-                              });
-                            }
+                            handleBusinessView(post.businessId);
                           }}
                           className="flex items-center space-x-1 text-app-gray-medium hover:text-app-black"
                         >
