@@ -727,6 +727,21 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
   
       mapRef.current = mapInstance;
+      
+      // Set bounds after storing in ref
+      try {
+        console.log('🗺️ Setting map bounds for NYC region...');
+        mapRef.current.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
+        
+        // Test basic map functionality
+        console.log('🧪 Testing map methods:', {
+          getZoom: mapRef.current.getZoom(),
+          getCenter: mapRef.current.getCenter(),
+          isStyleLoaded: mapRef.current.isStyleLoaded()
+        });
+      } catch (error) {
+        console.error('Error setting up map:', error);
+      }
     };
   
     initializeMap();
@@ -765,21 +780,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         }
       }, 100);
       return () => clearTimeout(retryTimer);
-    }
-    
-    // Set bounds after storing in ref
-    try {
-      console.log('🗺️ Setting map bounds for NYC region...');
-      mapRef.current.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
-      
-      // Test basic map functionality
-      console.log('🧪 Testing map methods:', {
-        getZoom: mapRef.current.getZoom(),
-        getCenter: mapRef.current.getCenter(),
-        isStyleLoaded: mapRef.current.isStyleLoaded()
-      });
-    } catch (error) {
-      console.error('Error setting up map:', error);
     }
 
     // Enhanced error handling and loading with validation
