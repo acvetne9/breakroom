@@ -14,13 +14,41 @@ export interface SearchFilters {
   neighborhoodFilter?: NeighborhoodBounds;
 }
 
+function findNeighborhoodBoundaryByName(name: string) {
+  if (!name) return null;
+  const normalized = name.trim().toLowerCase();
+  for (const borough of Object.keys(nycNeighborhoodBoundaries)) {
+    for (const n of Object.keys(nycNeighborhoodBoundaries[borough])) {
+      if (n.toLowerCase() === normalized) {
+        return {
+          borough,
+          name: n,
+          boundary: nycNeighborhoodBoundaries[borough][n]
+        };
+      }
+    }
+  }
+  return null;
+}
+
 export function parseSearchFilters(searchQuery: string): SearchFilters | null {
   console.log('🔍 [parseSearchFilters] Input query:', searchQuery);
   
   if (!searchQuery.trim()) return null;
 
   // Check for neighborhood first
-  const neighborhood = findNeighborhood(searchQuery);
+  const neighborhood = findNeighborhoodBoundaryByName(query);
+  if (neighborhood) {
+    filters.neighborhoodFilter = neighborhood;
+
+    // Add center for map panning
+    const lats = neighborhood.boundary.map(p => p.lat);
+    const lons = neighborhood.boundary.map(p => p.lon);
+    filters.neighborhoodFilter.center = {
+      lat: (Math.min(...lats) + Math.max(...lats)) / 2,
+      lon: (Math.min(...lons) + Math.max(...lons)) / 2,
+    };
+  }
   
   const { salaryQuery, textTerms } = parseSearchTerms(searchQuery);
   console.log('🔍 [parseSearchFilters] Parsed terms - salaryQuery:', salaryQuery, 'textTerms:', textTerms);

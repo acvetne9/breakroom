@@ -32,6 +32,23 @@ interface HomePageProps {
   onLocationSave?: (location: string, fullLocation: string) => void;
 }
 
+const handleNeighborhoodSearch = (query: string) => {
+  const neighborhood = findNeighborhoodBoundaryByName(query);
+
+  if (neighborhood) {
+    setSearchFilters(prev => ({
+      ...prev,
+      neighborhoodFilter: neighborhood, // { borough, name, boundary: [...] }
+    }));
+  } else {
+    console.warn("⚠️ No neighborhood found for:", query);
+    setSearchFilters(prev => ({
+      ...prev,
+      neighborhoodFilter: null,
+    }));
+  }
+};
+
 const HomePage: React.FC<HomePageProps> = ({ 
   currentSlide = 1,
   currentView = 'main',
