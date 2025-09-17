@@ -724,47 +724,44 @@ export function findNeighborhood(searchTerm: string): NeighborhoodBounds | null 
   return null;
 }
 
+// Ray-casting algorithm to check if a point is inside a polygon
+export function isPointInPolygon(
+  point: { lat: number; lon: number }, 
+  polygon: { lat: number; lon: number }[]
+): boolean {
+  let inside = false;
+  const x = point.lon;
+  const y = point.lat;
+  
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].lon, yi = polygon[i].lat;
+    const xj = polygon[j].lon, yj = polygon[j].lat;
+
+    const intersect = ((yi > y) !== (yj > y)) &&
+                      (x < (xj - xi) * (y - yi) / (yj - yi + 0.000000001) + xi);
+    if (intersect) inside = !inside;
+  }
+
+  return inside;
+}
+
 // Filter businesses within neighborhood rectangular bounds with generous padding
 export function filterBusinessesByNeighborhood(
   businesses: Business[], 
   neighborhoodBounds: NeighborhoodBounds
 ): Business[] {
-  // Create rectangular bounds from the neighborhood boundary points
-  const lats = neighborhoodBounds.boundary.map(p => p.lat);
-  const lons = neighborhoodBounds.boundary.map(p => p.lon);
+  const polygon = neighborhoodBounds.boundary;
   
-  // Use much more generous padding to capture all businesses in the broader neighborhood area
-  const latPadding = 0.050; // ~5km padding - much more generous
-  const lonPadding = 0.060; // ~6km padding - adjusted for longitude, very generous
-  
-  const rectBounds = {
-    north: Math.max(...lats) + latPadding,
-    south: Math.min(...lats) - latPadding,
-    east: Math.max(...lons) + lonPadding,
-    west: Math.min(...lons) - lonPadding
-  };
-  
-  console.log('🏙️ [filterBusinessesByNeighborhood] Neighborhood:', neighborhoodBounds.name);
-  console.log('🏙️ [filterBusinessesByNeighborhood] Original boundary points:', neighborhoodBounds.boundary.length);
-  console.log('🏙️ [filterBusinessesByNeighborhood] Generous rectangular bounds:', rectBounds);
-  console.log('🏙️ [filterBusinessesByNeighborhood] Total businesses to filter:', businesses.length);
-  
-  const filtered = businesses.filter(business => {
-    if (!business.position?.lat || !business.position?.lng) return false;
-    
-    const lat = business.position.lat;
-    const lng = business.position.lng;
-    
-    // Very inclusive rectangular bounds check - capture all businesses within the generous area
-    const inBounds = lat <= rectBounds.north && 
-                     lat >= rectBounds.south && 
-                     lng <= rectBounds.east && 
-                     lng >= rectBounds.west;
-    
-    return inBounds;
+  console.log('🏙️ Filtering businesses using polygon for neighborhood:', neighborhoodBounds.name);
+  console.log('🏙️ Polygon points:', polygon.length);
+  console.log('🏙️ Total businesses to check:', businesses.length);
+
+  const filtered = businesses.filter(b => {
+    if (!b.position?.lat || !b.position?.lng) return false;
+    return isPointInPolygon({ lat: b.position.lat, lon: b.position.lng }, polygon);
   });
-  
-  console.log('🏙️ [filterBusinessesByNeighborhood] Businesses found in area:', filtered.length);
+
+  console.log('🏙️ Businesses inside polygon:', filtered.length);
   return filtered;
 }
 
