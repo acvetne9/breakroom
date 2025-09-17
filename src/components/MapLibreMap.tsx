@@ -432,49 +432,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const map = mapRef.current;
 
     // If neighborhood search is active, load businesses within neighborhood bounds
-    if (searchFilters?.neighborhoodFilter) {
-      console.log('🏙️ Neighborhood filter active, loading businesses within neighborhood bounds');
-      
-      // Create neighborhood bounds from the boundary points with padding
-      const boundary = searchFilters.neighborhoodFilter.boundary;
+    if (searchFilters?.neighborhoodFilter?.boundary?.length > 0) {
+      const { boundary, name } = searchFilters.neighborhoodFilter;
+      console.log("📍 Loading businesses within neighborhood boundary:", name);
+    
       const lats = boundary.map(p => p.lat);
       const lons = boundary.map(p => p.lon);
-      
-      // Add padding to ensure we capture all businesses in the area
-      const latPadding = 0.015; // ~1.5km padding
-      const lonPadding = 0.020; // ~1.5km padding (adjusted for longitude)
-      
-      const neighborhoodBounds: Bounds = {
-        north: Math.max(...lats) + latPadding,
-        south: Math.min(...lats) - latPadding,
-        east: Math.max(...lons) + lonPadding,
-        west: Math.min(...lons) - lonPadding
-      };
-      
-      try {
-        isLoadingRef.current = true;
-        const zoom = map.getZoom();
-        const businessLimit = getBusinessLimitForViewport(zoom, neighborhoodBounds);
-        
-        console.log('🏙️ Loading neighborhood businesses:', {
-          neighborhood: searchFilters.neighborhoodFilter.name,
-          bounds: neighborhoodBounds,
-          businessLimit
-        });
-        
-        const neighborhoodBusinesses = await loadBusinessesInViewport(neighborhoodBounds, businessLimit);
-        
-        if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length > 0) {
-          console.log(`✅ Loaded ${neighborhoodBusinesses.length} businesses for ${searchFilters.neighborhoodFilter.name}`);
-          businessCacheRef.current.addMultiple(neighborhoodBusinesses);
-        }
-        
-      } catch (error) {
-        console.error('❌ Error loading neighborhood businesses:', error);
-      } finally {
-        isLoadingRef.current = false;
-      }
-      return;
+      const neighborhoodBounds = [
+        [Math.min(...lons), Math.min(...lats)],
+        [Math.max(...lons), Math.max(...lats)],
+      ];
+    
+      const neighborhoodBusinesses = await loadBusinessesInViewport(neighborhoodBounds, businessLimit);
+      businessCacheRef.current.addMultiple(neighborhoodBusinesses);
+      return; // ✅ don’t fall through to viewport fetch
     }
 
     // Regular viewport-based loading for non-neighborhood searches

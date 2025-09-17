@@ -68,10 +68,16 @@ const HomePage: React.FC<HomePageProps> = ({
           lat: filters.neighborhoodFilter.center.lat,
           lon: filters.neighborhoodFilter.center.lon
         };
-        console.log('🏙️ Setting neighborhood center from trigger:', neighborhoodCoords);
         setNeighborhoodCenter(neighborhoodCoords);
-      } else {
-        setNeighborhoodCenter(null);
+      
+        // Ensure the boundary gets passed through
+        if (!filters.neighborhoodFilter.boundary && filters.neighborhoodFilter.name) {
+          // Lookup polygon by neighborhood name
+          const polygon = getNeighborhoodBoundary(filters.neighborhoodFilter.name); 
+          if (polygon) {
+            filters.neighborhoodFilter.boundary = polygon;
+          }
+        }
       }
       setSearchFilters(filters);
       setSearchCompleted(true); // Mark search as completed
