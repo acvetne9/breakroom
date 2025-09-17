@@ -504,8 +504,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         const currentArea = (bounds.north - bounds.south) * (bounds.east - bounds.west);
         const overlap = currentArea > 0 ? (overlapLat * overlapLng) / currentArea : 0;
         
-        // More lenient conditions: skip only if very recent AND very little change
-        if (overlap > 0.85 && Math.abs(zoom - lastZoom) < 0.3 && timeSinceLastLoad < 2000) {
+        // Only skip if very recent AND minimal change (much more lenient for initial loads)
+        if (overlap > 0.95 && Math.abs(zoom - lastZoom) < 0.1 && timeSinceLastLoad < 1000) {
           console.log('📍 Viewport change too small, skipping business reload', {
             overlap: overlap.toFixed(2),
             zoomDiff: Math.abs(zoom - lastZoom).toFixed(2),
@@ -656,10 +656,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Initialize map once
+  // Initialize map once - CRITICAL: Empty deps to prevent re-initialization
   useEffect(() => {
     const initializeMap = async () => {
-      console.log('🔄 MapLibre useEffect triggered - SHOULD ONLY RUN ONCE', { 
+      console.log('🔄 MapLibre initialization starting - SHOULD ONLY RUN ONCE', { 
         hasContainer: !!mapContainerRef.current, 
         hasMap: !!mapRef.current,
         containerDimensions: mapContainerRef.current ? {
@@ -710,7 +710,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         sources: {
           'nyc-tiles': vectorSource
         },
-        glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
+        // Remove glyphs to prevent DataCloneError and font loading crashes
         layers: [
           {
             id: 'background',
@@ -724,8 +724,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         version: mapStyle.version,
         sourceCount: Object.keys(mapStyle.sources).length,
         sources: Object.keys(mapStyle.sources),
-        layerCount: mapStyle.layers.length,
-        hasGlyphs: !!mapStyle.glyphs
+        layerCount: mapStyle.layers.length
       });
 
       try {
@@ -745,9 +744,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         // Set up viewport change handler ref
         handleViewportChangeRef.current = handleViewportChange;
 
-        // Add error handling for map errors
+        // Add comprehensive error handling for map errors
         mapInstance.on('error', (e) => {
-          console.error('Map error:', e.error);
+          console.error('MapLibre error (non-critical):', e.error?.message || e.error);
+          // Don't re-throw font/glyph errors as they're non-critical
         });
 
         // Map event listeners
@@ -764,30 +764,32 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             addVectorLayers(mapInstance);
           }
 
-          // Load initial businesses after map is ready
+          // Load initial businesses after map is ready - shorter delay
           setTimeout(() => {
             console.log('🏢 Loading initial businesses...');
             if (handleViewportChangeRef.current) {
               handleViewportChangeRef.current();
             }
-          }, 1000);
+          }, 500);
         });
 
-        // Fallback timer
+        // Fallback timer - reduced time and better handling
         setTimeout(() => {
           if (!mapLoaded) {
-            console.log('Map load fallback timer - forcing mapLoaded to true');
+            console.log('⏱️ Map load fallback timer - forcing mapLoaded to true');
             setMapLoaded(true);
             if (callbackRefs.current.onMapLoaded) {
               callbackRefs.current.onMapLoaded();
             }
+            // Load businesses immediately after fallback
+            setTimeout(() => {
+              console.log('🏢 Fallback: Loading businesses after timer...');
+              if (handleViewportChangeRef.current) {
+                handleViewportChangeRef.current();
+              }
+            }, 100);
           }
-          // Also try to load businesses after fallback timer
-          console.log('🏢 Fallback: Loading businesses after timer...');
-          if (handleViewportChangeRef.current) {
-            handleViewportChangeRef.current();
-          }
-        }, 3000);
+        }, 2000); // Reduced from 3000ms to 2000ms
 
         // Viewport change handlers
         const debouncedMoveHandler = (() => {
