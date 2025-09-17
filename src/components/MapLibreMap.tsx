@@ -441,7 +441,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const polygon: [number, number][] = boundary.map(p => [p.lon, p.lat]);
     
       // Pass polygon directly to your fetch
-      const neighborhoodBusinesses = await loadBusinessesInViewport(polygon, businessLimit);
+      const neighborhoodBusinesses = await loadBusinessesInViewport(polygonCoords, businessLimit);
     
       businessCacheRef.current.addMultiple(neighborhoodBusinesses);
       return; // ✅ do not fall back to rectangular viewport fetch
