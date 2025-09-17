@@ -10,6 +10,8 @@ const inflightRequests = new Map<string, Promise<Business[]>>();
 const detailsCache = new Map<string, Business>();
 const MAX_DETAILS_CACHE = 200;
 
+type MapBoundsOrPolygon = MapBounds | [number, number][];
+
 interface MapBounds {
   north: number;
   south: number;
@@ -90,7 +92,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
     }, 1000); // Preload after 1 second of inactivity
   }, [getCachedBusinesses, setCachedBusinesses]);
 
-  const loadBusinessesInViewport = useCallback(async (bounds: MapBounds, limit: number = 8000, isMoving: boolean = false) => {
+  const loadBusinessesInViewport = useCallback(async (bounds: MapBoundsOrPolygon, limit: number = 8000, isMoving: boolean = false) => {
     console.log('🗺️ [loadBusinessesInViewport] Called with bounds:', bounds);
     console.log('🗺️ [loadBusinessesInViewport] searchFilters parameter in hook:', searchFilters);
     console.log('🗺️ [loadBusinessesInViewport] searchFilters detailed state:', { 
