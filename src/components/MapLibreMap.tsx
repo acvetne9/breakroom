@@ -12,6 +12,7 @@ import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods';
 import type { GeoJSONFeature } from 'maplibre-gl';
 import type { Business } from '@/types/business';
 import * as turf from '@turf/turf';
+import type { Feature, Point } from 'geojson';
 
 interface MapLibreMapProps {
   onBusinessClick?: (business: any) => void;
@@ -42,14 +43,11 @@ interface ViewportState {
 let overlayInstance: MapboxOverlay | null = null;
 
 // Convert GeoJSON Point Feature -> { lat, lon }
-const featureToLatLon = (feature: turf.Feature<turf.Point> | { lat: number; lon: number }) => {
+const featureToLatLon = (feature: Feature<Point> | { lat: number; lon: number }) => {
   if ('geometry' in feature && feature.geometry?.type === 'Point') {
     return { lat: feature.geometry.coordinates[1], lon: feature.geometry.coordinates[0] };
   }
-  // Already { lat, lon }?
-  if ('lat' in feature && 'lon' in feature) {
-    return feature;
-  }
+  if ('lat' in feature && 'lon' in feature) return feature;
   throw new Error('Invalid feature for conversion to lat/lon');
 };
 
@@ -361,8 +359,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       const businessLimit = getBusinessLimitForViewport(zoom, bounds);
       try {
-        const converted = featureToLatLon(boundaryPoint);
-        const neighborhoodBusinesses = await loadBusinessesInViewport?.(converted);
+        const convertedBoundaryPoints = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
+        const neighborhoodBusinesses = await loadBusinessesInViewport?.(convertedBoundaryPoints);
         if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length) {
           // optional: clip results precisely to polygon
           const polygonCoords = boundary.map((p: any) => [p.lon, p.lat]);
@@ -381,12 +379,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
 
     // Regular rectangular viewport
-    const currentBounds = map.getBounds();
+    const lats = convertedBoundaryPoints.map(p => p.lat);
+    const lons = convertedBoundaryPoints.map(p => p.lon);
     const bounds: Bounds = {
-      north: currentBounds.getNorth(),
-      south: currentBounds.getSouth(),
-      east: currentBounds.getEast(),
-      west: currentBounds.getWest()
+      north: Math.max(...lats) + 0.015,
+      south: Math.min(...lats) - 0.015,
+      east: Math.max(...lons) + 0.02,
+      west: Math.min(...lons) - 0.02
     };
     const businessLimit = getBusinessLimitForViewport(zoom, bounds);
     try {
