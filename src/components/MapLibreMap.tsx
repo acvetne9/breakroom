@@ -378,15 +378,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return; // stop here (don't also request rectangular viewport)
     }
 
-    // Regular rectangular viewport
-    const lats = convertedBoundaryPoints.map(p => p.lat);
-    const lons = convertedBoundaryPoints.map(p => p.lon);
-    const bounds: Bounds = {
-      north: Math.max(...lats) + 0.015,
-      south: Math.min(...lats) - 0.015,
-      east: Math.max(...lons) + 0.02,
-      west: Math.min(...lons) - 0.02
-    };
     const businessLimit = getBusinessLimitForViewport(zoom, bounds);
     try {
       const viewportBusinesses = await loadBusinessesInViewport?.(bounds, businessLimit);
@@ -398,6 +389,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters]);
 
+  
   // DeckGL layers (scatterplot only). Pass the layer factory the object it expects.
   const deckGLLayers = useMemo(() => {
     try {
