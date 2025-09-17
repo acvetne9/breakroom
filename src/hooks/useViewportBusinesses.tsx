@@ -109,7 +109,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
       inflightRequests.set(requestKey, requestPromise);
 
       try {
-        let viewportBusinesses = await getBusinessesInViewport(bounds, limit, searchFilters, undefined, zoom);
+        let viewportBusinesses = await getBusinessesInViewport(viewportBounds, limit, searchFilters, undefined, zoom);
 
         // If a neighborhood polygon exists, only keep businesses inside
         if (searchPolygon) {
