@@ -642,10 +642,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Initialize map with createTileBlobUrl
+  // Initialize map once
   useEffect(() => {
     const initializeMap = async () => {
-      console.log('🔄 MapLibre useEffect triggered', { 
+      console.log('🔄 MapLibre useEffect triggered - SHOULD ONLY RUN ONCE', { 
         hasContainer: !!mapContainerRef.current, 
         hasMap: !!mapRef.current,
         containerDimensions: mapContainerRef.current ? {
@@ -654,7 +654,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         } : null
       });
       
-      if (!mapContainerRef.current || mapRef.current) return;
+      // Prevent multiple initializations
+      if (!mapContainerRef.current || mapRef.current) {
+        console.log('🚫 Skipping map initialization - already exists or no container');
+        return;
+      }
 
       // Ensure container has minimum dimensions
       const container = mapContainerRef.current;
@@ -741,7 +745,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             callbackRefs.current.onMapLoaded();
           }
 
-          // Add vector layers after load
+          // Add vector layers after load using the stable callback
           if (!layersAddedRef.current) {
             addVectorLayers(mapInstance);
           }
@@ -749,7 +753,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           // Load initial businesses after map is ready
           setTimeout(() => {
             console.log('🏢 Loading initial businesses...');
-            handleViewportChangeRef.current();
+            if (handleViewportChangeRef.current) {
+              handleViewportChangeRef.current();
+            }
           }, 1000);
         });
 
@@ -764,7 +770,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
           // Also try to load businesses after fallback timer
           console.log('🏢 Fallback: Loading businesses after timer...');
-          handleViewportChangeRef.current();
+          if (handleViewportChangeRef.current) {
+            handleViewportChangeRef.current();
+          }
         }, 3000);
 
         // Viewport change handlers
@@ -773,7 +781,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           return () => {
             clearTimeout(timeout);
             timeout = setTimeout(() => {
-              if (mapRef.current && typeof mapRef.current.getBounds === 'function') {
+              if (mapRef.current && typeof mapRef.current.getBounds === 'function' && handleViewportChangeRef.current) {
                 handleViewportChangeRef.current();
               }
             }, 150);
@@ -781,12 +789,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         })();
 
         mapInstance.on('moveend', () => {
-          if (mapRef.current && typeof mapRef.current.getBounds === 'function') {
+          if (mapRef.current && typeof mapRef.current.getBounds === 'function' && handleViewportChangeRef.current) {
             handleViewportChangeRef.current();
           }
         });
         mapInstance.on('zoomend', () => {
-          if (mapRef.current && typeof mapRef.current.getBounds === 'function') {
+          if (mapRef.current && typeof mapRef.current.getBounds === 'function' && handleViewportChangeRef.current) {
             handleViewportChangeRef.current();
           }
         });
@@ -795,7 +803,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         // Add layers when source is ready
         mapInstance.on('sourcedata', (e) => {
           if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
-            console.log('NYC tiles source loaded, adding vector layers...');
+            console.log('NYC tiles source loaded, adding vector layers via sourcedata event...');
             addVectorLayers(mapInstance);
           }
         });
@@ -836,8 +844,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         try { marker.remove(); } catch {}
       });
       
+      // Clean up DeckGL overlay
+      if (overlayInstance && mapRef.current) {
+        try {
+          mapRef.current.removeControl(overlayInstance);
+          overlayInstance = null;
+        } catch (error) {
+          console.error('Error removing overlay:', error);
+        }
+      }
+      
       if (mapRef.current) {
         try {
+          console.log('🧹 Cleaning up map instance');
           mapRef.current.remove();
         } catch (error) {
           console.error('Error removing map:', error);
@@ -847,9 +866,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       businessCacheRef.current.clear();
       layersAddedRef.current = false;
       setMapLoaded(false);
+      setOverlayReady(false);
+      setDeckOverlay(null);
       mapRef.current = null;
     };
-  }, [addVectorLayers, handleViewportChange]);
+  }, []); // Empty dependency array - should only run once
 
   // Update DeckGL layers when they change
   useEffect(() => {
