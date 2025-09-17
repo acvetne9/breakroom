@@ -1,7 +1,7 @@
 // ---------------- NYC neighborhoods (approximate polygons) ----------------
 import { Business } from '@/types/business';
 
-interface NeighborhoodBounds {
+export interface NeighborhoodBounds {
   borough: string;
   name: string;
   boundary: any;
