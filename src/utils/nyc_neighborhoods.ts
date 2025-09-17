@@ -697,36 +697,25 @@ export function haversine(lat1: number, lon1: number, lat2: number, lon2: number
 }
 
 // Find neighborhood by name (case insensitive)
-export function findNeighborhood(searchTerm: string): NeighborhoodBounds | null {
-  const term = searchTerm.toLowerCase().trim();
-  
-  for (const [borough, neighborhoods] of Object.entries(nycNeighborhoods)) {
-    for (const neighborhood of neighborhoods) {
-      if (neighborhood.name.toLowerCase().includes(term) || term.includes(neighborhood.name.toLowerCase())) {
-        // Get boundary from nycNeighborhoodBoundaries if available, otherwise generate
-        let boundary = nycNeighborhoodBoundaries[borough]?.[neighborhood.name];
-        if (!boundary) {
-          // Get other neighborhoods in the same borough as neighbors
-          const neighbors = neighborhoods.filter(n => n.name !== neighborhood.name);
-          boundary = generateNeighborhoodBoundary(neighborhood, neighbors);
-        }
-        
+export function findNeighborhoodBoundaryByName(name: string) {
+  if (!name) return null;
+  const normalized = name.trim().toLowerCase();
+  for (const borough of Object.keys(nycNeighborhoodBoundaries)) {
+    for (const n of Object.keys(nycNeighborhoodBoundaries[borough])) {
+      if (n.toLowerCase() === normalized) {
         return {
-          name: neighborhood.name,
           borough,
-          center: { lat: neighborhood.lat, lon: neighborhood.lon },
-          boundary
+          name: n,
+          boundary: nycNeighborhoodBoundaries[borough][n]
         };
       }
     }
   }
-  
   return null;
 }
 
 // Ray-casting algorithm to check if a point is inside a polygon
-export // Utility: point in polygon (ray-casting)
-const isPointInPolygon = (point: { lat: number; lon: number }, polygon: { lat: number; lon: number }[]) => {
+export const isPointInPolygon = (point: { lat: number; lon: number }, polygon: { lat: number; lon: number }[]) => {
   let inside = false;
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
     const xi = polygon[i].lon, yi = polygon[i].lat;

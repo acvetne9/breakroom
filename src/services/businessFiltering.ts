@@ -1,6 +1,6 @@
 import { Business } from '@/types/business';
 import { parseSearchTerms } from '@/utils/searchUtils';
-import { findNeighborhood, nycNeighborhoodBoundaries, filterBusinessesByNeighborhood } from '@/utils/nyc_neighborhoods';
+import { findNeighborhoodBoundaryByName, nycNeighborhoodBoundaries, filterBusinessesByNeighborhood } from '@/utils/nyc_neighborhoods';
 import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods'
 
 export interface SearchFilters {
@@ -13,23 +13,6 @@ export interface SearchFilters {
   roleFilter?: string;
   businessTypeFilter?: string;
   neighborhoodFilter?: NeighborhoodBounds;
-}
-
-function findNeighborhoodBoundaryByName(name: string) {
-  if (!name) return null;
-  const normalized = name.trim().toLowerCase();
-  for (const borough of Object.keys(nycNeighborhoodBoundaries)) {
-    for (const n of Object.keys(nycNeighborhoodBoundaries[borough])) {
-      if (n.toLowerCase() === normalized) {
-        return {
-          borough,
-          name: n,
-          boundary: nycNeighborhoodBoundaries[borough][n]
-        };
-      }
-    }
-  }
-  return null;
 }
 
 export function parseSearchFilters(searchQuery: string): SearchFilters | null {
