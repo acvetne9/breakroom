@@ -725,7 +725,7 @@ export function findNeighborhood(searchTerm: string): NeighborhoodBounds | null 
 }
 
 // Ray-casting algorithm to check if a point is inside a polygon
-const isPointInPolygon = (point: { lat: number; lon: number }, polygon: { lat: number; lon: number }[]) => {
+export const isPointInPolygon = (point: { lat: number; lon: number }, polygon: { lat: number; lon: number }[]) => {
   let inside = false;
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
     const xi = polygon[i].lon, yi = polygon[i].lat;
