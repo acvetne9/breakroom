@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Business } from '@/types/business';
 import { getBusinessesInViewport, getFullBusinessDetails as getFullBusinessDetailsService } from '@/services/businesses';
 import { progressiveSearch } from '@/services/progressiveSearch';
+import { isPointInPolygon } from '@/utils/nyc_neighborhoods'
 import { useTileCache } from './useTileCache';
 import { useMapWorker } from './useMapWorker';
 
@@ -86,13 +87,13 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
 
     // Generate request key
     const filterKey = searchFilters ? JSON.stringify(searchFilters) : 'no-filter';
-    const requestKey = `${bounds.north}-${bounds.south}-${bounds.east}-${bounds.west}-${limit}-${filterKey}`;
+    const requestKey = `${viewportBounds.north}-${viewportBounds.south}-${viewportBounds.east}-${viewportBounds.west}-${limit}-${filterKey}`;
 
     if (inflightRequests.has(requestKey)) {
       try {
         const result = await inflightRequests.get(requestKey)!;
         setBusinesses(result);
-        setCurrentBounds(bounds);
+        setCurrentBounds(viewportBounds);
         return result;
       } catch (err) {
         console.error('In-flight request failed', err);
@@ -104,7 +105,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
 
     loadTimeoutRef.current = setTimeout(async () => {
       setLoading(true);
-      const requestPromise = getBusinessesInViewport(bounds, limit, searchFilters, undefined, zoom);
+      const requestPromise = getBusinessesInViewport(viewportBounds, limit, searchFilters, undefined, zoom);
       inflightRequests.set(requestKey, requestPromise);
 
       try {
@@ -113,16 +114,20 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
         // If a neighborhood polygon exists, only keep businesses inside
         if (searchPolygon) {
           viewportBusinesses = viewportBusinesses.filter(b =>
-            isPointInPolygon({ lat: b.lat, lon: b.lng }, searchPolygon!)
+            isPointInPolygon({ lat: b.position.lat, lon: b.position.lng }, searchPolygon)
           );
         }
-        
-        setBusinesses(searchPolygon ? viewportBusinesses : mergeWithExisting(viewportBusinesses));
 
+        setBusinesses(prev => {
+          const existingIds = new Set(prev.map(b => b.id));
+          const newBusinesses = viewportBusinesses.filter(b => !existingIds.has(b.id));
+          return [...prev, ...newBusinesses];
+        });
 
-        if (!searchFilters) setCachedBusinesses(bounds, viewportBusinesses);
-        setCurrentBounds(bounds);
-        if (!searchFilters) schedulePreload(bounds);
+        if (!searchFilters) setCachedBusinesses(viewportBounds, viewportBusinesses);
+        setCurrentBounds(viewportBounds);
+        if (!searchFilters) schedulePreload(viewportBounds);
+
 
         return viewportBusinesses;
       } catch (err) {
