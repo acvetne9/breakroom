@@ -420,7 +420,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Debounced viewport change handler
   const handleViewportChange = useCallback(async () => {
-    if (!mapRef.current || !mapLoaded || !loadBusinessesInViewport || isLoadingRef.current) return;
+    if (!mapRef.current || !mapLoaded || isLoadingRef.current) {
+      console.log('🚫 Viewport change skipped:', {
+        hasMap: !!mapRef.current,
+        mapLoaded,
+        isLoading: isLoadingRef.current
+      });
+      return;
+    }
 
     const map = mapRef.current;
 
@@ -489,6 +496,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       if (lastViewportRef.current) {
         const lastBounds = lastViewportRef.current.bounds;
         const lastZoom = lastViewportRef.current.zoom;
+        const timeSinceLastLoad = Date.now() - lastViewportRef.current.timestamp;
         
         // Calculate viewport overlap
         const overlapLat = Math.max(0, Math.min(bounds.north, lastBounds.north) - Math.max(bounds.south, lastBounds.south));
@@ -496,11 +504,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         const currentArea = (bounds.north - bounds.south) * (bounds.east - bounds.west);
         const overlap = currentArea > 0 ? (overlapLat * overlapLng) / currentArea : 0;
         
-        // Skip if viewport hasn't changed significantly
-        if (overlap > 0.7 && Math.abs(zoom - lastZoom) < 0.5) {
-          console.log('📍 Viewport change too small, skipping business reload');
+        // More lenient conditions: skip only if very recent AND very little change
+        if (overlap > 0.85 && Math.abs(zoom - lastZoom) < 0.3 && timeSinceLastLoad < 2000) {
+          console.log('📍 Viewport change too small, skipping business reload', {
+            overlap: overlap.toFixed(2),
+            zoomDiff: Math.abs(zoom - lastZoom).toFixed(2),
+            timeSinceLastLoad
+          });
           return;
         }
+      } else {
+        console.log('🎯 Initial viewport load - no previous viewport to compare');
       }
       
       lastViewportRef.current = currentViewport;
@@ -696,7 +710,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         sources: {
           'nyc-tiles': vectorSource
         },
-        glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+        glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
         layers: [
           {
             id: 'background',
@@ -893,15 +907,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [deckGLLayers, deckOverlay, overlayReady]);
 
-  // Load businesses when map becomes ready
+  // Load businesses when map becomes ready - STABLE VERSION
   useEffect(() => {
-    if (mapLoaded && mapRef.current && loadBusinessesInViewport) {
+    if (mapLoaded && mapRef.current) {
       console.log('🔄 Map is loaded, triggering initial business load...');
       setTimeout(() => {
-        handleViewportChangeRef.current();
+        if (handleViewportChangeRef.current) {
+          handleViewportChangeRef.current();
+        }
       }, 500);
     }
-  }, [mapLoaded, loadBusinessesInViewport]);
+  }, [mapLoaded]); // Only depend on mapLoaded, not loadBusinessesInViewport
   useEffect(() => {
     if (!mapRef.current || !neighborhoodCenter) return;
     
@@ -913,9 +929,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     });
   }, [neighborhoodCenter]);
 
-  // Load neighborhood businesses when search filters change
+  // Load neighborhood businesses when search filters change - STABLE VERSION
   useEffect(() => {
-    if (!mapRef.current || !mapLoaded || !searchFilters?.neighborhoodFilter || !loadBusinessesInViewport) return;
+    if (!mapRef.current || !mapLoaded || !searchFilters?.neighborhoodFilter) return;
     
     const loadNeighborhoodBusinesses = async () => {
       console.log('🏙️ Search filters changed, loading neighborhood businesses');
@@ -946,7 +962,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           businessLimit
         });
         
-        const neighborhoodBusinesses = await loadBusinessesInViewport(neighborhoodBounds, businessLimit);
+        const neighborhoodBusinesses = await loadBusinessesInViewport?.(neighborhoodBounds, businessLimit);
         
         if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length > 0) {
           console.log(`✅ Initially loaded ${neighborhoodBusinesses.length} businesses for ${searchFilters.neighborhoodFilter.name}`);
@@ -962,7 +978,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     
     // Small delay to ensure map is ready
     setTimeout(loadNeighborhoodBusinesses, 500);
-  }, [mapLoaded, searchFilters?.neighborhoodFilter, loadBusinessesInViewport, getBusinessLimitForViewport]);
+  }, [mapLoaded, searchFilters?.neighborhoodFilter]); // Removed unstable dependencies
 
   // Initialize DeckGL overlay
   useEffect(() => {
