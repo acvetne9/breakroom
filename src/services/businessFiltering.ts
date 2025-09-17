@@ -21,7 +21,7 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
   if (!searchQuery.trim()) return null;
 
   // Check for neighborhood first
-  const neighborhood = findNeighborhoodBoundaryByName(query);
+  const neighborhood = findNeighborhoodBoundaryByName(searchQuery);
   if (neighborhood) {
     filters.neighborhoodFilter = neighborhood;
 
