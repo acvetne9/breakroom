@@ -69,15 +69,7 @@ const HomePage: React.FC<HomePageProps> = ({
           lon: filters.neighborhoodFilter.center.lon
         };
         setNeighborhoodCenter(neighborhoodCoords);
-      
-        // Ensure the boundary gets passed through
-        if (!filters.neighborhoodFilter.boundary && filters.neighborhoodFilter.name) {
-          // Lookup polygon by neighborhood name
-          const polygon = getNeighborhoodBoundary(filters.neighborhoodFilter.name); 
-          if (polygon) {
-            filters.neighborhoodFilter.boundary = polygon;
-          }
-        }
+
       }
       setSearchFilters(filters);
       setSearchCompleted(true); // Mark search as completed
