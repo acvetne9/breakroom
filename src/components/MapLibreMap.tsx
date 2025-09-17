@@ -7,6 +7,7 @@ import { useViewportMapData } from '../hooks/useViewportMapData';
 import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
 import { useIsMobile } from '../hooks/use-mobile';
 import { createTileBlobUrl } from '@/utils/tileDecompression';
+import { isPointInPolygon } from '@/utils/nyc_neighborhoods'
 import type { GeoJSONFeature } from 'maplibre-gl';
 import type { Business } from '@/types/business';
 
@@ -500,7 +501,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           const turfPoly = turfPolygon([polyCoords]);
           visibleBusinesses = businessesToRender.filter(b => {
             const p = turfPoint([b.position.lng, b.position.lat]);
-            return booleanPointInPolygon(p, turfPoly);
+            return isPointInPolygon(p, turfPoly);
           });
         }
         
