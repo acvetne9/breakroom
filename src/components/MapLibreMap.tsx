@@ -1,4 +1,3 @@
-// src/components/MapLibreMap.tsx
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -7,7 +6,6 @@ import { createBusinessScatterplotLayer } from '@/utils/deckGLLayers';
 import { useViewportMapData } from '../hooks/useViewportMapData';
 import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
 import { createTileBlobUrl } from '@/utils/tileDecompression';
-import { isPointInPolygon } from '@/utils/nyc_neighborhoods';
 import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods';
 import type { GeoJSONFeature } from 'maplibre-gl';
 import type { Business } from '@/types/business';
@@ -385,7 +383,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           const clipped = neighborhoodBusinesses.filter(b => {
             if (!b?.position) return false;
             const pt = turf.point([b.position.lng, b.position.lat]);
-            return isPointInPolygon(pt, turfPoly);
+            return turf.booleanPointInPolygon(pt, turfPoly);
           });
           businessCacheRef.current.addMultiple(clipped);
         }
@@ -439,8 +437,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           const polygonCoords = searchFilters.neighborhoodFilter.boundary.map((p: any) => [p.lon, p.lat]);
           const turfPoly = turf.polygon([polygonCoords]);
           businessesToRender = businessesToRender.filter(b => {
+            if (!b?.position) return false;
             const pt = turf.point([b.position.lng, b.position.lat]);
-            return isPointInPolygon(pt, turfPoly);
+            return turf.booleanPointInPolygon(pt, turfPoly);
           });
         } else {
           // visible + buffer logic
