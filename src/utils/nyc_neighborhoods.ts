@@ -1,11 +1,11 @@
 // ---------------- NYC neighborhoods (approximate polygons) ----------------
 import { Business } from '@/types/business';
 
-export interface NeighborhoodBounds {
-  name: string;
+interface NeighborhoodBounds {
   borough: string;
-  center: { lat: number; lon: number };
-  boundary: { lat: number; lon: number }[];
+  name: string;
+  boundary: any;
+  center?: { lat: number; lon: number }; // optional
 }
 
 export const nycNeighborhoodBoundaries = {
