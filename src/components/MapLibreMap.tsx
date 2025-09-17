@@ -290,48 +290,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, []);
 
-  // Updated handleBusinessClick with fly-to behavior
-  const handleBusinessClick = useCallback(async (business: any) => {
-    if (!business || !callbackRefs.current.onBusinessClick) return;
-  
-    try {
-      let businessToReturn = business;
-  
-      // Fly to the business on map
-      if (mapRef.current && business?.position?.lat && business?.position?.lng) {
-        mapRef.current.flyTo({
-          center: [business.position.lng, business.position.lat],
-          zoom: 16,
-          speed: 1.2,
-          curve: 1.2,
-          essential: true
-        });
-      }
-  
-      // Load full details if needed
-      if (business.id && !business.id.startsWith('vector_') && fetchFullBusinessDetails) {
-        const cached = businessCacheRef.current.get(business.id);
-        if (cached && (cached as any).detailsLoaded) {
-          businessToReturn = cached;
-        } else {
-          const full = await fetchFullBusinessDetails(business.id);
-          if (full) {
-            const extended = { ...full, detailsLoaded: true } as Business & { detailsLoaded: true };
-            businessCacheRef.current.set(business.id, extended);
-            businessToReturn = extended;
-          }
-        }
-      }
-  
-      callbackRefs.current.onBusinessClick(businessToReturn);
-  
-    } catch (err) {
-      console.warn('handleBusinessClick error', err);
-      callbackRefs.current.onBusinessClick(business);
-    }
-  }, [fetchFullBusinessDetails]);
-
-
   // Business density heuristic (unchanged)
   const getBusinessLimitForViewport = useCallback((zoom: number, bounds: Bounds): number => {
     if (!bounds) return 200;
@@ -353,6 +311,72 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return Math.max(minLimit, Math.min(maxLimit, target));
   }, []);
 
+  // handle business click -> fetch details if needed
+  const handleBusinessClick = useCallback(async (business: any) => {
+    if (!business || !callbackRefs.current.onBusinessClick) return;
+
+    try {
+      let businessToReturn = business;
+      if (business.id && !business.id.startsWith('vector_') && fetchFullBusinessDetails) {
+        const cached = businessCacheRef.current.get(business.id);
+        if (cached && (cached as any).detailsLoaded) {
+          businessToReturn = cached;
+        } else {
+          const full = await fetchFullBusinessDetails(business.id);
+          if (full) {
+            const extended = { ...full, detailsLoaded: true } as Business & { detailsLoaded: true };
+            businessCacheRef.current.set(business.id, extended);
+            businessToReturn = extended;
+          }
+        }
+      }
+      callbackRefs.current.onBusinessClick(businessToReturn);
+    } catch (err) {
+      console.warn('handleBusinessClick error', err);
+      callbackRefs.current.onBusinessClick(business);
+    }
+  }, [fetchFullBusinessDetails]);
+
+  // Updated handleBusinessClick with fly-to behavior
+const handleBusinessClick = useCallback(async (business: any) => {
+  if (!business || !callbackRefs.current.onBusinessClick) return;
+
+  try {
+    let businessToReturn = business;
+
+    // Fly to the business on map
+    if (mapRef.current && business?.position?.lat && business?.position?.lng) {
+      mapRef.current.flyTo({
+        center: [business.position.lng, business.position.lat],
+        zoom: 16,
+        speed: 1.2,
+        curve: 1.2,
+        essential: true
+      });
+    }
+
+    // Load full details if needed
+    if (business.id && !business.id.startsWith('vector_') && fetchFullBusinessDetails) {
+      const cached = businessCacheRef.current.get(business.id);
+      if (cached && (cached as any).detailsLoaded) {
+        businessToReturn = cached;
+      } else {
+        const full = await fetchFullBusinessDetails(business.id);
+        if (full) {
+          const extended = { ...full, detailsLoaded: true } as Business & { detailsLoaded: true };
+          businessCacheRef.current.set(business.id, extended);
+          businessToReturn = extended;
+        }
+      }
+    }
+
+    callbackRefs.current.onBusinessClick(businessToReturn);
+
+  } catch (err) {
+    console.warn('handleBusinessClick error', err);
+    callbackRefs.current.onBusinessClick(business);
+  }
+}, [fetchFullBusinessDetails]);
 
   // Clean, consistent viewport handler — supports neighborhood polygons
   const handleViewportChange = useCallback(async () => {
