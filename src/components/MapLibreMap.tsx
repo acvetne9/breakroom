@@ -11,6 +11,7 @@ import { isPointInPolygon } from '@/utils/nyc_neighborhoods'
 import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods'
 import type { GeoJSONFeature } from 'maplibre-gl';
 import type { Business } from '@/types/business';
+import * as turf from '@turf/turf';
 
 interface MapLibreMapProps {
   onBusinessClick?: (business: any) => void;
@@ -441,10 +442,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const polygon: [number, number][] = boundary.map(p => [p.lon, p.lat]);
     
       // Pass polygon directly to your fetch
-      const neighborhoodBusinesses = await loadBusinessesInViewport(polygon, businessLimit);
-    
-      businessCacheRef.current.addMultiple(neighborhoodBusinesses);
-      return; // ✅ do not fall back to rectangular viewport fetch
+      await loadBusinessesInViewport(bounds, businessLimit); // use bounds, not polygon array
+
+      // In your handleViewportChange
+      if (searchFilters?.neighborhoodFilter?.boundary?.length > 0) {
+        const { boundary } = searchFilters.neighborhoodFilter;
+        const lats = boundary.map(p => p.lat);
+        const lons = boundary.map(p => p.lon);
+        const polygon: [number, number][] = boundary.map(p => [p.lon, p.lat]);
+        const bounds: Bounds = {
+          north: Math.max(...lats),
+          south: Math.min(...lats),
+          east: Math.max(...lons),
+          west: Math.min(...lons)
+        };
+        const businessLimit = getBusinessLimitForViewport(mapRef.current!.getZoom(), bounds);
+        const neighborhoodBusinesses = await loadBusinessesInViewport(bounds, businessLimit);
+        businessCacheRef.current.addMultiple(neighborhoodBusinesses);
+        return;
+      }
     }
 
   }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters]);
@@ -498,11 +514,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         let visibleBusinesses = businessesToRender;
 
         if (searchFilters?.neighborhoodFilter?.boundary?.length > 0) {
-          const polyCoords = searchFilters.neighborhoodFilter.boundary.map(p => [p.lon, p.lat]);
-          const turfPoly = turfPolygon([polyCoords]);
+          const polygonCoords = searchFilters.neighborhoodFilter.boundary.map(p => [p.lon, p.lat]);
+          const turfPoly = turf.polygon([polygonCoords]); // was 'turfPolygon'
           visibleBusinesses = businessesToRender.filter(b => {
-            const p = turfPoint([b.position.lng, b.position.lat]);
-            return isPointInPolygon(p, turfPoly);
+            const point = turf.point([b.position.lng, b.position.lat]); // was 'turfPoint'
+            return isPointInPolygon(point, turfPoly);
           });
         }
         
@@ -855,14 +871,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       };
       
       try {
-        const zoom = mapRef.current!.getZoom();
-        const businessLimit = getBusinessLimitForViewport(zoom, neighborhoodBounds);
-        
-        console.log('🏙️ Initial neighborhood business load:', {
-          neighborhood: searchFilters.neighborhoodFilter.name,
-          bounds: neighborhoodBounds,
-          businessLimit
-        });
+        const zoom = mapRef.current?.getZoom() ?? 12;
+        const bounds: Bounds = {
+          north: Math.max(...boundary.map(p => p.lat)) + 0.01,
+          south: Math.min(...boundary.map(p => p.lat)) - 0.01,
+          east: Math.max(...boundary.map(p => p.lon)) + 0.01,
+          west: Math.min(...boundary.map(p => p.lon)) - 0.01
+        };
+        const businessLimit = getBusinessLimitForViewport(zoom, bounds);
         
         const neighborhoodBusinesses = await loadBusinessesInViewport?.(neighborhoodBounds, businessLimit);
         

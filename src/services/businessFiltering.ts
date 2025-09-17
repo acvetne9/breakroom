@@ -91,10 +91,6 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
     console.log('🏙️ [parseSearchFilters] Neighborhood found:', neighborhood.name, 'in', neighborhood.borough);
   }
 
-  const filters: SearchFilters = {
-    textTerms: filteredTextTerms || []
-  };
-
   // Only add optional filters if they have values (no undefined)
   if (salaryQuery) {
     filters.salaryQuery = salaryQuery;
