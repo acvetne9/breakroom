@@ -25,7 +25,7 @@ interface HomePageProps {
   currentView?: 'initiation' | 'main';
   selectedBusiness?: any;
   onBusinessSelect?: (business: any) => void;
-  posts: Post[];
+  posts?: Post[];
   onBusinessStoriesClick?: (businessId: string) => void;
   onPostClick?: (post: Post) => void;
   onRoleVote?: (businessId: string, roleIndex: number, voteType: 'up' | 'down') => void;
@@ -37,7 +37,7 @@ const HomePage: React.FC<HomePageProps> = ({
   currentView = 'main',
   selectedBusiness: propSelectedBusiness,
   onBusinessSelect,
-  posts,
+  posts = [],
   onBusinessStoriesClick,
   onPostClick,
   onRoleVote,
@@ -214,8 +214,27 @@ const HomePage: React.FC<HomePageProps> = ({
   const hasActiveSearch = searchValue.trim() !== '' || searchFilters !== null;
   const showClearButton = searchCompleted && hasActiveSearch;
 
+  useEffect(() => {
+    const handleResize = () => {
+      const mapContainer = document.querySelector('.maplibregl-map') as HTMLElement;
+      if (mapContainer) {
+        // MapLibre attaches the map instance to the container
+        // @ts-ignore
+        const map = mapContainer?.__map__ || mapContainer?.map;
+        if (map && typeof map.resize === 'function') {
+          map.resize();
+        }
+      }
+    };
+  
+    window.addEventListener('resize', handleResize);
+    handleResize();
+  
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
   return (
-    <div className="relative w-full h-full">
+    <div className="absolute inset-0 w-full h-full min-w-[200px] min-h-[200px]">
       {showLoading && (
         <BreakroomLoading onComplete={handleLoadingComplete} />
       )}

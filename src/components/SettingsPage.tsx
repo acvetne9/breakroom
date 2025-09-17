@@ -5,7 +5,8 @@ import BusinessSearchDropdown from './BusinessSearchDropdown';
 import { isProfane } from '../utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 import { useDevice } from '@/contexts/DeviceContext';
-import { nycNeighborhoods } from '../utils/nyc_neighborhoods'
+import { nycNeighborhoods } from '../utils/nyc_neighborhoods';
+import { usePosts } from '@/hooks/usePosts';
 
 interface UserInfo {
   salary: string;
@@ -37,7 +38,6 @@ interface SettingsPageProps {
     fullLocation?: string;
     timePeriod?: string;
   };
-  userPosts?: Post[];
   onStoriesClick?: () => void;
   onPostClick?: (post: Post) => void;
   onJobUpdate?: (jobData: { salary: string; role: string; location: string; timePeriod: string }) => void;
@@ -47,7 +47,6 @@ interface SettingsPageProps {
 
 const SettingsPage: React.FC<SettingsPageProps> = ({
   initialData,
-  userPosts = [],
   onStoriesClick,
   onPostClick,
   onJobUpdate,
@@ -56,6 +55,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 }) => {
   const { deviceId } = useDevice();
   const { toast } = useToast();
+  const { getUserPosts } = usePosts();
+  
+  const userPosts = getUserPosts();
 
   // Add ref for the scrollable container
   const scrollContainerRef = useRef<HTMLDivElement>(null);

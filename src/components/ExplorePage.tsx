@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import VotingComponent from './VotingComponent';
 import { formatTimeAgo } from '../utils/timeAgo';
 import { TranslatedText } from './TranslatedText';
+import { usePosts } from '@/hooks/usePosts';
 
 interface Post {
   id: string;
@@ -23,32 +24,29 @@ interface Post {
 }
 
 interface ExplorePageProps {
-  posts: Post[];
   filteredBusinessId?: string;
   filteredUserStories?: boolean;
   onBusinessView?: (businessId: string) => void;
   onExpandedPostChange?: (postId: string | null) => void;
   onCommentSubmit?: (postId: string, comment: string) => void;
-  onPostSubmit?: (text: string, businessId?: string) => void;
   onBackToAllPosts?: () => void;
-  onPostVote?: (postId: string, voteType: 'up' | 'down') => void;
-  onPostDelete?: (postId: string) => void;
   onNavigateToHomeBusiness?: (businessId: string) => void; // New prop for navigation
+  onBusinessPreview?: (businessId: string) => void; // New prop for business preview
 }
 
 const ExplorePage: React.FC<ExplorePageProps> = memo(({
-  posts,
   filteredBusinessId,
   filteredUserStories = false,
   onBusinessView,
   onExpandedPostChange,
   onCommentSubmit,
-  onPostSubmit,
   onBackToAllPosts,
-  onPostVote,
-  onPostDelete,
-  onNavigateToHomeBusiness
+  onNavigateToHomeBusiness,
+  onBusinessPreview
 }) => {
+  console.log('🔍 ExplorePage component initializing...');
+  
+  const { posts, loading, submitPost, votePost, removePost } = usePosts();
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
   const [hideSystemPost, setHideSystemPost] = useState(false);
@@ -93,7 +91,7 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
     }
   }, [realPosts.length, filteredBusinessId, fadeOutSystemPost, hideSystemPost]);
 
-  const handlePostSubmit = () => {
+  const handlePostSubmit = async () => {
     if (!postText.trim()) return;
 
     if (isProfane(postText)) {
@@ -105,10 +103,18 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
       setPostText('');
       return;
     }
-    if (onPostSubmit) {
-      onPostSubmit(postText, filteredBusinessId);
-      setPostText('');
-    }
+    
+    const success = await submitPost(postText, filteredBusinessId);
+    // if (success) {
+    //   setPostText('');
+      
+    // } else {
+    //   toast({
+    //     title: "Error",
+    //     description: "Failed to create post. Please try again.",
+    //     variant: "destructive"
+    //   });
+    // }
   };
 
   const handleCommentSubmit = () => {
@@ -163,12 +169,26 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
     }
   };
 
-  const handlePostVote = (postId: string, voteType: 'up' | 'down') => {
-    onPostVote?.(postId, voteType);
+  const handlePostVote = async (postId: string, voteType: 'up' | 'down') => {
+    const success = await votePost(postId, voteType);
+    if (!success) {
+      toast({
+        title: "Error",
+        description: "Failed to vote. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handlePostDelete = (postId: string) => {
-    onPostDelete?.(postId);
+  const handlePostDelete = async (postId: string) => {
+    const success = await removePost(postId);
+    if (!success) {
+      toast({
+        title: "Error", 
+        description: "Failed to delete post. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const displayPosts = useMemo(() => {
@@ -212,6 +232,17 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
 
     return filtered;
   }, [posts, filteredBusinessId, filteredUserStories, realPosts.length, hideSystemPost]);
+
+  if (loading) {
+    return (
+      <div className="relative w-full h-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-app-yellow mx-auto mb-4"></div>
+          <p className="text-app-gray-medium">Loading posts...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-full">
@@ -259,18 +290,11 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
                       }`}
                     />
                     <div className="flex-shrink-0 w-8 flex justify-center mt-1 my-0">
-                      {(post.businessId || post.isJobUpdate) && (
+                      {post.businessId && (
                         <button
                           onClick={e => {
                             e.stopPropagation();
-                            if (post.businessId) {
-                              handleBusinessView(post.businessId);
-                            } else if (post.linkedLocation) {
-                              toast({
-                                title: "Location",
-                                description: post.linkedLocation
-                              });
-                            }
+                            handleBusinessView(post.businessId);
                           }}
                           className="flex items-center space-x-1 text-app-gray-medium hover:text-app-black"
                         >

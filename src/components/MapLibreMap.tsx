@@ -35,7 +35,7 @@ interface ViewportState {
   timestamp: number;
 }
 
-// Singleton overlay for performance
+// Singleton ovxerlay for performance
 let overlayInstance: MapboxOverlay | null = null;
 
 // Optimized grid sampling with visible area priority
@@ -183,13 +183,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   isClusteredData = false
 }) => {
   const isMobile = useIsMobile();
-  const mapRef = useRef<HTMLDivElement>(null);
-  const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [deckOverlay, setDeckOverlay] = useState<MapboxOverlay | null>(null);
   const [overlayReady, setOverlayReady] = useState(false);
   
   // Refs for stable references and state tracking
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const businessCacheRef = useRef(new BusinessCache(isMobile ? 10000 : 20000));
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
   const layersAddedRef = useRef(false);
@@ -213,18 +213,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     callbackRefs.current = { onBusinessClick, onMapLoaded, onBusinessesLoaded };
   }, [onBusinessClick, onMapLoaded, onBusinessesLoaded]);
-
-  // Center map on neighborhood when neighborhoodCenter changes
-  useEffect(() => {
-    if (!map || !neighborhoodCenter) return;
-    
-    console.log('🏙️ Centering map on neighborhood:', neighborhoodCenter);
-    map.flyTo({
-      center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
-      zoom: 14, // Good zoom level for neighborhood view
-      duration: 2000
-    });
-  }, [map, neighborhoodCenter]);
 
   // Initialize hooks (must be called unconditionally at top level)
   const mapDataHook = useViewportMapData();
@@ -257,6 +245,120 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.log(`💾 Cache now contains ${businessCacheRef.current.getAll().length} businesses`);
     }
   }, [businesses, searchFilters]);
+
+  // Function to add vector layers - must be defined before setupMapEventListeners
+  const addVectorLayers = useCallback((map: maplibregl.Map) => {
+    try {
+      const layers = [
+        {
+          id: 'nyc-land',
+          type: 'fill' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'examplepoints',
+          layout: {},
+          paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
+          filter: ['==', ['geometry-type'], 'Polygon'] as any
+        },
+        {
+          id: 'nyc-green-spaces',
+          type: 'fill' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'examplepoints',
+          layout: {},
+          paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
+          filter: [
+            'all',
+            ['==', ['geometry-type'], 'Polygon'],
+            ['any',
+              ['==', ['get', 'leisure'], 'park'],
+              ['==', ['get', 'landuse'], 'cemetery'],
+              ['==', ['get', 'amenity'], 'cemetery'],
+              ['==', ['get', 'amenity'], 'grave_yard'],
+              ['==', ['get', 'landuse'], 'recreation_ground'],
+              ['==', ['get', 'leisure'], 'recreation_ground'],
+              ['in', 'cemetery', ['get', 'name']],
+              ['in', 'Cemetery', ['get', 'name']],
+              ['in', 'Graveyard', ['get', 'name']],
+              ['in', 'graveyard', ['get', 'name']],
+              ['==', ['get', 'place'], 'cemetery'],
+              ['==', ['get', 'historic'], 'cemetery']
+            ]
+          ] as any
+        },
+        {
+          id: 'nyc-water',
+          type: 'fill' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'examplepoints',
+          layout: {},
+          paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
+          filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']] as any
+        },
+        {
+          id: 'nyc-roads',
+          type: 'line' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'examplepoints',
+          layout: {},
+          paint: {
+            'line-color': '#666666',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
+            'line-opacity': 0.8
+          },
+          filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']] as any
+        },
+        {
+          id: 'nyc-road-labels',
+          type: 'symbol' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'examplepoints',
+          layout: {
+            'text-field': ['get', 'name'],
+            'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+            'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
+            'text-max-width': 8,
+            'text-line-height': 1.2,
+            'symbol-placement': 'line',
+            'text-rotation-alignment': 'map',
+            'text-allow-overlap': false,
+            'text-ignore-placement': false
+          },
+          paint: {
+            'text-color': '#333333',
+            'text-halo-color': '#FFFFFF',
+            'text-halo-width': 1.5,
+            'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 1]
+          },
+          filter: [
+            'all', 
+            ['==', ['geometry-type'], 'LineString'], 
+            ['has', 'name'],
+            ['has', 'highway'],
+            ['!=', ['get', 'name'], '']
+          ] as any,
+          minzoom: 12
+        }
+      ];
+
+      console.log('Adding', layers.length, 'vector layers...');
+      
+      layers.forEach((layer, index) => {
+        try {
+          if (!map.getLayer(layer.id)) {
+            map.addLayer(layer as any);
+            console.log(`Added layer ${index + 1}/${layers.length}: ${layer.id}`);
+          }
+        } catch (error) {
+          console.error('Error adding layer:', layer.id, error);
+        }
+      });
+
+      layersAddedRef.current = true;
+      console.log('All vector layers added successfully');
+    } catch (error) {
+      console.error('Error in addVectorLayers:', error);
+    }
+  }, []);
 
   // Optimized business limit calculation
   const getBusinessLimitForViewport = useCallback((zoom: number, bounds: Bounds): number => {
@@ -320,66 +422,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [fetchFullBusinessDetails]);
 
-  // Load neighborhood businesses when search filters change
-  useEffect(() => {
-    if (!map || !mapLoaded || !searchFilters?.neighborhoodFilter || !loadBusinessesInViewport) return;
-    
-    const loadNeighborhoodBusinesses = async () => {
-      console.log('🏙️ Search filters changed, loading neighborhood businesses');
-      
-      // Create neighborhood bounds from the boundary points with padding
-      const boundary = searchFilters.neighborhoodFilter.boundary;
-      const lats = boundary.map(p => p.lat);
-      const lons = boundary.map(p => p.lon);
-      
-      // Add padding to ensure we capture all businesses in the area
-      const latPadding = 0.015; // ~1.5km padding
-      const lonPadding = 0.020; // ~1.5km padding (adjusted for longitude)
-      
-      const neighborhoodBounds: Bounds = {
-        north: Math.max(...lats) + latPadding,
-        south: Math.min(...lats) - latPadding,
-        east: Math.max(...lons) + lonPadding,
-        west: Math.min(...lons) - lonPadding
-      };
-      
-      try {
-        const zoom = map.getZoom();
-        const businessLimit = getBusinessLimitForViewport(zoom, neighborhoodBounds);
-        
-        console.log('🏙️ Initial neighborhood business load:', {
-          neighborhood: searchFilters.neighborhoodFilter.name,
-          bounds: neighborhoodBounds,
-          businessLimit
-        });
-        
-        const neighborhoodBusinesses = await loadBusinessesInViewport(neighborhoodBounds, businessLimit);
-        
-        if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length > 0) {
-          console.log(`✅ Initially loaded ${neighborhoodBusinesses.length} businesses for ${searchFilters.neighborhoodFilter.name}`);
-          businessCacheRef.current.addMultiple(neighborhoodBusinesses);
-        } else {
-          console.log('❌ No businesses found for neighborhood:', searchFilters.neighborhoodFilter.name);
-        }
-        
-      } catch (error) {
-        console.error('❌ Error loading initial neighborhood businesses:', error);
-      }
-    };
-    
-    // Small delay to ensure map is ready
-    setTimeout(loadNeighborhoodBusinesses, 500);
-  }, [map, mapLoaded, searchFilters?.neighborhoodFilter, loadBusinessesInViewport, getBusinessLimitForViewport]);
-
   // Debounced viewport change handler
   const handleViewportChange = useCallback(async () => {
     console.log('🔍 DEBUG: handleViewportChange deps check', { 
-      map: typeof map,
+      mapRef: typeof mapRef.current,
       mapLoaded: typeof mapLoaded,
       loadBusinessesInViewport: typeof loadBusinessesInViewport,
       getBusinessLimitForViewport: typeof getBusinessLimitForViewport 
     });
-    if (!map || !mapLoaded || !loadBusinessesInViewport || isLoadingRef.current) return;
+    
+    if (!mapRef.current || !mapLoaded || !loadBusinessesInViewport || isLoadingRef.current) return;
+
+    const map = mapRef.current;
 
     // If neighborhood search is active, load businesses within neighborhood bounds
     if (searchFilters?.neighborhoodFilter) {
@@ -496,9 +550,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }, 200);
     }
 
-  }, [map, mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters]);
+  }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters]);
 
-  // Keep a ref to latest handler for stable listeners
+  // // Keep a ref to latest handler for stable listeners
   useEffect(() => {
     handleViewportChangeRef.current = handleViewportChange;
   }, [handleViewportChange]);
@@ -515,10 +569,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       hookBusinessesCount: businesses?.length || 0,
       finalBusinessesCount: allBusinesses?.length || 0,
       mapLoaded,
-      hasMap: !!map,
+      hasMap: !!mapRef.current,
       containerDimensions: mapRef.current ? {
-        width: mapRef.current.clientWidth,
-        height: mapRef.current.clientHeight
+        width: mapRef.current?.getContainer().clientWidth,
+        height: mapRef.current?.getContainer().clientHeight
       } : null
     });
     
@@ -546,8 +600,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
 
       // Filter businesses to current viewport if map is loaded
-      if (map && mapLoaded) {
-        const currentBounds = map.getBounds();
+      if (mapRef.current && mapLoaded) {
+        const currentBounds = mapRef.current.getBounds();
         const visibleBusinesses = businessesToRender.filter(business => {
           if (!business?.position?.lat || !business?.position?.lng) return false;
           
@@ -595,24 +649,105 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.error('Error creating DeckGL layers:', error);
       return [];
     }
-  }, [businesses, selectedBusiness?.id, isClusteredData, handleBusinessClick, map, mapLoaded]);
+  }, [businesses, selectedBusiness?.id, isClusteredData, handleBusinessClick, mapLoaded]);
 
-  // Initialize map with optimized configuration
+  // Handle container resize
   useEffect(() => {
-    console.log('🔄 MapLibre useEffect triggered', { 
-      hasContainer: !!mapRef.current, 
-      hasMap: !!map,
-      isCapacitor: isCapacitor(),
-      containerDimensions: mapRef.current ? {
-        width: mapRef.current.clientWidth,
-        height: mapRef.current.clientHeight
-      } : null
-    });
+    const handleResize = () => {
+      mapRef.current?.resize();
+    };
+    window.addEventListener('resize', handleResize);
+    handleResize(); // run once
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
     
-    if (!mapRef.current || map) return;
+  // 2. Initialize the map once we have a valid string tileUrl
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return;
+  
+    const initializeMap = async () => {
+      // Generate blob URLs for tiles
+      const urls = ['/data/tiles/{z}/{x}/{y}.pbf'];
+      const tileUrls: string[] = await Promise.all(
+        urls.map(url => createTileBlobUrl(url))
+      );
+  
+      // Build style
+      const mapStyle: maplibregl.StyleSpecification = {
+        version: 8,
+        sources: {
+          'nyc-tiles': {
+            type: 'vector',
+            tiles: tileUrls, // ✅ string[]
+            minzoom: 9,
+            maxzoom: 19,
+            scheme: 'xyz',
+          },
+        },
+        glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+        layers: [
+          {
+            id: 'background',
+            type: 'background',
+            paint: { 'background-color': '#fff' },
+          },
+          // add your layers here...
+        ],
+      };
+  
+      // Create map (with second-map config merged in)
+      const mapInstance = new maplibregl.Map({
+        container: mapContainerRef.current!,
+        style: mapStyle,
+        center: [-73.986104, 40.715245],
+        zoom: 12.77,
+        maxZoom: isCapacitor() ? 19 : 18,
+        minZoom: 9,
+        renderWorldCopies: false,
+        attributionControl: false,
+        transformRequest: (url, resourceType) => {
+          if (resourceType === 'Tile') {
+            console.log('🔧 Tile request:', {
+              url,
+              resourceType,
+              isCapacitor: isCapacitor(),
+            });
+          }
+  
+          // Force HTTPS in Capacitor
+          if (isCapacitor() && url.startsWith('http://')) {
+            const httpsUrl = url.replace('http://', 'https://');
+            console.log('🔒 Converting to HTTPS for Capacitor:', httpsUrl);
+            return { url: httpsUrl };
+          }
+  
+          return { url };
+        },
+      });
+  
+      mapRef.current = mapInstance;
+      
+      // Set bounds after storing in ref
+      try {
+        console.log('🗺️ Setting map bounds for NYC region...');
+        mapRef.current.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
+        
+        // Test basic map functionality
+        console.log('🧪 Testing map methods:', {
+          getZoom: mapRef.current.getZoom(),
+          getCenter: mapRef.current.getCenter(),
+          isStyleLoaded: mapRef.current.isStyleLoaded()
+        });
+      } catch (error) {
+        console.error('Error setting up map:', error);
+      }
+    };
+  
+    initializeMap();
 
     // Ensure container has minimum dimensions before creating map
-    const container = mapRef.current;
+    const container = mapContainerRef.current;
     const containerWidth = container.clientWidth;
     const containerHeight = container.clientHeight;
     
@@ -622,9 +757,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.warn('⚠️ Container too small, waiting for proper sizing:', { containerWidth, containerHeight });
       // Retry after a brief delay to allow layout to complete
       const retryTimer = setTimeout(() => {
-        if (mapRef.current && !map) {
-          const newWidth = mapRef.current.clientWidth;
-          const newHeight = mapRef.current.clientHeight;
+        if (mapContainerRef.current && !mapRef.current) {
+          const newWidth = mapContainerRef.current.clientWidth;
+          const newHeight = mapContainerRef.current.clientHeight;
           console.log('🔄 Retrying map creation with dimensions:', { newWidth, newHeight });
           // Trigger a re-render by updating a dummy state
           setMapLoaded(false);
@@ -633,380 +768,127 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return () => clearTimeout(retryTimer);
     }
 
-    // Comprehensive tile configuration for different environments
-    const createTileSource = () => {
-      if (isCapacitor()) {
-        // For Capacitor, use OpenStreetMap raster tiles as fallback
-        // since vector tiles from capacitor://localhost don't work reliably
-        console.log('🔧 Using Capacitor raster tile fallback');
-        return null; // We'll create a raster source instead
-      } else {
-        // For web, use vector tiles
-        const fullUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-        console.log('🔧 Using web vector tiles:', fullUrl);
-        return {
-          type: 'vector' as const,
-          tiles: [fullUrl],
-          minzoom: 10,
-          maxzoom: 16,
-          scheme: 'xyz' as const
-        };
-      }
-    };
-
-    // Create appropriate map style based on environment
-    const createMapStyle = () => {
-      if (isCapacitor()) {
-        // For Capacitor, use a more reliable raster-based style with better error handling
-        console.log('🔧 Creating Capacitor raster map style');
-        return {
-          version: 8 as const,
-          sources: {
-            'osm': {
-              type: 'raster' as const,
-              tiles: [
-                'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-              ],
-              tileSize: 256,
-              attribution: '© OpenStreetMap contributors',
-              maxzoom: 19
-            }
-          },
-          layers: [
-            {
-              id: 'background',
-              type: 'background' as const,
-              paint: { 'background-color': '#B3E5FC' }
-            },
-            {
-              id: 'osm',
-              type: 'raster' as const,
-              source: 'osm',
-              minzoom: 0,
-              maxzoom: 19
-            }
-          ]
-        };
-      } else {
-        // For web, use vector tiles with full styling
-        const vectorSource = createTileSource();
-        if (!vectorSource) {
-          throw new Error('Vector source creation failed');
-        }
-        
-        return {
-          version: 8 as const,
-          sources: {
-            'nyc-tiles': vectorSource,
-            // Add fallback raster source for reliability
-            'fallback-raster': {
-              type: 'raster' as const,
-              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-              tileSize: 256,
-              attribution: '© OpenStreetMap contributors',
-              maxzoom: 19
-            }
-          },
-          glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-          layers: [
-            {
-              id: 'background',
-              type: 'background' as const,
-              paint: { 'background-color': '#F5F5DC' }
-            },
-            // Add a fallback raster layer that's initially invisible
-            {
-              id: 'fallback-base',
-              type: 'raster' as const,
-              source: 'fallback-raster',
-              layout: { visibility: 'none' as const }, // Hidden by default
-              minzoom: 0,
-              maxzoom: 19
-            }
-          ]
-        };
-      }
-    };
-
-    const mapStyle = createMapStyle();
-
-    // Log the tile configuration for debugging
-    console.log('🗺️ Map initialization - Style sources:', Object.keys(mapStyle.sources));
-    console.log('🗺️ Environment check - isCapacitor:', isCapacitor(), 'isMobile:', isMobile);
-    console.log('🗺️ Current location:', {
-      protocol: window.location.protocol,
-      origin: window.location.origin,
-      href: window.location.href
-    });
-
-    console.log('🗺️ Creating MapLibre instance with style:', {
-      version: mapStyle.version,
-      sourceCount: Object.keys(mapStyle.sources).length,
-      sources: Object.keys(mapStyle.sources),
-      layerCount: mapStyle.layers.length,
-      hasGlyphs: !!mapStyle.glyphs
-    });
-
-    const mapInstance = new maplibregl.Map({
-      container: mapRef.current!,
-      style: mapStyle,
-      center: [-73.986104, 40.715245],
-      zoom: 12.77,
-      maxZoom: isCapacitor() ? 19 : 18,
-      minZoom: 9,
-      renderWorldCopies: false,
-      attributionControl: false,
-      transformRequest: (url, resourceType) => {
-        // Enhanced logging for all environments
-        if (resourceType === 'Tile') {
-          console.log('🔧 Tile request:', { url, resourceType, isCapacitor: isCapacitor() });
-        }
-        
-        // For Capacitor, ensure HTTPS requests
-        if (isCapacitor() && url.startsWith('http://')) {
-          const httpsUrl = url.replace('http://', 'https://');
-          console.log('🔒 Converting to HTTPS for Capacitor:', httpsUrl);
-          return { url: httpsUrl };
-        }
-        
-        return { url };
-      }
-    });
-    
-    console.log('✅ MapLibre instance created successfully');
-    
-    // Immediately set bounds after creation
-    console.log('🗺️ Setting map bounds for NYC region...');
-    mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
-    
-    // Test basic map functionality
-    console.log('🧪 Testing map methods:', {
-      getZoom: mapInstance.getZoom(),
-      getCenter: mapInstance.getCenter(),
-      isStyleLoaded: mapInstance.isStyleLoaded()
-    });
-
-    // Enhanced error handling and loading
-    mapInstance.on('error', (e) => {
-      console.error('🚨 Map error:', e.error);
-    });
-
-    // Add fallback timer to ensure map loads even if 'load' event doesn't fire
-    const loadFallbackTimer = setTimeout(() => {
-      if (!mapLoaded) {
-        console.log('⏰ Map load fallback timer - forcing mapLoaded to true');
-        setMapLoaded(true);
-        callbackRefs.current.onMapLoaded?.();
-      }
-    }, 2000); // 2 second fallback
-
-    mapInstance.on('load', () => {
-      console.log('🗺️ Map loaded successfully via load event');
-      clearTimeout(loadFallbackTimer);
-      setMapLoaded(true);
-      callbackRefs.current.onMapLoaded?.();
-      
-      // For desktop, manually add layers after map loads if sourcedata doesn't fire
-      if (!isCapacitor() && !layersAddedRef.current) {
-        console.log('🔄 Manually adding vector layers after map load...');
-        setTimeout(() => {
-          if (!layersAddedRef.current) {
-            addVectorLayers(mapInstance);
-          }
-        }, 1000);
-      }
-    });
-
-    // Function to add vector layers
-    const addVectorLayers = (mapInstance: maplibregl.Map) => {
+    // Enhanced error handling and loading with validation
+    const setupMapEventListeners = (map: maplibregl.Map) => {
       try {
-        const layers = [
-          {
-            id: 'nyc-land',
-            type: 'fill' as const,
-            source: 'nyc-tiles',
-            'source-layer': 'examplepoints',
-            layout: {},
-            paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
-            filter: ['==', ['geometry-type'], 'Polygon'] as any
-          },
-          {
-            id: 'nyc-green-spaces',
-            type: 'fill' as const,
-            source: 'nyc-tiles',
-            'source-layer': 'examplepoints',
-            layout: {},
-            paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
-            filter: [
-              'all',
-              ['==', ['geometry-type'], 'Polygon'],
-              ['any',
-                ['==', ['get', 'leisure'], 'park'],
-                ['==', ['get', 'landuse'], 'cemetery'],
-                ['==', ['get', 'amenity'], 'cemetery'],
-                ['==', ['get', 'amenity'], 'grave_yard'],
-                ['==', ['get', 'landuse'], 'recreation_ground'],
-                ['==', ['get', 'leisure'], 'recreation_ground'],
-                ['in', 'cemetery', ['get', 'name']],
-                ['in', 'Cemetery', ['get', 'name']],
-                ['in', 'Graveyard', ['get', 'name']],
-                ['in', 'graveyard', ['get', 'name']],
-                ['==', ['get', 'place'], 'cemetery'],
-                ['==', ['get', 'historic'], 'cemetery']
-              ]
-            ] as any
-          },
-          {
-            id: 'nyc-water',
-            type: 'fill' as const,
-            source: 'nyc-tiles',
-            'source-layer': 'examplepoints',
-            layout: {},
-            paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
-            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']] as any
-          },
-          {
-            id: 'nyc-roads',
-            type: 'line' as const,
-            source: 'nyc-tiles',
-            'source-layer': 'examplepoints',
-            layout: {},
-            paint: {
-              'line-color': '#666666',
-              'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
-              'line-opacity': 0.8
-            },
-            filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']] as any
-          },
-          {
-            id: 'nyc-road-labels',
-            type: 'symbol' as const,
-            source: 'nyc-tiles',
-            'source-layer': 'examplepoints',
-            layout: {
-              'text-field': ['get', 'name'],
-              'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
-              'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
-              'text-max-width': 8,
-              'text-line-height': 1.2,
-              'symbol-placement': 'line',
-              'text-rotation-alignment': 'map',
-              'text-allow-overlap': false,
-              'text-ignore-placement': false
-            },
-            paint: {
-              'text-color': '#333333',
-              'text-halo-color': '#FFFFFF',
-              'text-halo-width': 1.5,
-              'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 1]
-            },
-            filter: [
-              'all', 
-              ['==', ['geometry-type'], 'LineString'], 
-              ['has', 'name'],
-              ['has', 'highway'],
-              ['!=', ['get', 'name'], '']
-            ] as any,
-            minzoom: 12
-          }
-        ];
+        // Verify map instance has required methods before adding listeners
+        if (!map || typeof map.on !== 'function') {
+          console.error('Invalid map instance - missing event methods');
+          return;
+        }
 
-        console.log('📍 Adding', layers.length, 'vector layers...');
-        
-        layers.forEach((layer, index) => {
-          try {
-            if (!mapInstance.getLayer(layer.id)) {
-              mapInstance.addLayer(layer as any);
-              console.log(`✅ Added layer ${index + 1}/${layers.length}: ${layer.id}`);
-            }
-          } catch (error) {
-            console.error('❌ Error adding layer:', layer.id, error);
+        map.on('error', (e) => {
+          console.error('Map error:', e.error);
+        });
+
+        // Add fallback timer to ensure map loads even if 'load' event doesn't fire
+        const loadFallbackTimer = setTimeout(() => {
+          if (!mapLoaded) {
+            console.log('Map load fallback timer - forcing mapLoaded to true');
+            setMapLoaded(true);
+            callbackRefs.current.onMapLoaded?.();
+          }
+        }, 2000); // 2 second fallback
+
+        map.on('load', () => {
+          console.log('Map loaded successfully via load event');
+          clearTimeout(loadFallbackTimer);
+          setMapLoaded(true);
+          callbackRefs.current.onMapLoaded?.();
+          
+          // For desktop, manually add layers after map loads if sourcedata doesn't fire
+          if (!isCapacitor() && !layersAddedRef.current) {
+            console.log('Manually adding vector layers after map load...');
+            setTimeout(() => {
+              if (!layersAddedRef.current && mapRef.current) {
+                addVectorLayers(mapRef.current);
+              }
+            }, 1000);
           }
         });
 
-        layersAddedRef.current = true;
-        console.log('✅ All vector layers added successfully');
+        // Optimized move handlers with validation
+        const callViewportChange = () => {
+          if (mapRef.current && typeof mapRef.current.getBounds === 'function') {
+            handleViewportChangeRef.current();
+          }
+        };
+        
+        const debouncedMoveHandler = (() => {
+          let timeout: NodeJS.Timeout;
+          return () => {
+            clearTimeout(timeout);
+            timeout = setTimeout(callViewportChange, 150);
+          };
+        })();
+
+        map.on('moveend', callViewportChange);
+        map.on('zoomend', callViewportChange);
+        map.on('move', debouncedMoveHandler);
+
+        // Add map layers when ready with environment-specific handling
+        map.on('sourcedata', (e) => {
+          if (isCapacitor()) {
+            // For Capacitor with raster tiles
+            if (e.sourceId === 'osm' && e.isSourceLoaded && !layersAddedRef.current) {
+              console.log('Capacitor raster tiles loaded successfully');
+              layersAddedRef.current = true;
+            } else if (e.sourceId === 'osm') {
+              console.log('OSM source event:', {
+                sourceId: e.sourceId,
+                isSourceLoaded: e.isSourceLoaded,
+                layersAdded: layersAddedRef.current
+              });
+            }
+            return;
+          }
+          
+          // For web environment with vector tiles
+          if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
+            console.log('NYC tiles source loaded, adding vector layers via sourcedata event...');
+            addVectorLayers(mapRef.current);
+          } else if (e.sourceId === 'nyc-tiles') {
+            console.log('NYC tiles sourcedata event:', {
+              sourceId: e.sourceId,
+              isSourceLoaded: e.isSourceLoaded,
+              layersAdded: layersAddedRef.current
+            });
+          }
+        });
+
+        // Additional mobile-specific event handlers
+        if (isCapacitor()) {
+          map.on('data', (e: any) => {
+            if (e.dataType === 'source' && e.sourceId === 'osm') {
+              console.log('OSM data event:', {
+                dataType: e.dataType,
+                sourceId: e.sourceId,
+                isSourceLoaded: e.isSourceLoaded
+              });
+            }
+          });
+
+          map.on('dataloading', (e: any) => {
+            if (e.dataType === 'source' && e.sourceId === 'osm') {
+              console.log('OSM data loading:', e.sourceId);
+            }
+          });
+        }
+
+        console.log('Map event listeners set up successfully');
       } catch (error) {
-        console.error('❌ Error in addVectorLayers:', error);
+        console.error('Error setting up map event listeners:', error);
       }
     };
 
-    // Optimized move handlers
-    const callViewportChange = () => handleViewportChangeRef.current();
-    const debouncedMoveHandler = (() => {
-      let timeout: NodeJS.Timeout;
-      return () => {
-        clearTimeout(timeout);
-        timeout = setTimeout(callViewportChange, 150);
-      };
-    })();
+    // Setup event listeners
+    setupMapEventListeners(mapRef.current);
 
-    mapInstance.on('moveend', callViewportChange);
-    mapInstance.on('zoomend', callViewportChange);
-    mapInstance.on('move', debouncedMoveHandler);
-
-    // Add map layers when ready with environment-specific handling
-    mapInstance.on('sourcedata', (e) => {
-      if (isCapacitor()) {
-        // For Capacitor with raster tiles
-        if (e.sourceId === 'osm' && e.isSourceLoaded && !layersAddedRef.current) {
-          console.log('✅ Capacitor raster tiles loaded successfully');
-          layersAddedRef.current = true;
-        } else if (e.sourceId === 'osm') {
-          console.log('🔄 OSM source event:', {
-            sourceId: e.sourceId,
-            isSourceLoaded: e.isSourceLoaded,
-            layersAdded: layersAddedRef.current
-          });
-        }
-        return;
-      }
-      
-      // For web environment with vector tiles
-      if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
-        console.log('🔄 NYC tiles source loaded, adding vector layers via sourcedata event...');
-        addVectorLayers(mapInstance);
-      } else if (e.sourceId === 'nyc-tiles') {
-        console.log('🔄 NYC tiles sourcedata event:', {
-          sourceId: e.sourceId,
-          isSourceLoaded: e.isSourceLoaded,
-          layersAdded: layersAddedRef.current
-        });
-      }
+    console.log('Map instance created, setting up event listeners...');
+    console.log('Map container dimensions:', {
+      width: mapContainerRef.current?.clientWidth,
+      height: mapContainerRef.current?.clientHeight
     });
-
-    // Additional mobile-specific event handlers
-    if (isCapacitor()) {
-      mapInstance.on('data', (e: any) => {
-        if (e.dataType === 'source' && e.sourceId === 'osm') {
-          console.log('📊 OSM data event:', {
-            dataType: e.dataType,
-            sourceId: e.sourceId,
-            isSourceLoaded: e.isSourceLoaded
-          });
-        }
-      });
-
-      mapInstance.on('dataloading', (e: any) => {
-        if (e.dataType === 'source' && e.sourceId === 'osm') {
-          console.log('⏳ OSM data loading:', e.sourceId);
-        }
-      });
-    }
-
-    console.log('🗺️ Map instance created, setting up event listeners...');
-    console.log('🗺️ Map container dimensions:', {
-      width: mapRef.current?.clientWidth,
-      height: mapRef.current?.clientHeight
-    });
-    
-    console.log('🗺️ Map instance created, setting up event listeners...');
-    console.log('🗺️ Map container dimensions:', {
-      width: mapRef.current?.clientWidth,
-      height: mapRef.current?.clientHeight
-    });
-    
-    setMap(mapInstance);
 
     return () => {
       // Cleanup
@@ -1019,7 +901,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
       
       try {
-        mapInstance.remove();
+        mapRef.current?.remove();
       } catch (error) {
         console.error('Error removing map:', error);
       }
@@ -1027,13 +909,77 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       businessCacheRef.current.clear();
       layersAddedRef.current = false;
       setMapLoaded(false);
-      setMap(null);
+      mapRef.current = null;
     };
-  }, [isMobile]);
+  }, [isMobile, addVectorLayers]);
+
+
+  // // Center map on neighborhood when neighborhoodCenter changes
+  useEffect(() => {
+    if (!mapRef.current || !neighborhoodCenter) return;
+    
+    console.log('🏙️ Centering map on neighborhood:', neighborhoodCenter);
+    mapRef.current.flyTo({
+      center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
+      zoom: 14, // Good zoom level for neighborhood view
+      duration: 2000
+    });
+  }, [neighborhoodCenter]);
+
+  // Load neighborhood businesses when search filters change
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded || !searchFilters?.neighborhoodFilter || !loadBusinessesInViewport) return;
+    
+    const loadNeighborhoodBusinesses = async () => {
+      console.log('🏙️ Search filters changed, loading neighborhood businesses');
+      
+      // Create neighborhood bounds from the boundary points with padding
+      const boundary = searchFilters.neighborhoodFilter.boundary;
+      const lats = boundary.map(p => p.lat);
+      const lons = boundary.map(p => p.lon);
+      
+      // Add padding to ensure we capture all businesses in the area
+      const latPadding = 0.015; // ~1.5km padding
+      const lonPadding = 0.020; // ~1.5km padding (adjusted for longitude)
+      
+      const neighborhoodBounds: Bounds = {
+        north: Math.max(...lats) + latPadding,
+        south: Math.min(...lats) - latPadding,
+        east: Math.max(...lons) + lonPadding,
+        west: Math.min(...lons) - lonPadding
+      };
+      
+      try {
+        const zoom = mapRef.current!.getZoom();
+        const businessLimit = getBusinessLimitForViewport(zoom, neighborhoodBounds);
+        
+        console.log('🏙️ Initial neighborhood business load:', {
+          neighborhood: searchFilters.neighborhoodFilter.name,
+          bounds: neighborhoodBounds,
+          businessLimit
+        });
+        
+        const neighborhoodBusinesses = await loadBusinessesInViewport(neighborhoodBounds, businessLimit);
+        
+        if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length > 0) {
+          console.log(`✅ Initially loaded ${neighborhoodBusinesses.length} businesses for ${searchFilters.neighborhoodFilter.name}`);
+          businessCacheRef.current.addMultiple(neighborhoodBusinesses);
+        } else {
+          console.log('❌ No businesses found for neighborhood:', searchFilters.neighborhoodFilter.name);
+        }
+        
+      } catch (error) {
+        console.error('❌ Error loading initial neighborhood businesses:', error);
+      }
+    };
+    
+    // Small delay to ensure map is ready
+    setTimeout(loadNeighborhoodBusinesses, 500);
+  }, [mapLoaded, searchFilters?.neighborhoodFilter, loadBusinessesInViewport, getBusinessLimitForViewport]);
 
   // Initialize DeckGL overlay
   useEffect(() => {
-    if (!map || !mapLoaded || deckOverlay) return;
+    if (!mapRef.current || !mapLoaded || deckOverlay) return;
     
     let overlay = overlayInstance;
     if (!overlay) {
@@ -1045,14 +991,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
     
     try {
-      map.addControl(overlay as any);
+      mapRef.current.addControl(overlay as any);
       setDeckOverlay(overlay);
       setOverlayReady(true);
     } catch (e) {
       console.log('DeckGL overlay already added:', e);
       setOverlayReady(true);
     }
-  }, [map, mapLoaded]);
+  }, [mapLoaded]);
 
   // Update DeckGL layers with throttling and immediate visible area updates
   useEffect(() => {
@@ -1071,18 +1017,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
     
     // Update immediately if we have visible businesses
-    if (map && mapLoaded && deckGLLayers.length > 0) {
+    if (mapRef.current && mapLoaded && deckGLLayers.length > 0) {
       updateLayers();
     } else {
       // Throttle updates for other cases
       updateTimeoutRef.current = setTimeout(updateLayers, 50);
     }
-  }, [deckOverlay, overlayReady, deckGLLayers, map, mapLoaded]);
+  }, [deckOverlay, overlayReady, deckGLLayers, mapLoaded]);
 
   // Handle search filter changes
   useEffect(() => {
     const filtersChanged = JSON.stringify(lastSearchFiltersRef.current) !== JSON.stringify(searchFilters);
-    if (!filtersChanged || !map || !mapLoaded) return;
+    if (!filtersChanged || !mapRef.current || !mapLoaded) return;
     
     console.log('🔍 Search filters changed, clearing cache');
     lastSearchFiltersRef.current = searchFilters;
@@ -1090,7 +1036,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     isLoadingRef.current = false;
     
     setTimeout(() => handleViewportChangeRef.current(), 100);
-  }, [searchFilters, map, mapLoaded]);
+  }, [searchFilters, mapLoaded]);
 
   // Handle business updates
   useEffect(() => {
@@ -1102,29 +1048,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Zoom to selected business
   useEffect(() => {
-    if (!map || !mapLoaded || !selectedBusiness?.position) return;
+    if (!mapRef.current || !mapLoaded || !selectedBusiness?.position) return;
     
-    map.easeTo({
+    mapRef.current.easeTo({
       center: [selectedBusiness.position.lng, selectedBusiness.position.lat],
-      zoom: Math.max(map.getZoom(), 16),
+      zoom: Math.max(mapRef.current.getZoom(), 16),
       duration: 600
     });
-  }, [selectedBusiness?.id, map, mapLoaded]);
-
-  // Center on neighborhood
-  useEffect(() => {
-    if (!map || !mapLoaded || !neighborhoodCenter) return;
-    
-    map.easeTo({
-      center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
-      zoom: 14,
-      duration: 800
-    });
-  }, [neighborhoodCenter, map, mapLoaded]);
+  }, [selectedBusiness?.id, mapLoaded]);
 
   // Handle landmarks with performance optimization
   useEffect(() => {
-    if (!mapLoaded || !Array.isArray(landmarks) || landmarks.length === 0 || !map) return;
+    if (!mapLoaded || !Array.isArray(landmarks) || landmarks.length === 0 || !mapRef.current) return;
 
     // Clear existing markers
     landmarkMarkersRef.current.forEach(marker => {
@@ -1132,7 +1067,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     });
     landmarkMarkersRef.current = [];
 
-    const zoom = map.getZoom();
+    const zoom = mapRef.current.getZoom();
     const size = Math.max(12, Math.min(32, 16 * Math.pow(1.15, zoom - 10)));
 
     const markers = landmarks.map(landmark => {
@@ -1155,7 +1090,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       try {
         return new maplibregl.Marker({ element: el, anchor: 'center' })
           .setLngLat([landmark.lng, landmark.lat])
-          .addTo(map);
+          .addTo(mapRef.current!);
       } catch (error) {
         console.error('Error creating marker:', error);
         return null;
@@ -1166,7 +1101,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     // Optimized zoom handler for emoji sizing
     const handleZoomChange = () => {
-      const newZoom = map.getZoom();
+      const newZoom = mapRef.current!.getZoom();
       const newSize = Math.max(12, Math.min(32, 16 * Math.pow(1.15, newZoom - 10)));
       
       markers.forEach(marker => {
@@ -1180,24 +1115,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
     };
 
-    map.on('zoom', handleZoomChange);
+    mapRef.current.on('zoom', handleZoomChange);
 
     return () => {
-      try { map.off('zoom', handleZoomChange); } catch {}
+      try { mapRef.current?.off('zoom', handleZoomChange); } catch {}
     };
-  }, [mapLoaded, landmarks, map]);
+  }, [mapLoaded, landmarks]);
 
-  // Initial viewport load
-  useEffect(() => {
-    if (mapLoaded && map) {
-      setTimeout(() => handleViewportChangeRef.current(), 800);
-    }
-  }, [mapLoaded, map]);
 
   return (
     <div
-      ref={mapRef}
-      className="maplibre-map"
+      ref={mapContainerRef}
+      className="map-container maplibre-map"
       style={{
         position: 'absolute',
         top: 0,
