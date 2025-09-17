@@ -106,11 +106,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    const style = {
-      version: 8,
-      sources: { 'nyc-tiles': { type: 'vector', tiles: [`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`], minzoom: 10, maxzoom: 16, scheme: 'xyz' } },
-      layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } }]
+    const style: maplibregl.StyleSpecification = {
+      version: 8 as 8,
+      sources: {
+        'nyc-tiles': {
+          type: 'vector',
+          tiles: [`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`],
+          minzoom: 10,
+          maxzoom: 16,
+          scheme: 'xyz',
+        },
+      },
+      layers: [
+        { id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } },
+      ],
     };
+
 
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
