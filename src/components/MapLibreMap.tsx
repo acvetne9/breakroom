@@ -337,35 +337,74 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [fetchFullBusinessDetails]);
 
-  // Handle viewport change
+  // Updated handleBusinessClick with fly-to behavior
+const handleBusinessClick = useCallback(async (business: any) => {
+  if (!business || !callbackRefs.current.onBusinessClick) return;
+
+  try {
+    let businessToReturn = business;
+
+    // Fly to the business on map
+    if (mapRef.current && business?.position?.lat && business?.position?.lng) {
+      mapRef.current.flyTo({
+        center: [business.position.lng, business.position.lat],
+        zoom: 16,
+        speed: 1.2,
+        curve: 1.2,
+        essential: true
+      });
+    }
+
+    // Load full details if needed
+    if (business.id && !business.id.startsWith('vector_') && fetchFullBusinessDetails) {
+      const cached = businessCacheRef.current.get(business.id);
+      if (cached && (cached as any).detailsLoaded) {
+        businessToReturn = cached;
+      } else {
+        const full = await fetchFullBusinessDetails(business.id);
+        if (full) {
+          const extended = { ...full, detailsLoaded: true } as Business & { detailsLoaded: true };
+          businessCacheRef.current.set(business.id, extended);
+          businessToReturn = extended;
+        }
+      }
+    }
+
+    callbackRefs.current.onBusinessClick(businessToReturn);
+
+  } catch (err) {
+    console.warn('handleBusinessClick error', err);
+    callbackRefs.current.onBusinessClick(business);
+  }
+}, [fetchFullBusinessDetails]);
+
+  // Clean, consistent viewport handler — supports neighborhood polygons
   const handleViewportChange = useCallback(async () => {
     if (!mapRef.current || !mapLoaded || isLoadingRef.current) return;
-  
+
     const map = mapRef.current;
     const zoom = map.getZoom();
-  
-    let bounds: Bounds;
-  
+
+    // If a neighborhood polygon is active => compute bounds from polygon, then load for that neighborhood
     if (searchFilters?.neighborhoodFilter?.boundary?.length) {
-      const { boundary } = searchFilters.neighborhoodFilter;
-      const lats = boundary.map((p: any) => featureToLatLon(p).lat);
-      const lons = boundary.map((p: any) => featureToLatLon(p).lon);
-  
-      bounds = {
+      const { boundary, name } = searchFilters.neighborhoodFilter;
+      const lats = boundary.map((p: any) => p.lat);
+      const lons = boundary.map((p: any) => p.lon);
+
+      const bounds: Bounds = {
         north: Math.max(...lats) + 0.015,
         south: Math.min(...lats) - 0.015,
         east: Math.max(...lons) + 0.02,
         west: Math.min(...lons) - 0.02
       };
-  
+
       const businessLimit = getBusinessLimitForViewport(zoom, bounds);
-  
-      const convertedBoundaryPoints = boundary.map((p: any) => featureToLatLon(p));
-  
+      const convertedBoundaryPoints = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
       try {
         const neighborhoodBusinesses = await loadBusinessesInViewport?.(convertedBoundaryPoints);
         if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length) {
-          const polygonCoords = boundary.map((p: any) => [featureToLatLon(p).lon, featureToLatLon(p).lat]);
+          // optional: clip results precisely to polygon
+          const polygonCoords = boundary.map((p: any) => [p.lon, p.lat]);
           const turfPoly = turf.polygon([polygonCoords]);
           const clipped = neighborhoodBusinesses.filter(b => {
             if (!b?.position) return false;
@@ -377,20 +416,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       } catch (err) {
         console.error('Error loading neighborhood businesses', err);
       }
-      return;
+      return; // stop here (don't also request rectangular viewport)
     }
-  
-    // For normal rectangular viewport
-    const currentBounds = map.getBounds();
-    bounds = {
-      north: currentBounds.getNorth(),
-      south: currentBounds.getSouth(),
-      east: currentBounds.getEast(),
-      west: currentBounds.getWest()
-    };
-  
+
     const businessLimit = getBusinessLimitForViewport(zoom, bounds);
-  
     try {
       const viewportBusinesses = await loadBusinessesInViewport?.(bounds, businessLimit);
       if (Array.isArray(viewportBusinesses) && viewportBusinesses.length) {
@@ -400,7 +429,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.error('Error loading viewport businesses', err);
     }
   }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters]);
-
 
   
   // DeckGL layers (scatterplot only). Pass the layer factory the object it expects.
