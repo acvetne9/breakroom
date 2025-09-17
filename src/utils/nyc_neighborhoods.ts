@@ -725,25 +725,19 @@ export function findNeighborhood(searchTerm: string): NeighborhoodBounds | null 
 }
 
 // Ray-casting algorithm to check if a point is inside a polygon
-export function isPointInPolygon(
-  point: { lat: number; lon: number }, 
-  polygon: { lat: number; lon: number }[]
-): boolean {
+const isPointInPolygon = (point: { lat: number; lon: number }, polygon: { lat: number; lon: number }[]) => {
   let inside = false;
-  const x = point.lon;
-  const y = point.lat;
-  
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
     const xi = polygon[i].lon, yi = polygon[i].lat;
     const xj = polygon[j].lon, yj = polygon[j].lat;
 
-    const intersect = ((yi > y) !== (yj > y)) &&
-                      (x < (xj - xi) * (y - yi) / (yj - yi + 0.000000001) + xi);
+    const intersect = ((yi > point.lat) !== (yj > point.lat)) &&
+      (point.lon < (xj - xi) * (point.lat - yi) / (yj - yi + 1e-12) + xi);
+
     if (intersect) inside = !inside;
   }
-
   return inside;
-}
+};
 
 // Filter businesses within neighborhood rectangular bounds with generous padding
 export function filterBusinessesByNeighborhood(
