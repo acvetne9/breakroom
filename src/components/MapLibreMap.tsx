@@ -667,34 +667,61 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (!mapContainerRef.current || mapRef.current) return;
   
     const initializeMap = async () => {
-      // Generate blob URLs for tiles
-      const urls = ['/data/tiles/{z}/{x}/{y}.pbf'];
-      const tileUrls: string[] = await Promise.all(
-        urls.map(url => createTileBlobUrl(url))
-      );
-  
-      // Build style
-      const mapStyle: maplibregl.StyleSpecification = {
-        version: 8,
-        sources: {
-          'nyc-tiles': {
-            type: 'vector',
-            tiles: tileUrls, // ✅ string[]
-            minzoom: 9,
-            maxzoom: 19,
-            scheme: 'xyz',
+      let mapStyle: maplibregl.StyleSpecification;
+
+      // Configure tiles based on environment
+      if (isCapacitor()) {
+        // For Capacitor: Use OSM raster tiles since vector tiles may not work well
+        console.log('🔧 Capacitor environment detected, using raster tiles...');
+        mapStyle = {
+          version: 8,
+          sources: {
+            'osm': {
+              type: 'raster',
+              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+              tileSize: 256,
+              attribution: '© OpenStreetMap contributors'
+            }
           },
-        },
-        glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-        layers: [
-          {
-            id: 'background',
-            type: 'background',
-            paint: { 'background-color': '#fff' },
+          glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+          layers: [
+            {
+              id: 'background',
+              type: 'background',
+              paint: { 'background-color': '#f8f8f8' },
+            },
+            {
+              id: 'osm-tiles',
+              type: 'raster',
+              source: 'osm',
+              paint: {}
+            }
+          ],
+        };
+      } else {
+        // For web: Use vector tiles with service worker handling
+        console.log('🔧 Web environment detected, using vector tiles with service worker...');
+        mapStyle = {
+          version: 8,
+          sources: {
+            'nyc-tiles': {
+              type: 'vector',
+              tiles: ['/data/tiles/{z}/{x}/{y}.pbf'], // Let service worker handle these
+              minzoom: 9,
+              maxzoom: 16,
+              scheme: 'xyz',
+            },
           },
-          // add your layers here...
-        ],
-      };
+          glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+          layers: [
+            {
+              id: 'background',
+              type: 'background',
+              paint: { 'background-color': '#fff' },
+            },
+          ],
+        };
+      }
   
       // Create map (with second-map config merged in)
       const mapInstance = new maplibregl.Map({
