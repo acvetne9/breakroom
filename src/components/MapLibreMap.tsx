@@ -18,7 +18,6 @@ interface SearchFilters {
 }
 
 interface Props {
-  businesses: Business[];
   searchFilters?: SearchFilters | null;
   onBusinessClick?: (business: Business) => void;
   selectedBusiness?: Business | null;
@@ -26,7 +25,7 @@ interface Props {
   neighborhoodCenter?: { lat: number; lon: number };
 }
 
-const MapLibreMap: React.FC<Props> = ({ businesses, searchFilters }) => {
+const MapLibreMap: React.FC<Props> = ({ searchFilters }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const overlayRef = useRef<MapboxOverlay | null>(null);
