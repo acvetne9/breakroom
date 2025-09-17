@@ -431,95 +431,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     const map = mapRef.current;
 
-    // If neighborhood search is active, load businesses within neighborhood bounds
     if (searchFilters?.neighborhoodFilter?.boundary?.length > 0) {
       const { boundary, name } = searchFilters.neighborhoodFilter;
-      console.log("📍 Loading businesses within neighborhood boundary:", name);
+      console.log("📍 Loading businesses within neighborhood polygon:", name);
     
-      const lats = boundary.map(p => p.lat);
-      const lons = boundary.map(p => p.lon);
-      const neighborhoodBounds = [
-        [Math.min(...lons), Math.min(...lats)],
-        [Math.max(...lons), Math.max(...lats)],
-      ];
+      // Convert boundary points to [lng, lat] for polygon
+      const polygon: [number, number][] = boundary.map(p => [p.lon, p.lat]);
     
-      const neighborhoodBusinesses = await loadBusinessesInViewport(neighborhoodBounds, businessLimit);
+      // Pass polygon directly to your fetch
+      const neighborhoodBusinesses = await loadBusinessesInViewport(polygon, businessLimit);
+    
       businessCacheRef.current.addMultiple(neighborhoodBusinesses);
-      return; // ✅ don’t fall through to viewport fetch
+      return; // ✅ do not fall back to rectangular viewport fetch
     }
 
-    // Regular viewport-based loading for non-neighborhood searches
-    try {
-      isLoadingRef.current = true;
-      const currentBounds = map.getBounds();
-      const zoom = map.getZoom();
-      
-      const bounds: Bounds = {
-        north: currentBounds.getNorth(),
-        south: currentBounds.getSouth(),
-        east: currentBounds.getEast(),
-        west: currentBounds.getWest()
-      };
-
-      // Check if this viewport change is significant enough to warrant new data
-      const currentViewport: ViewportState = { bounds, zoom, timestamp: Date.now() };
-      
-      if (lastViewportRef.current) {
-        const lastBounds = lastViewportRef.current.bounds;
-        const lastZoom = lastViewportRef.current.zoom;
-        const timeSinceLastLoad = Date.now() - lastViewportRef.current.timestamp;
-        
-        // Calculate viewport overlap
-        const overlapLat = Math.max(0, Math.min(bounds.north, lastBounds.north) - Math.max(bounds.south, lastBounds.south));
-        const overlapLng = Math.max(0, Math.min(bounds.east, lastBounds.east) - Math.max(bounds.west, lastBounds.west));
-        const currentArea = (bounds.north - bounds.south) * (bounds.east - bounds.west);
-        const overlap = currentArea > 0 ? (overlapLat * overlapLng) / currentArea : 0;
-        
-        // Only skip if very recent AND minimal change (much more lenient for initial loads)
-        if (overlap > 0.95 && Math.abs(zoom - lastZoom) < 0.1 && timeSinceLastLoad < 1000) {
-          console.log('📍 Viewport change too small, skipping business reload', {
-            overlap: overlap.toFixed(2),
-            zoomDiff: Math.abs(zoom - lastZoom).toFixed(2),
-            timeSinceLastLoad
-          });
-          return;
-        }
-      } else {
-        console.log('🎯 Initial viewport load - no previous viewport to compare');
-      }
-      
-      lastViewportRef.current = currentViewport;
-      
-      const businessLimit = getBusinessLimitForViewport(zoom, bounds);
-      
-      console.log('🗺️ Loading businesses for viewport:', {
-        bounds: {
-          north: bounds.north.toFixed(4),
-          south: bounds.south.toFixed(4),
-          east: bounds.east.toFixed(4),
-          west: bounds.west.toFixed(4)
-        },
-        zoom: zoom.toFixed(2),
-        businessLimit,
-        area: ((bounds.north - bounds.south) * (bounds.east - bounds.west)).toFixed(6)
-      });
-      
-      const viewportBusinesses = await loadBusinessesInViewport(bounds, businessLimit);
-      
-      if (Array.isArray(viewportBusinesses) && viewportBusinesses.length > 0) {
-        console.log(`✅ Loaded ${viewportBusinesses.length} businesses for current viewport`);
-        businessCacheRef.current.addMultiple(viewportBusinesses);
-        
-        if (callbackRefs.current.onBusinessesLoaded) {
-          callbackRefs.current.onBusinessesLoaded();
-        }
-      }
-      
-    } catch (error) {
-      console.error('❌ Error in handleViewportChange:', error);
-    } finally {
-      isLoadingRef.current = false;
-    }
   }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters]);
 
   // Memoized DeckGL layers calculation with detailed logging
@@ -568,14 +493,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       // Filter businesses to current viewport if map is loaded
       if (mapRef.current && mapLoaded) {
         const currentBounds = mapRef.current.getBounds();
-        const visibleBusinesses = businessesToRender.filter(business => {
-          if (!business?.position?.lat || !business?.position?.lng) return false;
-          
-          return business.position.lat <= currentBounds.getNorth() &&
-                 business.position.lat >= currentBounds.getSouth() &&
-                 business.position.lng <= currentBounds.getEast() &&
-                 business.position.lng >= currentBounds.getWest();
-        });
+        let visibleBusinesses = businessesToRender;
+
+        if (searchFilters?.neighborhoodFilter?.boundary?.length > 0) {
+          const polyCoords = searchFilters.neighborhoodFilter.boundary.map(p => [p.lon, p.lat]);
+          const turfPoly = turfPolygon([polyCoords]);
+          visibleBusinesses = businessesToRender.filter(b => {
+            const p = turfPoint([b.position.lng, b.position.lat]);
+            return booleanPointInPolygon(p, turfPoly);
+          });
+        }
         
         // Combine visible businesses with some cached ones for smooth scrolling
         const bufferBusinesses = businessesToRender.filter(business => {
