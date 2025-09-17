@@ -41,6 +41,19 @@ interface ViewportState {
 // singleton overlay
 let overlayInstance: MapboxOverlay | null = null;
 
+// Convert GeoJSON Point Feature -> { lat, lon }
+const featureToLatLon = (feature: turf.Feature<turf.Point> | { lat: number; lon: number }) => {
+  if ('geometry' in feature && feature.geometry?.type === 'Point') {
+    return { lat: feature.geometry.coordinates[1], lon: feature.geometry.coordinates[0] };
+  }
+  // Already { lat, lon }?
+  if ('lat' in feature && 'lon' in feature) {
+    return feature;
+  }
+  throw new Error('Invalid feature for conversion to lat/lon');
+};
+
+
 // basic grid-sampling (unchanged, preserved behavior)
 const createOptimizedGridSampling = (bounds: Bounds, businesses: Business[], maxBusinesses: number, prioritizeVisible: boolean = false): Business[] => {
   if (!businesses || businesses.length <= maxBusinesses) return businesses;
@@ -348,7 +361,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       const businessLimit = getBusinessLimitForViewport(zoom, bounds);
       try {
-        const neighborhoodBusinesses = await loadBusinessesInViewport?.(bounds, businessLimit);
+        const converted = featureToLatLon(boundaryPoint);
+        const neighborhoodBusinesses = await loadBusinessesInViewport?.(converted);
         if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length) {
           // optional: clip results precisely to polygon
           const polygonCoords = boundary.map((p: any) => [p.lon, p.lat]);
