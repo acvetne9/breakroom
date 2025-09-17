@@ -8,6 +8,7 @@ import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
 import { useIsMobile } from '../hooks/use-mobile';
 import { createTileBlobUrl } from '@/utils/tileDecompression';
 import { isPointInPolygon } from '@/utils/nyc_neighborhoods'
+import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods'
 import type { GeoJSONFeature } from 'maplibre-gl';
 import type { Business } from '@/types/business';
 
