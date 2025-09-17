@@ -239,7 +239,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         const results: SearchResult[] = [];
         
         // Check if the query matches a neighborhood
-        const neighborhood = findNeighborhood(q);
+        const neighborhood = findNeighborhoodBoundaryByName(q);
         if (neighborhood) {
           results.push({
             id: `neighborhood-${neighborhood.name}`,
