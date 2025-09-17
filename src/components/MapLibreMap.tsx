@@ -358,8 +358,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       };
 
       const businessLimit = getBusinessLimitForViewport(zoom, bounds);
+      const convertedBoundaryPoints = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
       try {
-        const convertedBoundaryPoints = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
         const neighborhoodBusinesses = await loadBusinessesInViewport?.(convertedBoundaryPoints);
         if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length) {
           // optional: clip results precisely to polygon
