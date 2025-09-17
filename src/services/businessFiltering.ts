@@ -20,6 +20,10 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
   
   if (!searchQuery.trim()) return null;
 
+  let filters: SearchFilters = {
+    textTerms: []
+  };
+
   // Check for neighborhood first
   const neighborhood = findNeighborhoodBoundaryByName(searchQuery);
   if (neighborhood) {
