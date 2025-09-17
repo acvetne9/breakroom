@@ -670,36 +670,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       console.log('🔧 Web environment detected, using vector tiles with service worker...');
 
-      // Create tile source using blob URLs
-      const createTileSource = async () => {
-        try {
-          const tileTemplate = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-          console.log('🔧 Creating blob URL for tile template:', tileTemplate);
-          
-          const blobUrl = await createTileBlobUrl(tileTemplate);
-          console.log('🔧 Created blob URL:', blobUrl);
-          
-          return {
-            type: 'vector' as const,
-            tiles: [blobUrl],
-            minzoom: 10,
-            maxzoom: 16,
-            scheme: 'xyz' as const
-          };
-        } catch (error) {
-          console.warn('🔧 Fallback to direct tiles due to blob URL error:', error);
-          // Fallback to direct URL
-          return {
-            type: 'vector' as const,
-            tiles: [`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`],
-            minzoom: 10,
-            maxzoom: 16,
-            scheme: 'xyz' as const
-          };
-        }
+      // Create tile source - use direct URLs since blob URLs are causing parsing issues
+      const createTileSource = () => {
+        console.log('🔧 Using direct vector tiles for web environment');
+        const fullUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+        console.log('🔧 Tile URL template:', fullUrl);
+        
+        return {
+          type: 'vector' as const,
+          tiles: [fullUrl],
+          minzoom: 10,
+          maxzoom: 16,
+          scheme: 'xyz' as const
+        };
       };
 
-      const vectorSource = await createTileSource();
+      const vectorSource = createTileSource();
       
       const mapStyle = {
         version: 8 as const,
@@ -741,6 +727,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         // Set up viewport change handler ref
         handleViewportChangeRef.current = handleViewportChange;
 
+        // Add error handling for map errors
+        mapInstance.on('error', (e) => {
+          console.error('Map error:', e.error);
+        });
+
         // Map event listeners
         mapInstance.on('load', () => {
           console.log('🗺️ Map loaded successfully');
@@ -754,6 +745,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           if (!layersAddedRef.current) {
             addVectorLayers(mapInstance);
           }
+
+          // Load initial businesses after map is ready
+          setTimeout(() => {
+            console.log('🏢 Loading initial businesses...');
+            handleViewportChangeRef.current();
+          }, 1000);
         });
 
         // Fallback timer
@@ -765,6 +762,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               callbackRefs.current.onMapLoaded();
             }
           }
+          // Also try to load businesses after fallback timer
+          console.log('🏢 Fallback: Loading businesses after timer...');
+          handleViewportChangeRef.current();
         }, 3000);
 
         // Viewport change handlers
@@ -872,7 +872,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [deckGLLayers, deckOverlay, overlayReady]);
 
-  // Center map on neighborhood when neighborhoodCenter changes
+  // Load businesses when map becomes ready
+  useEffect(() => {
+    if (mapLoaded && mapRef.current && loadBusinessesInViewport) {
+      console.log('🔄 Map is loaded, triggering initial business load...');
+      setTimeout(() => {
+        handleViewportChangeRef.current();
+      }, 500);
+    }
+  }, [mapLoaded, loadBusinessesInViewport]);
   useEffect(() => {
     if (!mapRef.current || !neighborhoodCenter) return;
     
@@ -1077,4 +1085,4 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   );
 };
 
-export default React.memo(MapLibreMap);
+export default MapLibreMap;
