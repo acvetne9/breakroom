@@ -102,77 +102,151 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return [createBusinessScatterplotLayer({ businesses: toRender, selectedBusinessId: selectedBusiness?.id, onBusinessClick: handleBusinessClick })];
   }, [businesses, selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters]);
 
-  // Initialize map
-  useEffect(() => {
-    if (!mapContainerRef.current || mapRef.current) return;
-
-    const style: maplibregl.StyleSpecification = {
-      version: 8 as 8,
-      sources: {
-        'nyc-tiles': {
-          type: 'vector',
-          tiles: [`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`],
-          minzoom: 10,
-          maxzoom: 16,
-          scheme: 'xyz',
+const addVectorLayers = useCallback((map: maplibregl.Map) => {
+    try {
+      const layers = [
+        {
+          id: 'nyc-land',
+          type: 'fill' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'examplepoints',
+          layout: {},
+          paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
+          filter: ['==', ['geometry-type'], 'Polygon'] as any
         },
-      },
-      layers: [
-        { id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } },
-      ],
-    };
+        {
+          id: 'nyc-green-spaces',
+          type: 'fill' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'examplepoints',
+          layout: {},
+          paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
+          filter: [
+            'all',
+            ['==', ['geometry-type'], 'Polygon'],
+            ['any',
+              ['==', ['get', 'leisure'], 'park'],
+              ['==', ['get', 'landuse'], 'cemetery'],
+              ['==', ['get', 'amenity'], 'cemetery'],
+              ['==', ['get', 'amenity'], 'grave_yard'],
+              ['==', ['get', 'landuse'], 'recreation_ground'],
+              ['==', ['get', 'leisure'], 'recreation_ground'],
+              ['in', 'cemetery', ['get', 'name']],
+              ['in', 'Cemetery', ['get', 'name']],
+              ['in', 'Graveyard', ['get', 'name']],
+              ['in', 'graveyard', ['get', 'name']],
+              ['==', ['get', 'place'], 'cemetery'],
+              ['==', ['get', 'historic'], 'cemetery']
+            ]
+          ] as any
+        },
+        {
+          id: 'nyc-water',
+          type: 'fill' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'examplepoints',
+          layout: {},
+          paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
+          filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']] as any
+        },
+        {
+          id: 'nyc-roads',
+          type: 'line' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'examplepoints',
+          layout: {},
+          paint: {
+            'line-color': '#666666',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
+            'line-opacity': 0.8
+          },
+          filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']] as any
+        },
+        {
+          id: 'nyc-road-labels',
+          type: 'symbol' as const,
+          source: 'nyc-tiles',
+          'source-layer': 'examplepoints',
+          layout: {
+            'text-field': ['get', 'name'],
+            'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+            'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
+            'text-max-width': 8,
+            'text-line-height': 1.2,
+            'symbol-placement': 'line',
+            'text-rotation-alignment': 'map',
+            'text-allow-overlap': false,
+            'text-ignore-placement': false
+          },
+          paint: {
+            'text-color': '#333333',
+            'text-halo-color': '#FFFFFF',
+            'text-halo-width': 1.5,
+            'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 1]
+          },
+          filter: [
+            'all', 
+            ['==', ['geometry-type'], 'LineString'], 
+            ['has', 'name'],
+            ['has', 'highway'],
+            ['!=', ['get', 'name'], '']
+          ] as any,
+          minzoom: 12
+        }
+      ];
 
-
-    const map = new maplibregl.Map({
-      container: mapContainerRef.current,
-      style,
-      center: [-73.986104, 40.715245],
-      zoom: 12.77,
-      maxZoom: 18,
-      minZoom: 9,
-      renderWorldCopies: false,
-      attributionControl: false
-    });
-
-    mapRef.current = map;
-
-    // Add vector layers once source is ready
-    map.on('sourcedata', e => {
-      if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
+      console.log('Adding', layers.length, 'vector layers...');
+      
+      layers.forEach((layer, index) => {
         try {
-          // Example: roads, water, parks
-          const layersToAdd = [
-            { id: 'nyc-roads', type: 'line', source: 'nyc-tiles', 'source-layer': 'examplepoints', paint: { 'line-color': '#666', 'line-width': 1 } },
-            { id: 'nyc-water', type: 'fill', source: 'nyc-tiles', 'source-layer': 'examplepoints', paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1 } },
-            { id: 'nyc-green', type: 'fill', source: 'nyc-tiles', 'source-layer': 'examplepoints', paint: { 'fill-color': '#87C17A', 'fill-opacity': 1 } }
-          ];
-          layersToAdd.forEach(l => { if (!map.getLayer(l.id)) map.addLayer(l as any); });
-          layersAddedRef.current = true;
-        } catch (err) { console.error('Error adding layers', err); }
-      }
-    });
+          if (!map.getLayer(layer.id)) {
+            map.addLayer(layer as any);
+            console.log(`Added layer ${index + 1}/${layers.length}: ${layer.id}`);
+          }
+        } catch (error) {
+          console.error('Error adding layer:', layer.id, error);
+        }
+      });
 
-    map.on('load', () => {
-      setMapLoaded(true);
-      callbackRefs.current.onMapLoaded?.();
-
-      // Add DeckGL overlay
-      if (!overlayInstance) {
-        overlayInstance = new MapboxOverlay({ interleaved: true });
-        map.addControl(overlayInstance);
-        setDeckOverlay(overlayInstance);
-        setOverlayReady(true);
-      }
-
-      // Load initial businesses
-      setTimeout(() => handleViewportChangeRef.current?.(), 500);
-    });
-
-    return () => {
-      map.remove();
-      overlayInstance = null;
-    };
+      layersAddedRef.current = true;
+      console.log('All vector layers added successfully');
+    } catch (error) {
+      console.error('Error in addVectorLayers:', error);
+    }
   }, []);
+
+  useEffect(() => {
+    if (mapContainerRef.current && !mapRef.current) {
+      const map = new maplibregl.Map({
+        container: mapContainerRef.current,
+        style: {
+          version: 8 as 8, // ✅ TS fix
+          sources: {
+            'nyc-tiles': {
+              type: 'vector',
+              tiles: [`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`],
+              minzoom: 10,
+              maxzoom: 16,
+              scheme: 'xyz',
+            },
+          },
+          layers: [
+            { id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } },
+          ],
+        } as maplibregl.StyleSpecification,
+        center: [-73.97, 40.78],
+        zoom: 12,
+      });
+
+      mapRef.current = map;
+
+      map.on('load', () => {
+        console.log('✅ Map loaded, adding custom layers...');
+        addVectorLayers(map);
+      });
+    }
+  }, [addVectorLayers]);
+
 
   // Handle viewport changes
   const handleViewportChangeRef = useRef<() => void>(() => {});
