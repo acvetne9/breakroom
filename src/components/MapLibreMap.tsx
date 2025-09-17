@@ -22,36 +22,23 @@ interface MapLibreMapProps {
   isClusteredData?: boolean;
 }
 
-interface Bounds {
-  north: number;
-  south: number;
-  east: number;
-  west: number;
-}
+interface Bounds { north: number; south: number; east: number; west: number; }
 
-// Singleton DeckGL overlay
+// Singleton overlay
 let overlayInstance: MapboxOverlay | null = null;
 
+// Business cache
 class BusinessCache {
   private cache = new Map<string, Business & { detailsLoaded?: boolean }>();
   private maxSize: number;
-
   constructor(maxSize = 10000) { this.maxSize = maxSize; }
-
   set(id: string, business: Business & { detailsLoaded?: boolean }) {
     if (this.cache.size >= this.maxSize) {
-      const keysToDelete = Array.from(this.cache.keys()).slice(0, Math.floor(this.maxSize * 0.1));
-      keysToDelete.forEach(k => this.cache.delete(k));
+      Array.from(this.cache.keys()).slice(0, Math.floor(this.maxSize * 0.1)).forEach(k => this.cache.delete(k));
     }
     this.cache.set(id, business);
   }
-
-  get(id: string) {
-    const b = this.cache.get(id);
-    if (b) { this.cache.delete(id); this.cache.set(id, b); }
-    return b;
-  }
-
+  get(id: string) { const b = this.cache.get(id); if (b) { this.cache.delete(id); this.cache.set(id, b); } return b; }
   getAll() { return Array.from(this.cache.values()); }
   addMultiple(businesses: Business[]) { businesses.forEach(b => b?.id && this.set(b.id, b)); }
   clear() { this.cache.clear(); }
@@ -71,18 +58,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const businessCacheRef = useRef(new BusinessCache(isMobile ? 10000 : 20000));
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
   const layersAddedRef = useRef(false);
+  const isLoadingRef = useRef(false);
 
   const callbackRefs = useRef({ onBusinessClick, onMapLoaded, onBusinessesLoaded });
   useEffect(() => { callbackRefs.current = { onBusinessClick, onMapLoaded, onBusinessesLoaded }; }, [onBusinessClick, onMapLoaded, onBusinessesLoaded]);
 
-  const mapDataHook = useViewportMapData();
   const businessesHook = useViewportBusinesses(searchFilters);
+  const mapDataHook = useViewportMapData();
   const { businesses: rawBusinesses, loadBusinessesInViewport, fetchFullBusinessDetails } = businessesHook;
   const businesses = Array.isArray(rawBusinesses) ? rawBusinesses : [];
 
-  // Cache businesses
+  // Add businesses to cache
   useEffect(() => { if (businesses.length) businessCacheRef.current.addMultiple(businesses); }, [businesses]);
 
+  // Business click handler
   const handleBusinessClick = useCallback(async (business: any) => {
     if (!business || !callbackRefs.current.onBusinessClick) return;
     try {
@@ -91,14 +80,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         const cached = businessCacheRef.current.get(business.id);
         if (cached?.detailsLoaded) result = cached;
         else {
-          const fullBusiness = await fetchFullBusinessDetails(business.id);
-          if (fullBusiness) { fullBusiness.detailsLoaded = true; businessCacheRef.current.set(business.id, fullBusiness); result = fullBusiness; }
+          const full = await fetchFullBusinessDetails(business.id);
+          if (full) { full.detailsLoaded = true; businessCacheRef.current.set(business.id, full); result = full; }
         }
       }
       callbackRefs.current.onBusinessClick(result);
     } catch { callbackRefs.current.onBusinessClick(business); }
   }, [fetchFullBusinessDetails]);
 
+  // Memoized DeckGL layers
   const deckGLLayers = useMemo(() => {
     const cached = businessCacheRef.current.getAll();
     const all = [...cached, ...businesses.filter(b => !cached.some(c => c.id === b.id))];
@@ -112,14 +102,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return [createBusinessScatterplotLayer({ businesses: toRender, selectedBusinessId: selectedBusiness?.id, onBusinessClick: handleBusinessClick })];
   }, [businesses, selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters]);
 
-  const initializeMap = useCallback(() => {
+  // Initialize map
+  useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
     const style = {
       version: 8,
-      sources: {
-        'nyc-tiles': { type: 'vector', tiles: [`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`], minzoom: 10, maxzoom: 16, scheme: 'xyz' }
-      },
+      sources: { 'nyc-tiles': { type: 'vector', tiles: [`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`], minzoom: 10, maxzoom: 16, scheme: 'xyz' } },
       layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } }]
     };
 
@@ -136,9 +125,26 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     mapRef.current = map;
 
-    map.on('load', async () => {
+    // Add vector layers once source is ready
+    map.on('sourcedata', e => {
+      if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
+        try {
+          // Example: roads, water, parks
+          const layersToAdd = [
+            { id: 'nyc-roads', type: 'line', source: 'nyc-tiles', 'source-layer': 'examplepoints', paint: { 'line-color': '#666', 'line-width': 1 } },
+            { id: 'nyc-water', type: 'fill', source: 'nyc-tiles', 'source-layer': 'examplepoints', paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1 } },
+            { id: 'nyc-green', type: 'fill', source: 'nyc-tiles', 'source-layer': 'examplepoints', paint: { 'fill-color': '#87C17A', 'fill-opacity': 1 } }
+          ];
+          layersToAdd.forEach(l => { if (!map.getLayer(l.id)) map.addLayer(l as any); });
+          layersAddedRef.current = true;
+        } catch (err) { console.error('Error adding layers', err); }
+      }
+    });
+
+    map.on('load', () => {
       setMapLoaded(true);
       callbackRefs.current.onMapLoaded?.();
+
       // Add DeckGL overlay
       if (!overlayInstance) {
         overlayInstance = new MapboxOverlay({ interleaved: true });
@@ -146,22 +152,29 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         setDeckOverlay(overlayInstance);
         setOverlayReady(true);
       }
-      // Load businesses
+
+      // Load initial businesses
       setTimeout(() => handleViewportChangeRef.current?.(), 500);
     });
+
+    return () => {
+      map.remove();
+      overlayInstance = null;
+    };
   }, []);
 
+  // Handle viewport changes
   const handleViewportChangeRef = useRef<() => void>(() => {});
   handleViewportChangeRef.current = useCallback(async () => {
     if (!mapRef.current || !loadBusinessesInViewport) return;
-    const boundsObj: Bounds = { north: 40.92, south: 40.55, east: -73.70, west: -74.25 }; // placeholder
-    await loadBusinessesInViewport(boundsObj, 1000);
-  }, [loadBusinessesInViewport]);
+    if (searchFilters?.neighborhoodFilter?.boundary?.length) {
+      const b = searchFilters.neighborhoodFilter.boundary;
+      const bounds: Bounds = { north: Math.max(...b.map(p => p.lat)), south: Math.min(...b.map(p => p.lat)), east: Math.max(...b.map(p => p.lon)), west: Math.min(...b.map(p => p.lon)) };
+      await loadBusinessesInViewport(bounds, 1000);
+    }
+  }, [loadBusinessesInViewport, searchFilters]);
 
-  // Initialize map once
-  useEffect(() => { initializeMap(); return () => { mapRef.current?.remove(); overlayInstance = null; }; }, []);
-
-  // Update DeckGL
+  // Update DeckGL layers
   useEffect(() => { if (deckOverlay) deckOverlay.setProps({ layers: deckGLLayers }); }, [deckOverlay, deckGLLayers]);
 
   return <div ref={mapContainerRef} className="map-container maplibre-map" style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, width: '100%', height: '100%' }} />;
