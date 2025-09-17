@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useCallback } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { MapboxOverlay } from "@deck.gl/mapbox/typed";
+import { MapboxOverlay } from "@deck.gl/mapbox";
 import { createBusinessScatterplotLayer } from "@/utils/deckGLLayers";
 import { Business } from "@/types";
 import * as turf from "@turf/turf";
@@ -20,6 +20,10 @@ interface SearchFilters {
 interface Props {
   businesses: Business[];
   searchFilters?: SearchFilters | null;
+  onBusinessClick?: (business: Business) => void;
+  selectedBusiness?: Business | null;
+  landmarks?: { lat: number; lng: number; emoji: string }[];
+  neighborhoodCenter?: { lat: number; lon: number };
 }
 
 const MapLibreMap: React.FC<Props> = ({ businesses, searchFilters }) => {
@@ -239,7 +243,7 @@ const MapLibreMap: React.FC<Props> = ({ businesses, searchFilters }) => {
     }
 
     overlayRef.current.setProps({
-      layers: [createBusinessScatterplotLayer(filtered)],
+      layers: [createBusinessScatterplotLayer({ businesses: filtered })],
     });
   }, [businesses, searchFilters, filterBusinessesByNeighborhood]);
 
