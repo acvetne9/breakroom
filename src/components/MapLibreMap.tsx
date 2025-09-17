@@ -6,7 +6,7 @@ import { createBusinessScatterplotLayer, createBusinessClusterLayer } from '@/ut
 import { useViewportMapData } from '../hooks/useViewportMapData';
 import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
 import { useIsMobile } from '../hooks/use-mobile';
-import { isCapacitor, createTileBlobUrl } from '@/utils/tileDecompression';
+import { createTileBlobUrl } from '@/utils/tileDecompression';
 import type { GeoJSONFeature } from 'maplibre-gl';
 import type { Business } from '@/types/business';
 
@@ -35,7 +35,7 @@ interface ViewportState {
   timestamp: number;
 }
 
-// Singleton ovxerlay for performance
+// Singleton overlay for performance
 let overlayInstance: MapboxOverlay | null = null;
 
 // Optimized grid sampling with visible area priority
@@ -246,7 +246,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [businesses, searchFilters]);
 
-  // Function to add vector layers - must be defined before setupMapEventListeners
+  // Function to add vector layers
   const addVectorLayers = useCallback((map: maplibregl.Map) => {
     try {
       const layers = [
@@ -362,7 +362,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Optimized business limit calculation
   const getBusinessLimitForViewport = useCallback((zoom: number, bounds: Bounds): number => {
-    if (!bounds) return 200; // fallback if bounds is undefined
+    if (!bounds) return 200;
     
     const latDiff = bounds.north - bounds.south;
     const lngDiff = bounds.east - bounds.west;
@@ -373,29 +373,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const lngKm = lngDiff * 111 * Math.cos(avgLat * Math.PI / 180);
     const areaKm2 = latKm * lngKm;
     
-    // Adaptive density based on zoom level - increased for more consistent loading
+    // Adaptive density based on zoom level
     let baseDensity: number;
-    if (zoom >= 16) baseDensity = 500;        // Increased from 300
-    else if (zoom >= 14) baseDensity = 250;   // Increased from 150  
-    else if (zoom >= 12) baseDensity = 150;   // Increased from 80
-    else baseDensity = 80;                    // Increased from 40
+    if (zoom >= 16) baseDensity = 500;
+    else if (zoom >= 14) baseDensity = 250;
+    else if (zoom >= 12) baseDensity = 150;
+    else baseDensity = 80;
     
     // Adjust for mobile performance
-    const mobileFactor = isMobile ? 0.8 : 1.0;  // Less aggressive mobile reduction
+    const mobileFactor = isMobile ? 0.8 : 1.0;
     const targetBusinesses = Math.ceil(areaKm2 * baseDensity * mobileFactor);
     
-    const maxLimit = isMobile ? 20000 : 40000;    // Increased limits
-    const minLimit = 5000;                        // Increased minimum from 200
+    const maxLimit = isMobile ? 20000 : 40000;
+    const minLimit = 5000;
     
     return Math.max(minLimit, Math.min(maxLimit, targetBusinesses));
   }, [isMobile]);
 
   // Optimized business click handler
   const handleBusinessClick = useCallback(async (business: any) => {
-    console.log('🔍 DEBUG: MapLibreMap handleBusinessClick deps check', { 
-      fetchFullBusinessDetails: typeof fetchFullBusinessDetails,
-      callbackRefs: typeof callbackRefs.current 
-    });
     if (!business || !callbackRefs.current.onBusinessClick) return;
     
     try {
@@ -424,13 +420,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Debounced viewport change handler
   const handleViewportChange = useCallback(async () => {
-    console.log('🔍 DEBUG: handleViewportChange deps check', { 
-      mapRef: typeof mapRef.current,
-      mapLoaded: typeof mapLoaded,
-      loadBusinessesInViewport: typeof loadBusinessesInViewport,
-      getBusinessLimitForViewport: typeof getBusinessLimitForViewport 
-    });
-    
     if (!mapRef.current || !mapLoaded || !loadBusinessesInViewport || isLoadingRef.current) return;
 
     const map = mapRef.current;
@@ -481,123 +470,115 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return;
     }
 
-    // Get current visible bounds - this is the key fix
-    const currentBounds = map.getBounds();
-    const currentZoom = map.getZoom();
-    
-    // Create tight bounds for the visible area FIRST
-    const visibleBounds: Bounds = {
-      north: currentBounds.getNorth(),
-      south: currentBounds.getSouth(),
-      east: currentBounds.getEast(),
-      west: currentBounds.getWest(),
-    };
-    
-    console.log('🗺️ Current visible bounds:', visibleBounds);
-    
-    // Load businesses for the EXACT visible area first
+    // Regular viewport-based loading for non-neighborhood searches
     try {
       isLoadingRef.current = true;
-      const visibleBusinessLimit = Math.floor(getBusinessLimitForViewport(currentZoom, visibleBounds) * 0.8);
+      const currentBounds = map.getBounds();
+      const zoom = map.getZoom();
       
-      console.log('🎯 Loading businesses for VISIBLE area:', {
-        zoom: currentZoom.toFixed(2),
-        businessLimit: visibleBusinessLimit,
-        bounds: visibleBounds
-      });
+      const bounds: Bounds = {
+        north: currentBounds.getNorth(),
+        south: currentBounds.getSouth(),
+        east: currentBounds.getEast(),
+        west: currentBounds.getWest()
+      };
+
+      // Check if this viewport change is significant enough to warrant new data
+      const currentViewport: ViewportState = { bounds, zoom, timestamp: Date.now() };
       
-      const visibleBusinesses = await loadBusinessesInViewport(visibleBounds, visibleBusinessLimit);
-      
-      if (Array.isArray(visibleBusinesses) && visibleBusinesses.length > 0) {
-        console.log(`✅ Loaded ${visibleBusinesses.length} businesses for VISIBLE viewport`);
-        businessCacheRef.current.addMultiple(visibleBusinesses);
-      } else {
-        console.log('❌ No businesses loaded for visible viewport');
+      if (lastViewportRef.current) {
+        const lastBounds = lastViewportRef.current.bounds;
+        const lastZoom = lastViewportRef.current.zoom;
+        
+        // Calculate viewport overlap
+        const overlapLat = Math.max(0, Math.min(bounds.north, lastBounds.north) - Math.max(bounds.south, lastBounds.south));
+        const overlapLng = Math.max(0, Math.min(bounds.east, lastBounds.east) - Math.max(bounds.west, lastBounds.west));
+        const currentArea = (bounds.north - bounds.south) * (bounds.east - bounds.west);
+        const overlap = currentArea > 0 ? (overlapLat * overlapLng) / currentArea : 0;
+        
+        // Skip if viewport hasn't changed significantly
+        if (overlap > 0.7 && Math.abs(zoom - lastZoom) < 0.5) {
+          console.log('📍 Viewport change too small, skipping business reload');
+          return;
+        }
       }
       
-      // Then load buffer area (don't wait for this)
-      setTimeout(async () => {
-        const latDiff = visibleBounds.north - visibleBounds.south;
-        const lngDiff = visibleBounds.east - visibleBounds.west;
-        const expansion = 0.3; // 30% expansion for buffer
+      lastViewportRef.current = currentViewport;
+      
+      const businessLimit = getBusinessLimitForViewport(zoom, bounds);
+      
+      console.log('🗺️ Loading businesses for viewport:', {
+        bounds: {
+          north: bounds.north.toFixed(4),
+          south: bounds.south.toFixed(4),
+          east: bounds.east.toFixed(4),
+          west: bounds.west.toFixed(4)
+        },
+        zoom: zoom.toFixed(2),
+        businessLimit,
+        area: ((bounds.north - bounds.south) * (bounds.east - bounds.west)).toFixed(6)
+      });
+      
+      const viewportBusinesses = await loadBusinessesInViewport(bounds, businessLimit);
+      
+      if (Array.isArray(viewportBusinesses) && viewportBusinesses.length > 0) {
+        console.log(`✅ Loaded ${viewportBusinesses.length} businesses for current viewport`);
+        businessCacheRef.current.addMultiple(viewportBusinesses);
         
-        const bufferBounds: Bounds = {
-          north: visibleBounds.north + latDiff * expansion,
-          south: visibleBounds.south - latDiff * expansion,
-          east: visibleBounds.east + lngDiff * expansion,
-          west: visibleBounds.west - lngDiff * expansion,
-        };
-        
-        const bufferBusinessLimit = Math.floor(getBusinessLimitForViewport(currentZoom, bufferBounds) * 0.3);
-        
-        console.log('🔮 Loading buffer businesses:', {
-          businessLimit: bufferBusinessLimit,
-          bounds: bufferBounds
-        });
-        
-        const bufferBusinesses = await loadBusinessesInViewport(bufferBounds, bufferBusinessLimit);
-        if (Array.isArray(bufferBusinesses) && bufferBusinesses.length > 0) {
-          console.log(`🔮 Loaded ${bufferBusinesses.length} buffer businesses`);
-          businessCacheRef.current.addMultiple(bufferBusinesses);
+        if (callbackRefs.current.onBusinessesLoaded) {
+          callbackRefs.current.onBusinessesLoaded();
         }
-      }, 100);
+      }
       
     } catch (error) {
       console.error('❌ Error in handleViewportChange:', error);
     } finally {
-      setTimeout(() => {
-        isLoadingRef.current = false;
-      }, 200);
+      isLoadingRef.current = false;
     }
-
   }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters]);
 
-  // // Keep a ref to latest handler for stable listeners
-  useEffect(() => {
-    handleViewportChangeRef.current = handleViewportChange;
-  }, [handleViewportChange]);
-
-  // Memoized DeckGL layers with better caching and visible area focus
+  // Memoized DeckGL layers calculation with detailed logging
   const deckGLLayers = useMemo(() => {
-    const cachedBusinesses = businessCacheRef.current.getAll();
-    
-    // Also consider businesses from hook state as fallback/supplement
-    const allBusinesses = cachedBusinesses.length > 0 ? cachedBusinesses : businesses;
-    
-    console.log('🎯 DeckGL layers calculation:', {
-      cachedBusinessesCount: cachedBusinesses?.length || 0,
-      hookBusinessesCount: businesses?.length || 0,
-      finalBusinessesCount: allBusinesses?.length || 0,
-      mapLoaded,
-      hasMap: !!mapRef.current,
-      containerDimensions: mapRef.current ? {
-        width: mapRef.current?.getContainer().clientWidth,
-        height: mapRef.current?.getContainer().clientHeight
-      } : null
-    });
-    
-    if (!allBusinesses || allBusinesses.length === 0) {
-      console.log('❌ No businesses available for DeckGL layers (cache + hook)');
-      return [];
-    }
-
     try {
-      let businessesToRender = allBusinesses;
+      // Get all businesses from cache
+      const cachedBusinesses = businessCacheRef.current.getAll();
       
-      // Handle clustered data efficiently
-      if (isClusteredData && Array.isArray(businesses) && businesses.length > 0) {
-        const flattenedBusinesses: Business[] = [];
-        businesses.forEach((item: any) => {
-          if (item?.type === 'cluster' && Array.isArray(item.businesses)) {
-            item.businesses.forEach((b: Business) => {
-              if (b?.position) flattenedBusinesses.push(b);
-            });
-          } else if (item?.type !== 'cluster' && item?.position) {
-            flattenedBusinesses.push(item);
-          }
-        });
-        businessesToRender = flattenedBusinesses;
+      // Get businesses from hook
+      const hookBusinesses = businesses || [];
+      
+      // Combine and deduplicate businesses
+      const allBusinesses = [...cachedBusinesses];
+      hookBusinesses.forEach(hookBusiness => {
+        if (!allBusinesses.some(cached => cached.id === hookBusiness.id)) {
+          allBusinesses.push(hookBusiness);
+        }
+      });
+
+      console.log(`🎯 DeckGL layers calculation:`, {
+        cachedBusinessesCount: cachedBusinesses.length,
+        hookBusinessesCount: hookBusinesses.length,
+        finalBusinessesCount: allBusinesses.length,
+        mapLoaded,
+        hasMap: !!mapRef.current,
+        containerDimensions: mapContainerRef.current ? {
+          width: mapContainerRef.current.clientWidth,
+          height: mapContainerRef.current.clientHeight
+        } : null
+      });
+
+      if (allBusinesses.length === 0) {
+        console.log('❌ No businesses available for DeckGL layers (cache + hook)');
+        return [];
       }
+
+      let businessesToRender = allBusinesses.filter(business => 
+        business && 
+        business.position && 
+        typeof business.position.lat === 'number' && 
+        typeof business.position.lng === 'number' &&
+        !isNaN(business.position.lat) && 
+        !isNaN(business.position.lng)
+      );
 
       // Filter businesses to current viewport if map is loaded
       if (mapRef.current && mapLoaded) {
@@ -661,73 +642,66 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Initialize map with optimized configuration
+  // Initialize map with createTileBlobUrl
   useEffect(() => {
-    console.log('🔄 MapLibre useEffect triggered', { 
-      hasContainer: !!mapContainerRef.current, 
-      hasMap: !!mapRef.current,
-      isCapacitor: isCapacitor(),
-      containerDimensions: mapContainerRef.current ? {
-        width: mapContainerRef.current.clientWidth,
-        height: mapContainerRef.current.clientHeight
-      } : null
-    });
-    
-    if (!mapContainerRef.current || mapRef.current) return;
+    const initializeMap = async () => {
+      console.log('🔄 MapLibre useEffect triggered', { 
+        hasContainer: !!mapContainerRef.current, 
+        hasMap: !!mapRef.current,
+        containerDimensions: mapContainerRef.current ? {
+          width: mapContainerRef.current.clientWidth,
+          height: mapContainerRef.current.clientHeight
+        } : null
+      });
+      
+      if (!mapContainerRef.current || mapRef.current) return;
 
-    // Ensure container has minimum dimensions before creating map
-    const container = mapContainerRef.current;
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
-    
-    console.log('🔧 Container dimensions check:', { containerWidth, containerHeight });
-    
-    if (containerWidth < 100 || containerHeight < 100) {
-      console.warn('⚠️ Container too small, waiting for proper sizing:', { containerWidth, containerHeight });
-      // Retry after a brief delay to allow layout to complete
-      const retryTimer = setTimeout(() => {
-        if (mapContainerRef.current && !mapRef.current) {
-          const newWidth = mapContainerRef.current.clientWidth;
-          const newHeight = mapContainerRef.current.clientHeight;
-          console.log('🔄 Retrying map creation with dimensions:', { newWidth, newHeight });
-          // Trigger a re-render by updating a dummy state
-          setMapLoaded(false);
-        }
-      }, 100);
-      return () => clearTimeout(retryTimer);
-    }
-
-    // Comprehensive tile configuration for different environments
-    const createTileSource = () => {
-      if (isCapacitor()) {
-        console.log('🔧 Using blob URLs for Capacitor tiles');
-        return {
-          type: 'vector' as const,
-          tiles: [
-            createTileBlobUrl('/data/tiles/{z}/{x}/{y}.pbf')
-          ],
-          minzoom: 10,
-          maxzoom: 16,
-          scheme: 'xyz' as const
-        };
+      // Ensure container has minimum dimensions
+      const container = mapContainerRef.current;
+      const containerWidth = container.clientWidth;
+      const containerHeight = container.clientHeight;
+      
+      console.log('🔧 Container dimensions check:', { containerWidth, containerHeight });
+      
+      if (containerWidth < 100 || containerHeight < 100) {
+        console.warn('⚠️ Container too small, waiting for proper sizing:', { containerWidth, containerHeight });
+        return;
       }
-    
-      // Web
-      const fullUrl = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-      console.log('🔧 Using web vector tiles:', fullUrl);
-      return {
-        type: 'vector' as const,
-        tiles: [fullUrl],
-        minzoom: 10,
-        maxzoom: 16,
-        scheme: 'xyz' as const
-      };
-    };
 
-    const createMapStyle = () => {
-      const vectorSource = createTileSource();
-    
-      return {
+      console.log('🔧 Web environment detected, using vector tiles with service worker...');
+
+      // Create tile source using blob URLs
+      const createTileSource = async () => {
+        try {
+          const tileTemplate = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+          console.log('🔧 Creating blob URL for tile template:', tileTemplate);
+          
+          const blobUrl = await createTileBlobUrl(tileTemplate);
+          console.log('🔧 Created blob URL:', blobUrl);
+          
+          return {
+            type: 'vector' as const,
+            tiles: [blobUrl],
+            minzoom: 10,
+            maxzoom: 16,
+            scheme: 'xyz' as const
+          };
+        } catch (error) {
+          console.warn('🔧 Fallback to direct tiles due to blob URL error:', error);
+          // Fallback to direct URL
+          return {
+            type: 'vector' as const,
+            tiles: [`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`],
+            minzoom: 10,
+            maxzoom: 16,
+            scheme: 'xyz' as const
+          };
+        }
+      };
+
+      const vectorSource = await createTileSource();
+      
+      const mapStyle = {
         version: 8 as const,
         sources: {
           'nyc-tiles': vectorSource
@@ -741,212 +715,119 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         ]
       };
-    };
-    
-    const mapStyle = createMapStyle();
 
-    // Log the tile configuration for debugging
-    console.log('🗺️ Map initialization - Style sources:', Object.keys(mapStyle.sources));
-    console.log('🗺️ Environment check - isCapacitor:', isCapacitor(), 'isMobile:', isMobile);
-    console.log('🗺️ Current location:', {
-      protocol: window.location.protocol,
-      origin: window.location.origin,
-      href: window.location.href
-    });
-
-    console.log('🗺️ Creating MapLibre instance with style:', {
-      version: mapStyle.version,
-      sourceCount: Object.keys(mapStyle.sources).length,
-      sources: Object.keys(mapStyle.sources),
-      layerCount: mapStyle.layers.length,
-      hasGlyphs: !!mapStyle.glyphs
-    });
-
-    let mapInstance: maplibregl.Map;
-
-    const tileUrls = await Promise.all(urls.map(url => createTileBlobUrl(url)));
-    
-    try {
-      // 3️⃣ Create the map AFTER tiles are ready
-      mapInstance = new maplibregl.Map({
-        container: mapContainerRef.current!,
-        style: mapStyle,
-        center: [-73.986104, 40.715245],
-        zoom: 12.77,
-        maxZoom: isCapacitor() ? 19 : 18,
-        minZoom: 9,
-        renderWorldCopies: false,
-        attributionControl: false,
-        transformRequest: (url, resourceType) => {
-          if (resourceType === 'Tile') {
-            console.log('🔧 Tile request:', { url, resourceType, isCapacitor: isCapacitor() });
-          }
-      
-          if (isCapacitor() && url.startsWith('http://')) {
-            const httpsUrl = url.replace('http://', 'https://');
-            console.log('🔒 Converting to HTTPS for Capacitor:', httpsUrl);
-            return { url: httpsUrl };
-          }
-      
-          return { url };
-        }
+      console.log('🗺️ Creating MapLibre instance with style:', {
+        version: mapStyle.version,
+        sourceCount: Object.keys(mapStyle.sources).length,
+        sources: Object.keys(mapStyle.sources),
+        layerCount: mapStyle.layers.length,
+        hasGlyphs: !!mapStyle.glyphs
       });
 
-    } catch (error) {
-      console.error('Failed to create MapLibre instance:', error);
-      return;
-    }
-    
-    // Verify the map instance is valid before proceeding
-    if (!mapInstance || typeof mapInstance.on !== 'function') {
-      console.error('Invalid MapLibre instance created');
-      return;
-    }
-    
-    console.log('✅ MapLibre instance created successfully');
-    
-    // Store map instance in ref immediately after creation
-    mapRef.current = mapInstance;
-    
-    // Set bounds after storing in ref
-    try {
-      console.log('🗺️ Setting map bounds for NYC region...');
-      mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
-      
-      // Test basic map functionality
-      console.log('🧪 Testing map methods:', {
-        getZoom: mapInstance.getZoom(),
-        getCenter: mapInstance.getCenter(),
-        isStyleLoaded: mapInstance.isStyleLoaded()
-      });
-    } catch (error) {
-      console.error('Error setting up map:', error);
-    }
-
-    // Enhanced error handling and loading with validation
-    const setupMapEventListeners = (map: maplibregl.Map) => {
       try {
-        // Verify map instance has required methods before adding listeners
-        if (!map || typeof map.on !== 'function') {
-          console.error('Invalid map instance - missing event methods');
-          return;
-        }
-
-        map.on('error', (e) => {
-          console.error('Map error:', e.error);
+        const mapInstance = new maplibregl.Map({
+          container: mapContainerRef.current!,
+          style: mapStyle,
+          center: [-73.986104, 40.715245],
+          zoom: 12.77,
+          maxZoom: 18,
+          minZoom: 9,
+          renderWorldCopies: false,
+          attributionControl: false
         });
 
-        // Add fallback timer to ensure map loads even if 'load' event doesn't fire
-        const loadFallbackTimer = setTimeout(() => {
+        mapRef.current = mapInstance;
+
+        // Set up viewport change handler ref
+        handleViewportChangeRef.current = handleViewportChange;
+
+        // Map event listeners
+        mapInstance.on('load', () => {
+          console.log('🗺️ Map loaded successfully');
+          setMapLoaded(true);
+          
+          if (callbackRefs.current.onMapLoaded) {
+            callbackRefs.current.onMapLoaded();
+          }
+
+          // Add vector layers after load
+          if (!layersAddedRef.current) {
+            addVectorLayers(mapInstance);
+          }
+        });
+
+        // Fallback timer
+        setTimeout(() => {
           if (!mapLoaded) {
             console.log('Map load fallback timer - forcing mapLoaded to true');
             setMapLoaded(true);
-            callbackRefs.current.onMapLoaded?.();
+            if (callbackRefs.current.onMapLoaded) {
+              callbackRefs.current.onMapLoaded();
+            }
           }
-        }, 2000); // 2 second fallback
+        }, 3000);
 
-        map.on('load', () => {
-          console.log('Map loaded successfully via load event');
-          clearTimeout(loadFallbackTimer);
-          setMapLoaded(true);
-          callbackRefs.current.onMapLoaded?.();
-          
-          // For desktop, manually add layers after map loads if sourcedata doesn't fire
-          if (!isCapacitor() && !layersAddedRef.current) {
-            console.log('Manually adding vector layers after map load...');
-            setTimeout(() => {
-              if (!layersAddedRef.current && mapRef.current) {
-                addVectorLayers(mapRef.current);
-              }
-            }, 1000);
-          }
-        });
-
-        // Optimized move handlers with validation
-        const callViewportChange = () => {
-          if (mapRef.current && typeof mapRef.current.getBounds === 'function') {
-            handleViewportChangeRef.current();
-          }
-        };
-        
+        // Viewport change handlers
         const debouncedMoveHandler = (() => {
           let timeout: NodeJS.Timeout;
           return () => {
             clearTimeout(timeout);
-            timeout = setTimeout(callViewportChange, 150);
+            timeout = setTimeout(() => {
+              if (mapRef.current && typeof mapRef.current.getBounds === 'function') {
+                handleViewportChangeRef.current();
+              }
+            }, 150);
           };
         })();
 
-        map.on('moveend', callViewportChange);
-        map.on('zoomend', callViewportChange);
-        map.on('move', debouncedMoveHandler);
-
-        // Add map layers when ready with environment-specific handling
-        map.on('sourcedata', (e) => {
-          if (isCapacitor()) {
-            // For Capacitor with raster tiles
-            if (e.sourceId === 'osm' && e.isSourceLoaded && !layersAddedRef.current) {
-              console.log('Capacitor raster tiles loaded successfully');
-              layersAddedRef.current = true;
-            } else if (e.sourceId === 'osm') {
-              console.log('OSM source event:', {
-                sourceId: e.sourceId,
-                isSourceLoaded: e.isSourceLoaded,
-                layersAdded: layersAddedRef.current
-              });
-            }
-            return;
+        mapInstance.on('moveend', () => {
+          if (mapRef.current && typeof mapRef.current.getBounds === 'function') {
+            handleViewportChangeRef.current();
           }
-          
-          // For web environment with vector tiles
+        });
+        mapInstance.on('zoomend', () => {
+          if (mapRef.current && typeof mapRef.current.getBounds === 'function') {
+            handleViewportChangeRef.current();
+          }
+        });
+        mapInstance.on('move', debouncedMoveHandler);
+
+        // Add layers when source is ready
+        mapInstance.on('sourcedata', (e) => {
           if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
-            console.log('NYC tiles source loaded, adding vector layers via sourcedata event...');
+            console.log('NYC tiles source loaded, adding vector layers...');
             addVectorLayers(mapInstance);
-          } else if (e.sourceId === 'nyc-tiles') {
-            console.log('NYC tiles sourcedata event:', {
-              sourceId: e.sourceId,
-              isSourceLoaded: e.isSourceLoaded,
-              layersAdded: layersAddedRef.current
-            });
           }
         });
 
-        // Additional mobile-specific event handlers
-        if (isCapacitor()) {
-          map.on('data', (e: any) => {
-            if (e.dataType === 'source' && e.sourceId === 'osm') {
-              console.log('OSM data event:', {
-                dataType: e.dataType,
-                sourceId: e.sourceId,
-                isSourceLoaded: e.isSourceLoaded
-              });
-            }
-          });
+        console.log('Map instance created successfully');
 
-          map.on('dataloading', (e: any) => {
-            if (e.dataType === 'source' && e.sourceId === 'osm') {
-              console.log('OSM data loading:', e.sourceId);
-            }
-          });
-        }
+        // Initialize DeckGL overlay
+        setTimeout(() => {
+          if (mapRef.current && !overlayInstance) {
+            console.log('🎨 Creating DeckGL overlay...');
+            overlayInstance = new MapboxOverlay({
+              interleaved: true,
+              pickingRadius: 10,
+            });
+            
+            mapRef.current.addControl(overlayInstance);
+            setDeckOverlay(overlayInstance);
+            setOverlayReady(true);
+            console.log('✅ DeckGL overlay initialized');
+          }
+        }, 500);
 
-        console.log('Map event listeners set up successfully');
       } catch (error) {
-        console.error('Error setting up map event listeners:', error);
+        console.error('Failed to create MapLibre instance:', error);
+        return;
       }
     };
 
-    // Setup event listeners
-    setupMapEventListeners(mapInstance);
+    initializeMap();
 
-    console.log('Map instance created, setting up event listeners...');
-    console.log('Map container dimensions:', {
-      width: mapContainerRef.current?.clientWidth,
-      height: mapContainerRef.current?.clientHeight
-    });
-
+    // Cleanup
     return () => {
-      // Cleanup
       [updateTimeoutRef, moveTimeoutRef, debounceTimeoutRef].forEach(ref => {
         if (ref.current) clearTimeout(ref.current);
       });
@@ -955,10 +836,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         try { marker.remove(); } catch {}
       });
       
-      try {
-        mapInstance.remove();
-      } catch (error) {
-        console.error('Error removing map:', error);
+      if (mapRef.current) {
+        try {
+          mapRef.current.remove();
+        } catch (error) {
+          console.error('Error removing map:', error);
+        }
       }
       
       businessCacheRef.current.clear();
@@ -966,39 +849,37 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       setMapLoaded(false);
       mapRef.current = null;
     };
-  }, [isMobile, addVectorLayers]);
+  }, [addVectorLayers, handleViewportChange]);
 
-  // 1️⃣ Wait for all tile URLs
-  const tileUrls = await Promise.all(
-    urls.map(url => createTileBlobUrl(url)) // createTileBlobUrl returns Promise<string>
-  );
-  
-  // 2️⃣ Build the style
-  const mapStyle: maplibregl.StyleSpecification = {
-    version: 8,
-    sources: {
-      'nyc-tiles': {
-        type: 'vector',
-        tiles: tileUrls, // ✅ string[]
-        minzoom: 0,
-        maxzoom: 22,
-        scheme: 'xyz',
-      }
-    },
-    glyphs: 'https://example.com/fonts/{fontstack}/{range}.pbf',
-    layers: [
-      // your layers here
-    ]
-  };
+  // Update DeckGL layers when they change
+  useEffect(() => {
+    if (!deckOverlay || !overlayReady || deckGLLayers.length === 0) {
+      console.log(`🎯 DeckGL update skipped:`, {
+        hasOverlay: !!deckOverlay,
+        overlayReady,
+        layerCount: deckGLLayers.length
+      });
+      return;
+    }
 
-  // // Center map on neighborhood when neighborhoodCenter changes
+    try {
+      console.log(`🎯 Updated DeckGL with ${deckGLLayers.length} layers`);
+      deckOverlay.setProps({
+        layers: deckGLLayers
+      });
+    } catch (error) {
+      console.error('Error updating DeckGL layers:', error);
+    }
+  }, [deckGLLayers, deckOverlay, overlayReady]);
+
+  // Center map on neighborhood when neighborhoodCenter changes
   useEffect(() => {
     if (!mapRef.current || !neighborhoodCenter) return;
     
     console.log('🏙️ Centering map on neighborhood:', neighborhoodCenter);
     mapRef.current.flyTo({
       center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
-      zoom: 14, // Good zoom level for neighborhood view
+      zoom: 14,
       duration: 2000
     });
   }, [neighborhoodCenter]);
@@ -1076,31 +957,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       setOverlayReady(true);
     }
   }, [mapLoaded]);
-
-  // Update DeckGL layers with throttling and immediate visible area updates
-  useEffect(() => {
-    if (!deckOverlay || !overlayReady) return;
-    
-    if (updateTimeoutRef.current) clearTimeout(updateTimeoutRef.current);
-    
-    // Update immediately for visible area, then throttle for performance
-    const updateLayers = () => {
-      try {
-        deckOverlay.setProps({ layers: deckGLLayers });
-        console.log(`🎯 Updated DeckGL with ${deckGLLayers?.length || 0} layers`);
-      } catch (error) {
-        console.error('Error updating DeckGL:', error);
-      }
-    };
-    
-    // Update immediately if we have visible businesses
-    if (mapRef.current && mapLoaded && deckGLLayers.length > 0) {
-      updateLayers();
-    } else {
-      // Throttle updates for other cases
-      updateTimeoutRef.current = setTimeout(updateLayers, 50);
-    }
-  }, [deckOverlay, overlayReady, deckGLLayers, mapLoaded]);
 
   // Handle search filter changes
   useEffect(() => {
@@ -1199,62 +1055,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, [mapLoaded, landmarks]);
 
-  // // Initial viewport load
-  // useEffect(() => {
-  //   if (mapLoaded && mapRef.current) {
-  //     setTimeout(() => handleViewportChangeRef.current(), 800);
-  //   }
-  // }, [mapLoaded]);
-
-  const [tileUrl, setTileUrl] = useState<string | null>(null);
-
-  // 1. Load the tile URL (async)
-  useEffect(() => {
-    let active = true;
-  
-    const initTiles = async () => {
-      if (isCapacitor()) {
-        const blobUrl = await createTileBlobUrl('/data/tiles/{z}/{x}/{y}.pbf');
-        if (active) setTileUrl(blobUrl);
-      } else {
-        setTileUrl(`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`);
-      }
-    };
-  
-    initTiles();
-    return () => { active = false; };
-  }, []);
-  
-  // 2. Initialize the map once we have a valid string tileUrl
-  useEffect(() => {
-    if (!mapContainerRef.current || !tileUrl) return;
-  
-    const map = new maplibregl.Map({
-      container: mapContainerRef.current,
-      style: {
-        version: 8,
-        sources: {
-          'nyc-tiles': {
-            type: 'vector',
-            tiles: [tileUrl], // ✅ string only now
-            minzoom: 10,
-            maxzoom: 16,
-            scheme: 'xyz'
-          }
-        },
-        glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-        layers: [
-          { id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } }
-        ]
-      },
-      center: [-73.986104, 40.715245],
-      zoom: 12.77
-    });
-  
-    mapRef.current = map;
-    return () => map.remove();
-  }, [tileUrl]);
-
   return (
     <div
       ref={mapContainerRef}
@@ -1267,11 +1067,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         right: 0,
         width: '100%',
         height: '100%',
-        minWidth: '250px', // Increased minimum width for mobile compatibility
-        minHeight: '300px', // Increased minimum height for mobile compatibility
+        minWidth: '250px',
+        minHeight: '300px',
         zIndex: 1,
         backgroundColor: '#B3E5FC',
-        overflow: 'hidden' // Prevent scrollbars on small screens
+        overflow: 'hidden'
       }}
     />
   );
