@@ -32,23 +32,6 @@ interface HomePageProps {
   onLocationSave?: (location: string, fullLocation: string) => void;
 }
 
-const handleNeighborhoodSearch = (query: string) => {
-  const neighborhood = findNeighborhoodBoundaryByName(query);
-
-  if (neighborhood) {
-    setSearchFilters(prev => ({
-      ...prev,
-      neighborhoodFilter: neighborhood, // { borough, name, boundary: [...] }
-    }));
-  } else {
-    console.warn("⚠️ No neighborhood found for:", query);
-    setSearchFilters(prev => ({
-      ...prev,
-      neighborhoodFilter: null,
-    }));
-  }
-};
-
 const HomePage: React.FC<HomePageProps> = ({ 
   currentSlide = 1,
   currentView = 'main',
@@ -148,35 +131,37 @@ const HomePage: React.FC<HomePageProps> = ({
   ];
   const { toast } = useToast();
 
-  const handleSearchChange = (value: string, business?: EnhancedBusiness, filters?: any, neighborhoodCoords?: { lat: number; lon: number }) => {
-    console.log('🔍 Search change in HomePage:', { value, filters, neighborhoodCoords, hasFilters: !!filters });
-    console.log('🔍 DEBUG: handleSearchChange deps check', { 
-      searchFilters: typeof searchFilters, 
-      neighborhoodCenter: typeof neighborhoodCenter,
-      searchCompleted: typeof searchCompleted 
-    });
+  const handleSearchChange = (
+    value: string,
+    business?: EnhancedBusiness,
+    filters?: any,
+    neighborhoodCoords?: { lat: number; lon: number }
+  ) => {
+    console.log("🔍 Search change in HomePage:", { value, filters });
+  
     setSearchValue(value);
-    setSearchFilters(filters);
-    
-    // Mark search as completed when there's a meaningful search
-    if (value.trim() !== '' || filters !== null) {
-      setSearchCompleted(true);
-    }
-    
-    if (neighborhoodCoords) {
-      console.log('🏙️ Setting neighborhood center:', neighborhoodCoords);
-      setNeighborhoodCenter(neighborhoodCoords);
+  
+    // Always re-parse if filters weren’t passed from child
+    const parsedFilters = filters || parseSearchFilters(value);
+  
+    setSearchFilters(parsedFilters);
+  
+    if (parsedFilters?.neighborhoodFilter?.center) {
+      setNeighborhoodCenter(parsedFilters.neighborhoodFilter.center);
     } else {
       setNeighborhoodCenter(null);
     }
-    
-    if (!value && !filters) {
-      console.log('🧹 Search explicitly cleared - removing filters');
+  
+    setSearchCompleted(!!value.trim() || parsedFilters !== null);
+  
+    if (!value && !parsedFilters) {
+      console.log("🧹 Search explicitly cleared - removing filters");
       setSearchFilters(null);
       setNeighborhoodCenter(null);
-      setSearchCompleted(false); // Reset search completed state when cleared
+      setSearchCompleted(false);
     }
   };
+
 
   const handleSearchBusinessSelect = (business: EnhancedBusiness) => {
     console.log('🔍 DEBUG: handleSearchBusinessSelect deps check', { 
