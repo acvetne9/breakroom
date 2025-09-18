@@ -1,11 +1,11 @@
 import React, { useState, useMemo, memo, useEffect } from 'react';
 import { Eye } from 'lucide-react';
 import { isProfane } from '../utils/profanityFilter';
-import { useToast } from '@/hooks/use-toast';
+import { usePosts } from '@/hooks/usePosts';
 import VotingComponent from './VotingComponent';
 import { formatTimeAgo } from '../utils/timeAgo';
 import { TranslatedText } from './TranslatedText';
-import { usePosts } from '@/hooks/usePosts';
+import { useToast } from '@/hooks/use-toast';
 
 interface Post {
   id: string;
@@ -72,6 +72,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   const [postText, setPostText] = useState('');
   const [commentText, setCommentText] = useState('');
   const { toast } = useToast();
+  const { trackCommentedPost } = usePosts();
 
   // Check if we need to fade out the system post when real posts are added
   const realPosts = useMemo(() => {
@@ -139,6 +140,9 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
       ...comments,
       [expandedPost]: [...(comments[expandedPost] || []), newComment],
     });
+  
+    // Track that user commented on this post
+    trackCommentedPost(expandedPost);
   
     setCommentText('');
     onCommentSubmit?.(expandedPost, commentText);

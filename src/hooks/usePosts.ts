@@ -195,9 +195,35 @@ export const usePosts = () => {
     return posts.filter(post => post.businessId === businessId);
   };
 
-  // Filter user's posts
+  // Filter user's posts and posts they've commented on
+  const getUserPostsAndCommented = () => {
+    const userPosts = posts.filter(post => post.author === 'You');
+    
+    // Get posts that user has commented on from localStorage
+    const commentedPostIds = JSON.parse(localStorage.getItem('userCommentedPosts') || '[]');
+    const commentedPosts = posts.filter(post => 
+      post.author !== 'You' && commentedPostIds.includes(post.id)
+    );
+    
+    // Combine and sort by creation date (newest first)
+    const allUserRelatedPosts = [...userPosts, ...commentedPosts];
+    return allUserRelatedPosts.sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  };
+
+  // Filter user's posts only (original function for backward compatibility)
   const getUserPosts = () => {
     return posts.filter(post => post.author === 'You');
+  };
+
+  // Track when user comments on a post
+  const trackCommentedPost = (postId: string) => {
+    const commentedPostIds = JSON.parse(localStorage.getItem('userCommentedPosts') || '[]');
+    if (!commentedPostIds.includes(postId)) {
+      commentedPostIds.push(postId);
+      localStorage.setItem('userCommentedPosts', JSON.stringify(commentedPostIds));
+    }
   };
 
   return {
@@ -209,6 +235,8 @@ export const usePosts = () => {
     removePost,
     refetch: fetchPosts,
     getBusinessPosts,
-    getUserPosts
+    getUserPosts,
+    getUserPostsAndCommented,
+    trackCommentedPost
   };
 };
