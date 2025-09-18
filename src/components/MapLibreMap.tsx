@@ -198,116 +198,111 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [businesses]);
   // vector layers (styling restored exactly as requested)
-  const addVectorLayers = useCallback((map: maplibregl.Map) => {
-    try {
-      const layers = [
-        {
-          id: 'nyc-land',
-          type: 'fill' as const,
-          source: 'nyc-tiles',
-          'source-layer': 'examplepoints',
-          layout: {},
-          paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
-          filter: ['==', ['geometry-type'], 'Polygon'] as any
+ const addVectorLayers = useCallback((map: maplibregl.Map) => {
+  try {
+    const layers = [
+      {
+        id: 'nyc-land',
+        type: 'fill' as const,
+        source: 'nyc-tiles',
+        'source-layer': 'examplepoints',
+        layout: {},
+        paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
+        filter: ['==', ['geometry-type'], 'Polygon'] as any
+      },
+      {
+        id: 'nyc-green-spaces',
+        type: 'fill' as const,
+        source: 'nyc-tiles',
+        'source-layer': 'examplepoints',
+        layout: {},
+        paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
+        filter: [
+          'all',
+          ['==', ['geometry-type'], 'Polygon'],
+          ['any',
+            ['all', ['has', 'leisure'], ['==', ['get', 'leisure'], 'park']],
+            ['all', ['has', 'landuse'], ['==', ['get', 'landuse'], 'cemetery']],
+            ['all', ['has', 'amenity'], ['==', ['get', 'amenity'], 'cemetery']],
+            ['all', ['has', 'amenity'], ['==', ['get', 'amenity'], 'grave_yard']],
+            ['all', ['has', 'landuse'], ['==', ['get', 'landuse'], 'recreation_ground']],
+            ['all', ['has', 'leisure'], ['==', ['get', 'leisure'], 'recreation_ground']],
+            ['all', ['has', 'name'], ['in', 'cemetery', ['coalesce', ['get', 'name'], '']]],
+            ['all', ['has', 'name'], ['in', 'Cemetery', ['coalesce', ['get', 'name'], '']]],
+            ['all', ['has', 'name'], ['in', 'graveyard', ['coalesce', ['get', 'name'], '']]],
+            ['all', ['has', 'place'], ['==', ['get', 'place'], 'cemetery']],
+            ['all', ['has', 'historic'], ['==', ['get', 'historic'], 'cemetery']]
+          ]
+        ] as any
+      },
+      {
+        id: 'nyc-water',
+        type: 'fill' as const,
+        source: 'nyc-tiles',
+        'source-layer': 'examplepoints',
+        layout: {},
+        paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
+        filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']] as any
+      },
+      {
+        id: 'nyc-roads',
+        type: 'line' as const,
+        source: 'nyc-tiles',
+        'source-layer': 'examplepoints',
+        layout: {},
+        paint: {
+          'line-color': '#666666',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
+          'line-opacity': 0.8
         },
-        {
-          id: 'nyc-green-spaces',
-          type: 'fill' as const,
-          source: 'nyc-tiles',
-          'source-layer': 'examplepoints',
-          layout: {},
-          paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
-          filter: [
-            'all',
-            ['==', ['geometry-type'], 'Polygon'],
-            ['any',
-              ['==', ['get', 'leisure'], 'park'],
-              ['==', ['get', 'landuse'], 'cemetery'],
-              ['==', ['get', 'amenity'], 'cemetery'],
-              ['==', ['get', 'amenity'], 'grave_yard'],
-              ['==', ['get', 'landuse'], 'recreation_ground'],
-              ['==', ['get', 'leisure'], 'recreation_ground'],
-              ['in', 'cemetery', ['coalesce', ['get', 'name'], '']],
-              ['in', 'Cemetery', ['coalesce', ['get', 'name'], '']],
-              ['in', 'graveyard', ['coalesce', ['get', 'name'], '']],
-              ['in', 'graveyard', ['coalesce', ['get', 'name'], '']],
-              ['==', ['get', 'place'], 'cemetery'],
-              ['==', ['get', 'historic'], 'cemetery']
-            ]
-          ] as any
+        filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']] as any
+      },
+      {
+        id: 'nyc-road-labels',
+        type: 'symbol' as const,
+        source: 'nyc-tiles',
+        'source-layer': 'examplepoints',
+        layout: {
+          'text-field': ['coalesce', ['get', 'name'], ''],
+          'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
+          'text-max-width': 8,
+          'text-line-height': 1.2,
+          'symbol-placement': 'line',
+          'text-rotation-alignment': 'map',
+          'text-allow-overlap': false,
+          'text-ignore-placement': false
         },
-        {
-          id: 'nyc-water',
-          type: 'fill' as const,
-          source: 'nyc-tiles',
-          'source-layer': 'examplepoints',
-          layout: {},
-          paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
-          filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']] as any
+        paint: {
+          'text-color': '#333333',
+          'text-halo-color': '#FFFFFF',
+          'text-halo-width': 1.5,
+          'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 1]
         },
-        {
-          id: 'nyc-roads',
-          type: 'line' as const,
-          source: 'nyc-tiles',
-          'source-layer': 'examplepoints',
-          layout: {},
-          paint: {
-            'line-color': '#666666',
-            'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
-            'line-opacity': 0.8
-          },
-          filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']] as any
-        },
-        {
-          id: 'nyc-road-labels',
-          type: 'symbol' as const,
-          source: 'nyc-tiles',
-          'source-layer': 'examplepoints',
-          layout: {
-            'text-field': [
-              'coalesce',
-              ['get', 'name'],
-              '' // fallback empty string
-            ],
-            'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
-            'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
-            'text-max-width': 8,
-            'text-line-height': 1.2,
-            'symbol-placement': 'line',
-            'text-rotation-alignment': 'map',
-            'text-allow-overlap': false,
-            'text-ignore-placement': false
-          },
-          paint: {
-            'text-color': '#333333',
-            'text-halo-color': '#FFFFFF',
-            'text-halo-width': 1.5,
-            'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 1]
-          },
-          filter: [
-            'all',
-            ['==', ['geometry-type'], 'LineString'],
-            ['has', 'name'],
-            ['has', 'highway'],
-            ['!=', ['get', 'name'], '']
-          ] as any,
-          minzoom: 12
-        }
-      ];
+        filter: ['all',
+          ['==', ['geometry-type'], 'LineString'],
+          ['has', 'name'],
+          ['has', 'highway'],
+          ['!=', ['get', 'name'], '']
+        ] as any,
+        minzoom: 12
+      }
+    ];
 
-      layers.forEach((layer, idx) => {
-        try {
-          if (!map.getLayer(layer.id)) map.addLayer(layer as any);
-        } catch (err) {
-          console.error('Error adding vector layer', layer.id, err);
-        }
-      });
+    layers.forEach(layer => {
+      try {
+        if (!map.getLayer(layer.id)) map.addLayer(layer as any);
+      } catch (err) {
+        console.error('Error adding vector layer', layer.id, err);
+      }
+    });
 
-      layersAddedRef.current = true;
-    } catch (err) {
-      console.error('addVectorLayers error', err);
-    }
-  }, []);
+    layersAddedRef.current = true;
+
+  } catch (err) {
+    console.error('addVectorLayers error', err);
+  }
+}, []);
 
   // Business density heuristic (unchanged)
   const getBusinessLimitForViewport = useCallback((zoom: number, bounds: Bounds): number => {
