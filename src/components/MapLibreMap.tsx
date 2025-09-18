@@ -609,8 +609,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // update deck layers
   useEffect(() => {
     if (!deckOverlay || !overlayReady) return;
-    const cached = businessCacheRef.current.getAll();
-    if (!cached.length) return; // nothing to render yet
+    console.log('🎯 Updating DeckGL layers, business count:', deckGLLayers.length > 0 ? deckGLLayers[0]?.props?.data?.length || 0 : 0);
     deckOverlay.setProps({ layers: deckGLLayers });
   }, [deckOverlay, overlayReady, deckGLLayers]);
 
