@@ -376,48 +376,32 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     let bounds: Bounds;
   
     if (searchFilters?.neighborhoodFilter?.boundary?.length) {
-      const { boundary } = searchFilters.neighborhoodFilter;
-      const lats = boundary.map((p: any) => featureToLatLon(p).lat);
-      const lons = boundary.map((p: any) => featureToLatLon(p).lon);
-  
-      bounds = {
-        north: Math.max(...lats) + 0.015,
-        south: Math.min(...lats) - 0.015,
-        east: Math.max(...lons) + 0.02,
-        west: Math.min(...lons) - 0.02
-      };
-  
-      const businessLimit = getBusinessLimitForViewport(zoom, bounds);
-  
-      const convertedBoundaryPoints = boundary.map((p: any) => featureToLatLon(p));
-  
+      const boundary = searchFilters.neighborhoodFilter.boundary;
+      const polygonCoords = boundary.map((p: any) => [featureToLatLon(p).lon, featureToLatLon(p).lat]);
+      const turfPoly = turf.polygon([polygonCoords]);
+    
       try {
-        // ✅ clear old businesses for neighborhood search
         businessCacheRef.current.clear();
-      
-        // load businesses inside boundary
-        const neighborhoodBusinesses = await loadBusinessesInViewport?.(convertedBoundaryPoints);
-        if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length) {
-          const polygonCoords = boundary.map((p: any) => [featureToLatLon(p).lon, featureToLatLon(p).lat]);
-          const turfPoly = turf.polygon([polygonCoords]);
-          const clipped = neighborhoodBusinesses.filter(b => {
-            if (!b?.position) return false;
-            const pt = turf.point([b.position.lng, b.position.lat]);
-            return turf.booleanPointInPolygon(pt, turfPoly);
-          });
-      
-          // ✅ add to cache and trigger deckGLLayers update
-          businessCacheRef.current.addMultiple(clipped);
-          setCacheVersion(prev => prev + 1);
-        } else {
-          console.warn('No businesses returned for neighborhood boundary');
-        }
+    
+        // ✅ Pass full polygon coordinates to backend/API
+        const neighborhoodBusinesses = await loadBusinessesInViewport?.(boundary, { polygon: true });
+        
+        // Fallback: filter client-side with Turf if API does not fully support polygons
+        let filteredBusinesses = neighborhoodBusinesses || [];
+        filteredBusinesses = filteredBusinesses.filter(b => {
+          if (!b?.position) return false;
+          const pt = turf.point([b.position.lng, b.position.lat]);
+          return turf.booleanPointInPolygon(pt, turfPoly);
+        });
+    
+        businessCacheRef.current.addMultiple(filteredBusinesses);
+        setCacheVersion(prev => prev + 1);
+    
       } catch (err) {
         console.error('Error loading neighborhood businesses', err);
       }
     }
 
-  
     // For normal rectangular viewport
     const currentBounds = map.getBounds();
     bounds = {
@@ -473,7 +457,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       })
     ];
   }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, cacheVersion]);
-
 
   // initialize map once
   useEffect(() => {
