@@ -187,14 +187,29 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
 
   const handlePostDelete = async (postId: string) => {
     const success = await removePost(postId);
+  
     if (!success) {
-      toast({
-        title: "Error", 
-        description: "Failed to delete post. Please try again.",
-        variant: "destructive"
-      });
+      setPostText('');
+      setPostPlaceholder('Failed to create post. Please try again.');
+      return;
+    }
+  
+    // If the deleted post is currently expanded, collapse it and reset comment input
+    if (expandedPost === postId) {
+      setExpandedPost(null);
+      setCommentText('');
     }
   };
+
+  useEffect(() => {
+    if (!expandedPost) {
+      setCommentText('');
+      setPostPlaceholder(
+        filteredBusinessId ? "Thoughts about this business?" : "How's work?"
+      );
+    }
+  }, [expandedPost, filteredBusinessId]);
+
 
   const displayPosts = useMemo(() => {
     const filtered = filteredBusinessId 
