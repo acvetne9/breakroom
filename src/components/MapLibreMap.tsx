@@ -439,34 +439,37 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const all = businessCacheRef.current.getAll();
     console.log('🎯 Cache has', all.length, 'businesses');
     if (!all.length) return [];
-    const businessesToRender = all.filter(b => b?.position?.lat != null && b?.position?.lng != null);
+  
+    // Convert raw boundary features into [lat, lon] for turf
+    let neighborhoodBoundary: { lat: number; lon: number }[] | undefined;
+    if (searchFilters?.neighborhoodFilter?.boundary?.length) {
+      neighborhoodBoundary = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
+    }
+  
+    // Filter businesses inside polygon if neighborhoodBoundary exists
+    let businessesToRender = all.filter(b => b?.position?.lat != null && b?.position?.lng != null);
+    if (neighborhoodBoundary?.length) {
+      const polygonCoords = neighborhoodBoundary.map(p => [p.lon, p.lat]);
+      const turfPoly = turf.polygon([polygonCoords]);
+      businessesToRender = businessesToRender.filter(b => {
+        const pt = turf.point([b.position.lng, b.position.lat]);
+        return turf.booleanPointInPolygon(pt, turfPoly);
+      });
+    }
+  
     console.log('🎯 Rendering', businessesToRender.length, 'businesses');
     if (!businessesToRender.length) return [];
+  
     return [
       createBusinessScatterplotLayer({
         businesses: businessesToRender,
         selectedBusinessId: selectedBusiness?.id,
-        onBusinessClick: handleBusinessClick
+        onBusinessClick: handleBusinessClick,
+        neighborhoodBoundary // pass it to the layer for future reactivity
       })
     ];
   }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, cacheVersion]);
-  
-  useEffect(() => {
-    const handleResize = () => { mapRef.current?.resize(); };
-    window.addEventListener('resize', handleResize);
-    handleResize();
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
-  useEffect(() => {
-    if (selectedBusiness && mapRef.current) {
-      mapRef.current.flyTo({
-        center: [selectedBusiness.position.lng, selectedBusiness.position.lat],
-        zoom: 16,
-        essential: true,
-      });
-    }
-  }, [selectedBusiness]);
 
   // initialize map once
   useEffect(() => {
@@ -583,24 +586,32 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded]);
 
-  // center on neighborhood center if provided
+  // center/load neighborhood center
   useEffect(() => {
     if (!mapRef.current || !mapLoaded || !searchFilters?.neighborhoodFilter || !neighborhoodCenter) return;
   
-    // Only trigger when a neighborhood search occurs
-    const timeout = setTimeout(() => {
-      mapRef.current!.flyTo({
-        center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
-        zoom: 14,
-        duration: 2000, // 2-second fly animation
-        essential: true
-      });
-    }, 2000); // 2-second delay before starting the fly
+    const isUserTriggered = !!selectedBusiness; // or you can pass a dedicated flag if needed
   
-    return () => clearTimeout(timeout); // cleanup if search changes
-  }, [searchFilters?.neighborhoodFilter, neighborhoodCenter, mapLoaded]);
-
-
+    if (isUserTriggered) {
+      // fly immediately for user clicks
+      mapRef.current.flyTo({
+        center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
+        zoom: 16,
+        essential: true,
+      });
+    } else {
+      // automatic fly (e.g., on initial search/filter load) waits 2s
+      const timeout = setTimeout(() => {
+        mapRef.current!.flyTo({
+          center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
+          zoom: 14,
+          duration: 2000, // smooth 2-second fly
+          essential: true,
+        });
+      }, 2000);
+      return () => clearTimeout(timeout);
+    }
+  }, [searchFilters?.neighborhoodFilter, neighborhoodCenter, mapLoaded, selectedBusiness]);
 
   // center/load neighborhood businesses on searchFilters change (stable)
   useEffect(() => {
