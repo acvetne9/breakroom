@@ -652,7 +652,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // center on neighborhood center if provided
   useEffect(() => {
     if (!mapRef.current || !neighborhoodCenter) return;
-    mapRef.current.flyTo({ center: [neighborhoodCenter.lon, neighborhoodCenter.lat], zoom: 14, duration: 2000 });
+  
+    const timeout = setTimeout(() => {
+      mapRef.current!.flyTo({
+        center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
+        zoom: 14,
+        duration: 2000, // fly duration
+        essential: true
+      });
+    }, 2000); // 2-second delay before starting the fly
+  
+    return () => clearTimeout(timeout); // cleanup if neighborhoodCenter changes
   }, [neighborhoodCenter]);
 
   // center/load neighborhood businesses on searchFilters change (stable)
