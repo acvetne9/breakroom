@@ -176,6 +176,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (businesses && businesses.length) {
       businessCacheRef.current.addMultiple(businesses);
+      handleViewportChangeRef.current(); // recalc after cache updated
       callbackRefs.current.onBusinessesLoaded?.();
     }
   }, [businesses]);
