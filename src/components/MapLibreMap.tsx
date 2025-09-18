@@ -171,17 +171,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const { isProcessing, setIsProcessing } = mapDataHook;
   const { businesses: rawBusinesses, loading: businessesLoading, loadBusinessesInViewport, fetchFullBusinessDetails, isSearching } = businessesHook;
   const businesses = Array.isArray(rawBusinesses) ? rawBusinesses : [];
-  const [cacheVersion, setCacheVersion] = useState(0);
-  
-  // whenever cache updated:
-  useEffect(() => {
-    if (businesses && businesses.length) {
-      businessCacheRef.current.addMultiple(businesses);
-      setCacheVersion(prev => prev + 1); // trigger deckGLLayers refresh
-      handleViewportChangeRef.current();
-      callbackRefs.current.onBusinessesLoaded?.();
-    }
-  }, [businesses]);
 
   // vector layers (styling restored exactly as requested)
   const addVectorLayers = useCallback((map: maplibregl.Map) => {
