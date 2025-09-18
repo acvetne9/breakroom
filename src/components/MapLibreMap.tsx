@@ -128,7 +128,16 @@ class BusinessCache {
   }
 
   addMultiple(businesses: Business[]) {
+    console.log('🏢 BusinessCache.addMultiple called with', businesses.length, 'businesses');
+    if (businesses.length > 0) {
+      console.log('🏢 Sample business being added:', {
+        id: businesses[0].id,
+        name: businesses[0].name,
+        position: businesses[0].position
+      });
+    }
     businesses.forEach(b => { if (b?.id) this.set(b.id, b as any); });
+    console.log('🏢 Cache now has', this.cache.size, 'businesses');
   }
 
   clear() {
@@ -175,6 +184,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   useEffect(() => {
     if (businesses && businesses.length) {
+      console.log('🏢 Adding businesses to cache:', businesses.length);
+      console.log('🏢 Sample business data:', businesses[0]);
       businessCacheRef.current.addMultiple(businesses);
       setCacheVersion(prev => prev + 1); // triggers deckGLLayers useMemo
       handleViewportChangeRef.current();
@@ -421,8 +432,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   const deckGLLayers = useMemo(() => {
     const all = businessCacheRef.current.getAll();
+    console.log('🎯 Cache has', all.length, 'businesses');
     if (!all.length) return [];
     const businessesToRender = all.filter(b => b?.position?.lat != null && b?.position?.lng != null);
+    console.log('🎯 Rendering', businessesToRender.length, 'businesses');
     if (!businessesToRender.length) return [];
     return [
       createBusinessScatterplotLayer({
