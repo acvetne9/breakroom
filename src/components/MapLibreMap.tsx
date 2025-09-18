@@ -605,12 +605,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // update deck layers
   useEffect(() => {
     if (!deckOverlay || !overlayReady) return;
-    try {
-      deckOverlay.setProps({ layers: deckGLLayers });
-    } catch (err) {
-      console.error('Updating deck overlay failed', err);
-    }
-  }, [deckGLLayers, deckOverlay, overlayReady]);
+    const cached = businessCacheRef.current.getAll();
+    if (!cached.length) return; // nothing to render yet
+    deckOverlay.setProps({ layers: deckGLLayers });
+  }, [deckOverlay, overlayReady, deckGLLayers]);
 
   // initial load trigger when map ready
   useEffect(() => {
