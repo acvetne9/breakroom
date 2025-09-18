@@ -86,19 +86,29 @@ export const createBusinessClusterLayer = (
   // If neighborhood boundary provided, build turf polygon and filter data
   let filteredData = data;
   if (neighborhoodBoundary?.length) {
-    try {
-      const polygonCoords = neighborhoodBoundary.map((p) => [p.lon, p.lat]);
-      const turfPoly = turf.polygon([polygonCoords]);
+  try {
+    const polygonCoords = neighborhoodBoundary.map((p) => [p.lon, p.lat]);
 
-      filteredData = data.filter((d: any) => {
-        if (!d?.position) return false;
-        const pt = turf.point([d.position.lng, d.position.lat]);
-        return turf.booleanPointInPolygon(pt, turfPoly);
-      });
-    } catch (err) {
-      console.error('❌ Error filtering businesses by polygon:', err);
+    // Close the polygon by repeating the first point
+    if (
+      polygonCoords.length > 2 &&
+      (polygonCoords[0][0] !== polygonCoords[polygonCoords.length - 1][0] ||
+        polygonCoords[0][1] !== polygonCoords[polygonCoords.length - 1][1])
+    ) {
+      polygonCoords.push(polygonCoords[0]);
     }
+
+    const turfPoly = turf.polygon([polygonCoords]);
+
+    filteredData = data.filter((d: any) => {
+      if (!d?.position) return false;
+      const pt = turf.point([d.position.lng, d.position.lat]);
+      return turf.booleanPointInPolygon(pt, turfPoly);
+    });
+  } catch (err) {
+    console.error('❌ Error filtering businesses by polygon:', err);
   }
+}
 
   return new ScatterplotLayer({
     id: layerId,
