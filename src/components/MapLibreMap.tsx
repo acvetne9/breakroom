@@ -247,7 +247,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           layout: {
-            'text-field': ['get', 'name'],
+            'text-field': [
+              'coalesce',
+              ['get', 'name'],
+              '' // fallback empty string
+            ],
             'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
             'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
             'text-max-width': 8,
