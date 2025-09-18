@@ -211,22 +211,22 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
 
 
   const displayPosts = useMemo(() => {
-    const filtered = filteredBusinessId 
-      ? posts.filter(post => post.businessId === filteredBusinessId && !post.isJobUpdate)
-      : filteredUserStories 
-      ? posts.filter(post => post.author === 'You' && !post.isJobUpdate)
-      : posts;
-
-    console.log('📋 Display posts calculation:', {
-      filteredBusinessId,
-      filteredPostsCount: filtered.length,
-      realPostsCount: realPosts.length,
-      hideSystemPost,
-      willShowDefaultPost: filteredBusinessId && realPosts.length === 0 && !hideSystemPost
-    });
-
-    // Add default post if viewing a specific business with no posts and system post is not hidden
-    if (filteredBusinessId && realPosts.length === 0 && !hideSystemPost) {
+    let filtered: Post[] = [];
+  
+    if (filteredBusinessId) {
+      // Include all posts for this business (including system)
+      filtered = posts.filter(post => post.businessId === filteredBusinessId && !post.isJobUpdate);
+    } else if (filteredUserStories) {
+      filtered = posts.filter(post => post.author === 'You' && !post.isJobUpdate);
+    } else {
+      filtered = posts;
+    }
+  
+    // Check for real (non-system) posts for this business
+    const realBusinessPosts = filtered.filter(post => post.author !== 'System');
+  
+    // Add default system post if business has no real posts
+    if (filteredBusinessId && realBusinessPosts.length === 0) {
       const defaultPost: Post = {
         id: `default-${filteredBusinessId}`,
         author: 'System',
@@ -238,19 +238,12 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
         userVote: null,
         createdAt: new Date()
       };
-      
-      console.log('➕ Adding default system post');
-      
-      // If we have real posts but haven't hidden the system post yet, show both during transition
-      if (realPosts.length > 0) {
-        return [defaultPost, ...filtered.filter(post => post.author !== 'System')];
-      }
-      
-      return [defaultPost];
+      filtered = [defaultPost, ...filtered];
     }
-
+  
     return filtered;
-  }, [posts, filteredBusinessId, filteredUserStories, realPosts.length, hideSystemPost]);
+  }, [posts, filteredBusinessId, filteredUserStories]);
+
 
   if (loading) {
     return (
