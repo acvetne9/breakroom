@@ -123,8 +123,10 @@ class BusinessCache {
     return business;
   }
 
-  getAll(): (Business & { detailsLoaded?: boolean })[] {
-    return Array.from(this.cache.values());
+  getAll() {
+    const all = Array.from(this.cache.values());
+    console.log('🏢 getAll returning', all.length, 'businesses');
+    return all;
   }
 
   addMultiple(businesses: Business[]) {
@@ -136,8 +138,11 @@ class BusinessCache {
         position: businesses[0].position
       });
     }
-    businesses.forEach(b => { if (b?.id) this.set(b.id, b as any); });
-    console.log('🏢 Cache now has', this.cache.size, 'businesses');
+    businesses.forEach(b => {
+      if (!b?.id) console.warn('Skipping business without id', b);
+      else businessCacheRef.current.set(b.id, b as any);
+    });
+    console.log('Sample position:', businesses[0]?.position);
   }
 
   clear() {
