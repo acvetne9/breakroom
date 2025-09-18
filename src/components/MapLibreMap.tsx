@@ -198,7 +198,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [businesses]);
   // vector layers (styling restored exactly as requested)
- const addVectorLayers = useCallback((map: maplibregl.Map) => {
+const addVectorLayers = useCallback((map: maplibregl.Map) => {
   try {
     const layers = [
       {
@@ -289,18 +289,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     ];
 
+    console.log('🗺️ Adding vector layers...');
     layers.forEach(layer => {
       try {
-        if (!map.getLayer(layer.id)) map.addLayer(layer as any);
+        if (!map.getLayer(layer.id)) {
+          map.addLayer(layer as any);
+          console.log(`✅ Layer added: ${layer.id}`);
+        } else {
+          console.log(`⚠️ Layer already exists, skipping: ${layer.id}`);
+        }
       } catch (err) {
-        console.error('Error adding vector layer', layer.id, err);
+        console.error(`❌ Error adding layer ${layer.id}:`, err);
       }
     });
 
     layersAddedRef.current = true;
+    console.log('🗺️ All vector layers processed');
 
   } catch (err) {
-    console.error('addVectorLayers error', err);
+    console.error('❌ addVectorLayers error:', err);
   }
 }, []);
 
