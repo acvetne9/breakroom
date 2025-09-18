@@ -420,6 +420,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       } catch (err) {
         console.error('Error loading neighborhood businesses', err);
       }
+    }
 
   
     // For normal rectangular viewport
