@@ -53,6 +53,10 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
   const [hideSystemPost, setHideSystemPost] = useState(false);
 
+  const [postPlaceholder, setPostPlaceholder] = useState(
+    filteredBusinessId ? "Thoughts about this business?" : "How's work?"
+  );
+
   interface Comment {
     id: string;
     author: string;
@@ -95,20 +99,21 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
 
   const handlePostSubmit = async () => {
     if (!postText.trim()) return;
-
+  
     if (isProfane(postText)) {
-      toast({
-        title: "Post blocked",
-        description: "Inappropriate content detected",
-        variant: "destructive"
-      });
       setPostText('');
+      setPostPlaceholder('Post blocked: Inappropriate content detected');
       return;
     }
     
     const success = await submitPost(postText, filteredBusinessId);
     if (success) {
       setPostText('');
+      setPostPlaceholder(filteredBusinessId ? "Thoughts about this business?" : "How's work?");
+    } else {
+      setPostText('');
+      setPostPlaceholder('Failed to create post. Please try again.');
+    }
   };
 
   const handleCommentSubmit = () => {
@@ -400,12 +405,10 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
               type="text"
               value={postText}
               onChange={e => setPostText(e.target.value)}
-              placeholder={filteredBusinessId ? "Thoughts about this business?" : "How's work?"}
+              placeholder={postPlaceholder}
               className="search-bar pr-14"
               onKeyPress={e => {
-                if (e.key === 'Enter') {
-                  handlePostSubmit();
-                }
+                if (e.key === 'Enter') handlePostSubmit();
               }}
             />
             <button
