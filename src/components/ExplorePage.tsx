@@ -427,6 +427,6 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
       </div>
     </div>
   );
-});
+};
 
 export default ExplorePage;
