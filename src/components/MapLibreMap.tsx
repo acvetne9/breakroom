@@ -491,6 +491,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  useEffect(() => {
+    if (selectedBusiness && mapRef.current) {
+      mapRef.current.flyTo({
+        center: [selectedBusiness.position.lng, selectedBusiness.position.lat],
+        zoom: 16,
+        essential: true,
+      });
+    }
+  }, [selectedBusiness]);
+
   // initialize map once
   useEffect(() => {
     const initializeMap = async () => {
