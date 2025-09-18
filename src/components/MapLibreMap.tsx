@@ -383,8 +383,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       try {
         businessCacheRef.current.clear();
     
-        // ✅ Pass full polygon coordinates to backend/API
-        const neighborhoodBusinesses = await loadBusinessesInViewport?.(boundary, { polygon: true });
+        const neighborhoodBusinesses = await loadBusinessesInViewport?.(boundary, 10000);
         
         // Fallback: filter client-side with Turf if API does not fully support polygons
         let filteredBusinesses = neighborhoodBusinesses || [];
