@@ -48,7 +48,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
 }) => {
   console.log('🔍 ExplorePage component initializing...');
   
-  const { posts, loading, submitPost, votePost, removePost } = usePosts();
+  const { posts, loading, submitPost, votePost, removePost, trackCommentedPost } = usePosts();
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
   const [hideSystemPost, setHideSystemPost] = useState(false);
@@ -72,7 +72,6 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   const [postText, setPostText] = useState('');
   const [commentText, setCommentText] = useState('');
   const { toast } = useToast();
-  const { trackCommentedPost } = usePosts();
 
   // Check if we need to fade out the system post when real posts are added
   const realPosts = useMemo(() => {
