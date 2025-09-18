@@ -1,4 +1,5 @@
 import { ScatterplotLayer } from '@deck.gl/layers';
+import * as turf from '@turf/turf';
 import type { Business } from '@/types/business';
 
 export interface DeckGLBusinessLayerProps {
