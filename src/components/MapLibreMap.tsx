@@ -140,7 +140,7 @@ class BusinessCache {
     }
     businesses.forEach(b => {
       if (!b?.id) console.warn('Skipping business without id', b);
-      else businessCacheRef.current.set(b.id, b as any);
+      else this.set(b.id, b as any);
     });
     console.log('Sample position:', businesses[0]?.position);
   }
