@@ -397,6 +397,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const convertedBoundaryPoints = boundary.map((p: any) => featureToLatLon(p));
   
       try {
+        // ✅ clear old businesses for neighborhood search
+        businessCacheRef.current.clear();
+      
+        // load businesses inside boundary
         const neighborhoodBusinesses = await loadBusinessesInViewport?.(convertedBoundaryPoints);
         if (Array.isArray(neighborhoodBusinesses) && neighborhoodBusinesses.length) {
           const polygonCoords = boundary.map((p: any) => [featureToLatLon(p).lon, featureToLatLon(p).lat]);
@@ -406,13 +410,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             const pt = turf.point([b.position.lng, b.position.lat]);
             return turf.booleanPointInPolygon(pt, turfPoly);
           });
+      
+          // ✅ add to cache and trigger deckGLLayers update
           businessCacheRef.current.addMultiple(clipped);
+          setCacheVersion(prev => prev + 1);
+        } else {
+          console.warn('No businesses returned for neighborhood boundary');
         }
       } catch (err) {
         console.error('Error loading neighborhood businesses', err);
       }
-      return;
-    }
+
   
     // For normal rectangular viewport
     const currentBounds = map.getBounds();
