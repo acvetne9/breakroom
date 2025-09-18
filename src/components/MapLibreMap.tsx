@@ -171,12 +171,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const { isProcessing, setIsProcessing } = mapDataHook;
   const { businesses: rawBusinesses, loading: businessesLoading, loadBusinessesInViewport, fetchFullBusinessDetails, isSearching } = businessesHook;
   const businesses = Array.isArray(rawBusinesses) ? rawBusinesses : [];
-
-  // add to cache whenever hook returns results (so DeckGL can read from cache)
+  const [cacheVersion, setCacheVersion] = useState(0);
+  
+  // whenever cache updated:
   useEffect(() => {
     if (businesses && businesses.length) {
       businessCacheRef.current.addMultiple(businesses);
-      handleViewportChangeRef.current(); // recalc after cache updated
+      setCacheVersion(prev => prev + 1); // trigger deckGLLayers refresh
+      handleViewportChangeRef.current();
       callbackRefs.current.onBusinessesLoaded?.();
     }
   }, [businesses]);
@@ -423,6 +425,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // DeckGL layers (scatterplot only). Pass the layer factory the object it expects.
   const deckGLLayers = useMemo(() => {
     try {
+  
       const cached = businessCacheRef.current.getAll();
       const hookBusinesses = businesses || [];
       const all: (Business & { detailsLoaded?: boolean })[] = [...cached];
