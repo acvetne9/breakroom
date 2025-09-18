@@ -171,6 +171,30 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const { isProcessing, setIsProcessing } = mapDataHook;
   const { businesses: rawBusinesses, loading: businessesLoading, loadBusinessesInViewport, fetchFullBusinessDetails, isSearching } = businessesHook;
   const businesses = Array.isArray(rawBusinesses) ? rawBusinesses : [];
+  const [cacheVersion, setCacheVersion] = useState(0);
+
+  useEffect(() => {
+    if (businesses && businesses.length) {
+      businessCacheRef.current.addMultiple(businesses);
+      setCacheVersion(prev => prev + 1); // triggers deckGLLayers useMemo
+      handleViewportChangeRef.current();
+      callbackRefs.current.onBusinessesLoaded?.();
+    }
+  }, [businesses]);
+  
+  const deckGLLayers = useMemo(() => {
+    const all = businessCacheRef.current.getAll();
+    if (!all.length) return [];
+    const businessesToRender = all.filter(b => b?.position?.lat != null && b?.position?.lng != null);
+    if (!businessesToRender.length) return [];
+    return [
+      createBusinessScatterplotLayer({
+        businesses: businessesToRender,
+        selectedBusinessId: selectedBusiness?.id,
+        onBusinessClick: handleBusinessClick
+      })
+    ];
+  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, cacheVersion]);
 
   // vector layers (styling restored exactly as requested)
   const addVectorLayers = useCallback((map: maplibregl.Map) => {
@@ -412,69 +436,69 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   
   // DeckGL layers (scatterplot only). Pass the layer factory the object it expects.
-  const deckGLLayers = useMemo(() => {
-    try {
+  // const deckGLLayers = useMemo(() => {
+  //   try {
   
-      const cached = businessCacheRef.current.getAll();
-      const hookBusinesses = businesses || [];
-      const all: (Business & { detailsLoaded?: boolean })[] = [...cached];
+  //     const cached = businessCacheRef.current.getAll();
+  //     const hookBusinesses = businesses || [];
+  //     const all: (Business & { detailsLoaded?: boolean })[] = [...cached];
 
-      hookBusinesses.forEach(h => { if (!all.some(a => a.id === h.id)) all.push(h as any); });
+  //     hookBusinesses.forEach(h => { if (!all.some(a => a.id === h.id)) all.push(h as any); });
 
-      if (!all.length) return [];
+  //     if (!all.length) return [];
 
-      // usable coords
-      let businessesToRender = all.filter(b => b && b.position && typeof b.position.lat === 'number' && typeof b.position.lng === 'number');
+  //     // usable coords
+  //     let businessesToRender = all.filter(b => b && b.position && typeof b.position.lat === 'number' && typeof b.position.lng === 'number');
 
-      if (mapRef.current && mapLoaded) {
-        const currentBounds = mapRef.current.getBounds();
+  //     if (mapRef.current && mapLoaded) {
+  //       const currentBounds = mapRef.current.getBounds();
 
-        // if neighborhood polygon active, clip to polygon first
-        if (searchFilters?.neighborhoodFilter?.boundary?.length) {
-          const polygonCoords = searchFilters.neighborhoodFilter.boundary.map((p: any) => [p.lon, p.lat]);
-          const turfPoly = turf.polygon([polygonCoords]);
-          businessesToRender = businessesToRender.filter(b => {
-            if (!b?.position) return false;
-            const pt = turf.point([b.position.lng, b.position.lat]);
-            return turf.booleanPointInPolygon(pt, turfPoly);
-          });
-        } else {
-          // visible + buffer logic
-          const visible = businessesToRender.filter(b => {
-            const latBuffer = (currentBounds.getNorth() - currentBounds.getSouth()) * 0.2;
-            const lngBuffer = (currentBounds.getEast() - currentBounds.getWest()) * 0.2;
-            return b.position.lat <= currentBounds.getNorth() + latBuffer &&
-                   b.position.lat >= currentBounds.getSouth() - latBuffer &&
-                   b.position.lng <= currentBounds.getEast() + lngBuffer &&
-                   b.position.lng >= currentBounds.getWest() - lngBuffer;
-          });
+  //       // if neighborhood polygon active, clip to polygon first
+  //       if (searchFilters?.neighborhoodFilter?.boundary?.length) {
+  //         const polygonCoords = searchFilters.neighborhoodFilter.boundary.map((p: any) => [p.lon, p.lat]);
+  //         const turfPoly = turf.polygon([polygonCoords]);
+  //         businessesToRender = businessesToRender.filter(b => {
+  //           if (!b?.position) return false;
+  //           const pt = turf.point([b.position.lng, b.position.lat]);
+  //           return turf.booleanPointInPolygon(pt, turfPoly);
+  //         });
+  //       } else {
+  //         // visible + buffer logic
+  //         const visible = businessesToRender.filter(b => {
+  //           const latBuffer = (currentBounds.getNorth() - currentBounds.getSouth()) * 0.2;
+  //           const lngBuffer = (currentBounds.getEast() - currentBounds.getWest()) * 0.2;
+  //           return b.position.lat <= currentBounds.getNorth() + latBuffer &&
+  //                  b.position.lat >= currentBounds.getSouth() - latBuffer &&
+  //                  b.position.lng <= currentBounds.getEast() + lngBuffer &&
+  //                  b.position.lng >= currentBounds.getWest() - lngBuffer;
+  //         });
 
-          const buffer = businessesToRender.filter(b => !visible.includes(b)).slice(0, 1000);
-          businessesToRender = [...visible, ...buffer];
-        }
+  //         const buffer = businessesToRender.filter(b => !visible.includes(b)).slice(0, 1000);
+  //         businessesToRender = [...visible, ...buffer];
+  //       }
 
-        // dedupe
-        const set = new Set<string>();
-        businessesToRender = businessesToRender.filter(b => {
-          if (set.has(b.id)) return false;
-          set.add(b.id);
-          return true;
-        });
-      }
+  //       // dedupe
+  //       const set = new Set<string>();
+  //       businessesToRender = businessesToRender.filter(b => {
+  //         if (set.has(b.id)) return false;
+  //         set.add(b.id);
+  //         return true;
+  //       });
+  //     }
 
-      // create the scatterplot layer (pass object)
-      return [
-        createBusinessScatterplotLayer({
-          businesses: businessesToRender,
-          selectedBusinessId: selectedBusiness?.id,
-          onBusinessClick: handleBusinessClick
-        })
-      ];
-    } catch (err) {
-      console.error('Error building deck layers', err);
-      return [];
-    }
-  }, [businesses, selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters]);
+  //     // create the scatterplot layer (pass object)
+  //     return [
+  //       createBusinessScatterplotLayer({
+  //         businesses: businessesToRender,
+  //         selectedBusinessId: selectedBusiness?.id,
+  //         onBusinessClick: handleBusinessClick
+  //       })
+  //     ];
+  //   } catch (err) {
+  //     console.error('Error building deck layers', err);
+  //     return [];
+  //   }
+  // }, [businesses, selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters]);
 
   // Resize handler
   useEffect(() => {
