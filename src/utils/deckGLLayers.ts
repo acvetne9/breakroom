@@ -8,22 +8,88 @@ export interface DeckGLBusinessLayerProps {
   onBusinessClick?: (business: Business) => void;
   getTooltip?: (info: any) => string;
   map?: any;
-  neighborhoodBoundary?: { lat: number; lon: number }[];
 }
 
-/**
- * Filters businesses strictly inside a neighborhood polygon
- */
-const filterBusinessesInPolygon = (
-  businesses: Business[],
-  neighborhoodBoundary?: { lat: number; lon: number }[]
-): Business[] => {
-  if (!neighborhoodBoundary?.length) return businesses;
+export const createBusinessScatterplotLayer = ({
+  businesses,
+  selectedBusinessId,
+  onBusinessClick,
+  getTooltip
+}: DeckGLBusinessLayerProps) => {
+  // Use stable ID to prevent layer recreation
+  const layerId = 'businesses-scatter';
+  
+  console.log(`🎯 Creating scatterplot layer with ${businesses.length} clickable businesses`);
+  console.log(`🎯 onClick handler provided:`, !!onBusinessClick);
+  
+  // Log sample business data to debug
+  if (businesses.length > 0) {
+    console.log(`🎯 Sample business data:`, {
+      id: businesses[0].id,
+      name: businesses[0].name,
+      position: businesses[0].position
+    });
+  }
+  
+  return new ScatterplotLayer({
+    id: layerId,
+    data: businesses,
+    pickable: true,
+    stroked: true,
+    filled: true,
+    opacity: 1.0,
+    radiusMinPixels: 8,
+    radiusMaxPixels: 8,
+    lineWidthMinPixels: 2,
+    getPosition: (d: Business) => {
+      if (!d || !d.position) {
+        console.warn('⚠️ Invalid business data:', d);
+        return [0, 0];
+      }
+      return [d.position.lng, d.position.lat];
+    },
+    getRadius: (_d: Business) => 8, // Fixed size for all dots
+    getFillColor: (_d: Business) => [250, 204, 21, 255], // Consistent yellow for all
+    getLineColor: (_d: Business) => [255, 255, 255, 255], // Consistent white border
+    onClick: onBusinessClick ? (info, event) => {
+      console.log('🎯 DeckGL click event triggered!', { 
+        hasObject: !!info.object, 
+        objectName: info.object?.name,
+        objectId: info.object?.id,
+        pickingInfos: info,
+        event: event 
+      });
+      if (info.object) {
+        console.log('🎯 Business clicked:', info.object.name, 'ID:', info.object.id);
+        onBusinessClick(info.object as Business);
+      } else {
+        console.warn('⚠️ Click on invalid business object:', info.object);
+      }
+    } : undefined,
+    // Update triggers - dots will appear/disappear instantly when data changes
+    updateTriggers: {
+      getPosition: [businesses],
+      getRadius: [businesses.length],
+      getFillColor: [businesses.length]
+    }
+  });
+};
 
+export const createBusinessClusterLayer = (
+  data: any[],
+  onBusinessClick?: (business: Business) => void,
+  map?: any,
+  neighborhoodBoundary?: { lat: number; lon: number }[]
+) => {
+  const layerId = 'businesses-cluster';
+
+  // If neighborhood boundary provided, build turf polygon and filter data
+  let filteredData = data;
+  if (neighborhoodBoundary?.length) {
   try {
     const polygonCoords = neighborhoodBoundary.map((p) => [p.lon, p.lat]);
 
-    // Close polygon if necessary
+    // Close the polygon by repeating the first point
     if (
       polygonCoords.length > 2 &&
       (polygonCoords[0][0] !== polygonCoords[polygonCoords.length - 1][0] ||
@@ -34,76 +100,23 @@ const filterBusinessesInPolygon = (
 
     const turfPoly = turf.polygon([polygonCoords]);
 
-    return businesses.filter((b) => {
-      if (!b?.position) return false;
-      return turf.booleanPointInPolygon(
-        turf.point([b.position.lng, b.position.lat]),
-        turfPoly
-      );
+    filteredData = data.filter((d: any) => {
+      if (!d?.position) return false;
+      const pt = turf.point([d.position.lng, d.position.lat]);
+      return turf.booleanPointInPolygon(pt, turfPoly);
     });
   } catch (err) {
     console.error('❌ Error filtering businesses by polygon:', err);
-    return businesses;
   }
-};
-
-/**
- * Scatterplot layer for individual businesses
- */
-export const createBusinessScatterplotLayer = ({
-  businesses,
-  selectedBusinessId,
-  onBusinessClick,
-  getTooltip,
-  neighborhoodBoundary
-}: DeckGLBusinessLayerProps) => {
-  // Filter businesses inside the polygon
-  const filteredBusinesses = filterBusinessesInPolygon(businesses, neighborhoodBoundary);
-
-  console.log(`🎯 Creating scatterplot layer with ${filteredBusinesses.length} businesses inside polygon`);
-  
-  return new ScatterplotLayer({
-    id: 'businesses-scatter',
-    data: filteredBusinesses,
-    pickable: true,
-    stroked: true,
-    filled: true,
-    opacity: 1.0,
-    radiusMinPixels: 8,
-    radiusMaxPixels: 8,
-    lineWidthMinPixels: 2,
-    getPosition: (d: Business) => [d.position.lng, d.position.lat],
-    getRadius: (_d: Business) => 8,
-    getFillColor: (_d: Business) => [250, 204, 21, 255],
-    getLineColor: (_d: Business) => [255, 255, 255, 255],
-    onClick: onBusinessClick ? (info) => info.object && onBusinessClick(info.object as Business) : undefined,
-    updateTriggers: {
-      getPosition: [filteredBusinesses],
-      getRadius: [filteredBusinesses],
-      getFillColor: [filteredBusinesses],
-    },
-  });
-};
-
-/**
- * Clustered scatterplot layer
- */
-export const createBusinessClusterLayer = (
-  data: any[],
-  onBusinessClick?: (business: Business) => void,
-  map?: any,
-  neighborhoodBoundary?: { lat: number; lon: number }[]
-) => {
-  // Filter businesses strictly inside the polygon
-  const filteredData = filterBusinessesInPolygon(data, neighborhoodBoundary);
+}
 
   return new ScatterplotLayer({
-    id: 'businesses-cluster',
+    id: layerId,
     data: filteredData,
     pickable: true,
+    opacity: 1.0,
     stroked: true,
     filled: true,
-    opacity: 1.0,
     radiusScale: 1,
     radiusMinPixels: 10,
     radiusMaxPixels: 15,
@@ -121,7 +134,9 @@ export const createBusinessClusterLayer = (
     onClick: (info) => {
       if (!info.object) return;
       const item = info.object as any;
+
       if (item.type === 'cluster') {
+        console.log(`🔎 Cluster clicked with ${item.count} businesses. Zooming in...`);
         if (map && map.getZoom) {
           const nextZoom = Math.min((map.getZoom?.() || 12) + 2, 18);
           map.easeTo?.({
@@ -131,6 +146,7 @@ export const createBusinessClusterLayer = (
           });
         }
       } else {
+        console.log('🎯 Individual business clicked from cluster:', item.name);
         onBusinessClick?.(item);
       }
     },

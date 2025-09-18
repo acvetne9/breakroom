@@ -583,32 +583,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded]);
 
-  // center/load neighborhood center
+  // center on neighborhood center if provided
   useEffect(() => {
     if (!mapRef.current || !mapLoaded || !searchFilters?.neighborhoodFilter || !neighborhoodCenter) return;
   
-    const isUserTriggered = !!selectedBusiness; // or you can pass a dedicated flag if needed
-  
-    if (isUserTriggered) {
-      // fly immediately for user clicks
-      mapRef.current.flyTo({
+    // Only trigger when a neighborhood search occurs
+    const timeout = setTimeout(() => {
+      mapRef.current!.flyTo({
         center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
-        zoom: 16,
-        essential: true,
+        zoom: 14,
+        duration: 2000, // 2-second fly animation
+        essential: true
       });
-    } else {
-      // automatic fly (e.g., on initial search/filter load) waits 2s
-      const timeout = setTimeout(() => {
-        mapRef.current!.flyTo({
-          center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
-          zoom: 14,
-          duration: 2000, // smooth 2-second fly
-          essential: true,
-        });
-      }, 2000);
-      return () => clearTimeout(timeout);
-    }
-  }, [searchFilters?.neighborhoodFilter, neighborhoodCenter, mapLoaded, selectedBusiness]);
+    }, 2000); // 2-second delay before starting the fly
+  
+    return () => clearTimeout(timeout); // cleanup if search changes
+  }, [searchFilters?.neighborhoodFilter, neighborhoodCenter, mapLoaded]);
+
+
 
   // center/load neighborhood businesses on searchFilters change (stable)
   useEffect(() => {
