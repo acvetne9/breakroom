@@ -181,21 +181,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       callbackRefs.current.onBusinessesLoaded?.();
     }
   }, [businesses]);
-  
-  const deckGLLayers = useMemo(() => {
-    const all = businessCacheRef.current.getAll();
-    if (!all.length) return [];
-    const businessesToRender = all.filter(b => b?.position?.lat != null && b?.position?.lng != null);
-    if (!businessesToRender.length) return [];
-    return [
-      createBusinessScatterplotLayer({
-        businesses: businessesToRender,
-        selectedBusinessId: selectedBusiness?.id,
-        onBusinessClick: handleBusinessClick
-      })
-    ];
-  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, cacheVersion]);
-
   // vector layers (styling restored exactly as requested)
   const addVectorLayers = useCallback((map: maplibregl.Map) => {
     try {
@@ -434,6 +419,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters]);
 
+  const deckGLLayers = useMemo(() => {
+    const all = businessCacheRef.current.getAll();
+    if (!all.length) return [];
+    const businessesToRender = all.filter(b => b?.position?.lat != null && b?.position?.lng != null);
+    if (!businessesToRender.length) return [];
+    return [
+      createBusinessScatterplotLayer({
+        businesses: businessesToRender,
+        selectedBusinessId: selectedBusiness?.id,
+        onBusinessClick: handleBusinessClick
+      })
+    ];
+  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, cacheVersion]);
   
   // DeckGL layers (scatterplot only). Pass the layer factory the object it expects.
   // const deckGLLayers = useMemo(() => {
