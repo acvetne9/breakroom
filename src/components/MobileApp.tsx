@@ -438,19 +438,22 @@ const MobileApp: React.FC = () => {
         >
           <Suspense fallback={<Skeleton className="w-full h-full" />}>
             <ExplorePage 
-              onFlyToBusiness={(businessId: string) => {
-                const business = businesses.find(b => b.id === businessId);
-                if (business && mapRef.current) {
-                  mapRef.current.flyTo({
-                    center: [business.position.lng, business.position.lat],
-                    zoom: 16,
-                    essential: true,
-                  });
-                }
-              }}
               filteredBusinessId={filteredBusinessId || undefined}
               filteredUserStories={filteredUserStories}
               onBusinessView={(businessId) => {
+                const business = businesses.find(b => b.id === businessId);
+                if (business) {
+                  setSelectedBusiness(business);  // ✅ MapLibreMap will auto-fly
+                  setCurrentSlide(1);
+                } else {
+                  (async () => {
+                    const full = await fetchFullBusinessDetails(businessId);
+                    if (full) {
+                      setSelectedBusiness(full);
+                      setCurrentSlide(1);
+                    }
+                  })();
+                }
                 console.log('👁️ Business view requested:', businessId);
                 const business = businesses.find(b => b.id === businessId);
                 console.log('📍 Found business:', business?.name);
