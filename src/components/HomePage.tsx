@@ -52,6 +52,30 @@ const HomePage: React.FC<HomePageProps> = ({
 
   // 👇 state for welcome banner
   const [showWelcome, setShowWelcome] = useState(false);
+  const [cacheVersion, setCacheVersion] = useState(0);
+
+  useEffect(() => {
+    if (businesses && businesses.length) {
+      businessCacheRef.current.addMultiple(businesses);
+      setCacheVersion(prev => prev + 1); // triggers deckGLLayers useMemo
+      handleViewportChangeRef.current();
+      callbackRefs.current.onBusinessesLoaded?.();
+    }
+  }, [businesses]);
+  
+  const deckGLLayers = useMemo(() => {
+    const all = businessCacheRef.current.getAll();
+    if (!all.length) return [];
+    const businessesToRender = all.filter(b => b?.position?.lat != null && b?.position?.lng != null);
+    if (!businessesToRender.length) return [];
+    return [
+      createBusinessScatterplotLayer({
+        businesses: businessesToRender,
+        selectedBusinessId: selectedBusiness?.id,
+        onBusinessClick: handleBusinessClick
+      })
+    ];
+  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, cacheVersion]);
 
   // Listen for search triggers from other pages
   useEffect(() => {
