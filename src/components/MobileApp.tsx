@@ -438,6 +438,16 @@ const MobileApp: React.FC = () => {
         >
           <Suspense fallback={<Skeleton className="w-full h-full" />}>
             <ExplorePage 
+              onFlyToBusiness={(businessId: string) => {
+                const business = businesses.find(b => b.id === businessId);
+                if (business && mapRef.current) {
+                  mapRef.current.flyTo({
+                    center: [business.position.lng, business.position.lat],
+                    zoom: 16,
+                    essential: true,
+                  });
+                }
+              }}
               filteredBusinessId={filteredBusinessId || undefined}
               filteredUserStories={filteredUserStories}
               onBusinessView={(businessId) => {
