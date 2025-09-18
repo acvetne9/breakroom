@@ -35,15 +35,16 @@ interface ExplorePageProps {
   onFlyToBusiness?: (businessId: string) => void; // 🚀 NEW
 }
 
-const ExplorePage: React.FC<ExplorePageProps> = memo(({
+const ExplorePage: React.FC<ExplorePageProps> = ({
   filteredBusinessId,
-  filteredUserStories = false,
+  filteredUserStories,
   onBusinessView,
   onExpandedPostChange,
   onCommentSubmit,
   onBackToAllPosts,
   onNavigateToHomeBusiness,
-  onBusinessPreview
+  onBusinessPreview,
+  onFlyToBusiness,
 }) => {
   console.log('🔍 ExplorePage component initializing...');
   

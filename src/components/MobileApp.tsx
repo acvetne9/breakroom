@@ -444,7 +444,7 @@ const MobileApp: React.FC = () => {
                   mapRef.current.flyTo({
                     center: [business.position.lng, business.position.lat],
                     zoom: 16,
-                    essential: true
+                    essential: true,
                   });
                 }
               }}

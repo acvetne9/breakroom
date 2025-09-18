@@ -257,6 +257,7 @@ const HomePage: React.FC<HomePageProps> = ({
           landmarks={landmarks}
           searchFilters={searchFilters}
           neighborhoodCenter={neighborhoodCenter}
+          ref={mapRef}
         />
       
         {/* Business Preview Popup */}
