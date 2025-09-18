@@ -10,15 +10,14 @@ export interface NeighborhoodBounds {
 
 export const nycNeighborhoodBoundaries = {
   "Manhattan": {
-        "Harlem": [
-      { lat: 40.795, lon: -73.975 },
-      { lat: 40.805, lon: -73.970 },
-      { lat: 40.815, lon: -73.965 },
-      { lat: 40.825, lon: -73.960 },
-      { lat: 40.835, lon: -73.955 },
-      { lat: 40.845, lon: -73.950 },
-      { lat: 40.850, lon: -73.945 },
-      { lat: 40.845, lon: -73.940 },
+    "Harlem": [
+      { lat: 40.800, lon: -73.970 },
+      { lat: 40.810, lon: -73.965 },
+      { lat: 40.820, lon: -73.960 },
+      { lat: 40.830, lon: -73.955 },
+      { lat: 40.835, lon: -73.950 },
+      { lat: 40.840, lon: -73.945 },
+      { lat: 40.842, lon: -73.940 },
       { lat: 40.840, lon: -73.935 },
       { lat: 40.835, lon: -73.930 },
       { lat: 40.830, lon: -73.928 },
@@ -29,33 +28,29 @@ export const nycNeighborhoodBoundaries = {
       { lat: 40.805, lon: -73.950 },
       { lat: 40.800, lon: -73.955 },
       { lat: 40.798, lon: -73.960 },
-      { lat: 40.796, lon: -73.965 },
-      { lat: 40.795, lon: -73.970 },
-      { lat: 40.795, lon: -73.975 } // close loop
+      { lat: 40.799, lon: -73.965 },
+      { lat: 40.800, lon: -73.970 }
     ],
     "Upper East Side": [
-      { lat: 40.770, lon: -73.963 },
       { lat: 40.773, lon: -73.959 },
-      { lat: 40.776, lon: -73.955 },
-      { lat: 40.779, lon: -73.952 },
-      { lat: 40.782, lon: -73.955 },
-      { lat: 40.784, lon: -73.960 },
-      { lat: 40.783, lon: -73.965 },
-      { lat: 40.780, lon: -73.968 },
-      { lat: 40.777, lon: -73.969 },
-      { lat: 40.773, lon: -73.966 },
-      { lat: 40.770, lon: -73.963 } // close loop
+      { lat: 40.775, lon: -73.954 },
+      { lat: 40.778, lon: -73.952 },
+      { lat: 40.781, lon: -73.955 },
+      { lat: 40.782, lon: -73.960 },
+      { lat: 40.780, lon: -73.964 },
+      { lat: 40.777, lon: -73.965 },
+      { lat: 40.773, lon: -73.962 },
+      { lat: 40.773, lon: -73.959 } // close loop
     ],
     "Upper West Side": [
-      { lat: 40.784, lon: -73.986 },
       { lat: 40.788, lon: -73.981 },
-      { lat: 40.790, lon: -73.976 },
-      { lat: 40.788, lon: -73.972 },
-      { lat: 40.785, lon: -73.970 },
-      { lat: 40.781, lon: -73.973 },
-      { lat: 40.780, lon: -73.978 },
-      { lat: 40.782, lon: -73.983 },
-      { lat: 40.784, lon: -73.986 } // close loop
+      { lat: 40.789, lon: -73.975 },
+      { lat: 40.787, lon: -73.972 },
+      { lat: 40.784, lon: -73.971 },
+      { lat: 40.781, lon: -73.975 },
+      { lat: 40.782, lon: -73.981 },
+      { lat: 40.785, lon: -73.983 },
+      { lat: 40.788, lon: -73.981 }
     ],
     "Midtown": [
       { lat: 40.740, lon: -74.010 },
