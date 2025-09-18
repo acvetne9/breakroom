@@ -502,11 +502,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       const style = {
         version: 8 as const,
+        glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf", // 👈 required
         sources: { 'nyc-tiles': vectorSource },
         layers: [
-          { id: 'background', type: 'background' as const, paint: { 'background-color': '#F5F5DC' } }
+          { id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } }
         ]
-      } as any; // MapLibre's typings can be picky; keep as any here to avoid typed mismatch
+      } as any;
 
       const mapInstance = new maplibregl.Map({
         container: mapContainerRef.current!,
