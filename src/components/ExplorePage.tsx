@@ -107,16 +107,8 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     }
     
     const success = await submitPost(postText, filteredBusinessId);
-    // if (success) {
-    //   setPostText('');
-      
-    // } else {
-    //   toast({
-    //     title: "Error",
-    //     description: "Failed to create post. Please try again.",
-    //     variant: "destructive"
-    //   });
-    // }
+    if (success) {
+      setPostText('');
   };
 
   const handleCommentSubmit = () => {
