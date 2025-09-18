@@ -53,9 +53,13 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
   const [hideSystemPost, setHideSystemPost] = useState(false);
 
-  const [postPlaceholder, setPostPlaceholder] = useState(
-    filteredBusinessId ? "Thoughts about this business?" : "How's work?"
-  );
+  const defaultPlaceholder = filteredBusinessId ? "Thoughts about this business?" : "How's work?";
+  const [postPlaceholder, setPostPlaceholder] = useState(defaultPlaceholder);
+  
+  // 2️⃣ Reset placeholder whenever filteredBusinessId changes
+  useEffect(() => {
+    setPostPlaceholder(filteredBusinessId ? "Thoughts about this business?" : "How's work?");
+  }, [filteredBusinessId]);
 
   interface Comment {
     id: string;
@@ -105,7 +109,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
       setPostPlaceholder('Post blocked: Inappropriate content detected');
       return;
     }
-    
+  
     const success = await submitPost(postText, filteredBusinessId);
     if (success) {
       setPostText('');
@@ -118,29 +122,24 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
 
   const handleCommentSubmit = () => {
     if (!commentText.trim() || !expandedPost) return;
-
+  
     if (isProfane(commentText)) {
-      toast({
-        title: "Comment blocked",
-        description: "Inappropriate content detected",
-        variant: "destructive",
-      });
       setCommentText('');
       return;
     }
-
+  
     const newComment: Comment = {
       id: crypto.randomUUID(),
-      author: "You", // replace with logged-in user's name/id
+      author: "You",
       text: commentText,
       createdAt: new Date(),
     };
-
+  
     setComments({
       ...comments,
       [expandedPost]: [...(comments[expandedPost] || []), newComment],
     });
-
+  
     setCommentText('');
     onCommentSubmit?.(expandedPost, commentText);
   };
@@ -194,10 +193,10 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
       return;
     }
   
-    // If the deleted post is currently expanded, collapse it and reset comment input
     if (expandedPost === postId) {
       setExpandedPost(null);
       setCommentText('');
+      setPostPlaceholder(filteredBusinessId ? "Thoughts about this business?" : "How's work?");
     }
   };
 
