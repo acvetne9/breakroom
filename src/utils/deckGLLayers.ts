@@ -74,12 +74,34 @@ export const createBusinessScatterplotLayer = ({
   });
 };
 
-export const createBusinessClusterLayer = (data: any[], onBusinessClick?: (business: Business) => void, map?: any) => {
+export const createBusinessClusterLayer = (
+  data: any[],
+  onBusinessClick?: (business: Business) => void,
+  map?: any,
+  neighborhoodBoundary?: { lat: number; lon: number }[]
+) => {
   const layerId = 'businesses-cluster';
-  
+
+  // If neighborhood boundary provided, build turf polygon and filter data
+  let filteredData = data;
+  if (neighborhoodBoundary?.length) {
+    try {
+      const polygonCoords = neighborhoodBoundary.map((p) => [p.lon, p.lat]);
+      const turfPoly = turf.polygon([polygonCoords]);
+
+      filteredData = data.filter((d: any) => {
+        if (!d?.position) return false;
+        const pt = turf.point([d.position.lng, d.position.lat]);
+        return turf.booleanPointInPolygon(pt, turfPoly);
+      });
+    } catch (err) {
+      console.error('❌ Error filtering businesses by polygon:', err);
+    }
+  }
+
   return new ScatterplotLayer({
     id: layerId,
-    data: data,
+    data: filteredData,
     pickable: true,
     opacity: 1.0,
     stroked: true,
@@ -88,52 +110,39 @@ export const createBusinessClusterLayer = (data: any[], onBusinessClick?: (busin
     radiusMinPixels: 10,
     radiusMaxPixels: 15,
     lineWidthMinPixels: 2,
-    getPosition: (d: any) => {
-      if (d.type === 'cluster') {
-        return [d.position.lng, d.position.lat];
-      } else {
-        return [d.position.lng, d.position.lat];
-      }
-    },
-    getRadius: (d: any) => {
-      if (d.type === 'cluster') {
-        return Math.min(Math.max(Math.sqrt(d.count) * 4, 12), 50);
-      } else {
-        return 6;
-      }
-    },
-    getFillColor: (d: any) => {
-      if (d.type === 'cluster') {
-        const intensity = Math.min(d.count / 20, 1);
-        return [250, 204, 21, 200 + intensity * 55];
-      } else {
-        return [250, 204, 21, 255];
-      }
-    },
+    getPosition: (d: any) => [d.position.lng, d.position.lat],
+    getRadius: (d: any) =>
+      d.type === 'cluster'
+        ? Math.min(Math.max(Math.sqrt(d.count) * 4, 12), 50)
+        : 6,
+    getFillColor: (d: any) =>
+      d.type === 'cluster'
+        ? [250, 204, 21, 200 + Math.min(d.count / 20, 1) * 55]
+        : [250, 204, 21, 255],
     getLineColor: [255, 255, 255, 255],
     onClick: (info) => {
-      if (info.object) {
-        const item = info.object as any;
-        if (item.type === 'cluster') {
-          console.log(`🔎 Cluster clicked with ${item.count} businesses. Zooming in...`);
-          if (map && map.getZoom) {
-            const nextZoom = Math.min((map.getZoom?.() || 12) + 2, 18);
-            map.easeTo?.({ 
-              center: [item.position.lng, item.position.lat], 
-              zoom: nextZoom, 
-              duration: 600 
-            });
-          }
-        } else {
-          console.log('🎯 Individual business clicked from cluster:', item.name);
-          onBusinessClick?.(item);
+      if (!info.object) return;
+      const item = info.object as any;
+
+      if (item.type === 'cluster') {
+        console.log(`🔎 Cluster clicked with ${item.count} businesses. Zooming in...`);
+        if (map && map.getZoom) {
+          const nextZoom = Math.min((map.getZoom?.() || 12) + 2, 18);
+          map.easeTo?.({
+            center: [item.position.lng, item.position.lat],
+            zoom: nextZoom,
+            duration: 600,
+          });
         }
+      } else {
+        console.log('🎯 Individual business clicked from cluster:', item.name);
+        onBusinessClick?.(item);
       }
     },
     updateTriggers: {
-      getPosition: [data],
-      getRadius: [data],
-      getFillColor: [data]
-    }
+      getPosition: [filteredData],
+      getRadius: [filteredData],
+      getFillColor: [filteredData],
+    },
   });
 };
