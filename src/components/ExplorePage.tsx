@@ -30,8 +30,9 @@ interface ExplorePageProps {
   onExpandedPostChange?: (postId: string | null) => void;
   onCommentSubmit?: (postId: string, comment: string) => void;
   onBackToAllPosts?: () => void;
-  onNavigateToHomeBusiness?: (businessId: string) => void; // New prop for navigation
-  onBusinessPreview?: (businessId: string) => void; // New prop for business preview
+  onNavigateToHomeBusiness?: (businessId: string) => void;
+  onBusinessPreview?: (businessId: string) => void;
+  onFlyToBusiness?: (businessId: string) => void; // 🚀 NEW
 }
 
 const ExplorePage: React.FC<ExplorePageProps> = memo(({
@@ -160,11 +161,17 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   };
 
   const handleBusinessView = (businessId: string) => {
-    console.log('👀 Eye clicked - navigating to home page with business:', businessId);
+    console.log('👀 Eye clicked - navigating and flying to business:', businessId);
+  
+    // First, request map fly-to if available
+    if (onFlyToBusiness) {
+      onFlyToBusiness(businessId);
+    }
+  
+    // Keep existing navigation fallback
     if (onNavigateToHomeBusiness) {
       onNavigateToHomeBusiness(businessId);
     } else {
-      // Fallback to old behavior if new prop not provided
       onBusinessView?.(businessId);
     }
   };
