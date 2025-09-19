@@ -197,7 +197,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.log("📦 Adding businesses to cache:", businesses.length);
   
       // ✅ Instead of clearing, merge them in
-      businessCacheRef.current.addMultiple(businesses);
+      businessCacheRef.current.addMultiple(newBusinesses, { dedupe: true });
   
       // Force DeckGL re-render
       setCacheVersion(prev => prev + 1);
