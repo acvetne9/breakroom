@@ -131,19 +131,14 @@ class BusinessCache {
   }
 
   addMultiple(businesses: Business[]) {
-    console.log('🏢 BusinessCache.addMultiple called with', businesses.length, 'businesses');
-    if (businesses.length > 0) {
-      console.log('🏢 Sample business being added:', {
-        id: businesses[0].id,
-        name: businesses[0].name,
-        position: businesses[0].position
-      });
+    if (!Array.isArray(businesses)) return;
+    const validBusinesses = businesses.filter(b => b?.id && b?.position?.lat != null && b?.position?.lng != null);
+    if (validBusinesses.length === 0) {
+      console.warn('No valid businesses to add. Skipping all.');
+      return;
     }
-    businesses.forEach(b => {
-      if (!b?.id) console.warn('Skipping business without id', b);
-      else this.set(b.id, b as any);
-    });
-    console.log('Sample position:', businesses[0]?.position);
+    validBusinesses.forEach(b => this.set(b.id, { ...b, detailsLoaded: !!b.detailsLoaded }));
+    console.log(`🏢 Added ${validBusinesses.length} businesses to cache.`);
   }
 
   clear() {
@@ -376,100 +371,115 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (mapLoaded) handleViewportChangeRef.current();
   }, [mapLoaded, searchFilters]);
 
-
-  // Handle viewport change
   const handleViewportChange = useCallback(async () => {
     if (!mapRef.current || !mapLoaded || isLoadingRef.current) return;
-  
-    const map = mapRef.current;
-    const zoom = map.getZoom();
-  
-    let bounds: Bounds;
-  
-    if (searchFilters?.neighborhoodFilter?.boundary?.length) {
-      const boundary = searchFilters.neighborhoodFilter.boundary;
-      const polygonCoords = boundary.map((p: any) => [featureToLatLon(p).lon, featureToLatLon(p).lat]);
-      const turfPoly = turf.polygon([polygonCoords]);
-    
-      try {
-        const fetched = await loadBusinessesInViewport?.(bounds, businessLimit);
-        if (fetched?.length) {
-          businessCacheRef.current.clear(); // now safe
-          businessCacheRef.current.addMultiple(fetched);
-        }
-        const neighborhoodBusinesses = await loadBusinessesInViewport?.(boundary, 10000);
-        
-        // Fallback: filter client-side with Turf if API does not fully support polygons
-        let filteredBusinesses = neighborhoodBusinesses || [];
-        filteredBusinesses = filteredBusinesses.filter(b => {
-          if (!b?.position) return false;
-          const pt = turf.point([b.position.lng, b.position.lat]);
-          return turf.booleanPointInPolygon(pt, turfPoly);
-        });
-    
-        businessCacheRef.current.addMultiple(filteredBusinesses);
-        setCacheVersion(prev => prev + 1);
-    
-      } catch (err) {
-        console.error('Error loading neighborhood businesses', err);
-      }
-    }
-
-    // For normal rectangular viewport
-    const currentBounds = map.getBounds();
-    bounds = {
-      north: currentBounds.getNorth(),
-      south: currentBounds.getSouth(),
-      east: currentBounds.getEast(),
-      west: currentBounds.getWest()
-    };
-  
-    const businessLimit = getBusinessLimitForViewport(zoom, bounds);
+    isLoadingRef.current = true;
   
     try {
-      const viewportBusinesses = await loadBusinessesInViewport?.(bounds, businessLimit);
-      console.log("viewportBusinesses fetched:", viewportBusinesses?.length);
-      if (viewportBusinesses?.length) {
-          businessCacheRef.current.addMultiple(viewportBusinesses);
-      } else {
-          console.warn("⚠️ No businesses returned from loadBusinessesInViewport");
+      const map = mapRef.current;
+      const zoom = map.getZoom();
+      let allFetchedBusinesses: any[] = [];
+  
+      // --- 1️⃣ Handle neighborhood polygon filter ---
+      if (searchFilters?.neighborhoodFilter?.boundary?.length) {
+        const boundary = searchFilters.neighborhoodFilter.boundary;
+        const polygonCoords = boundary.map((p: any) => {
+          const point = featureToLatLon(p);
+          return [point.lon, point.lat];
+        });
+        const turfPoly = turf.polygon([polygonCoords]);
+  
+        try {
+          // Attempt to fetch businesses from API with polygon boundary
+          const fetched = await loadBusinessesInViewport?.(boundary, 10000) || [];
+          
+          // Fallback: client-side filter in case API does not fully support polygons
+          const filtered = fetched.filter(b => {
+            if (!b?.position?.lat || !b?.position?.lng) return false;
+            const pt = turf.point([b.position.lng, b.position.lat]);
+            return turf.booleanPointInPolygon(pt, turfPoly);
+          });
+  
+          if (filtered.length) {
+            businessCacheRef.current.clear(); // safe to clear for neighborhood-specific
+            businessCacheRef.current.addMultiple(filtered);
+            allFetchedBusinesses.push(...filtered);
+            console.log(`🏘️ Loaded ${filtered.length} businesses within neighborhood`);
+          }
+        } catch (err) {
+          console.error('Error loading neighborhood businesses:', err);
+        }
       }
-    } catch (err) {
-      console.error("Error loading viewport businesses", err);
+  
+      // --- 2️⃣ Handle standard rectangular viewport ---
+      const bounds = map.getBounds();
+      const viewportBounds = {
+        north: bounds.getNorth(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        west: bounds.getWest()
+      };
+  
+      const businessLimit = getBusinessLimitForViewport(zoom, viewportBounds);
+  
+      try {
+        const viewportBusinesses = await loadBusinessesInViewport?.(viewportBounds, businessLimit) || [];
+        if (viewportBusinesses.length) {
+          businessCacheRef.current.addMultiple(viewportBusinesses);
+          allFetchedBusinesses.push(...viewportBusinesses);
+          console.log(`🗺️ Loaded ${viewportBusinesses.length} businesses for viewport`);
+        } else {
+          console.warn("⚠️ No businesses returned for viewport");
+        }
+      } catch (err) {
+        console.error("Error loading viewport businesses:", err);
+      }
+  
+      // --- 3️⃣ Trigger re-render of layers ---
+      if (allFetchedBusinesses.length) {
+        setCacheVersion(prev => prev + 1);
+      }
+  
+    } finally {
+      isLoadingRef.current = false;
     }
   }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters]);
 
   const deckGLLayers = useMemo(() => {
-    const all = businessCacheRef.current.getAll();
-    console.log('🎯 Cache has', all.length, 'businesses');
-    if (!all.length) return [];
+    // Get all businesses from cache
+    const allBusinesses = businessCacheRef.current.getAll();
+    console.log('🎯 Cache has', allBusinesses.length, 'businesses');
   
-    // Convert raw boundary features into [lat, lon] for turf
-    let neighborhoodBoundary: { lat: number; lon: number }[] | undefined;
+    if (!allBusinesses.length) return [];
+  
+    // Ensure each business has valid lat/lng
+    let validBusinesses = allBusinesses.filter(
+      b => b?.position?.lat != null && b?.position?.lng != null
+    );
+  
+    // Handle neighborhood filter if present
     if (searchFilters?.neighborhoodFilter?.boundary?.length) {
-      neighborhoodBoundary = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
+      const neighborhoodCoords = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
+      if (neighborhoodCoords.length) {
+        const turfPolygon = turf.polygon([neighborhoodCoords.map(p => [p.lon, p.lat])]);
+        validBusinesses = validBusinesses.filter(b => {
+          const point = turf.point([b.position.lng, b.position.lat]);
+          return turf.booleanPointInPolygon(point, turfPolygon);
+        });
+      }
     }
   
-    // Filter businesses inside polygon if neighborhoodBoundary exists
-    let businessesToRender = all.filter(b => b?.position?.lat != null && b?.position?.lng != null);
-    if (neighborhoodBoundary?.length) {
-      const polygonCoords = neighborhoodBoundary.map(p => [p.lon, p.lat]);
-      const turfPoly = turf.polygon([polygonCoords]);
-      businessesToRender = businessesToRender.filter(b => {
-        const pt = turf.point([b.position.lng, b.position.lat]);
-        return turf.booleanPointInPolygon(pt, turfPoly);
-      });
-    }
+    console.log('🎯 Rendering', validBusinesses.length, 'businesses');
   
-    console.log('🎯 Rendering', businessesToRender.length, 'businesses');
-    if (!businessesToRender.length) return [];
+    if (!validBusinesses.length) return [];
   
+    // Return DeckGL layer
     return [
       createBusinessScatterplotLayer({
-        businesses: businessesToRender,
+        businesses: validBusinesses,
         selectedBusinessId: selectedBusiness?.id,
         onBusinessClick: handleBusinessClick,
-        neighborhoodBoundary // pass it to the layer for future reactivity
+        neighborhoodBoundary: searchFilters?.neighborhoodFilter?.boundary || null
       })
     ];
   }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, cacheVersion]);
