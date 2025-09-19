@@ -100,12 +100,11 @@ class BusinessCache {
   private maxSize: number;
   private storageKey = 'businessCache';
 
-  constructor(maxSize = 15000) {
+  constructor(maxSize = Infinity) {
     this.maxSize = maxSize;
     this.loadFromStorage();
   }
 
-  // Persist current cache to localStorage
   private persist() {
     try {
       const data = Array.from(this.cache.values());
@@ -131,11 +130,7 @@ class BusinessCache {
 
   set(id: string, business: Business & { detailsLoaded?: boolean }) {
     if (!id || !business) return;
-    if (this.cache.size >= this.maxSize) {
-      // Evict oldest 10%
-      const keysToDelete = Array.from(this.cache.keys()).slice(0, Math.floor(this.maxSize * 0.1));
-      keysToDelete.forEach(k => this.cache.delete(k));
-    }
+    // remove eviction completely
     this.cache.set(id, business);
     this.persist();
   }
