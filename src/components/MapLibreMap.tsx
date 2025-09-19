@@ -38,7 +38,6 @@ interface ViewportState {
   timestamp: number;
 }
 
-// singleton overlay
 let overlayInstance: MapboxOverlay | null = null;
 
 // Convert GeoJSON Point Feature -> { lat, lon }
@@ -50,8 +49,6 @@ const featureToLatLon = (feature: Feature<Point> | { lat: number; lon: number })
   throw new Error('Invalid feature for conversion to lat/lon');
 };
 
-
-// basic grid-sampling (unchanged, preserved behavior)
 const createOptimizedGridSampling = (bounds: Bounds, businesses: Business[], maxBusinesses: number, prioritizeVisible: boolean = false): Business[] => {
   if (!businesses || businesses.length <= maxBusinesses) return businesses;
 
