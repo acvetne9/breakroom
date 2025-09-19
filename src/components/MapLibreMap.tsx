@@ -194,33 +194,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Add businesses to cache when they're loaded from the hook
   useEffect(() => {
-    console.log('🔍 useEffect triggered - businesses changed:', businesses?.length || 0);
-    
     if (businesses && businesses.length > 0) {
-      console.log('🏢 Processing businesses from hook:', businesses.length);
-      console.log('🏢 First business sample:', JSON.stringify(businesses[0], null, 2));
-      
-      // Clear cache to avoid stale data
       businessCacheRef.current.clear();
-      console.log('🧹 Cache cleared');
-      
-      // Add all businesses to cache
       businessCacheRef.current.addMultiple(businesses);
-      
-      // Verify cache was populated
-      const cacheCount = businessCacheRef.current.getAll().length;
-      console.log('✅ Cache populated with', cacheCount, 'businesses');
-      
-      // Force deck.gl layer update
-      setCacheVersion(prev => {
-        const newVersion = prev + 1;
-        console.log('🔄 Cache version updated to:', newVersion);
-        return newVersion;
-      });
-      
+      setCacheVersion(prev => prev + 1);
       callbackRefs.current.onBusinessesLoaded?.();
     } else {
-      console.log('⚠️ No businesses to cache:', businesses?.length || 0);
+      // just log, don’t clear
+      console.log('⚠️ Businesses array empty — keeping previous cache');
     }
   }, [businesses]);
   
