@@ -98,61 +98,80 @@ const createOptimizedGridSampling = (bounds: Bounds, businesses: Business[], max
   return result.slice(0, maxBusinesses);
 };
 
-// Simple cache (no isMobile branch — consistent)
 class BusinessCache {
   private cache = new Map<string, Business & { detailsLoaded?: boolean }>();
   private maxSize: number;
+  private storageKey = 'businessCache';
 
   constructor(maxSize = 15000) {
     this.maxSize = maxSize;
+    this.loadFromStorage();
+  }
+
+  // Persist current cache to localStorage
+  private persist() {
+    try {
+      const data = Array.from(this.cache.values());
+      localStorage.setItem(this.storageKey, JSON.stringify(data));
+    } catch (err) {
+      console.warn('⚠️ Failed to persist business cache', err);
+    }
+  }
+
+  private loadFromStorage() {
+    try {
+      const raw = localStorage.getItem(this.storageKey);
+      if (!raw) return;
+      const arr: Business[] = JSON.parse(raw);
+      arr.forEach(b => {
+        if (b?.id) this.cache.set(b.id, b);
+      });
+      console.log(`📦 Loaded ${this.cache.size} businesses from localStorage`);
+    } catch (err) {
+      console.warn('⚠️ Failed to load business cache from localStorage', err);
+    }
   }
 
   set(id: string, business: Business & { detailsLoaded?: boolean }) {
+    if (!id || !business) return;
     if (this.cache.size >= this.maxSize) {
+      // Evict oldest 10%
       const keysToDelete = Array.from(this.cache.keys()).slice(0, Math.floor(this.maxSize * 0.1));
-      keysToDelete.forEach(key => this.cache.delete(key));
+      keysToDelete.forEach(k => this.cache.delete(k));
     }
     this.cache.set(id, business);
+    this.persist();
   }
 
   get(id: string): (Business & { detailsLoaded?: boolean }) | undefined {
     const business = this.cache.get(id);
-    if (business) {
-      this.cache.delete(id);
-      this.cache.set(id, business);
-    }
+    if (!business) return undefined;
+    // Move to the end (LRU)
+    this.cache.delete(id);
+    this.cache.set(id, business);
     return business;
   }
 
-  getAll() {
-    const all = Array.from(this.cache.values());
-    console.log('🏢 getAll returning', all.length, 'businesses');
-    return all;
+  getAll(): (Business & { detailsLoaded?: boolean })[] {
+    return Array.from(this.cache.values());
   }
 
   addMultiple(businesses: Business[]) {
     if (!Array.isArray(businesses) || businesses.length === 0) return;
-    
-    const validBusinesses = businesses.filter(b => 
-      b?.id && 
-      b?.position?.lat != null && 
+
+    const validBusinesses = businesses.filter(b =>
+      b?.id &&
+      b?.position?.lat != null &&
       b?.position?.lng != null &&
-      !isNaN(b.position.lat) && 
+      !isNaN(b.position.lat) &&
       !isNaN(b.position.lng)
     );
-    
-    if (validBusinesses.length === 0) {
-      console.warn('⚠️ No valid businesses to add to cache');
-      return;
-    }
-    
+
     validBusinesses.forEach(b => this.set(b.id, { ...b, detailsLoaded: !!b.detailsLoaded }));
-    console.log(`✅ Added ${validBusinesses.length}/${businesses.length} valid businesses to cache. Total cache size: ${this.cache.size}`);
+    console.log(`✅ Added ${validBusinesses.length}/${businesses.length} valid businesses. Cache size: ${this.cache.size}`);
   }
 
-  clear() {
-    this.cache.clear();
-  }
+  // we can remove clear() entirely if we never need it
 }
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
