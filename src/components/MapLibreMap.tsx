@@ -422,9 +422,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const viewportBusinesses = await loadBusinessesInViewport?.(bounds, businessLimit);
       if (Array.isArray(viewportBusinesses) && viewportBusinesses.length) {
         businessCacheRef.current.addMultiple(viewportBusinesses);
+      } else {
+        console.warn("⚠️ loadBusinessesInViewport returned empty, keeping previous cache");
       }
     } catch (err) {
-      console.error('Error loading viewport businesses', err);
+      console.error("Error loading viewport businesses", err);
     }
   }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters]);
 
@@ -504,9 +506,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         setMapLoaded(true);
         callbackRefs.current.onMapLoaded?.();
         if (!layersAddedRef.current) addVectorLayers(mapInstance);
-
-        // initial load after small delay
-        setTimeout(() => { handleViewportChangeRef.current(); }, 500);
+      
+        // ⏳ delay more before first fetch
+        setTimeout(() => { handleViewportChangeRef.current(); }, 1500);
       });
 
       // fallback if load event didn't fire timely
