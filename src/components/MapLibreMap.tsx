@@ -201,19 +201,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // vector layers (styling restored exactly as requested)
   const addVectorLayers = useCallback((map: maplibregl.Map) => {
     try {
-      const layers = [
+      const layers: maplibregl.AnyLayer[] = [
         {
           id: 'nyc-land',
-          type: 'fill' as const,
+          type: 'fill',
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           layout: {},
           paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
-          filter: ['==', ['geometry-type'], 'Polygon'] as any
+          filter: ['all', ['==', ['geometry-type'], 'Polygon']]
         },
         {
           id: 'nyc-green-spaces',
-          type: 'fill' as const,
+          type: 'fill',
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           layout: {},
@@ -222,36 +222,30 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'all',
             ['==', ['geometry-type'], 'Polygon'],
             ['any',
-              ['all', ['has', 'leisure'], ['==', ['coalesce', ['get', 'leisure'], ''], 'park']],
-              ['all', ['has', 'landuse'], ['==', ['coalesce', ['get', 'landuse'], ''], 'cemetery']],
-              ['all', ['has', 'amenity'], ['==', ['coalesce', ['get', 'amenity'], ''], 'cemetery']],
-              ['all', ['has', 'amenity'], ['==', ['coalesce', ['get', 'amenity'], ''], 'grave_yard']],
-              ['all', ['has', 'landuse'], ['==', ['coalesce', ['get', 'landuse'], ''], 'recreation_ground']],
-              ['all', ['has', 'leisure'], ['==', ['coalesce', ['get', 'leisure'], ''], 'recreation_ground']],
-              ['all', ['has', 'name'], ['in', 'cemetery', ['coalesce', ['get', 'name'], '']]],
-              ['all', ['has', 'name'], ['in', 'Cemetery', ['coalesce', ['get', 'name'], '']]],
-              ['all', ['has', 'name'], ['in', 'graveyard', ['coalesce', ['get', 'name'], '']]],
-              ['all', ['has', 'place'], ['==', ['coalesce', ['get', 'place'], ''], 'cemetery']],
-              ['all', ['has', 'historic'], ['==', ['coalesce', ['get', 'historic'], ''], 'cemetery']]
+              ['all', ['has', 'leisure'], ['==', ['get', 'leisure'], 'park']],
+              ['all', ['has', 'landuse'], ['==', ['get', 'landuse'], 'cemetery']],
+              ['all', ['has', 'amenity'], ['==', ['get', 'amenity'], 'cemetery']],
+              ['all', ['has', 'amenity'], ['==', ['get', 'amenity'], 'grave_yard']],
+              ['all', ['has', 'landuse'], ['==', ['get', 'landuse'], 'recreation_ground']],
+              ['all', ['has', 'leisure'], ['==', ['get', 'leisure'], 'recreation_ground']],
+              ['all', ['has', 'name'], ['in', ['get', 'name'], ['literal', ['cemetery', 'Cemetery', 'graveyard']]]],
+              ['all', ['has', 'place'], ['==', ['get', 'place'], 'cemetery']],
+              ['all', ['has', 'historic'], ['==', ['get', 'historic'], 'cemetery']]
             ]
-          ] as any
+          ]
         },
         {
           id: 'nyc-water',
-          type: 'fill' as const,
+          type: 'fill',
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           layout: {},
           paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
-          filter: [
-            'all',
-            ['==', ['geometry-type'], 'Polygon'],
-            ['has', 'natural']
-          ] as any
+          filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']]
         },
         {
           id: 'nyc-roads',
-          type: 'line' as const,
+          type: 'line',
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           layout: {},
@@ -260,11 +254,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
             'line-opacity': 0.8
           },
-          filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']] as any
+          filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
         },
         {
           id: 'nyc-road-labels',
-          type: 'symbol' as const,
+          type: 'symbol',
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           layout: {
@@ -290,30 +284,29 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             ['has', 'name'],
             ['has', 'highway'],
             ['!=', ['coalesce', ['get', 'name'], ''], '']
-          ] as any,
+          ],
           minzoom: 12
         }
       ];
-
-    console.log('🗺️ Adding vector layers...');
-    layers.forEach(layer => {
-      try {
-        if (!map.getLayer(layer.id)) {
-          map.addLayer(layer as any);
-          console.log(`✅ Layer added: ${layer.id}`);
-        } else {
-          console.log(`⚠️ Layer already exists, skipping: ${layer.id}`);
-        }
-      } catch (err) {
-        console.error(`❌ Error adding layer ${layer.id}:`, err);
-      }
-    });
-
-    layersAddedRef.current = true;
-    console.log('🗺️ All vector layers processed');
   
+      console.log('🗺️ Adding vector layers...');
+      layers.forEach(layer => {
+        try {
+          if (!map.getLayer(layer.id)) {
+            map.addLayer(layer);
+            console.log(`✅ Layer added: ${layer.id}`);
+          } else {
+            console.log(`⚠️ Layer already exists, skipping: ${layer.id}`);
+          }
+        } catch (err) {
+          console.error(`❌ Failed to add layer ${layer.id}. Skipping...`, err);
+        }
+      });
+  
+      layersAddedRef.current = true;
+      console.log('🗺️ All vector layers processed.');
     } catch (err) {
-      console.error('❌ addVectorLayers error:', err);
+      console.error('❌ addVectorLayers top-level error:', err);
     }
   }, []);
 
