@@ -531,6 +531,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         attributionControl: false
       });
 
+      mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
+
       mapRef.current = mapInstance;
       handleViewportChangeRef.current = handleViewportChange;
 
