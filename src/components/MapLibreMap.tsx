@@ -194,19 +194,33 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Add businesses to cache when they're loaded from the hook
   useEffect(() => {
+    console.log('🔍 useEffect triggered - businesses changed:', businesses?.length || 0);
+    
     if (businesses && businesses.length > 0) {
-      console.log('🏢 Adding businesses from hook to cache:', businesses.length);
-      console.log('🏢 Sample business data:', JSON.stringify(businesses[0], null, 2));
+      console.log('🏢 Processing businesses from hook:', businesses.length);
+      console.log('🏢 First business sample:', JSON.stringify(businesses[0], null, 2));
       
-      // Clear cache first to avoid duplicates
+      // Clear cache to avoid stale data
       businessCacheRef.current.clear();
+      console.log('🧹 Cache cleared');
+      
+      // Add all businesses to cache
       businessCacheRef.current.addMultiple(businesses);
       
-      // Force re-render of deck.gl layers
-      setCacheVersion(prev => prev + 1);
+      // Verify cache was populated
+      const cacheCount = businessCacheRef.current.getAll().length;
+      console.log('✅ Cache populated with', cacheCount, 'businesses');
+      
+      // Force deck.gl layer update
+      setCacheVersion(prev => {
+        const newVersion = prev + 1;
+        console.log('🔄 Cache version updated to:', newVersion);
+        return newVersion;
+      });
       
       callbackRefs.current.onBusinessesLoaded?.();
-      console.log('🏢 Cache now has:', businessCacheRef.current.getAll().length, 'businesses');
+    } else {
+      console.log('⚠️ No businesses to cache:', businesses?.length || 0);
     }
   }, [businesses]);
   
@@ -434,9 +448,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters, businesses]);
 
   const deckGLLayers = useMemo(() => {
+    console.log('🎯 deckGLLayers useMemo triggered - cacheVersion:', cacheVersion);
+    
     // Get all businesses from cache
     const allBusinesses = businessCacheRef.current.getAll();
-    console.log('🎯 Updating DeckGL layers, business count:', allBusinesses.length);
+    console.log('🎯 Retrieved from cache:', allBusinesses.length, 'businesses');
     
     if (!allBusinesses.length) {
       console.log('🎯 No businesses in cache, returning empty layers');
@@ -449,6 +465,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     );
     
     console.log('🎯 Valid businesses after filtering:', validBusinesses.length);
+    
+    if (!validBusinesses.length) {
+      console.log('🎯 No valid businesses after filtering, returning empty layers');
+      return [];
+    }
   
     // Handle neighborhood filter if present
     if (searchFilters?.neighborhoodFilter?.boundary?.length) {
