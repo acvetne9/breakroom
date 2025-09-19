@@ -531,7 +531,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         attributionControl: false
       });
 
-      mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.916999]]);
+      mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
 
       mapRef.current = mapInstance;
       handleViewportChangeRef.current = handleViewportChange;
@@ -644,31 +644,53 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [mapLoaded]);
 
   // center/load neighborhood center
+  const isUserInteractingRef = useRef(false);
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+  
+    const onDragStart = () => { isUserInteractingRef.current = true; };
+    const onDragEnd = () => { isUserInteractingRef.current = false; };
+    const onZoomStart = () => { isUserInteractingRef.current = true; };
+    const onZoomEnd = () => { isUserInteractingRef.current = false; };
+  
+    map.on("dragstart", onDragStart);
+    map.on("dragend", onDragEnd);
+    map.on("zoomstart", onZoomStart);
+    map.on("zoomend", onZoomEnd);
+  
+    return () => {
+      map.off("dragstart", onDragStart);
+      map.off("dragend", onDragEnd);
+      map.off("zoomstart", onZoomStart);
+      map.off("zoomend", onZoomEnd);
+    };
+  }, [mapLoaded]);
+  
   useEffect(() => {
     if (!mapRef.current || !mapLoaded || !searchFilters?.neighborhoodFilter || !neighborhoodCenter) return;
   
-    const isUserTriggered = !!selectedBusiness; // or you can pass a dedicated flag if needed
+    // cancel if user is scrolling
+    if (isUserInteractingRef.current) {
+      console.log("⏸️ User interacting with map, skipping auto-fly");
+      return;
+    }
   
-    if (isUserTriggered) {
-      // fly immediately for user clicks
-      mapRef.current.flyTo({
-        center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
-        zoom: 16,
-        essential: true,
-      });
-    } else {
-      // automatic fly (e.g., on initial search/filter load) waits 2s
-      const timeout = setTimeout(() => {
-        mapRef.current!.flyTo({
+    // debounce until search input idle (e.g., 800ms after last change)
+    const timeout = setTimeout(() => {
+      if (!isUserInteractingRef.current && mapRef.current) {
+        console.log("✈️ Flying to neighborhood center");
+        mapRef.current.flyTo({
           center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
           zoom: 14,
-          duration: 2000, // smooth 2-second fly
-          essential: true,
+          duration: 1500,
+          essential: true
         });
-      }, 2000);
-      return () => clearTimeout(timeout);
-    }
-  }, [searchFilters?.neighborhoodFilter, neighborhoodCenter, mapLoaded, selectedBusiness]);
+      }
+    }, 800);
+  
+    return () => clearTimeout(timeout);
+  }, [searchFilters?.neighborhoodFilter, neighborhoodCenter, mapLoaded]);
 
   // center/load neighborhood businesses on searchFilters change (stable)
   useEffect(() => {
