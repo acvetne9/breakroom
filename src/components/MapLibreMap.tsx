@@ -201,7 +201,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // vector layers (styling restored exactly as requested)
   const addVectorLayers = useCallback((map: maplibregl.Map) => {
     try {
-      const layers: maplibregl.AnyLayer[] = [
+      const layers: LayerSpecification[] = [
         {
           id: 'nyc-land',
           type: 'fill',
@@ -296,17 +296,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             map.addLayer(layer);
             console.log(`✅ Layer added: ${layer.id}`);
           } else {
-            console.log(`⚠️ Layer already exists, skipping: ${layer.id}`);
+            console.log(`⚠️ Already exists, skipping: ${layer.id}`);
           }
         } catch (err) {
-          console.error(`❌ Failed to add layer ${layer.id}. Skipping...`, err);
+          console.error(`❌ Failed layer ${layer.id}:`, err);
         }
       });
   
       layersAddedRef.current = true;
-      console.log('🗺️ All vector layers processed.');
     } catch (err) {
-      console.error('❌ addVectorLayers top-level error:', err);
+      console.error('❌ addVectorLayers error:', err);
     }
   }, []);
 
