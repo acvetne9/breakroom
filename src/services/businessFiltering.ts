@@ -1,6 +1,7 @@
 import { Business } from '@/types/business';
 import { parseSearchTerms } from '@/utils/searchUtils';
-import { findNeighborhood, NeighborhoodBounds, filterBusinessesByNeighborhood } from '@/utils/nyc_neighborhoods';
+import { findNeighborhoodBoundaryByName, nycNeighborhoodBoundaries, filterBusinessesByNeighborhood } from '@/utils/nyc_neighborhoods';
+import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods'
 
 export interface SearchFilters {
   textTerms: string[];
@@ -19,8 +20,23 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
   
   if (!searchQuery.trim()) return null;
 
+  let filters: SearchFilters = {
+    textTerms: []
+  };
+
   // Check for neighborhood first
-  const neighborhood = findNeighborhood(searchQuery);
+  const neighborhood = findNeighborhoodBoundaryByName(searchQuery);
+  if (neighborhood) {
+    filters.neighborhoodFilter = neighborhood;
+
+    // Add center for map panning
+    const lats = neighborhood.boundary.map(p => p.lat);
+    const lons = neighborhood.boundary.map(p => p.lon);
+    filters.neighborhoodFilter.center = {
+      lat: (Math.min(...lats) + Math.max(...lats)) / 2,
+      lon: (Math.min(...lons) + Math.max(...lons)) / 2,
+    };
+  }
   
   const { salaryQuery, textTerms } = parseSearchTerms(searchQuery);
   console.log('🔍 [parseSearchFilters] Parsed terms - salaryQuery:', salaryQuery, 'textTerms:', textTerms);
@@ -74,10 +90,6 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
   if (neighborhood) {
     console.log('🏙️ [parseSearchFilters] Neighborhood found:', neighborhood.name, 'in', neighborhood.borough);
   }
-
-  const filters: SearchFilters = {
-    textTerms: filteredTextTerms || []
-  };
 
   // Only add optional filters if they have values (no undefined)
   if (salaryQuery) {

@@ -6,8 +6,33 @@ import BreakroomLoading from './BreakroomLoading';
 import UnifiedBusinessSearch from './UnifiedBusinessSearch';
 import { EnhancedBusiness } from '@/services/enhancedBusinessSearch';
 import { parseSearchFilters } from '@/services/businessFiltering';
-
 import { useToast } from '@/hooks/use-toast';
+
+// Move landmarks outside component to prevent recreation on every render
+const LANDMARKS = [
+  {lat: 40.690331, lng: -74.045414, emoji: "🗽"},
+  {lat: 40.75266, lng: -73.97729, emoji: "🚃"},
+  {lat: 40.75058, lng: -73.99358, emoji: "🚃"},
+  {lat: 40.548575, lng: -74.0321778, emoji: "🐬"},
+  {lat: 40.547303, lng: -73.794261, emoji: "🦈"},
+  {lat: 40.869180, lng: -73.755437, emoji: "🐠"},
+  {lat: 40.781713, lng: -73.966566, emoji: "🪁"},
+  {lat: 40.641540, lng: -73.772358, emoji: "✈️"},
+  {lat: 40.777721, lng: -73.875939, emoji: "✈️"},
+  {lat: 40.756317, lng: -73.847403, emoji: "🏟️"},
+  {lat: 40.830000, lng: -73.926208, emoji: "🏟️"},
+  {lat: 40.45022, lng: -73.59364, emoji: "🏟️"},
+  {lat: 40.683047, lng: -73.975912, emoji: "🏟️"},
+  {lat: 40.759111, lng: -73.985294, emoji: "🎼"},
+  {lat: 40.669823, lng: -73.965892, emoji: "🌼"},
+  {lat: 40.572445, lng: -73.983244, emoji: "🎡"},
+  {lat: 40.577249, lng: -73.837034, emoji: "🏖️"},
+  {lat: 40.574829, lng: -73.959530, emoji: "🏖️"},
+  {lat: 40.573527, lng: -74.082761, emoji: "🏖️"},
+  {lat: 40.708890, lng: -74.008396, emoji: "🏦"},
+  {lat: 40.850103, lng: -73.876716, emoji: "🐾"},
+  {lat: 40.625569, lng: -74.115425, emoji: "🐾"},
+];
 
 interface Post {
   id: string;
@@ -68,10 +93,8 @@ const HomePage: React.FC<HomePageProps> = ({
           lat: filters.neighborhoodFilter.center.lat,
           lon: filters.neighborhoodFilter.center.lon
         };
-        console.log('🏙️ Setting neighborhood center from trigger:', neighborhoodCoords);
         setNeighborhoodCenter(neighborhoodCoords);
-      } else {
-        setNeighborhoodCenter(null);
+
       }
       setSearchFilters(filters);
       setSearchCompleted(true); // Mark search as completed
@@ -99,61 +122,39 @@ const HomePage: React.FC<HomePageProps> = ({
   }, [showLoading, currentView]);
   
   const selectedBusiness = propSelectedBusiness;
-  const landmarks = [
-    {lat: 40.690331, lng: -74.045414, emoji: "🗽"},
-    {lat: 40.75266, lng: -73.97729, emoji: "🚃"},
-    {lat: 40.75058, lng: -73.99358, emoji: "🚃"},
-    {lat: 40.548575, lng: -74.0321778, emoji: "🐬"},
-    {lat: 40.547303, lng: -73.794261, emoji: "🦈"},
-    {lat: 40.869180, lng: -73.755437, emoji: "🐠"},
-    {lat: 40.781713, lng: -73.966566, emoji: "🪁"},
-    {lat: 40.641540, lng: -73.772358, emoji: "✈️"},
-    {lat: 40.777721, lng: -73.875939, emoji: "✈️"},
-    {lat: 40.756317, lng: -73.847403, emoji: "🏟️"},
-    {lat: 40.830000, lng: -73.926208, emoji: "🏟️"},
-    {lat: 40.45022, lng: -73.59364, emoji: "🏟️"},
-    {lat: 40.683047, lng: -73.975912, emoji: "🏟️"},
-    {lat: 40.759111, lng: -73.985294, emoji: "🎼"},
-    {lat: 40.669823, lng: -73.965892, emoji: "🌼"},
-    {lat: 40.572445, lng: -73.983244, emoji: "🎡"},
-    {lat: 40.577249, lng: -73.837034, emoji: "🏖️"},
-    {lat: 40.574829, lng: -73.959530, emoji: "🏖️"},
-    {lat: 40.573527, lng: -74.082761, emoji: "🏖️"},
-    {lat: 40.708890, lng: -74.008396, emoji: "🏦"},
-    {lat: 40.850103, lng: -73.876716, emoji: "🐾"},
-    {lat: 40.625569, lng: -74.115425, emoji: "🐾"},
-  ];
   const { toast } = useToast();
 
-  const handleSearchChange = (value: string, business?: EnhancedBusiness, filters?: any, neighborhoodCoords?: { lat: number; lon: number }) => {
-    console.log('🔍 Search change in HomePage:', { value, filters, neighborhoodCoords, hasFilters: !!filters });
-    console.log('🔍 DEBUG: handleSearchChange deps check', { 
-      searchFilters: typeof searchFilters, 
-      neighborhoodCenter: typeof neighborhoodCenter,
-      searchCompleted: typeof searchCompleted 
-    });
+  const handleSearchChange = (
+    value: string,
+    business?: EnhancedBusiness,
+    filters?: any,
+    neighborhoodCoords?: { lat: number; lon: number }
+  ) => {
+    console.log("🔍 Search change in HomePage:", { value, filters });
+  
     setSearchValue(value);
-    setSearchFilters(filters);
-    
-    // Mark search as completed when there's a meaningful search
-    if (value.trim() !== '' || filters !== null) {
-      setSearchCompleted(true);
-    }
-    
-    if (neighborhoodCoords) {
-      console.log('🏙️ Setting neighborhood center:', neighborhoodCoords);
-      setNeighborhoodCenter(neighborhoodCoords);
+  
+    // Always re-parse if filters weren’t passed from child
+    const parsedFilters = filters || parseSearchFilters(value);
+  
+    setSearchFilters(parsedFilters);
+  
+    if (parsedFilters?.neighborhoodFilter?.center) {
+      setNeighborhoodCenter(parsedFilters.neighborhoodFilter.center);
     } else {
       setNeighborhoodCenter(null);
     }
-    
-    if (!value && !filters) {
-      console.log('🧹 Search explicitly cleared - removing filters');
+  
+    setSearchCompleted(!!value.trim() || parsedFilters !== null);
+  
+    if (!value && !parsedFilters) {
+      console.log("🧹 Search explicitly cleared - removing filters");
       setSearchFilters(null);
       setNeighborhoodCenter(null);
-      setSearchCompleted(false); // Reset search completed state when cleared
+      setSearchCompleted(false);
     }
   };
+
 
   const handleSearchBusinessSelect = (business: EnhancedBusiness) => {
     console.log('🔍 DEBUG: handleSearchBusinessSelect deps check', { 
@@ -254,7 +255,7 @@ const HomePage: React.FC<HomePageProps> = ({
         <MapLibreMap
           onBusinessClick={handleBusinessClick}
           selectedBusiness={selectedBusiness}
-          landmarks={landmarks}
+          landmarks={LANDMARKS}
           searchFilters={searchFilters}
           neighborhoodCenter={neighborhoodCenter}
         />

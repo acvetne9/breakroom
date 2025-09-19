@@ -1,11 +1,11 @@
 import React, { useState, useMemo, memo, useEffect } from 'react';
 import { Eye } from 'lucide-react';
 import { isProfane } from '../utils/profanityFilter';
-import { useToast } from '@/hooks/use-toast';
+import { usePosts } from '@/hooks/usePosts';
 import VotingComponent from './VotingComponent';
 import { formatTimeAgo } from '../utils/timeAgo';
 import { TranslatedText } from './TranslatedText';
-import { usePosts } from '@/hooks/usePosts';
+import { useToast } from '@/hooks/use-toast';
 
 interface Post {
   id: string;
@@ -30,26 +30,36 @@ interface ExplorePageProps {
   onExpandedPostChange?: (postId: string | null) => void;
   onCommentSubmit?: (postId: string, comment: string) => void;
   onBackToAllPosts?: () => void;
-  onNavigateToHomeBusiness?: (businessId: string) => void; // New prop for navigation
-  onBusinessPreview?: (businessId: string) => void; // New prop for business preview
+  onNavigateToHomeBusiness?: (businessId: string) => void;
+  onBusinessPreview?: (businessId: string) => void;
+  onFlyToBusiness?: (businessId: string) => void; // 🚀 NEW
 }
 
-const ExplorePage: React.FC<ExplorePageProps> = memo(({
+const ExplorePage: React.FC<ExplorePageProps> = ({
   filteredBusinessId,
-  filteredUserStories = false,
+  filteredUserStories,
   onBusinessView,
   onExpandedPostChange,
   onCommentSubmit,
   onBackToAllPosts,
   onNavigateToHomeBusiness,
-  onBusinessPreview
+  onBusinessPreview,
+  onFlyToBusiness,
 }) => {
   console.log('🔍 ExplorePage component initializing...');
   
-  const { posts, loading, submitPost, votePost, removePost } = usePosts();
+  const { posts, loading, submitPost, votePost, removePost, trackCommentedPost } = usePosts();
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
   const [hideSystemPost, setHideSystemPost] = useState(false);
+
+  const defaultPlaceholder = filteredBusinessId ? "Thoughts about this business?" : "How's work?";
+  const [postPlaceholder, setPostPlaceholder] = useState(defaultPlaceholder);
+  
+  // 2️⃣ Reset placeholder whenever filteredBusinessId changes
+  useEffect(() => {
+    setPostPlaceholder(filteredBusinessId ? "Thoughts about this business?" : "How's work?");
+  }, [filteredBusinessId]);
 
   interface Comment {
     id: string;
@@ -93,55 +103,46 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
 
   const handlePostSubmit = async () => {
     if (!postText.trim()) return;
-
+  
     if (isProfane(postText)) {
-      toast({
-        title: "Post blocked",
-        description: "Inappropriate content detected",
-        variant: "destructive"
-      });
       setPostText('');
+      setPostPlaceholder('Post blocked: Inappropriate content detected');
       return;
     }
-    
+  
     const success = await submitPost(postText, filteredBusinessId);
-    // if (success) {
-    //   setPostText('');
-      
-    // } else {
-    //   toast({
-    //     title: "Error",
-    //     description: "Failed to create post. Please try again.",
-    //     variant: "destructive"
-    //   });
-    // }
+    if (success) {
+      setPostText('');
+      setPostPlaceholder(filteredBusinessId ? "Thoughts about this business?" : "How's work?");
+    } else {
+      setPostText('');
+      setPostPlaceholder('Failed to create post. Please try again.');
+    }
   };
 
   const handleCommentSubmit = () => {
     if (!commentText.trim() || !expandedPost) return;
-
+  
     if (isProfane(commentText)) {
-      toast({
-        title: "Comment blocked",
-        description: "Inappropriate content detected",
-        variant: "destructive",
-      });
       setCommentText('');
       return;
     }
-
+  
     const newComment: Comment = {
       id: crypto.randomUUID(),
-      author: "You", // replace with logged-in user's name/id
+      author: "You",
       text: commentText,
       createdAt: new Date(),
     };
-
+  
     setComments({
       ...comments,
       [expandedPost]: [...(comments[expandedPost] || []), newComment],
     });
-
+  
+    // Track that user commented on this post
+    trackCommentedPost(expandedPost);
+  
     setCommentText('');
     onCommentSubmit?.(expandedPost, commentText);
   };
@@ -160,11 +161,17 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   };
 
   const handleBusinessView = (businessId: string) => {
-    console.log('👀 Eye clicked - navigating to home page with business:', businessId);
+    console.log('👀 Eye clicked - navigating and flying to business:', businessId);
+  
+    // First, request map fly-to if available
+    if (onFlyToBusiness) {
+      onFlyToBusiness(businessId);
+    }
+  
+    // Keep existing navigation fallback
     if (onNavigateToHomeBusiness) {
       onNavigateToHomeBusiness(businessId);
     } else {
-      // Fallback to old behavior if new prop not provided
       onBusinessView?.(businessId);
     }
   };
@@ -182,32 +189,47 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
 
   const handlePostDelete = async (postId: string) => {
     const success = await removePost(postId);
+  
     if (!success) {
-      toast({
-        title: "Error", 
-        description: "Failed to delete post. Please try again.",
-        variant: "destructive"
-      });
+      setPostText('');
+      setPostPlaceholder('Failed to create post. Please try again.');
+      return;
+    }
+  
+    if (expandedPost === postId) {
+      setExpandedPost(null);
+      setCommentText('');
+      setPostPlaceholder(filteredBusinessId ? "Thoughts about this business?" : "How's work?");
     }
   };
 
+  useEffect(() => {
+    if (!expandedPost) {
+      setCommentText('');
+      setPostPlaceholder(
+        filteredBusinessId ? "Thoughts about this business?" : "How's work?"
+      );
+    }
+  }, [expandedPost, filteredBusinessId]);
+
+
   const displayPosts = useMemo(() => {
-    const filtered = filteredBusinessId 
-      ? posts.filter(post => post.businessId === filteredBusinessId && !post.isJobUpdate)
-      : filteredUserStories 
-      ? posts.filter(post => post.author === 'You' && !post.isJobUpdate)
-      : posts;
-
-    console.log('📋 Display posts calculation:', {
-      filteredBusinessId,
-      filteredPostsCount: filtered.length,
-      realPostsCount: realPosts.length,
-      hideSystemPost,
-      willShowDefaultPost: filteredBusinessId && realPosts.length === 0 && !hideSystemPost
-    });
-
-    // Add default post if viewing a specific business with no posts and system post is not hidden
-    if (filteredBusinessId && realPosts.length === 0 && !hideSystemPost) {
+    let filtered: Post[] = [];
+  
+    if (filteredBusinessId) {
+      // Include all posts for this business (including system)
+      filtered = posts.filter(post => post.businessId === filteredBusinessId && !post.isJobUpdate);
+    } else if (filteredUserStories) {
+      filtered = posts.filter(post => post.author === 'You' && !post.isJobUpdate);
+    } else {
+      filtered = posts;
+    }
+  
+    // Check for real (non-system) posts for this business
+    const realBusinessPosts = filtered.filter(post => post.author !== 'System');
+  
+    // Add default system post if business has no real posts
+    if (filteredBusinessId && realBusinessPosts.length === 0) {
       const defaultPost: Post = {
         id: `default-${filteredBusinessId}`,
         author: 'System',
@@ -219,19 +241,12 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
         userVote: null,
         createdAt: new Date()
       };
-      
-      console.log('➕ Adding default system post');
-      
-      // If we have real posts but haven't hidden the system post yet, show both during transition
-      if (realPosts.length > 0) {
-        return [defaultPost, ...filtered.filter(post => post.author !== 'System')];
-      }
-      
-      return [defaultPost];
+      filtered = [defaultPost, ...filtered];
     }
-
+  
     return filtered;
-  }, [posts, filteredBusinessId, filteredUserStories, realPosts.length, hideSystemPost]);
+  }, [posts, filteredBusinessId, filteredUserStories]);
+
 
   if (loading) {
     return (
@@ -400,12 +415,10 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
               type="text"
               value={postText}
               onChange={e => setPostText(e.target.value)}
-              placeholder={filteredBusinessId ? "Thoughts about this business?" : "How's work?"}
+              placeholder={postPlaceholder}
               className="search-bar pr-14"
               onKeyPress={e => {
-                if (e.key === 'Enter') {
-                  handlePostSubmit();
-                }
+                if (e.key === 'Enter') handlePostSubmit();
               }}
             />
             <button
@@ -419,6 +432,6 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
       </div>
     </div>
   );
-});
+};
 
 export default ExplorePage;

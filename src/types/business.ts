@@ -14,6 +14,7 @@ export interface Business {
   atmosphere: string[];
   salary?: string;
   roles?: BusinessRole[];
+  detailsLoaded?: boolean;
   businessType?: string;
   website?: string;
   address?: string;

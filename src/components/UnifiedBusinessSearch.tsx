@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { searchBusinessesEnhanced, EnhancedBusiness } from '@/services/enhancedBusinessSearch';
 import { parseSearchFilters } from '@/services/businessFiltering';
-import { findNeighborhood } from '@/utils/nyc_neighborhoods';
+import { findNeighborhoodBoundaryByName } from '@/utils/nyc_neighborhoods';
 import { isProfane } from '@/utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 import { Search } from 'lucide-react';
@@ -239,7 +239,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         const results: SearchResult[] = [];
         
         // Check if the query matches a neighborhood
-        const neighborhood = findNeighborhood(q);
+        const neighborhood = findNeighborhoodBoundaryByName(q);
         if (neighborhood) {
           results.push({
             id: `neighborhood-${neighborhood.name}`,

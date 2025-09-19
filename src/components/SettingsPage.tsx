@@ -55,9 +55,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 }) => {
   const { deviceId } = useDevice();
   const { toast } = useToast();
-  const { getUserPosts } = usePosts();
+  const { getUserPostsAndCommented, trackCommentedPost } = usePosts();
   
-  const userPosts = getUserPosts();
+  const userPosts = getUserPostsAndCommented();
 
   // Add ref for the scrollable container
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -661,25 +661,33 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           </div>
         </div>
 
-        {/* Your Stories */}
+        {/* My Stories & Comments */}
         <div className="mt-8">
           <button onClick={() => setIsStoriesExpanded(!isStoriesExpanded)} className="flex items-center justify-between w-full text-left">
-            <h3 className="text-lg font-medium text-app-black">Your Stories 📖</h3>
+            <h3 className="text-lg font-medium text-app-black">My Stories & Comments 📖</h3>
           </button>
           {isStoriesExpanded && (
             <div className="mt-4 space-y-2">
               {userPosts.length === 0 ? (
-                <p className="text-app-gray-medium text-sm">No stories yet. Share your workplace experiences!</p>
+                <p className="text-app-gray-medium text-sm">No stories or comments yet. Share your workplace experiences!</p>
               ) : (
                 <>
                   {userPosts.slice(0, 3).map(post => (
                     <div key={post.id} className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded" onClick={() => onPostClick?.(post)}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-xs text-app-gray-medium">
+                          {post.author === 'You' ? 'Your story' : 'Commented on'}
+                        </p>
+                        {post.businessName && (
+                          <span className="text-xs text-app-gray-medium">at {post.businessName}</span>
+                        )}
+                      </div>
                       <p className="text-app-gray-dark text-sm">{post.text.length > 100 ? `${post.text.substring(0, 100)}...` : post.text}</p>
                     </div>
                   ))}
                   {userPosts.length >= 5 && (
                     <button onClick={onStoriesClick} className="w-full mt-3 px-4 py-2 bg-app-yellow text-app-black rounded hover:bg-app-yellow/90 transition-colors">
-                      View All Stories ({userPosts.length})
+                      View All Stories & Comments ({userPosts.length})
                     </button>
                   )}
                 </>

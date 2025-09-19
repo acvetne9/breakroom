@@ -441,27 +441,16 @@ const MobileApp: React.FC = () => {
               filteredBusinessId={filteredBusinessId || undefined}
               filteredUserStories={filteredUserStories}
               onBusinessView={(businessId) => {
-                console.log('👁️ Business view requested:', businessId);
                 const business = businesses.find(b => b.id === businessId);
-                console.log('📍 Found business:', business?.name);
                 if (business) {
-                  console.log('🏠 Setting selected business and navigating to home');
-                  setSelectedBusiness(business);
-                  setCurrentSlide(1); // Navigate to home page
+                  setSelectedBusiness(business);  // ✅ MapLibreMap will auto-fly
+                  setCurrentSlide(1);
                 } else {
-                  console.warn('❌ Business not found in businesses array, fetching details...');
                   (async () => {
-                    try {
-                      const full = await fetchFullBusinessDetails(businessId);
-                      if (full) {
-                        console.log('✅ Loaded business details, navigating to home');
-                        setSelectedBusiness(full);
-                        setCurrentSlide(1);
-                      } else {
-                        console.warn('❌ Could not load business details for id:', businessId);
-                      }
-                    } catch (err) {
-                      console.error('❌ Error fetching business details:', err);
+                    const full = await fetchFullBusinessDetails(businessId);
+                    if (full) {
+                      setSelectedBusiness(full);
+                      setCurrentSlide(1);
                     }
                   })();
                 }
