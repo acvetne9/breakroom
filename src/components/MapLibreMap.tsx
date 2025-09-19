@@ -199,113 +199,152 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [businesses]);
   
   // vector layers (styling restored exactly as requested)
-const addVectorLayers = useCallback((map: maplibregl.Map) => {
-  try {
-    const layers = [
-      {
-        id: 'nyc-land',
-        type: 'fill' as const,
-        source: 'nyc-tiles',
-        'source-layer': 'examplepoints',
-        layout: {},
-        paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
-        filter: ['==', ['geometry-type'], 'Polygon'] as any
+  const addVectorLayers = useCallback((map: maplibregl.Map) => {
+    try {
+      const layers = [
+    // Base land polygons
+    {
+      id: 'nyc-land',
+      type: 'fill' as const,
+      source: 'nyc-tiles',
+      'source-layer': 'examplepoints',
+      layout: {},
+      paint: {
+        'fill-color': '#F5F5DC',
+        'fill-opacity': 1.0
       },
-      {
-        id: 'nyc-green-spaces',
-        type: 'fill' as const,
-        source: 'nyc-tiles',
-        'source-layer': 'examplepoints',
-        layout: {},
-        paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
-        filter: [
-          'all',
-          ['==', ['geometry-type'], 'Polygon'],
-          ['any',
-            ['all', ['has', 'leisure'], ['==', ['get', 'leisure'], 'park']],
-            ['all', ['has', 'landuse'], ['==', ['get', 'landuse'], 'cemetery']],
-            ['all', ['has', 'amenity'], ['==', ['get', 'amenity'], 'cemetery']],
-            ['all', ['has', 'amenity'], ['==', ['get', 'amenity'], 'grave_yard']],
-            ['all', ['has', 'landuse'], ['==', ['get', 'landuse'], 'recreation_ground']],
-            ['all', ['has', 'leisure'], ['==', ['get', 'leisure'], 'recreation_ground']],
-            ['all', ['has', 'name'], ['in', 'cemetery', ['coalesce', ['get', 'name'], '']]],
-            ['all', ['has', 'name'], ['in', 'Cemetery', ['coalesce', ['get', 'name'], '']]],
-            ['all', ['has', 'name'], ['in', 'graveyard', ['coalesce', ['get', 'name'], '']]],
-            ['all', ['has', 'place'], ['==', ['get', 'place'], 'cemetery']],
-            ['all', ['has', 'historic'], ['==', ['get', 'historic'], 'cemetery']]
-          ]
-        ] as any
+      filter: ['all',
+        ['==', ['geometry-type'], 'Polygon']
+      ] as any
+    },
+  
+    // Parks, cemeteries, and recreation spaces
+    {
+      id: 'nyc-green-spaces',
+      type: 'fill' as const,
+      source: 'nyc-tiles',
+      'source-layer': 'examplepoints',
+      layout: {},
+      paint: {
+        'fill-color': '#87C17A',
+        'fill-opacity': 1.0
       },
-      {
-        id: 'nyc-water',
-        type: 'fill' as const,
-        source: 'nyc-tiles',
-        'source-layer': 'examplepoints',
-        layout: {},
-        paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
-        filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']] as any
+      filter: ['all',
+        ['==', ['geometry-type'], 'Polygon'],
+        ['any',
+          // Leisure → park or recreation ground
+          ['all', ['has', 'leisure'], ['in', ['get', 'leisure'], ['literal', ['park', 'recreation_ground']]]],
+  
+          // Landuse → cemetery or recreation ground
+          ['all', ['has', 'landuse'], ['in', ['get', 'landuse'], ['literal', ['cemetery', 'recreation_ground']]]],
+  
+          // Amenity → cemetery or graveyard
+          ['all', ['has', 'amenity'], ['in', ['get', 'amenity'], ['literal', ['cemetery', 'grave_yard']]]],
+  
+          // Named features containing cemetery/graveyard
+          ['all', ['has', 'name'], ['in', ['get', 'name'], ['literal', ['cemetery', 'Cemetery', 'graveyard', 'Graveyard']]]],
+  
+          // Place or historic tags
+          ['all', ['has', 'place'], ['==', ['get', 'place'], 'cemetery']],
+          ['all', ['has', 'historic'], ['==', ['get', 'historic'], 'cemetery']]
+        ]
+      ] as any
+    },
+  
+    // Water polygons
+    {
+      id: 'nyc-water',
+      type: 'fill' as const,
+      source: 'nyc-tiles',
+      'source-layer': 'examplepoints',
+      layout: {},
+      paint: {
+        'fill-color': '#6CA4E1',
+        'fill-opacity': 1.0
       },
-      {
-        id: 'nyc-roads',
-        type: 'line' as const,
-        source: 'nyc-tiles',
-        'source-layer': 'examplepoints',
-        layout: {},
-        paint: {
-          'line-color': '#666666',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
-          'line-opacity': 0.8
-        },
-        filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']] as any
+      filter: ['all',
+        ['==', ['geometry-type'], 'Polygon'],
+        ['has', 'natural']
+      ] as any
+    },
+  
+    // Roads (line geometry)
+    {
+      id: 'nyc-roads',
+      type: 'line' as const,
+      source: 'nyc-tiles',
+      'source-layer': 'examplepoints',
+      layout: {},
+      paint: {
+        'line-color': '#666666',
+        'line-width': ['interpolate', ['linear'], ['zoom'],
+          10, 0.5,
+          14, 1.5,
+          16, 3
+        ],
+        'line-opacity': 0.8
       },
-      {
-        id: 'nyc-road-labels',
-        type: 'symbol' as const,
-        source: 'nyc-tiles',
-        'source-layer': 'examplepoints',
-        layout: {
-          'text-field': ['coalesce', ['get', 'name'], ''],
-          'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
-          'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
-          'text-max-width': 8,
-          'text-line-height': 1.2,
-          'symbol-placement': 'line',
-          'text-rotation-alignment': 'map',
-          'text-allow-overlap': false,
-          'text-ignore-placement': false
-        },
-        paint: {
-          'text-color': '#333333',
-          'text-halo-color': '#FFFFFF',
-          'text-halo-width': 1.5,
-          'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 1]
-        },
-        filter: ['all',
-          ['==', ['geometry-type'], 'LineString'],
-          ['has', 'name'],
-          ['has', 'highway'],
-          ['!=', ['get', 'name'], '']
-        ] as any,
-        minzoom: 12
-      }
-    ];
+      filter: ['all',
+        ['==', ['geometry-type'], 'LineString'],
+        ['has', 'highway']
+      ] as any
+    },
+  
+    // Road labels (symbols placed along roads)
+    {
+      id: 'nyc-road-labels',
+      type: 'symbol' as const,
+      source: 'nyc-tiles',
+      'source-layer': 'examplepoints',
+      layout: {
+        'text-field': ['coalesce', ['get', 'name'], ''],
+        'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+        'text-size': ['interpolate', ['linear'], ['zoom'],
+          12, 9,
+          16, 12
+        ],
+        'text-max-width': 8,
+        'text-line-height': 1.2,
+        'symbol-placement': 'line',
+        'text-rotation-alignment': 'map',
+        'text-allow-overlap': false,
+        'text-ignore-placement': false
+      },
+      paint: {
+        'text-color': '#333333',
+        'text-halo-color': '#FFFFFF',
+        'text-halo-width': 1.5,
+        'text-opacity': ['interpolate', ['linear'], ['zoom'],
+          12, 0.6,
+          16, 1
+        ]
+      },
+      filter: ['all',
+        ['==', ['geometry-type'], 'LineString'],
+        ['has', 'name'],
+        ['has', 'highway'],
+        ['!=', ['get', 'name'], '']
+      ] as any,
+      minzoom: 12
+    }
+  ];
 
-    console.log('🗺️ Adding vector layers...');
-    layers.forEach(layer => {
-      try {
-        if (!map.getLayer(layer.id)) {
-          map.addLayer(layer as any);
-          console.log(`✅ Layer added: ${layer.id}`);
-        } else {
-          console.log(`⚠️ Layer already exists, skipping: ${layer.id}`);
-        }
-      } catch (err) {
-        console.error(`❌ Error adding layer ${layer.id}:`, err);
+  console.log('🗺️ Adding vector layers...');
+  layers.forEach(layer => {
+    try {
+      if (!map.getLayer(layer.id)) {
+        map.addLayer(layer as any);
+        console.log(`✅ Layer added: ${layer.id}`);
+      } else {
+        console.log(`⚠️ Layer already exists, skipping: ${layer.id}`);
       }
-    });
+    } catch (err) {
+      console.error(`❌ Error adding layer ${layer.id}:`, err);
+    }
+  });
 
-    layersAddedRef.current = true;
-    console.log('🗺️ All vector layers processed');
+  layersAddedRef.current = true;
+  console.log('🗺️ All vector layers processed');
 
   } catch (err) {
     console.error('❌ addVectorLayers error:', err);
