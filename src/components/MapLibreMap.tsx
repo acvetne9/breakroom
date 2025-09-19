@@ -12,6 +12,7 @@ import type { GeoJSONFeature } from 'maplibre-gl';
 import type { Business } from '@/types/business';
 import * as turf from '@turf/turf';
 import type { Feature, Point } from 'geojson';
+import type { BusinessCache, Business } from '@/utils/businessesCache'
 
 interface MapLibreMapProps {
   onBusinessClick?: (business: any) => void;
@@ -97,63 +98,6 @@ const createOptimizedGridSampling = (bounds: Bounds, businesses: Business[], max
 
   return result.slice(0, maxBusinesses);
 };
-
-// Simple cache (no isMobile branch — consistent)
-class BusinessCache {
-  private cache = new Map<string, Business & { detailsLoaded?: boolean }>();
-  private maxSize: number;
-
-  constructor(maxSize = 15000) {
-    this.maxSize = maxSize;
-  }
-
-  set(id: string, business: Business & { detailsLoaded?: boolean }) {
-    if (this.cache.size >= this.maxSize) {
-      const keysToDelete = Array.from(this.cache.keys()).slice(0, Math.floor(this.maxSize * 0.1));
-      keysToDelete.forEach(key => this.cache.delete(key));
-    }
-    this.cache.set(id, business);
-  }
-
-  get(id: string): (Business & { detailsLoaded?: boolean }) | undefined {
-    const business = this.cache.get(id);
-    if (business) {
-      this.cache.delete(id);
-      this.cache.set(id, business);
-    }
-    return business;
-  }
-
-  getAll() {
-    const all = Array.from(this.cache.values());
-    console.log('🏢 getAll returning', all.length, 'businesses');
-    return all;
-  }
-
-  addMultiple(businesses: Business[]) {
-    if (!Array.isArray(businesses) || businesses.length === 0) return;
-    
-    const validBusinesses = businesses.filter(b => 
-      b?.id && 
-      b?.position?.lat != null && 
-      b?.position?.lng != null &&
-      !isNaN(b.position.lat) && 
-      !isNaN(b.position.lng)
-    );
-    
-    if (validBusinesses.length === 0) {
-      console.warn('⚠️ No valid businesses to add to cache');
-      return;
-    }
-    
-    validBusinesses.forEach(b => this.set(b.id, { ...b, detailsLoaded: !!b.detailsLoaded }));
-    console.log(`✅ Added ${validBusinesses.length}/${businesses.length} valid businesses to cache. Total cache size: ${this.cache.size}`);
-  }
-
-  clear() {
-    this.cache.clear();
-  }
-}
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
   onBusinessClick,
