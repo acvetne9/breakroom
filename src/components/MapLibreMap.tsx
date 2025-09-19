@@ -416,7 +416,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         console.log('🗺️ Loading businesses for viewport (fallback):', businessLimit);
         const viewportBusinesses = await loadBusinessesInViewport?.(viewportBounds, businessLimit) || [];
         if (viewportBusinesses.length) {
-          businessCacheRef.current.clear();
           businessCacheRef.current.addMultiple(viewportBusinesses);
           setCacheVersion(prev => prev + 1);
           console.log(`🗺️ Fallback loaded ${viewportBusinesses.length} businesses for viewport`);
@@ -605,7 +604,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         if (overlayInstance && mapRef.current) { mapRef.current.removeControl(overlayInstance); overlayInstance = null; }
       } catch {}
       try { mapRef.current?.remove(); } catch {}
-      businessCacheRef.current.clear();
       layersAddedRef.current = false;
       setMapLoaded(false);
       setDeckOverlay(null);
