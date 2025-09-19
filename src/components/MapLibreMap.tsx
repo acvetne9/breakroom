@@ -192,16 +192,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const businesses = Array.isArray(rawBusinesses) ? rawBusinesses : [];
   const [cacheVersion, setCacheVersion] = useState(0);
 
-  // Add businesses to cache when they're loaded from the hook
   useEffect(() => {
-    if (businesses && businesses.length > 0) {
-      businessCacheRef.current.clear();
+    if (Array.isArray(businesses) && businesses.length > 0) {
+      console.log("📦 Adding businesses to cache:", businesses.length);
+  
+      // ✅ Instead of clearing, merge them in
       businessCacheRef.current.addMultiple(businesses);
+  
+      // Force DeckGL re-render
       setCacheVersion(prev => prev + 1);
+  
       callbackRefs.current.onBusinessesLoaded?.();
     } else {
-      // just log, don’t clear
-      console.log('⚠️ Businesses array empty — keeping previous cache');
+      // Just log — don’t nuke the cache
+      console.log("⚠️ Businesses array empty — keeping previous cache intact");
     }
   }, [businesses]);
   
