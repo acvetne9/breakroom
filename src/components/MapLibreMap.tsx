@@ -131,14 +131,23 @@ class BusinessCache {
   }
 
   addMultiple(businesses: Business[]) {
-    if (!Array.isArray(businesses)) return;
-    const validBusinesses = businesses.filter(b => b?.id && b?.position?.lat != null && b?.position?.lng != null);
+    if (!Array.isArray(businesses) || businesses.length === 0) return;
+    
+    const validBusinesses = businesses.filter(b => 
+      b?.id && 
+      b?.position?.lat != null && 
+      b?.position?.lng != null &&
+      !isNaN(b.position.lat) && 
+      !isNaN(b.position.lng)
+    );
+    
     if (validBusinesses.length === 0) {
-      console.warn('No valid businesses to add. Skipping all.');
+      console.warn('⚠️ No valid businesses to add to cache');
       return;
     }
+    
     validBusinesses.forEach(b => this.set(b.id, { ...b, detailsLoaded: !!b.detailsLoaded }));
-    console.log(`🏢 Added ${validBusinesses.length} businesses to cache.`);
+    console.log(`✅ Added ${validBusinesses.length}/${businesses.length} valid businesses to cache. Total cache size: ${this.cache.size}`);
   }
 
   clear() {
@@ -183,14 +192,21 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const businesses = Array.isArray(rawBusinesses) ? rawBusinesses : [];
   const [cacheVersion, setCacheVersion] = useState(0);
 
+  // Add businesses to cache when they're loaded from the hook
   useEffect(() => {
-    if (businesses && businesses.length) {
-      console.log('🏢 Adding businesses to cache:', businesses.length);
-      console.log('🏢 Sample business data:', businesses[0]);
+    if (businesses && businesses.length > 0) {
+      console.log('🏢 Adding businesses from hook to cache:', businesses.length);
+      console.log('🏢 Sample business data:', JSON.stringify(businesses[0], null, 2));
+      
+      // Clear cache first to avoid duplicates
+      businessCacheRef.current.clear();
       businessCacheRef.current.addMultiple(businesses);
-      setCacheVersion(prev => prev + 1); // triggers deckGLLayers useMemo
-      handleViewportChangeRef.current();
+      
+      // Force re-render of deck.gl layers
+      setCacheVersion(prev => prev + 1);
+      
       callbackRefs.current.onBusinessesLoaded?.();
+      console.log('🏢 Cache now has:', businessCacheRef.current.getAll().length, 'businesses');
     }
   }, [businesses]);
   
@@ -373,45 +389,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   const handleViewportChange = useCallback(async () => {
     if (!mapRef.current || !mapLoaded || isLoadingRef.current) return;
+    
+    // Don't load if we already have businesses from the hook
+    if (businesses && businesses.length > 0) {
+      console.log('🏢 Skipping viewport load - businesses already loaded from hook:', businesses.length);
+      return;
+    }
+    
     isLoadingRef.current = true;
   
     try {
       const map = mapRef.current;
       const zoom = map.getZoom();
-      let allFetchedBusinesses: any[] = [];
   
-      // --- 1️⃣ Handle neighborhood polygon filter ---
-      if (searchFilters?.neighborhoodFilter?.boundary?.length) {
-        const boundary = searchFilters.neighborhoodFilter.boundary;
-        const polygonCoords = boundary.map((p: any) => {
-          const point = featureToLatLon(p);
-          return [point.lon, point.lat];
-        });
-        const turfPoly = turf.polygon([polygonCoords]);
-  
-        try {
-          // Attempt to fetch businesses from API with polygon boundary
-          const fetched = await loadBusinessesInViewport?.(boundary, 10000) || [];
-          
-          // Fallback: client-side filter in case API does not fully support polygons
-          const filtered = fetched.filter(b => {
-            if (!b?.position?.lat || !b?.position?.lng) return false;
-            const pt = turf.point([b.position.lng, b.position.lat]);
-            return turf.booleanPointInPolygon(pt, turfPoly);
-          });
-  
-          if (filtered.length) {
-            businessCacheRef.current.clear(); // safe to clear for neighborhood-specific
-            businessCacheRef.current.addMultiple(filtered);
-            allFetchedBusinesses.push(...filtered);
-            console.log(`🏘️ Loaded ${filtered.length} businesses within neighborhood`);
-          }
-        } catch (err) {
-          console.error('Error loading neighborhood businesses:', err);
-        }
-      }
-  
-      // --- 2️⃣ Handle standard rectangular viewport ---
+      // Handle standard rectangular viewport only if no businesses from hook
       const bounds = map.getBounds();
       const viewportBounds = {
         north: bounds.getNorth(),
@@ -423,11 +414,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const businessLimit = getBusinessLimitForViewport(zoom, viewportBounds);
   
       try {
+        console.log('🗺️ Loading businesses for viewport (fallback):', businessLimit);
         const viewportBusinesses = await loadBusinessesInViewport?.(viewportBounds, businessLimit) || [];
         if (viewportBusinesses.length) {
+          businessCacheRef.current.clear();
           businessCacheRef.current.addMultiple(viewportBusinesses);
-          allFetchedBusinesses.push(...viewportBusinesses);
-          console.log(`🗺️ Loaded ${viewportBusinesses.length} businesses for viewport`);
+          setCacheVersion(prev => prev + 1);
+          console.log(`🗺️ Fallback loaded ${viewportBusinesses.length} businesses for viewport`);
         } else {
           console.warn("⚠️ No businesses returned for viewport");
         }
@@ -435,27 +428,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         console.error("Error loading viewport businesses:", err);
       }
   
-      // --- 3️⃣ Trigger re-render of layers ---
-      if (allFetchedBusinesses.length) {
-        setCacheVersion(prev => prev + 1);
-      }
-  
     } finally {
       isLoadingRef.current = false;
     }
-  }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters]);
+  }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters, businesses]);
 
   const deckGLLayers = useMemo(() => {
     // Get all businesses from cache
     const allBusinesses = businessCacheRef.current.getAll();
-    console.log('🎯 Cache has', allBusinesses.length, 'businesses');
-  
-    if (!allBusinesses.length) return [];
+    console.log('🎯 Updating DeckGL layers, business count:', allBusinesses.length);
+    
+    if (!allBusinesses.length) {
+      console.log('🎯 No businesses in cache, returning empty layers');
+      return [];
+    }
   
     // Ensure each business has valid lat/lng
     let validBusinesses = allBusinesses.filter(
       b => b?.position?.lat != null && b?.position?.lng != null
     );
+    
+    console.log('🎯 Valid businesses after filtering:', validBusinesses.length);
   
     // Handle neighborhood filter if present
     if (searchFilters?.neighborhoodFilter?.boundary?.length) {
@@ -520,24 +513,52 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       mapRef.current = mapInstance;
       handleViewportChangeRef.current = handleViewportChange;
 
-      mapInstance.on('error', (e) => console.error('Map error', e.error || e));
+      mapInstance.on('error', (e) => {
+        console.error('🗺️ Map error:', e.error || e);
+        // Try to continue despite errors
+        if (!mapLoaded) {
+          console.log('🗺️ Setting map as loaded despite error');
+          setMapLoaded(true);
+          callbackRefs.current.onMapLoaded?.();
+        }
+      });
+
       mapInstance.on('load', () => {
+        console.log('🗺️ Map loaded successfully');
         setMapLoaded(true);
         callbackRefs.current.onMapLoaded?.();
-        if (!layersAddedRef.current) addVectorLayers(mapInstance);
+        
+        try {
+          if (!layersAddedRef.current) {
+            addVectorLayers(mapInstance);
+          }
+        } catch (err) {
+          console.error('🗺️ Error adding vector layers:', err);
+        }
       
-        // ⏳ delay more before first fetch
-        setTimeout(() => { handleViewportChangeRef.current(); }, 1500);
+        // Initial data load
+        setTimeout(() => { 
+          console.log('🗺️ Triggering initial viewport load');
+          handleViewportChangeRef.current(); 
+        }, 1500);
       });
 
       // fallback if load event didn't fire timely
       setTimeout(() => {
-        if (!mapInstance.loaded()) {
-          setMapLoaded(true);
-          callbackRefs.current.onMapLoaded?.();
-          setTimeout(() => handleViewportChangeRef.current(), 100);
+        try {
+          if (!mapInstance.loaded() && !mapLoaded) {
+            console.log('🗺️ Map load timeout - forcing loaded state');
+            setMapLoaded(true);
+            callbackRefs.current.onMapLoaded?.();
+            setTimeout(() => {
+              console.log('🗺️ Fallback viewport load');
+              handleViewportChangeRef.current();
+            }, 100);
+          }
+        } catch (err) {
+          console.error('🗺️ Error in fallback load:', err);
         }
-      }, 2000);
+      }, 3000); // Increased timeout
 
       // events
       const debouncedMove = (() => {
