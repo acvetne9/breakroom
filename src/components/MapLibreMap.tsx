@@ -372,6 +372,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [fetchFullBusinessDetails]);
 
+  useEffect(() => {
+    if (mapLoaded) handleViewportChangeRef.current();
+  }, [mapLoaded, searchFilters]);
+
+
   // Handle viewport change
   const handleViewportChange = useCallback(async () => {
     if (!mapRef.current || !mapLoaded || isLoadingRef.current) return;
@@ -387,8 +392,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const turfPoly = turf.polygon([polygonCoords]);
     
       try {
-        businessCacheRef.current.clear();
-    
+        const fetched = await loadBusinessesInViewport?.(bounds, businessLimit);
+        if (fetched?.length) {
+          businessCacheRef.current.clear(); // now safe
+          businessCacheRef.current.addMultiple(fetched);
+        }
         const neighborhoodBusinesses = await loadBusinessesInViewport?.(boundary, 10000);
         
         // Fallback: filter client-side with Turf if API does not fully support polygons
@@ -420,10 +428,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   
     try {
       const viewportBusinesses = await loadBusinessesInViewport?.(bounds, businessLimit);
-      if (Array.isArray(viewportBusinesses) && viewportBusinesses.length) {
-        businessCacheRef.current.addMultiple(viewportBusinesses);
+      console.log("viewportBusinesses fetched:", viewportBusinesses?.length);
+      if (viewportBusinesses?.length) {
+          businessCacheRef.current.addMultiple(viewportBusinesses);
       } else {
-        console.warn("⚠️ loadBusinessesInViewport returned empty, keeping previous cache");
+          console.warn("⚠️ No businesses returned from loadBusinessesInViewport");
       }
     } catch (err) {
       console.error("Error loading viewport businesses", err);
