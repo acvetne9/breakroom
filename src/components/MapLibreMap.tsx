@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import maplibregl from 'maplibre-gl';
+import type { LayerSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { MapboxOverlay } from '@deck.gl/mapbox'; // use this package
 import { createBusinessScatterplotLayer } from '@/utils/deckGLLayers';
@@ -37,7 +38,6 @@ interface ViewportState {
   timestamp: number;
 }
 
-// singleton overlay
 let overlayInstance: MapboxOverlay | null = null;
 
 // Convert GeoJSON Point Feature -> { lat, lon }
@@ -49,8 +49,6 @@ const featureToLatLon = (feature: Feature<Point> | { lat: number; lon: number })
   throw new Error('Invalid feature for conversion to lat/lon');
 };
 
-
-// basic grid-sampling (unchanged, preserved behavior)
 const createOptimizedGridSampling = (bounds: Bounds, businesses: Business[], maxBusinesses: number, prioritizeVisible: boolean = false): Business[] => {
   if (!businesses || businesses.length <= maxBusinesses) return businesses;
 
@@ -97,57 +95,75 @@ const createOptimizedGridSampling = (bounds: Bounds, businesses: Business[], max
   return result.slice(0, maxBusinesses);
 };
 
-// Simple cache (no isMobile branch — consistent)
 class BusinessCache {
   private cache = new Map<string, Business & { detailsLoaded?: boolean }>();
   private maxSize: number;
+  private storageKey = 'businessCache';
 
-  constructor(maxSize = 15000) {
+  constructor(maxSize = Infinity) {
     this.maxSize = maxSize;
+    this.loadFromStorage();
+  }
+
+  private persist() {
+    try {
+      const data = Array.from(this.cache.values());
+      localStorage.setItem(this.storageKey, JSON.stringify(data));
+    } catch (err) {
+      console.warn('⚠️ Failed to persist business cache', err);
+    }
+  }
+
+  private loadFromStorage() {
+    try {
+      const raw = localStorage.getItem(this.storageKey);
+      if (!raw) return;
+      const arr: Business[] = JSON.parse(raw);
+      arr.forEach(b => {
+        if (b?.id) this.cache.set(b.id, b);
+      });
+      console.log(`📦 Loaded ${this.cache.size} businesses from localStorage`);
+    } catch (err) {
+      console.warn('⚠️ Failed to load business cache from localStorage', err);
+    }
   }
 
   set(id: string, business: Business & { detailsLoaded?: boolean }) {
-    if (this.cache.size >= this.maxSize) {
-      const keysToDelete = Array.from(this.cache.keys()).slice(0, Math.floor(this.maxSize * 0.1));
-      keysToDelete.forEach(key => this.cache.delete(key));
-    }
+    if (!id || !business) return;
+    // remove eviction completely
     this.cache.set(id, business);
+    this.persist();
   }
 
   get(id: string): (Business & { detailsLoaded?: boolean }) | undefined {
     const business = this.cache.get(id);
-    if (business) {
-      this.cache.delete(id);
-      this.cache.set(id, business);
-    }
+    if (!business) return undefined;
+    // Move to the end (LRU)
+    this.cache.delete(id);
+    this.cache.set(id, business);
     return business;
   }
 
-  getAll() {
-    const all = Array.from(this.cache.values());
-    console.log('🏢 getAll returning', all.length, 'businesses');
-    return all;
+  getAll(): (Business & { detailsLoaded?: boolean })[] {
+    return Array.from(this.cache.values());
   }
 
   addMultiple(businesses: Business[]) {
-    console.log('🏢 BusinessCache.addMultiple called with', businesses.length, 'businesses');
-    if (businesses.length > 0) {
-      console.log('🏢 Sample business being added:', {
-        id: businesses[0].id,
-        name: businesses[0].name,
-        position: businesses[0].position
-      });
-    }
-    businesses.forEach(b => {
-      if (!b?.id) console.warn('Skipping business without id', b);
-      else this.set(b.id, b as any);
-    });
-    console.log('Sample position:', businesses[0]?.position);
+    if (!Array.isArray(businesses) || businesses.length === 0) return;
+
+    const validBusinesses = businesses.filter(b =>
+      b?.id &&
+      b?.position?.lat != null &&
+      b?.position?.lng != null &&
+      !isNaN(b.position.lat) &&
+      !isNaN(b.position.lng)
+    );
+
+    validBusinesses.forEach(b => this.set(b.id, { ...b, detailsLoaded: !!b.detailsLoaded }));
+    console.log(`✅ Added ${validBusinesses.length}/${businesses.length} valid businesses. Cache size: ${this.cache.size}`);
   }
 
-  clear() {
-    this.cache.clear();
-  }
+  // we can remove clear() entirely if we never need it
 }
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
@@ -188,32 +204,37 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [cacheVersion, setCacheVersion] = useState(0);
 
   useEffect(() => {
-    if (businesses && businesses.length) {
-      console.log('🏢 Adding businesses to cache:', businesses.length);
-      console.log('🏢 Sample business data:', businesses[0]);
+    if (Array.isArray(businesses) && businesses.length > 0) {
+      console.log("📦 Adding businesses to cache:", businesses.length);
+  
+      // Merge new businesses into cache
       businessCacheRef.current.addMultiple(businesses);
-      setCacheVersion(prev => prev + 1); // triggers deckGLLayers useMemo
-      handleViewportChangeRef.current();
+  
+      // Force DeckGL re-render
+      setCacheVersion(prev => prev + 1);
+  
       callbackRefs.current.onBusinessesLoaded?.();
+    } else {
+      console.log("⚠️ Businesses array empty — keeping previous cache intact");
     }
   }, [businesses]);
   
   // vector layers (styling restored exactly as requested)
   const addVectorLayers = useCallback((map: maplibregl.Map) => {
     try {
-      const layers = [
+      const layers: LayerSpecification[] = [
         {
           id: 'nyc-land',
-          type: 'fill' as const,
+          type: 'fill',
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           layout: {},
           paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
-          filter: ['==', ['geometry-type'], 'Polygon'] as any
+          filter: ['all', ['==', ['geometry-type'], 'Polygon']]
         },
         {
           id: 'nyc-green-spaces',
-          type: 'fill' as const,
+          type: 'fill',
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           layout: {},
@@ -228,26 +249,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ['all', ['has', 'amenity'], ['==', ['get', 'amenity'], 'grave_yard']],
               ['all', ['has', 'landuse'], ['==', ['get', 'landuse'], 'recreation_ground']],
               ['all', ['has', 'leisure'], ['==', ['get', 'leisure'], 'recreation_ground']],
-              ['all', ['has', 'name'], ['in', 'cemetery', ['coalesce', ['get', 'name'], '']]],
-              ['all', ['has', 'name'], ['in', 'Cemetery', ['coalesce', ['get', 'name'], '']]],
-              ['all', ['has', 'name'], ['in', 'graveyard', ['coalesce', ['get', 'name'], '']]],
+              ['all', ['has', 'name'], ['in', ['get', 'name'], ['literal', ['cemetery', 'Cemetery', 'graveyard']]]],
               ['all', ['has', 'place'], ['==', ['get', 'place'], 'cemetery']],
               ['all', ['has', 'historic'], ['==', ['get', 'historic'], 'cemetery']]
             ]
-          ] as any
+          ]
         },
         {
           id: 'nyc-water',
-          type: 'fill' as const,
+          type: 'fill',
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           layout: {},
           paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
-          filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']] as any
+          filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']]
         },
         {
           id: 'nyc-roads',
-          type: 'line' as const,
+          type: 'line',
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           layout: {},
@@ -256,11 +275,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
             'line-opacity': 0.8
           },
-          filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']] as any
+          filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
         },
         {
           id: 'nyc-road-labels',
-          type: 'symbol' as const,
+          type: 'symbol',
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           layout: {
@@ -280,12 +299,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'text-halo-width': 1.5,
             'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 1]
           },
-          filter: ['all',
+          filter: [
+            'all',
             ['==', ['geometry-type'], 'LineString'],
             ['has', 'name'],
             ['has', 'highway'],
-            ['!=', ['get', 'name'], '']
-          ] as any,
+            ['!=', ['coalesce', ['get', 'name'], ''], '']
+          ],
           minzoom: 12
         }
       ];
@@ -294,19 +314,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       layers.forEach(layer => {
         try {
           if (!map.getLayer(layer.id)) {
-            map.addLayer(layer as any);
+            map.addLayer(layer);
             console.log(`✅ Layer added: ${layer.id}`);
           } else {
-            console.log(`⚠️ Layer already exists, skipping: ${layer.id}`);
+            console.log(`⚠️ Already exists, skipping: ${layer.id}`);
           }
         } catch (err) {
-          console.error(`❌ Error adding layer ${layer.id}:`, err);
+          console.error(`❌ Failed layer ${layer.id}:`, err);
         }
       });
   
       layersAddedRef.current = true;
-      console.log('🗺️ All vector layers processed');
-  
     } catch (err) {
       console.error('❌ addVectorLayers error:', err);
     }
@@ -374,93 +392,102 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [fetchFullBusinessDetails]);
 
-  // Handle viewport change
+  useEffect(() => {
+    if (mapLoaded) handleViewportChangeRef.current();
+  }, [mapLoaded, searchFilters]);
+
   const handleViewportChange = useCallback(async () => {
     if (!mapRef.current || !mapLoaded || isLoadingRef.current) return;
-  
-    const map = mapRef.current;
-    const zoom = map.getZoom();
-  
-    let bounds: Bounds;
-  
-    if (searchFilters?.neighborhoodFilter?.boundary?.length) {
-      const boundary = searchFilters.neighborhoodFilter.boundary;
-      const polygonCoords = boundary.map((p: any) => [featureToLatLon(p).lon, featureToLatLon(p).lat]);
-      const turfPoly = turf.polygon([polygonCoords]);
     
-      try {
-        businessCacheRef.current.clear();
-    
-        const neighborhoodBusinesses = await loadBusinessesInViewport?.(boundary, 10000);
-        
-        // Fallback: filter client-side with Turf if API does not fully support polygons
-        let filteredBusinesses = neighborhoodBusinesses || [];
-        filteredBusinesses = filteredBusinesses.filter(b => {
-          if (!b?.position) return false;
-          const pt = turf.point([b.position.lng, b.position.lat]);
-          return turf.booleanPointInPolygon(pt, turfPoly);
-        });
-    
-        businessCacheRef.current.addMultiple(filteredBusinesses);
-        setCacheVersion(prev => prev + 1);
-    
-      } catch (err) {
-        console.error('Error loading neighborhood businesses', err);
-      }
+    // Don't load if we already have businesses from the hook
+    if (businesses && businesses.length > 0) {
+      console.log('🏢 Skipping viewport load - businesses already loaded from hook:', businesses.length);
+      return;
     }
-
-    // For normal rectangular viewport
-    const currentBounds = map.getBounds();
-    bounds = {
-      north: currentBounds.getNorth(),
-      south: currentBounds.getSouth(),
-      east: currentBounds.getEast(),
-      west: currentBounds.getWest()
-    };
-  
-    const businessLimit = getBusinessLimitForViewport(zoom, bounds);
+    
+    isLoadingRef.current = true;
   
     try {
-      const viewportBusinesses = await loadBusinessesInViewport?.(bounds, businessLimit);
-      if (Array.isArray(viewportBusinesses) && viewportBusinesses.length) {
-        businessCacheRef.current.addMultiple(viewportBusinesses);
+      const map = mapRef.current;
+      const zoom = map.getZoom();
+  
+      // Handle standard rectangular viewport only if no businesses from hook
+      const bounds = map.getBounds();
+      const viewportBounds = {
+        north: bounds.getNorth(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        west: bounds.getWest()
+      };
+  
+      const businessLimit = getBusinessLimitForViewport(zoom, viewportBounds);
+  
+      try {
+        console.log('🗺️ Loading businesses for viewport (fallback):', businessLimit);
+        const viewportBusinesses = await loadBusinessesInViewport?.(viewportBounds, businessLimit) || [];
+        if (viewportBusinesses.length) {
+          businessCacheRef.current.addMultiple(viewportBusinesses);
+          setCacheVersion(prev => prev + 1);
+          console.log(`🗺️ Fallback loaded ${viewportBusinesses.length} businesses for viewport`);
+        } else {
+          console.warn("⚠️ No businesses returned for viewport");
+        }
+      } catch (err) {
+        console.error("Error loading viewport businesses:", err);
       }
-    } catch (err) {
-      console.error('Error loading viewport businesses', err);
+  
+    } finally {
+      isLoadingRef.current = false;
     }
-  }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters]);
+  }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters, businesses]);
 
   const deckGLLayers = useMemo(() => {
-    const all = businessCacheRef.current.getAll();
-    console.log('🎯 Cache has', all.length, 'businesses');
-    if (!all.length) return [];
+    console.log('🎯 deckGLLayers useMemo triggered - cacheVersion:', cacheVersion);
+    
+    // Get all businesses from cache
+    const allBusinesses = businessCacheRef.current.getAll();
+    console.log('🎯 Retrieved from cache:', allBusinesses.length, 'businesses');
+    
+    if (!allBusinesses.length) {
+      console.log('🎯 No businesses in cache, returning empty layers');
+      return [];
+    }
   
-    // Convert raw boundary features into [lat, lon] for turf
-    let neighborhoodBoundary: { lat: number; lon: number }[] | undefined;
+    // Ensure each business has valid lat/lng
+    let validBusinesses = allBusinesses.filter(
+      b => b?.position?.lat != null && b?.position?.lng != null
+    );
+    
+    console.log('🎯 Valid businesses after filtering:', validBusinesses.length);
+    
+    if (!validBusinesses.length) {
+      console.log('🎯 No valid businesses after filtering, returning empty layers');
+      return [];
+    }
+  
+    // Handle neighborhood filter if present
     if (searchFilters?.neighborhoodFilter?.boundary?.length) {
-      neighborhoodBoundary = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
+      const neighborhoodCoords = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
+      if (neighborhoodCoords.length) {
+        const turfPolygon = turf.polygon([neighborhoodCoords.map(p => [p.lon, p.lat])]);
+        validBusinesses = validBusinesses.filter(b => {
+          const point = turf.point([b.position.lng, b.position.lat]);
+          return turf.booleanPointInPolygon(point, turfPolygon);
+        });
+      }
     }
   
-    // Filter businesses inside polygon if neighborhoodBoundary exists
-    let businessesToRender = all.filter(b => b?.position?.lat != null && b?.position?.lng != null);
-    if (neighborhoodBoundary?.length) {
-      const polygonCoords = neighborhoodBoundary.map(p => [p.lon, p.lat]);
-      const turfPoly = turf.polygon([polygonCoords]);
-      businessesToRender = businessesToRender.filter(b => {
-        const pt = turf.point([b.position.lng, b.position.lat]);
-        return turf.booleanPointInPolygon(pt, turfPoly);
-      });
-    }
+    console.log('🎯 Rendering', validBusinesses.length, 'businesses');
   
-    console.log('🎯 Rendering', businessesToRender.length, 'businesses');
-    if (!businessesToRender.length) return [];
+    if (!validBusinesses.length) return [];
   
+    // Return DeckGL layer
     return [
       createBusinessScatterplotLayer({
-        businesses: businessesToRender,
+        businesses: validBusinesses,
         selectedBusinessId: selectedBusiness?.id,
         onBusinessClick: handleBusinessClick,
-        neighborhoodBoundary // pass it to the layer for future reactivity
+        neighborhoodBoundary: searchFilters?.neighborhoodFilter?.boundary || null
       })
     ];
   }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, cacheVersion]);
@@ -498,27 +525,57 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         attributionControl: false
       });
 
+      mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
+
       mapRef.current = mapInstance;
       handleViewportChangeRef.current = handleViewportChange;
 
-      mapInstance.on('error', (e) => console.error('Map error', e.error || e));
+      mapInstance.on('error', (e) => {
+        console.error('🗺️ Map error:', e.error || e);
+        // Try to continue despite errors
+        if (!mapLoaded) {
+          console.log('🗺️ Setting map as loaded despite error');
+          setMapLoaded(true);
+          callbackRefs.current.onMapLoaded?.();
+        }
+      });
+
       mapInstance.on('load', () => {
+        console.log('🗺️ Map loaded successfully');
         setMapLoaded(true);
         callbackRefs.current.onMapLoaded?.();
-        if (!layersAddedRef.current) addVectorLayers(mapInstance);
-
-        // initial load after small delay
-        setTimeout(() => { handleViewportChangeRef.current(); }, 500);
+        
+        try {
+          if (!layersAddedRef.current) {
+            addVectorLayers(mapInstance);
+          }
+        } catch (err) {
+          console.error('🗺️ Error adding vector layers:', err);
+        }
+      
+        // Initial data load
+        setTimeout(() => { 
+          console.log('🗺️ Triggering initial viewport load');
+          handleViewportChangeRef.current(); 
+        }, 1500);
       });
 
       // fallback if load event didn't fire timely
       setTimeout(() => {
-        if (!mapInstance.loaded()) {
-          setMapLoaded(true);
-          callbackRefs.current.onMapLoaded?.();
-          setTimeout(() => handleViewportChangeRef.current(), 100);
+        try {
+          if (!mapInstance.loaded() && !mapLoaded) {
+            console.log('🗺️ Map load timeout - forcing loaded state');
+            setMapLoaded(true);
+            callbackRefs.current.onMapLoaded?.();
+            setTimeout(() => {
+              console.log('🗺️ Fallback viewport load');
+              handleViewportChangeRef.current();
+            }, 100);
+          }
+        } catch (err) {
+          console.error('🗺️ Error in fallback load:', err);
         }
-      }, 2000);
+      }, 3000); // Increased timeout
 
       // events
       const debouncedMove = (() => {
@@ -557,7 +614,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         if (overlayInstance && mapRef.current) { mapRef.current.removeControl(overlayInstance); overlayInstance = null; }
       } catch {}
       try { mapRef.current?.remove(); } catch {}
-      businessCacheRef.current.clear();
       layersAddedRef.current = false;
       setMapLoaded(false);
       setDeckOverlay(null);
@@ -581,31 +637,53 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [mapLoaded]);
 
   // center/load neighborhood center
+  const isUserInteractingRef = useRef(false);
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+  
+    const onDragStart = () => { isUserInteractingRef.current = true; };
+    const onDragEnd = () => { isUserInteractingRef.current = false; };
+    const onZoomStart = () => { isUserInteractingRef.current = true; };
+    const onZoomEnd = () => { isUserInteractingRef.current = false; };
+  
+    map.on("dragstart", onDragStart);
+    map.on("dragend", onDragEnd);
+    map.on("zoomstart", onZoomStart);
+    map.on("zoomend", onZoomEnd);
+  
+    return () => {
+      map.off("dragstart", onDragStart);
+      map.off("dragend", onDragEnd);
+      map.off("zoomstart", onZoomStart);
+      map.off("zoomend", onZoomEnd);
+    };
+  }, [mapLoaded]);
+  
   useEffect(() => {
     if (!mapRef.current || !mapLoaded || !searchFilters?.neighborhoodFilter || !neighborhoodCenter) return;
   
-    const isUserTriggered = !!selectedBusiness; // or you can pass a dedicated flag if needed
+    // cancel if user is scrolling
+    if (isUserInteractingRef.current) {
+      console.log("⏸️ User interacting with map, skipping auto-fly");
+      return;
+    }
   
-    if (isUserTriggered) {
-      // fly immediately for user clicks
-      mapRef.current.flyTo({
-        center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
-        zoom: 16,
-        essential: true,
-      });
-    } else {
-      // automatic fly (e.g., on initial search/filter load) waits 2s
-      const timeout = setTimeout(() => {
-        mapRef.current!.flyTo({
+    // debounce until search input idle (e.g., 800ms after last change)
+    const timeout = setTimeout(() => {
+      if (!isUserInteractingRef.current && mapRef.current) {
+        console.log("✈️ Flying to neighborhood center");
+        mapRef.current.flyTo({
           center: [neighborhoodCenter.lon, neighborhoodCenter.lat],
           zoom: 14,
-          duration: 2000, // smooth 2-second fly
-          essential: true,
+          duration: 1500,
+          essential: true
         });
-      }, 2000);
-      return () => clearTimeout(timeout);
-    }
-  }, [searchFilters?.neighborhoodFilter, neighborhoodCenter, mapLoaded, selectedBusiness]);
+      }
+    }, 800);
+  
+    return () => clearTimeout(timeout);
+  }, [searchFilters?.neighborhoodFilter, neighborhoodCenter, mapLoaded]);
 
   // center/load neighborhood businesses on searchFilters change (stable)
   useEffect(() => {

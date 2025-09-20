@@ -119,9 +119,18 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
         }
 
         setBusinesses(prev => {
+          // If this is a search with filters, replace all businesses
+          if (searchFilters) {
+            console.log('🔍 Search with filters - replacing businesses:', viewportBusinesses.length);
+            return viewportBusinesses;
+          }
+          
+          // For normal viewport loading, accumulate businesses but avoid duplicates
           const existingIds = new Set(prev.map(b => b.id));
           const newBusinesses = viewportBusinesses.filter(b => !existingIds.has(b.id));
-          return [...prev, ...newBusinesses];
+          const combined = [...prev, ...newBusinesses];
+          console.log('🗺️ Combined businesses:', combined.length, '(', prev.length, 'existing +', newBusinesses.length, 'new )');
+          return combined;
         });
 
         if (!searchFilters) setCachedBusinesses(viewportBounds, viewportBusinesses);
@@ -166,6 +175,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
   };
 
   const clearBusinesses = useCallback(() => {
+    console.log('🧹 Clearing all businesses');
     setBusinesses([]);
     setCurrentBounds(null);
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
