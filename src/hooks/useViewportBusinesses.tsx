@@ -21,6 +21,14 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
   const [isSearching, setIsSearching] = useState(false);
   const [lastSearchFilters, setLastSearchFilters] = useState<any>(null);
 
+  // Debug businesses state changes
+  useEffect(() => {
+    console.log('🔄 useViewportBusinesses: businesses state changed to:', businesses.length, 'businesses');
+    if (businesses.length > 0) {
+      console.log('🔄 useViewportBusinesses: Sample businesses:', businesses.slice(0, 3).map(b => ({ id: b.id, name: b.name })));
+    }
+  }, [businesses]);
+
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const preloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -109,16 +117,23 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
       inflightRequests.set(requestKey, requestPromise);
 
       try {
+        console.log('🔄 useViewportBusinesses: Starting to fetch businesses...');
         let viewportBusinesses = await getBusinessesInViewport(viewportBounds, limit, searchFilters, undefined, zoom);
+        console.log('🔄 useViewportBusinesses: Received businesses from service:', viewportBusinesses.length);
 
         // If a neighborhood polygon exists, only keep businesses inside
         if (searchPolygon) {
           viewportBusinesses = viewportBusinesses.filter(b =>
             isPointInPolygon({ lat: b.position.lat, lon: b.position.lng }, searchPolygon)
           );
+          console.log('🔄 useViewportBusinesses: After polygon filter:', viewportBusinesses.length);
         }
 
+        console.log('🔄 useViewportBusinesses: About to update state with businesses:', viewportBusinesses.length);
+        
         setBusinesses(prev => {
+          console.log('🔄 useViewportBusinesses: setBusinesses called. Previous count:', prev.length);
+          
           // If this is a search with filters, replace all businesses
           if (searchFilters) {
             console.log('🔍 Search with filters - replacing businesses:', viewportBusinesses.length);
@@ -129,13 +144,15 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
           const existingIds = new Set(prev.map(b => b.id));
           const newBusinesses = viewportBusinesses.filter(b => !existingIds.has(b.id));
           const combined = [...prev, ...newBusinesses];
-          console.log('🗺️ Combined businesses:', combined.length, '(', prev.length, 'existing +', newBusinesses.length, 'new )');
+          console.log('🗺️ useViewportBusinesses: Combined businesses:', combined.length, '(', prev.length, 'existing +', newBusinesses.length, 'new )');
           return combined;
         });
 
         if (!searchFilters) setCachedBusinesses(viewportBounds, viewportBusinesses);
         setCurrentBounds(viewportBounds);
         if (!searchFilters) schedulePreload(viewportBounds);
+
+        console.log('🔄 useViewportBusinesses: State update completed, returning businesses:', viewportBusinesses.length);
 
 
         return viewportBusinesses;
