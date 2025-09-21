@@ -1,4 +1,8 @@
-import { Business } from '@/types/business';
+export type Business = {
+  id: string;
+  position?: { lat: number; lng: number };
+  [key: string]: any;
+};
 
 export class BusinessCache {
   private cache: Map<string, Business>;
@@ -33,40 +37,24 @@ export class BusinessCache {
   }
 
   addMultiple(businesses: Business[]) {
-    if (!Array.isArray(businesses)) {
-      console.log('🏢 addMultiple: businesses is not an array', typeof businesses);
-      return;
-    }
-
-    if (businesses.length === 0) {
-      console.log('🏢 addMultiple: businesses array is empty');
-      return;
-    }
+    if (!Array.isArray(businesses)) return;
 
     let addedCount = 0;
-    let validCount = 0;
-    
-    businesses.forEach((b, index) => {
+    businesses.forEach(b => {
       if (b?.id) {
-        validCount++;
         if (!this.cache.has(b.id)) addedCount++;
         this.cache.set(b.id, b); // overwrite with latest
-      } else {
-        console.warn(`🏢 Invalid business at index ${index}:`, b);
       }
     });
 
-    console.log(`🏢 addMultiple: processed ${businesses.length} businesses, ${validCount} valid, ${addedCount} new. Cache size: ${this.cache.size}`);
-    
-    if (addedCount > 0) {
+    if (addedCount) {
+      console.log(`➕ Added ${addedCount} new businesses (total ${this.cache.size})`);
       this.saveToStorage();
     }
   }
 
   getAll(): Business[] {
-    const businesses = Array.from(this.cache.values());
-    console.log(`🏢 getAll returning ${businesses.length} businesses`);
-    return businesses;
+    return Array.from(this.cache.values());
   }
 
   clear() {

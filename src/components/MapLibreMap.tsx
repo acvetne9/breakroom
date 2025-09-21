@@ -10,7 +10,6 @@ import { createTileBlobUrl } from '@/utils/tileDecompression';
 import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods';
 import type { GeoJSONFeature } from 'maplibre-gl';
 import type { Business } from '@/types/business';
-import { BusinessCache } from '@/utils/businessesCache';
 import * as turf from '@turf/turf';
 import type { Feature, Point } from 'geojson';
 
@@ -96,6 +95,77 @@ const createOptimizedGridSampling = (bounds: Bounds, businesses: Business[], max
   return result.slice(0, maxBusinesses);
 };
 
+class BusinessCache {
+  private cache = new Map<string, Business & { detailsLoaded?: boolean }>();
+  private maxSize: number;
+  private storageKey = 'businessCache';
+
+  constructor(maxSize = Infinity) {
+    this.maxSize = maxSize;
+    this.loadFromStorage();
+  }
+
+  private persist() {
+    try {
+      const data = Array.from(this.cache.values());
+      localStorage.setItem(this.storageKey, JSON.stringify(data));
+    } catch (err) {
+      console.warn('⚠️ Failed to persist business cache', err);
+    }
+  }
+
+  private loadFromStorage() {
+    try {
+      const raw = localStorage.getItem(this.storageKey);
+      if (!raw) return;
+      const arr: Business[] = JSON.parse(raw);
+      arr.forEach(b => {
+        if (b?.id) this.cache.set(b.id, b);
+      });
+      console.log(`📦 Loaded ${this.cache.size} businesses from localStorage`);
+    } catch (err) {
+      console.warn('⚠️ Failed to load business cache from localStorage', err);
+    }
+  }
+
+  set(id: string, business: Business & { detailsLoaded?: boolean }) {
+    if (!id || !business) return;
+    // remove eviction completely
+    this.cache.set(id, business);
+    this.persist();
+  }
+
+  get(id: string): (Business & { detailsLoaded?: boolean }) | undefined {
+    const business = this.cache.get(id);
+    if (!business) return undefined;
+    // Move to the end (LRU)
+    this.cache.delete(id);
+    this.cache.set(id, business);
+    return business;
+  }
+
+  getAll(): (Business & { detailsLoaded?: boolean })[] {
+    return Array.from(this.cache.values());
+  }
+
+  addMultiple(businesses: Business[]) {
+    if (!Array.isArray(businesses) || businesses.length === 0) return;
+
+    const validBusinesses = businesses.filter(b =>
+      b?.id &&
+      b?.position?.lat != null &&
+      b?.position?.lng != null &&
+      !isNaN(b.position.lat) &&
+      !isNaN(b.position.lng)
+    );
+
+    validBusinesses.forEach(b => this.set(b.id, { ...b, detailsLoaded: !!b.detailsLoaded }));
+    console.log(`✅ Added ${validBusinesses.length}/${businesses.length} valid businesses. Cache size: ${this.cache.size}`);
+  }
+
+  // we can remove clear() entirely if we never need it
+}
+
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
   onBusinessClick,
   selectedBusiness,
@@ -114,7 +184,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   const mapRef = useRef<maplibregl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const businessCacheRef = useRef(new BusinessCache());
+  const businessCacheRef = useRef(new BusinessCache(15000));
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
   const layersAddedRef = useRef(false);
   const isLoadingRef = useRef(false);
@@ -134,23 +204,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [cacheVersion, setCacheVersion] = useState(0);
 
   useEffect(() => {
-    console.log("📦 Businesses hook state changed:", businesses?.length || 0);
     if (Array.isArray(businesses) && businesses.length > 0) {
       console.log("📦 Adding businesses to cache:", businesses.length);
-      console.log("📦 Sample businesses:", businesses.slice(0, 3).map(b => ({ id: b.id, name: b.name, position: b.position })));
-      
+  
+      // Merge new businesses into cache
       businessCacheRef.current.addMultiple(businesses);
-      
+  
       // Force DeckGL re-render
-      setCacheVersion(prev => {
-        const newVersion = prev + 1;
-        console.log("📦 Cache version updated:", newVersion);
-        return newVersion;
-      });
-      
+      setCacheVersion(prev => prev + 1);
+  
       callbackRefs.current.onBusinessesLoaded?.();
     } else {
-      console.log("⚠️ Businesses array empty or invalid — keeping previous cache intact");
+      console.log("⚠️ Businesses array empty — keeping previous cache intact");
     }
   }, [businesses]);
   
@@ -306,9 +371,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   
       // Load full details if needed
       if (business.id && !business.id.startsWith('vector_') && fetchFullBusinessDetails) {
-        const full = await fetchFullBusinessDetails(business.id);
-        if (full) {
-          businessToReturn = full;
+        const cached = businessCacheRef.current.get(business.id);
+        if (cached && (cached as any).detailsLoaded) {
+          businessToReturn = cached;
+        } else {
+          const full = await fetchFullBusinessDetails(business.id);
+          if (full) {
+            const extended = { ...full, detailsLoaded: true } as Business & { detailsLoaded: true };
+            businessCacheRef.current.set(business.id, extended);
+            businessToReturn = extended;
+          }
         }
       }
   
@@ -374,25 +446,51 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     
     // Get all businesses from cache
     const allBusinesses = businessCacheRef.current.getAll();
-    console.log('🎯 Cache has', allBusinesses.length, 'businesses');
+    console.log('🎯 Retrieved from cache:', allBusinesses.length, 'businesses');
     
     if (!allBusinesses.length) {
       console.log('🎯 No businesses in cache, returning empty layers');
       return [];
     }
-
-    console.log('🎯 Creating layers for', allBusinesses.length, 'businesses');
+  
+    // Ensure each business has valid lat/lng
+    let validBusinesses = allBusinesses.filter(
+      b => b?.position?.lat != null && b?.position?.lng != null
+    );
     
+    console.log('🎯 Valid businesses after filtering:', validBusinesses.length);
+    
+    if (!validBusinesses.length) {
+      console.log('🎯 No valid businesses after filtering, returning empty layers');
+      return [];
+    }
+  
+    // Handle neighborhood filter if present
+    if (searchFilters?.neighborhoodFilter?.boundary?.length) {
+      const neighborhoodCoords = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
+      if (neighborhoodCoords.length) {
+        const turfPolygon = turf.polygon([neighborhoodCoords.map(p => [p.lon, p.lat])]);
+        validBusinesses = validBusinesses.filter(b => {
+          const point = turf.point([b.position.lng, b.position.lat]);
+          return turf.booleanPointInPolygon(point, turfPolygon);
+        });
+      }
+    }
+  
+    console.log('🎯 Rendering', validBusinesses.length, 'businesses');
+  
+    if (!validBusinesses.length) return [];
+  
     // Return DeckGL layer
     return [
       createBusinessScatterplotLayer({
-        businesses: allBusinesses,
+        businesses: validBusinesses,
         selectedBusinessId: selectedBusiness?.id,
         onBusinessClick: handleBusinessClick,
         neighborhoodBoundary: searchFilters?.neighborhoodFilter?.boundary || null
       })
     ];
-  }, [selectedBusiness?.id, handleBusinessClick, searchFilters, cacheVersion]);
+  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, cacheVersion]);
 
   // initialize map once
   useEffect(() => {
