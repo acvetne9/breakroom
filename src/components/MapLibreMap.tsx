@@ -145,7 +145,9 @@ class BusinessCache {
   }
 
   getAll(): (Business & { detailsLoaded?: boolean })[] {
-    return Array.from(this.cache.values());
+    const businesses = Array.from(this.cache.values());
+    console.log('🏢 getAll returning', businesses.length, 'businesses');
+    return businesses;
   }
 
   addMultiple(businesses: Business[]) {
@@ -204,20 +206,26 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [cacheVersion, setCacheVersion] = useState(0);
 
   useEffect(() => {
+    console.log("📦 Businesses hook state changed:", businesses.length);
+    
     if (Array.isArray(businesses) && businesses.length > 0) {
-      console.log("📦 Adding businesses to cache:", businesses.length);
+      console.log("📦 Adding businesses to cache:", businesses.length, "first business:", businesses[0]?.name);
   
-      // Merge new businesses into cache
+      // Clear cache and add new businesses for search results, otherwise accumulate
+      if (searchFilters) {
+        businessCacheRef.current = new BusinessCache(15000);
+      }
+      
       businessCacheRef.current.addMultiple(businesses);
   
       // Force DeckGL re-render
       setCacheVersion(prev => prev + 1);
   
       callbackRefs.current.onBusinessesLoaded?.();
-    } else {
-      console.log("⚠️ Businesses array empty — keeping previous cache intact");
+    } else if (businesses.length === 0) {
+      console.log("⚠️ Businesses array empty or invalid — keeping previous cache intact");
     }
-  }, [businesses]);
+  }, [businesses, searchFilters]);
   
   // vector layers (styling restored exactly as requested)
   const addVectorLayers = useCallback((map: maplibregl.Map) => {
