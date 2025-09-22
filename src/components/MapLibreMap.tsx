@@ -220,11 +220,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'all',
             ['==', ['geometry-type'], 'Polygon'],
             ['any',
-              ['all', ['==', ['get', 'landuse'], 'cemetery']],
-              ['all', ['in', ['get', 'amenity'], 'cemetery', 'grave_yard']],
-              ['all', ['==', ['get', 'leisure'], 'recreation_ground']],
-              ['all', ['==', ['get', 'historic'], 'cemetery']],
-              ['match', ['downcase', ['get', 'name']], ['cemetery', 'graveyard'], true, false]
+              // Parks & gardens
+              ['==', ['get', 'leisure'], 'park'],
+              ['==', ['get', 'leisure'], 'garden'],
+              ['==', ['get', 'leisure'], 'playground'],
+              ['==', ['get', 'leisure'], 'nature_reserve'],
+              ['==', ['get', 'leisure'], 'recreation_ground'],
+        
+              // Cemeteries
+              ['==', ['get', 'landuse'], 'cemetery'],
+              ['==', ['get', 'amenity'], 'cemetery'],
+              ['==', ['get', 'historic'], 'cemetery'],
+        
+              // Additional green spaces
+              ['==', ['get', 'landuse'], 'grass'],
+              ['==', ['get', 'landuse'], 'meadow'],
+              ['==', ['get', 'leisure'], 'sports_centre'],
+              ['==', ['get', 'leisure'], 'pitch']
             ]
           ] as any
         },
