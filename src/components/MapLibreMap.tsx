@@ -400,47 +400,41 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     const businessLimit = getBusinessLimitForViewport(zoom, viewportBounds);
     loadBusinessesInViewport?.(viewportBounds, businessLimit);
-  }, [mapLoaded, loading, loadBusinessesInViewport, getBusinessLimitForViewport]);
+    }, [mapLoaded, loading, loadBusinessesInViewport, getBusinessLimitForViewport]);
+  
+  const lastLoadTimeRef = useRef(0);
 
-  // Simplified DeckGL layers using only hook data
-  const deckGLLayers = useMemo(() => {
-    if (!businesses || !businesses.length) {
-      return [];
+  const handleViewportChange = useCallback(async () => {
+    if (!mapRef.current || !mapLoaded || loading) return;
+  
+    const map = mapRef.current;
+    const zoom = map.getZoom();
+    const bounds = map.getBounds();
+    const viewportBounds = {
+      north: bounds.getNorth(),
+      south: bounds.getSouth(),
+      east: bounds.getEast(),
+      west: bounds.getWest()
+    };
+  
+    const boundsKey = `${viewportBounds.north.toFixed(4)}-${viewportBounds.south.toFixed(4)}-${viewportBounds.east.toFixed(4)}-${viewportBounds.west.toFixed(4)}`;
+  
+    // Prevent duplicate calls for same viewport within 2s
+    const now = Date.now();
+    if (lastBoundsRef.current === boundsKey && now - lastLoadTimeRef.current < 2000) {
+      return;
     }
   
-    // Ensure each business has valid lat/lng
-    let validBusinesses = businesses.filter(
-      b => b?.position?.lat != null && b?.position?.lng != null
-    );
-    
-    if (!validBusinesses.length) {
-      return [];
+    lastBoundsRef.current = boundsKey;
+    lastLoadTimeRef.current = now;
+  
+    try {
+      const businessLimit = getBusinessLimitForViewport(zoom, viewportBounds);
+      await loadBusinessesInViewport?.(viewportBounds, businessLimit);
+    } catch (err) {
+      console.error("❌ Error loading businesses:", err);
     }
-  
-    // Handle neighborhood filter if present
-    if (searchFilters?.neighborhoodFilter?.boundary?.length) {
-      const neighborhoodCoords = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
-      if (neighborhoodCoords.length) {
-        const turfPolygon = turf.polygon([neighborhoodCoords.map(p => [p.lon, p.lat])]);
-        validBusinesses = validBusinesses.filter(b => {
-          const point = turf.point([b.position.lng, b.position.lat]);
-          return turf.booleanPointInPolygon(point, turfPolygon);
-        });
-      }
-    }
-  
-    if (!validBusinesses.length) return [];
-  
-    // Return DeckGL layer
-    return [
-      createBusinessScatterplotLayer({
-        businesses: validBusinesses,
-        selectedBusinessId: selectedBusiness?.id,
-        onBusinessClick: handleBusinessClick,
-        neighborhoodBoundary: searchFilters?.neighborhoodFilter?.boundary || null
-      })
-    ];
-  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, businesses]);
+  }, [mapLoaded, loading, loadBusinessesInViewport, getBusinessLimitForViewport]);
 
   // initialize map once
   useEffect(() => {
@@ -529,8 +523,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         };
       })();
 
-      mapInstance.on('moveend', () => handleViewportChange());
-      mapInstance.on('zoomend', () => handleViewportChange());
+      mapInstance.on('moveend', handleViewportChange);
+      mapInstance.on('zoomend', handleViewportChange);
       mapInstance.on('move', debouncedMove);
 
       mapInstance.on('sourcedata', (e: any) => {
@@ -631,10 +625,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // Load businesses ONLY when search filters change
   useEffect(() => {
     if (mapLoaded && searchFilters?.neighborhoodFilter) {
-      const timeout = setTimeout(() => handleViewportChange(), 1000);
+      const timeout = setTimeout(() => handleViewportChange(), 500);
       return () => clearTimeout(timeout);
     }
-  }, [searchFilters?.neighborhoodFilter, mapLoaded, handleViewportChange]);
+  }, [mapLoaded, searchFilters?.neighborhoodFilter, handleViewportChange]);
 
   // landmarks handling (unchanged)
   useEffect(() => {
