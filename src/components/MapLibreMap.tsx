@@ -220,15 +220,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'all',
             ['==', ['geometry-type'], 'Polygon'],
             ['any',
+              // leisure=park
               ['all', ['has', 'leisure'], ['==', ['get', 'leisure'], 'park']],
+              // landuse=cemetery
               ['all', ['has', 'landuse'], ['==', ['get', 'landuse'], 'cemetery']],
-              ['all', ['has', 'amenity'], ['==', ['get', 'amenity'], 'cemetery']],
-              ['all', ['has', 'amenity'], ['==', ['get', 'amenity'], 'grave_yard']],
-              ['all', ['has', 'landuse'], ['==', ['get', 'landuse'], 'recreation_ground']],
+              // amenity=cemetery or grave_yard
+              ['all', ['has', 'amenity'], ['in', ['get', 'amenity'], 'cemetery', 'grave_yard']],
+              // leisure=recreation_ground or landuse=recreation_ground
               ['all', ['has', 'leisure'], ['==', ['get', 'leisure'], 'recreation_ground']],
-              ['all', ['has', 'name'], ['in', ['get', 'name'], ['literal', ['cemetery', 'Cemetery', 'graveyard']]]],
-              ['all', ['has', 'place'], ['==', ['get', 'place'], 'cemetery']],
-              ['all', ['has', 'historic'], ['==', ['get', 'historic'], 'cemetery']]
+              ['all', ['has', 'landuse'], ['==', ['get', 'landuse'], 'recreation_ground']],
+              // historic=cemetery
+              ['all', ['has', 'historic'], ['==', ['get', 'historic'], 'cemetery']],
+              // name contains "cemetery" or "graveyard"
+              ['match',
+                ['downcase', ['get', 'name']],
+                ['cemetery', 'graveyard'], true,
+                false
+              ]
             ]
           ]
         },
