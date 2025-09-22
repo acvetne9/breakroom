@@ -376,6 +376,45 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return () => clearTimeout(timeout);
     }
   }, [searchFilters, mapLoaded, loadBusinessesInViewport]);
+
+  const deckGLLayers = useMemo(() => {
+    if (!businesses || !businesses.length) {
+      return [];
+    }
+  
+    // Ensure each business has valid lat/lng
+    let validBusinesses = businesses.filter(
+      b => b?.position?.lat != null && b?.position?.lng != null
+    );
+    
+    if (!validBusinesses.length) {
+      return [];
+    }
+  
+    // Handle neighborhood filter if present
+    if (searchFilters?.neighborhoodFilter?.boundary?.length) {
+      const neighborhoodCoords = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
+      if (neighborhoodCoords.length) {
+        const turfPolygon = turf.polygon([neighborhoodCoords.map(p => [p.lon, p.lat])]);
+        validBusinesses = validBusinesses.filter(b => {
+          const point = turf.point([b.position.lng, b.position.lat]);
+          return turf.booleanPointInPolygon(point, turfPolygon);
+        });
+      }
+    }
+  
+    if (!validBusinesses.length) return [];
+  
+    // Return DeckGL layer
+    return [
+      createBusinessScatterplotLayer({
+        businesses: validBusinesses,
+        selectedBusinessId: selectedBusiness?.id,
+        onBusinessClick: handleBusinessClick,
+        neighborhoodBoundary: searchFilters?.neighborhoodFilter?.boundary || null
+      })
+    ];
+  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, businesses]);
   
   const lastLoadTimeRef = useRef(0);
 
