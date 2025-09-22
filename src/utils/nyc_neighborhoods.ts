@@ -152,15 +152,11 @@ export const nycNeighborhoodBoundaries = {
       { lat: 40.708, lon: -73.957 }
     ],
     "Crown Heights": [
-      { "lat": 40.704200, "lon": -73.961300 },
-      { "lat": 40.704200, "lon": -73.937000 },
-      { "lat": 40.692100, "lon": -73.937000 },
-      { "lat": 40.676300, "lon": -73.937000 },
-      { "lat": 40.661600, "lon": -73.937000 },
-      { "lat": 40.661600, "lon": -73.961300 },
-      { "lat": 40.676300, "lon": -73.961300 },
-      { "lat": 40.692100, "lon": -73.961300 },
-      { "lat": 40.704200, "lon": -73.961300 }
+      { "lat": 40.687800, "lon": -73.958300 },  // Atlantic & Washington
+      { "lat": 40.687800, "lon": -73.936500 },  // Atlantic & Ralph
+      { "lat": 40.657500, "lon": -73.936500 },  // Empire Blvd & Ralph
+      { "lat": 40.657500, "lon": -73.958300 },  // Empire Blvd & Washington
+      { "lat": 40.687800, "lon": -73.958300 }   // close the polygon
     ],
     "Park Slope": [
       { lat: 40.660, lon: -74.005 },
