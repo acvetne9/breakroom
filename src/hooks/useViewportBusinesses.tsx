@@ -124,6 +124,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
           return [...businesses, ...newBusinesses];
         })();
         
+        console.log('🔄 useViewportBusinesses: updating businesses state to:', updatedBusinesses.length, 'businesses');
         setBusinesses(updatedBusinesses);
 
         if (!searchFilters) setCachedBusinesses(viewportBounds, viewportBusinesses);

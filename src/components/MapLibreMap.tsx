@@ -194,7 +194,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [cacheVersion, setCacheVersion] = useState(0);
 
   useEffect(() => {
+    console.log("📦 Businesses hook state changed:", businesses.length);
+    
     if (Array.isArray(businesses) && businesses.length > 0) {
+      console.log("📦 Adding businesses to cache:", businesses.length);
       // Clear cache and add new businesses for search results, otherwise accumulate
       if (searchFilters) {
         businessCacheRef.current = new BusinessCache(15000);
@@ -380,8 +383,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [fetchFullBusinessDetails]);
 
   useEffect(() => {
-    if (mapLoaded) handleViewportChangeRef.current();
-  }, [mapLoaded, searchFilters]);
+    // Only trigger on search filter changes, not initial map load
+    if (mapLoaded && searchFilters && handleViewportChangeRef.current) {
+      handleViewportChangeRef.current();
+    }
+  }, [searchFilters]);
 
   const handleViewportChange = useCallback(async () => {
     if (!mapRef.current || !mapLoaded || isLoadingRef.current) return;
@@ -530,11 +536,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           console.error('🗺️ Error adding vector layers:', err);
         }
       
-        // Initial data load
-        setTimeout(() => { 
-          console.log('🗺️ Triggering initial viewport load');
-          handleViewportChangeRef.current(); 
-        }, 1500);
+        // Delayed initial load only if no duplicate triggers
+        const timeout = setTimeout(() => { 
+          if (!businesses?.length && !businessesLoading) {
+            console.log('🗺️ Triggering initial viewport load');
+            handleViewportChangeRef.current(); 
+          }
+        }, 2000);
       });
 
       // fallback if load event didn't fire timely
@@ -545,9 +553,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             setMapLoaded(true);
             callbackRefs.current.onMapLoaded?.();
             setTimeout(() => {
-              console.log('🗺️ Fallback viewport load');
-              handleViewportChangeRef.current();
-            }, 100);
+              if (!businesses?.length && !businessesLoading) {
+                console.log('🗺️ Fallback viewport load');
+                handleViewportChangeRef.current();
+              }
+            }, 200);
           }
         } catch (err) {
           console.error('🗺️ Error in fallback load:', err);
@@ -605,12 +615,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     deckOverlay.setProps({ layers: deckGLLayers });
   }, [deckOverlay, overlayReady, deckGLLayers]);
 
-  // initial load trigger when map ready
+  // Consolidated initial load trigger 
   useEffect(() => {
-    if (mapLoaded && mapRef.current) {
-      setTimeout(() => handleViewportChangeRef.current(), 500);
+    if (mapLoaded && mapRef.current && !businesses?.length && !businessesLoading) {
+      const timeout = setTimeout(() => handleViewportChangeRef.current(), 1000);
+      return () => clearTimeout(timeout);
     }
-  }, [mapLoaded]);
+  }, [mapLoaded, businesses?.length, businessesLoading]);
 
   // center/load neighborhood center
   const isUserInteractingRef = useRef(false);
