@@ -376,31 +376,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       return () => clearTimeout(timeout);
     }
   }, [searchFilters, mapLoaded, loadBusinessesInViewport]);
-
-  // Simplified viewport change handler with loop prevention
-  const handleViewportChange = useCallback(async () => {
-    if (!mapRef.current || !mapLoaded || loading) return;
-    
-    const map = mapRef.current;
-    const zoom = map.getZoom();
-    const bounds = map.getBounds();
-    const viewportBounds = {
-      north: bounds.getNorth(),
-      south: bounds.getSouth(),
-      east: bounds.getEast(),
-      west: bounds.getWest()
-    };
-
-    // Create a unique key for this viewport to prevent duplicates
-    const boundsKey = `${viewportBounds.north.toFixed(4)}-${viewportBounds.south.toFixed(4)}-${viewportBounds.east.toFixed(4)}-${viewportBounds.west.toFixed(4)}`;
-    
-    // Prevent duplicate calls for the same viewport
-    if (lastBoundsRef.current === boundsKey) return;
-    lastBoundsRef.current = boundsKey;
-
-    const businessLimit = getBusinessLimitForViewport(zoom, viewportBounds);
-    loadBusinessesInViewport?.(viewportBounds, businessLimit);
-    }, [mapLoaded, loading, loadBusinessesInViewport, getBusinessLimitForViewport]);
   
   const lastLoadTimeRef = useRef(0);
 
