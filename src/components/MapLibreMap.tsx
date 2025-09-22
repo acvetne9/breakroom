@@ -115,17 +115,8 @@ class BusinessCache {
   }
 
   private loadFromStorage() {
-    try {
-      const raw = localStorage.getItem(this.storageKey);
-      if (!raw) return;
-      const arr: Business[] = JSON.parse(raw);
-      arr.forEach(b => {
-        if (b?.id) this.cache.set(b.id, b);
-      });
-      console.log(`📦 Loaded ${this.cache.size} businesses from localStorage`);
-    } catch (err) {
-      console.warn('⚠️ Failed to load business cache from localStorage', err);
-    }
+    // Disabled auto-loading from localStorage to prevent cache conflicts
+    // All business data should flow through the useViewportBusinesses hook
   }
 
   set(id: string, business: Business & { detailsLoaded?: boolean }) {
@@ -145,9 +136,7 @@ class BusinessCache {
   }
 
   getAll(): (Business & { detailsLoaded?: boolean })[] {
-    const businesses = Array.from(this.cache.values());
-    console.log('🏢 getAll returning', businesses.length, 'businesses');
-    return businesses;
+    return Array.from(this.cache.values());
   }
 
   addMultiple(businesses: Business[]) {
@@ -162,7 +151,6 @@ class BusinessCache {
     );
 
     validBusinesses.forEach(b => this.set(b.id, { ...b, detailsLoaded: !!b.detailsLoaded }));
-    console.log(`✅ Added ${validBusinesses.length}/${businesses.length} valid businesses. Cache size: ${this.cache.size}`);
   }
 
   // we can remove clear() entirely if we never need it
@@ -206,24 +194,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [cacheVersion, setCacheVersion] = useState(0);
 
   useEffect(() => {
-    console.log("📦 Businesses hook state changed:", businesses.length);
-    
     if (Array.isArray(businesses) && businesses.length > 0) {
-      console.log("📦 Adding businesses to cache:", businesses.length, "first business:", businesses[0]?.name);
-  
       // Clear cache and add new businesses for search results, otherwise accumulate
       if (searchFilters) {
         businessCacheRef.current = new BusinessCache(15000);
       }
       
       businessCacheRef.current.addMultiple(businesses);
-  
-      // Force DeckGL re-render
       setCacheVersion(prev => prev + 1);
-  
       callbackRefs.current.onBusinessesLoaded?.();
-    } else if (businesses.length === 0) {
-      console.log("⚠️ Businesses array empty or invalid — keeping previous cache intact");
     }
   }, [businesses, searchFilters]);
   
@@ -450,14 +429,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters, businesses]);
 
   const deckGLLayers = useMemo(() => {
-    console.log('🎯 deckGLLayers useMemo triggered - cacheVersion:', cacheVersion);
-    
-    // Get all businesses from cache
     const allBusinesses = businessCacheRef.current.getAll();
-    console.log('🎯 Retrieved from cache:', allBusinesses.length, 'businesses');
     
     if (!allBusinesses.length) {
-      console.log('🎯 No businesses in cache, returning empty layers');
       return [];
     }
   
@@ -466,10 +440,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       b => b?.position?.lat != null && b?.position?.lng != null
     );
     
-    console.log('🎯 Valid businesses after filtering:', validBusinesses.length);
-    
     if (!validBusinesses.length) {
-      console.log('🎯 No valid businesses after filtering, returning empty layers');
       return [];
     }
   
@@ -484,8 +455,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         });
       }
     }
-  
-    console.log('🎯 Rendering', validBusinesses.length, 'businesses');
   
     if (!validBusinesses.length) return [];
   
@@ -633,7 +602,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // update deck layers
   useEffect(() => {
     if (!deckOverlay || !overlayReady) return;
-    console.log('🎯 Updating DeckGL layers, business count:', deckGLLayers.length > 0 ? deckGLLayers[0]?.props?.data?.length || 0 : 0);
     deckOverlay.setProps({ layers: deckGLLayers });
   }, [deckOverlay, overlayReady, deckGLLayers]);
 
