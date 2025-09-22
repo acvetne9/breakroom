@@ -307,8 +307,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, []);
 
-  const getBusinessLimitForViewport = useCallback(() => {
-    return Infinity; // load everything
+  const getBusinessLimitForViewport = useCallback((zoom: number) => {
+    if (zoom < 10) return 500;   // far zoomed out → fewer
+    if (zoom < 12) return 1500;
+    if (zoom < 14) return 4000;
+    if (zoom < 16) return 8000;
+    if (zoom < 18) return 15000; // very close → many
+    return 20000; // max cap
   }, []);
 
   // Updated handleBusinessClick with fly-to behavior
@@ -429,7 +434,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     lastLoadTimeRef.current = now;
   
     try {
-      await loadBusinessesInViewport?.(viewportBounds, Infinity);
+      const limit = getBusinessLimitForViewport(zoom);
+      await loadBusinessesInViewport?.(viewportBounds, limit);
     } catch (err) {
       console.error("❌ Error loading businesses:", err);
     }
