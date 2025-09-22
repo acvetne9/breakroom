@@ -177,6 +177,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const mapRef = useRef<maplibregl.Map | null>(null);
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
   const layersAddedRef = useRef(false);
+  // Add loading state ref to prevent multiple calls
+  const lastBoundsRef = useRef<string>('');
 
   const callbackRefs = useRef({ onBusinessClick, onMapLoaded, onBusinessesLoaded });
   useEffect(() => { callbackRefs.current = { onBusinessClick, onMapLoaded, onBusinessesLoaded }; }, [onBusinessClick, onMapLoaded, onBusinessesLoaded]);
@@ -357,22 +359,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [fetchFullBusinessDetails]);
 
-  // Trigger load on search filter changes
+  // Trigger load ONLY on search filter changes - prevent multiple calls
   useEffect(() => {
-    if (mapLoaded && mapRef.current) {
-      const map = mapRef.current;
-      const bounds = map.getBounds();
-      const viewportBounds = {
-        north: bounds.getNorth(),
-        south: bounds.getSouth(),
-        east: bounds.getEast(),
-        west: bounds.getWest()
-      };
-      loadBusinessesInViewport?.(viewportBounds, 8000);
+    if (mapLoaded && mapRef.current && searchFilters) {
+      const timeout = setTimeout(() => {
+        const map = mapRef.current!;
+        const bounds = map.getBounds();
+        const viewportBounds = {
+          north: bounds.getNorth(),
+          south: bounds.getSouth(),
+          east: bounds.getEast(),
+          west: bounds.getWest()
+        };
+        loadBusinessesInViewport?.(viewportBounds, 8000);
+      }, 500);
+      return () => clearTimeout(timeout);
     }
   }, [searchFilters, mapLoaded, loadBusinessesInViewport]);
 
-  // Simplified viewport change handler
+  // Simplified viewport change handler with loop prevention
   const handleViewportChange = useCallback(async () => {
     if (!mapRef.current || !mapLoaded || loading) return;
     
@@ -385,6 +390,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       east: bounds.getEast(),
       west: bounds.getWest()
     };
+
+    // Create a unique key for this viewport to prevent duplicates
+    const boundsKey = `${viewportBounds.north.toFixed(4)}-${viewportBounds.south.toFixed(4)}-${viewportBounds.east.toFixed(4)}-${viewportBounds.west.toFixed(4)}`;
+    
+    // Prevent duplicate calls for the same viewport
+    if (lastBoundsRef.current === boundsKey) return;
+    lastBoundsRef.current = boundsKey;
 
     const businessLimit = getBusinessLimitForViewport(zoom, viewportBounds);
     loadBusinessesInViewport?.(viewportBounds, businessLimit);
@@ -559,12 +571,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     deckOverlay.setProps({ layers: deckGLLayers });
   }, [deckOverlay, overlayReady, deckGLLayers]);
 
-  // Initial load when map is ready
+  // Initial load when map is ready - SINGLE TRIGGER
   useEffect(() => {
-    if (mapLoaded && mapRef.current && !loading) {
-      handleViewportChange();
+    if (mapLoaded && !businesses?.length && !loading) {
+      const timeout = setTimeout(() => handleViewportChange(), 2000);
+      return () => clearTimeout(timeout);
     }
-  }, [mapLoaded, loading, handleViewportChange]);
+  }, [mapLoaded, handleViewportChange]); // Removed businesses and loading from deps to prevent loops
 
   // center/load neighborhood center
   const isUserInteractingRef = useRef(false);
@@ -615,12 +628,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return () => clearTimeout(timeout);
   }, [searchFilters?.neighborhoodFilter, neighborhoodCenter, mapLoaded]);
 
-  // Load businesses when neighborhood filter changes
+  // Load businesses ONLY when search filters change
   useEffect(() => {
     if (mapLoaded && searchFilters?.neighborhoodFilter) {
-      setTimeout(() => handleViewportChange(), 500);
+      const timeout = setTimeout(() => handleViewportChange(), 1000);
+      return () => clearTimeout(timeout);
     }
-  }, [mapLoaded, searchFilters?.neighborhoodFilter, handleViewportChange]);
+  }, [searchFilters?.neighborhoodFilter, mapLoaded, handleViewportChange]);
 
   // landmarks handling (unchanged)
   useEffect(() => {
