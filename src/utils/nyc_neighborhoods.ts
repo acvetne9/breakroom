@@ -152,12 +152,15 @@ export const nycNeighborhoodBoundaries = {
       { lat: 40.708, lon: -73.957 }
     ],
     "Crown Heights": [
-      { "lat": 40.7035, "lon": -73.9712 },  // southwest corner: Empire Blvd & Washington Ave
-      { "lat": 40.7035, "lon": -73.9283 },  // southeast corner: Empire Blvd & Ralph Ave
-      { "lat": 40.6935, "lon": -73.9283 },  // extend slightly south along Ralph Ave
-      { "lat": 40.6935, "lon": -73.9712 },  // extend south along Washington Ave
-      { "lat": 40.6960, "lon": -73.9712 },  // adjust toward Empire Blvd
-      { "lat": 40.7035, "lon": -73.9712 }   // close back to southwest corner
+      { "lat": 40.704200, "lon": -73.961300 },
+      { "lat": 40.704200, "lon": -73.937000 },
+      { "lat": 40.692100, "lon": -73.937000 },
+      { "lat": 40.676300, "lon": -73.937000 },
+      { "lat": 40.661600, "lon": -73.937000 },
+      { "lat": 40.661600, "lon": -73.961300 },
+      { "lat": 40.676300, "lon": -73.961300 },
+      { "lat": 40.692100, "lon": -73.961300 },
+      { "lat": 40.704200, "lon": -73.961300 }
     ],
     "Park Slope": [
       { lat: 40.660, lon: -74.005 },
