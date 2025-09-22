@@ -141,8 +141,18 @@ class BusinessCache {
     return Array.from(this.cache.values());
   }
 
-  addMultiple(businesses: Business[]) {
+  addMultiple(businesses: Business[], replace = false) {
     if (!Array.isArray(businesses)) return;
+  
+    if (replace) {
+      // build a set of incoming IDs
+      const incomingIds = new Set(businesses.map(b => b.id));
+      // remove anything not in incoming
+      for (const id of this.cache.keys()) {
+        if (!incomingIds.has(id)) this.cache.delete(id);
+      }
+    }
+  
     businesses.forEach(b => {
       if (b?.id) this.set(b.id, { ...b, detailsLoaded: !!b.detailsLoaded });
     });
