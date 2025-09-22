@@ -217,28 +217,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           layout: {},
           paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
           filter: [
+          filter: [
             'all',
             ['==', ['geometry-type'], 'Polygon'],
             ['any',
-              // leisure=park
-              ['all', ['has', 'leisure'], ['==', ['get', 'leisure'], 'park']],
-              // landuse=cemetery
-              ['all', ['has', 'landuse'], ['==', ['get', 'landuse'], 'cemetery']],
-              // amenity=cemetery or grave_yard
-              ['all', ['has', 'amenity'], ['in', ['get', 'amenity'], 'cemetery', 'grave_yard']],
-              // leisure=recreation_ground or landuse=recreation_ground
-              ['all', ['has', 'leisure'], ['==', ['get', 'leisure'], 'recreation_ground']],
-              ['all', ['has', 'landuse'], ['==', ['get', 'landuse'], 'recreation_ground']],
-              // historic=cemetery
-              ['all', ['has', 'historic'], ['==', ['get', 'historic'], 'cemetery']],
-              // name contains "cemetery" or "graveyard"
-              ['match',
-                ['downcase', ['get', 'name']],
-                ['cemetery', 'graveyard'], true,
-                false
-              ]
+              ['all', ['==', ['get', 'landuse'], 'cemetery']],
+              ['all', ['in', ['get', 'amenity'], 'cemetery', 'grave_yard']],
+              ['all', ['==', ['get', 'leisure'], 'recreation_ground']],
+              ['all', ['==', ['get', 'historic'], 'cemetery']],
+              ['match', ['downcase', ['get', 'name']], ['cemetery', 'graveyard'], true, false]
             ]
-          ]
+          ] as any
         },
         {
           id: 'nyc-water',
