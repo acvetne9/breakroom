@@ -217,7 +217,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           layout: {},
           paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
           filter: [
-          filter: [
             'all',
             ['==', ['geometry-type'], 'Polygon'],
             ['any',
