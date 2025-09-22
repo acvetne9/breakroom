@@ -220,19 +220,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'all',
             ['==', ['geometry-type'], 'Polygon'],
             ['any',
-              // Parks & gardens
+              // Parks & playgrounds
               ['==', ['get', 'leisure'], 'park'],
               ['==', ['get', 'leisure'], 'garden'],
               ['==', ['get', 'leisure'], 'playground'],
-              ['==', ['get', 'leisure'], 'nature_reserve'],
               ['==', ['get', 'leisure'], 'recreation_ground'],
-        
-              // Cemeteries
+              ['==', ['get', 'leisure'], 'nature_reserve'],
+          
+              // Cemeteries by tag
               ['==', ['get', 'landuse'], 'cemetery'],
               ['==', ['get', 'amenity'], 'cemetery'],
               ['==', ['get', 'historic'], 'cemetery'],
-        
-              // Additional green spaces
+          
+              // Cemeteries by name
+              ['match', ['downcase', ['get', 'name']], ['cemetery', 'graveyard'], true, false],
+          
+              // Extra green areas
               ['==', ['get', 'landuse'], 'grass'],
               ['==', ['get', 'landuse'], 'meadow'],
               ['==', ['get', 'leisure'], 'sports_centre'],
