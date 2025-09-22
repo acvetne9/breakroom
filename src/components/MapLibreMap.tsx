@@ -97,11 +97,9 @@ const createOptimizedGridSampling = (bounds: Bounds, businesses: Business[], max
 
 class BusinessCache {
   private cache = new Map<string, Business & { detailsLoaded?: boolean }>();
-  private maxSize: number;
   private storageKey = 'businessCache';
 
-  constructor(maxSize = Infinity) {
-    this.maxSize = maxSize;
+  constructor() {
     this.loadFromStorage();
   }
 
@@ -115,45 +113,40 @@ class BusinessCache {
   }
 
   private loadFromStorage() {
-    // Disabled auto-loading from localStorage to prevent cache conflicts
-    // All business data should flow through the useViewportBusinesses hook
+    try {
+      const stored = localStorage.getItem(this.storageKey);
+      if (stored) {
+        const arr: (Business & { detailsLoaded?: boolean })[] = JSON.parse(stored);
+        arr.forEach(b => {
+          if (b?.id) this.cache.set(b.id, b);
+        });
+        console.log(`✅ Restored ${this.cache.size} businesses from localStorage`);
+      }
+    } catch (err) {
+      console.warn('⚠️ Failed to restore business cache', err);
+    }
   }
 
   set(id: string, business: Business & { detailsLoaded?: boolean }) {
     if (!id || !business) return;
-    // remove eviction completely
     this.cache.set(id, business);
     this.persist();
   }
 
-  get(id: string): (Business & { detailsLoaded?: boolean }) | undefined {
-    const business = this.cache.get(id);
-    if (!business) return undefined;
-    // Move to the end (LRU)
-    this.cache.delete(id);
-    this.cache.set(id, business);
-    return business;
+  get(id: string) {
+    return this.cache.get(id);
   }
 
-  getAll(): (Business & { detailsLoaded?: boolean })[] {
+  getAll() {
     return Array.from(this.cache.values());
   }
 
   addMultiple(businesses: Business[]) {
-    if (!Array.isArray(businesses) || businesses.length === 0) return;
-
-    const validBusinesses = businesses.filter(b =>
-      b?.id &&
-      b?.position?.lat != null &&
-      b?.position?.lng != null &&
-      !isNaN(b.position.lat) &&
-      !isNaN(b.position.lng)
-    );
-
-    validBusinesses.forEach(b => this.set(b.id, { ...b, detailsLoaded: !!b.detailsLoaded }));
+    if (!Array.isArray(businesses)) return;
+    businesses.forEach(b => {
+      if (b?.id) this.set(b.id, { ...b, detailsLoaded: !!b.detailsLoaded });
+    });
   }
-
-  // we can remove clear() entirely if we never need it
 }
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
@@ -304,25 +297,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, []);
 
-  // Business density heuristic (unchanged)
-  const getBusinessLimitForViewport = useCallback((zoom: number, bounds: Bounds): number => {
-    if (!bounds) return 200;
-    const latDiff = bounds.north - bounds.south;
-    const lngDiff = bounds.east - bounds.west;
-    const avgLat = (bounds.north + bounds.south) / 2;
-    const latKm = latDiff * 111;
-    const lngKm = lngDiff * 111 * Math.cos(avgLat * Math.PI / 180);
-    const areaKm2 = Math.max(0.00001, latKm * lngKm);
-
-    let baseDensity = 80;
-    if (zoom >= 16) baseDensity = 500;
-    else if (zoom >= 14) baseDensity = 250;
-    else if (zoom >= 12) baseDensity = 150;
-
-    const target = Math.ceil(areaKm2 * baseDensity);
-    const maxLimit = 40000;
-    const minLimit = 5000;
-    return Math.max(minLimit, Math.min(maxLimit, target));
+  const getBusinessLimitForViewport = useCallback(() => {
+    return Infinity; // load everything
   }, []);
 
   // Updated handleBusinessClick with fly-to behavior
@@ -443,8 +419,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     lastLoadTimeRef.current = now;
   
     try {
-      const businessLimit = getBusinessLimitForViewport(zoom, viewportBounds);
-      await loadBusinessesInViewport?.(viewportBounds, businessLimit);
+      await loadBusinessesInViewport?.(viewportBounds, Infinity);
     } catch (err) {
       console.error("❌ Error loading businesses:", err);
     }
