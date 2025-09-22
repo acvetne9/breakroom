@@ -152,28 +152,12 @@ export const nycNeighborhoodBoundaries = {
       { lat: 40.708, lon: -73.957 }
     ],
     "Crown Heights": [
-      { lat: 40.694, lon: -73.960 },
-      { lat: 40.694, lon: -73.950 },
-      { lat: 40.693, lon: -73.940 },
-      { lat: 40.690, lon: -73.930 },
-      { lat: 40.685, lon: -73.925 },
-      { lat: 40.680, lon: -73.922 },
-      { lat: 40.675, lon: -73.920 },
-      { lat: 40.670, lon: -73.921 },
-      { lat: 40.665, lon: -73.922 },
-      { lat: 40.660, lon: -73.924 },
-      { lat: 40.655, lon: -73.926 },
-      { lat: 40.653, lon: -73.930 },
-      { lat: 40.653, lon: -73.940 },
-      { lat: 40.655, lon: -73.950 },
-      { lat: 40.660, lon: -73.955 },
-      { lat: 40.665, lon: -73.958 },
-      { lat: 40.670, lon: -73.959 },
-      { lat: 40.675, lon: -73.960 },
-      { lat: 40.680, lon: -73.960 },
-      { lat: 40.685, lon: -73.960 },
-      { lat: 40.690, lon: -73.960 },
-      { lat: 40.694, lon: -73.960 }
+      { "lat": 40.7035, "lon": -73.9712 },  // southwest corner: Empire Blvd & Washington Ave
+      { "lat": 40.7035, "lon": -73.9283 },  // southeast corner: Empire Blvd & Ralph Ave
+      { "lat": 40.6935, "lon": -73.9283 },  // extend slightly south along Ralph Ave
+      { "lat": 40.6935, "lon": -73.9712 },  // extend south along Washington Ave
+      { "lat": 40.6960, "lon": -73.9712 },  // adjust toward Empire Blvd
+      { "lat": 40.7035, "lon": -73.9712 }   // close back to southwest corner
     ],
     "Park Slope": [
       { lat: 40.660, lon: -74.005 },
