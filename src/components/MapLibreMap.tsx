@@ -226,15 +226,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ['==', ['get', 'leisure'], 'playground'],
               ['==', ['get', 'leisure'], 'recreation_ground'],
               ['==', ['get', 'leisure'], 'nature_reserve'],
-          
-              // Cemeteries by tag
+        
+              // ✅ Cemeteries (force same green style as parks)
               ['==', ['get', 'landuse'], 'cemetery'],
               ['==', ['get', 'amenity'], 'cemetery'],
               ['==', ['get', 'historic'], 'cemetery'],
-          
-              // Cemeteries by name
               ['match', ['downcase', ['get', 'name']], ['cemetery', 'graveyard'], true, false],
-          
+        
               // Extra green areas
               ['==', ['get', 'landuse'], 'grass'],
               ['==', ['get', 'landuse'], 'meadow'],
