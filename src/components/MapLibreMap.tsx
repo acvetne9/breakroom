@@ -14,7 +14,6 @@ import type { GeoJSONFeature } from 'maplibre-gl';
 import type { Business } from '@/types/business';
 import * as turf from '@turf/turf';
 import type { Feature, Point } from 'geojson';
-import Supercluster from 'supercluster';
 
 interface MapLibreMapProps {
   onBusinessClick?: (business: any) => void;
@@ -97,57 +96,6 @@ const createOptimizedGridSampling = (bounds: Bounds, businesses: Business[], max
 
   return result.slice(0, maxBusinesses);
 };
-
-const clusterBusinesses = (
-  businesses: Business[],
-  zoom: number,
-  bounds: Bounds
-) => {
-  if (!businesses?.length) return [];
-
-  const points = businesses.map(biz => ({
-    type: 'Feature' as const,
-    properties: { business: biz },
-    geometry: {
-      type: 'Point' as const,
-      coordinates: [biz.position.lng, biz.position.lat]
-    }
-  }));
-
-  const index = new Supercluster({
-    radius: 60,
-    maxZoom: 16,
-    minZoom: 0,
-    minPoints: 2,
-    map: (props: any) => ({ business: props.business }),
-    reduce: (accum: any, props: any) => {
-      if (!accum.businesses) accum.businesses = [];
-      accum.businesses.push(props.business);
-    }
-  });
-
-  index.load(points);
-
-  const clusters = index.getClusters(
-    [bounds.west, bounds.south, bounds.east, bounds.north],
-    Math.floor(zoom)
-  );
-
-  return clusters.map(c => {
-    if (c.properties.cluster) {
-      return {
-        id: `cluster_${c.id}`,
-        position: { lat: c.geometry.coordinates[1], lng: c.geometry.coordinates[0] },
-        cluster: true,
-        pointCount: c.properties.point_count,
-        businesses: c.properties.businesses || []
-      };
-    } else {
-      return c.properties.business;
-    }
-  });
-};
-
 
 class BusinessCache {
   private cache = new Map<string, Business & { detailsLoaded?: boolean }>();
@@ -397,6 +345,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return 20000; // max cap
   }, []);
 
+  // Updated handleBusinessClick with fly-to behavior
   const handleBusinessClick = useCallback(async (business: any) => {
     if (!business || !callbackRefs.current.onBusinessClick) return;
   
@@ -404,17 +353,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       let businessToReturn = business;
   
       // Fly to the business on map
-      if (business.cluster) {
-        // zoom in when a cluster is clicked
-        if (mapRef.current) {
-          mapRef.current.flyTo({
-            center: [business.position.lng, business.position.lat],
-            zoom: mapRef.current.getZoom() + 2,
-            speed: 1.2,
-            curve: 1.2
-          });
-        }
-        return;
+      if (mapRef.current && business?.position?.lat && business?.position?.lng) {
+        mapRef.current.flyTo({
+          center: [business.position.lng, business.position.lat],
+          zoom: 16,
+          speed: 1.2,
+          curve: 1.2,
+          essential: true
+        });
       }
   
       // Load full details if needed  
@@ -452,18 +398,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [searchFilters, mapLoaded, loadBusinessesInViewport]);
 
   const deckGLLayers = useMemo(() => {
-    if (!businesses || !businesses.length) return [];
+    if (!businesses || !businesses.length) {
+      return [];
+    }
   
+    // Ensure each business has valid lat/lng
     let validBusinesses = businesses.filter(
       b => b?.position?.lat != null && b?.position?.lng != null
     );
-    if (!validBusinesses.length) return [];
+    
+    if (!validBusinesses.length) {
+      return [];
+    }
   
-    // Apply neighborhood filter if needed
+    // Handle neighborhood filter if present
     if (searchFilters?.neighborhoodFilter?.boundary?.length) {
-      const neighborhoodCoords = searchFilters.neighborhoodFilter.boundary.map((p: any) =>
-        featureToLatLon(p)
-      );
+      const neighborhoodCoords = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
       if (neighborhoodCoords.length) {
         const turfPolygon = turf.polygon([neighborhoodCoords.map(p => [p.lon, p.lat])]);
         validBusinesses = validBusinesses.filter(b => {
@@ -472,26 +422,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         });
       }
     }
-    if (!validBusinesses.length) return [];
   
-    // 📌 NEW: cluster businesses here
-    let businessesToRender = validBusinesses;
-    if (enableClustering && mapRef.current) {
-      const bounds = mapRef.current.getBounds();
-      const viewportBounds: Bounds = {
-        north: bounds.getNorth(),
-        south: bounds.getSouth(),
-        east: bounds.getEast(),
-        west: bounds.getWest()
-      };
-      const zoom = mapRef.current.getZoom();
-      businessesToRender = clusterBusinesses(validBusinesses, zoom, viewportBounds);
-    }
+    if (!validBusinesses.length) return [];
   
     let safeLayer: any = null;
     try {
       safeLayer = createBusinessScatterplotLayer({
-        businesses: businessesToRender,
+        businesses: validBusinesses,
         selectedBusinessId: selectedBusiness?.id,
         onBusinessClick: handleBusinessClick,
         neighborhoodBoundary: searchFilters?.neighborhoodFilter?.boundary || null
@@ -500,9 +437,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     } catch (err) {
       console.error("❌ Failed to create scatterplot layer", err);
     }
-  
+    
     return safeLayer ? [safeLayer] : [];
-  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, businesses, enableClustering]);
+  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, businesses]);
   
   const lastLoadTimeRef = useRef(0);
 
