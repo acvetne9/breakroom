@@ -253,7 +253,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
           </div>
         </div>
 
-        <div className="mt-auto pt-4 flex justify-start">
+        <div className="pt-4 flex justify-start shrink-0">
           <button 
             onClick={handleHelpButtonClick}
             className="w-6 h-6 bg-app-gray-light rounded-full flex items-center justify-center hover:bg-app-gray-medium transition-colors text-app-black font-bold text-sm"
@@ -261,10 +261,10 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
             ?
           </button>
         </div>
-        
+    
         {showHelpPopup && (
           <div 
-            className="mt-2 w-full bg-white border-2 border-app-yellow rounded-xl p-4 shadow-lg"
+            className="mt-2 w-full bg-white border-2 border-app-yellow rounded-xl p-4 shadow-lg shrink-0"
             onClick={(e) => e.stopPropagation()}
           >
             <p className="text-sm text-app-gray-dark">
