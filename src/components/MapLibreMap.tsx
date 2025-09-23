@@ -6,7 +6,8 @@ import { MapboxOverlay } from '@deck.gl/mapbox'; // use this package
 import { createBusinessScatterplotLayer } from '@/utils/deckGLLayers';
 import { useViewportMapData } from '../hooks/useViewportMapData';
 import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
-import { createTileBlobUrl } from '@/utils/tileDecompression';
+import { createTileBlobUrl, isCapacitor } from '@/utils/tileDecompression';
+import { patchTileLoading } from '@/utils/capacitorTileHandler';
 import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods';
 import type { GeoJSONFeature } from 'maplibre-gl';
 import type { Business } from '@/types/business';
@@ -448,6 +449,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // initialize map once
   useEffect(() => {
+    // Patch tile loading for Capacitor environments
+    if (isCapacitor()) {
+      patchTileLoading();
+    }
+    
     const initializeMap = async () => {
       if (!mapContainerRef.current || mapRef.current) return;
 

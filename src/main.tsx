@@ -34,7 +34,7 @@ if ('serviceWorker' in navigator && !isCapacitor()) {
     }
   });
 } else if (isCapacitor()) {
-  console.log('🔧 Running in Capacitor - service worker disabled');
+  console.log('🔧 Running in Capacitor - service worker disabled, using tile patching');
 }
 
 createRoot(document.getElementById("root")!).render(
