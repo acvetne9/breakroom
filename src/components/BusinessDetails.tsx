@@ -281,6 +281,6 @@ return (
       )}
     </div>
   </div>
-);
+)});
 
 export default BusinessDetails;
