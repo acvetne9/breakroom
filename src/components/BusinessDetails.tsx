@@ -120,15 +120,10 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
       style={{ paddingTop: '8vh' }}
       onClick={handleBackgroundClick}
     >
-      <div 
-        className="app-card p-6 animate-fade-in flex flex-col max-h-[80vh] w-full md:w-[600px]" 
-        onClick={handleCardClick}
-      >
-        {/* Scrollable content */}
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pr-2">
-          {/* Header */}
-          <div className="flex justify-between items-start mb-2">
-            
+      <div className="app-card p-6 overflow-y-auto animate-fade-in" onClick={handleCardClick}>
+        
+        <div className="flex justify-between items-start mb-2">
+          <div>
             <TranslatedText 
               text={business.name}
               className="text-xl font-medium text-app-black"
