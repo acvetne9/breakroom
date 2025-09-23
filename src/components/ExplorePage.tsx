@@ -21,6 +21,8 @@ interface Post {
   downvotes: number;
   userVote?: 'up' | 'down' | null;
   createdAt: Date;
+  timestamp?: string;
+  isComment?: string;
 }
 
 interface ExplorePageProps {
@@ -120,7 +122,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     }
   };
 
-  const handleCommentSubmit = () => {
+  const handleCommentSubmit = async () => {
     if (!commentText.trim() || !expandedPost) return;
   
     if (isProfane(commentText)) {
@@ -128,23 +130,21 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
       return;
     }
   
-    const newComment: Comment = {
-      id: crypto.randomUUID(),
-      author: "You",
-      text: commentText,
-      createdAt: new Date(),
-    };
-  
-    setComments({
-      ...comments,
-      [expandedPost]: [...(comments[expandedPost] || []), newComment],
-    });
-  
-    // Track that user commented on this post
-    trackCommentedPost(expandedPost);
-  
-    setCommentText('');
-    onCommentSubmit?.(expandedPost, commentText);
+    // Save comment to database
+    const success = await submitPost(commentText, undefined, false, undefined, undefined, undefined, expandedPost);
+    
+    if (success) {
+      // Track that user commented on this post
+      trackCommentedPost(expandedPost);
+      setCommentText('');
+      onCommentSubmit?.(expandedPost, commentText);
+    } else {
+      toast({
+        title: "Failed to submit comment",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleCommentDelete = (postId: string, commentId: string) => {
