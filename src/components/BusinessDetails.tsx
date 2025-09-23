@@ -74,6 +74,22 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
     }
   };
 
+  // Handle help button click with scroll to bottom
+  const handleHelpButtonClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowHelpPopup(!showHelpPopup);
+    
+    // Scroll to bottom after a short delay to allow popup to render
+    setTimeout(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTo({
+          top: scrollContainerRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
+    }, 100);
+  };
+
   const businessStories = Array.isArray(posts) ? posts.filter(post => post.businessId === business.id && post.isStory) : [];
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -233,6 +249,28 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
             )}
           </div>
         </div>
+
+        {/* Help Button - At the bottom left of scrollable content */}
+        <div className="mt-8 flex justify-start relative">
+          <button 
+            onClick={handleHelpButtonClick}
+            className="w-6 h-6 bg-app-gray-light rounded-full flex items-center justify-center hover:bg-app-gray-medium transition-colors text-app-black font-bold text-sm"
+          >
+            ?
+          </button>
+        </div>
+
+        {/* Help Popup - Styled like other cards with rounded edges */}
+        {showHelpPopup && (
+          <div 
+            className="mt-4 w-full bg-white border-2 border-app-yellow rounded-xl p-4 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm text-app-gray-dark">
+              <strong>Disclaimer:</strong> The information presented in this app is based on surveys, user input, and publicly available sources. We do not independently verify all information, and it should not be taken as factual statements about any individual or organization.
+            </p>
+          </div>
+        )}
 
       </div>
     </div>
