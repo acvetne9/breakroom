@@ -466,10 +466,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       );
       if (neighborhoodCoords.length) {
         const turfPolygon = turf.polygon([neighborhoodCoords.map(p => [p.lon, p.lat])]);
-        validBusinesses = validBusinesses.filter(b => {
-          const point = turf.point([b.position.lng, b.position.lat]);
-          return turf.booleanPointInPolygon(point, turfPolygon);
-        });
+        // validBusinesses = validBusinesses.filter(b => {
+        //   const point = turf.point([b.position.lng, b.position.lat]);
+        //   return turf.booleanPointInPolygon(point, turfPolygon);
+        // });
       }
     }
     if (!validBusinesses.length) return [];
