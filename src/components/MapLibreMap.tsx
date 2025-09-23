@@ -281,10 +281,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           layout: {
             'text-field': [
               'case',
-              ['has', 'name'],          // if the feature has a 'name' property
-              ['get', 'name'],           // use the name
-              ''                         // otherwise, just render empty string
-            ],
+              ['all', ['has', 'properties'], ['has', 'name']],
+              ['get', 'name'],
+              ''
+            ]
             'text-font': ['Open Sans Regular'],
             'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
             'text-max-width': 8,
