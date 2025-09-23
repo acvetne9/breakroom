@@ -6,59 +6,56 @@ let isPatched = false;
 /**
  * Patch fetch to handle tile decompression in Capacitor environments
  */
-export function patchTileLoading() {
-  if (!isCapacitor() || isPatched) return;
-  
-  console.log('🔧 Patching fetch for Capacitor tile decompression');
-  
-  originalFetch = window.fetch;
-  
-  window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const url = typeof input === 'string' ? input : input.toString();
-    
-    // More comprehensive URL matching for Capacitor environments
-    const isTileRequest = (
-      (url.includes('/data/tiles/') || url.includes('data/tiles/')) && 
-      url.endsWith('.pbf')
-    );
-    
-    if (isTileRequest) {
-      try {
-        console.log('🔧 Intercepting tile request:', url);
-        
-        // Use original fetch to get the data
-        const response = await originalFetch(input, init);
-        
-        if (!response.ok) {
-          return response;
-        }
-        
-        // Get the tile data and decompress if needed
-        const arrayBuffer = await response.arrayBuffer();
-        const decompressed = await decompressTile(arrayBuffer, url);
-        
-        // Return a new response with the decompressed data and proper headers
-        return new Response(decompressed, {
-          status: response.status,
-          statusText: response.statusText,
-          headers: {
-            'Content-Type': 'application/x-protobuf',
-            'Content-Encoding': 'gzip',
-            'Cache-Control': 'public, max-age=3600'
-          }
-        });
-      } catch (error) {
-        console.error('🔧 Error processing tile:', url, error);
-        // Fall back to original fetch
-        return originalFetch(input, init);
-      }
+function patchTileLoading() {
+  const originalFetch = window.fetch;
+  window.fetch = async (input: RequestInfo, init?: RequestInit): Promise<Response> => {
+    const url = typeof input === 'string' ? input : input.url;
+
+    // 🔍 Log every tile request
+    if (url.includes("/data/tiles/")) {
+      console.log("🟦 Tile request:", url);
     }
-    
-    // For all other requests, use original fetch
-    return originalFetch(input, init);
+
+    try {
+      const response = await originalFetch(input, init);
+      const buf = await response.arrayBuffer();
+      const u8 = new Uint8Array(buf);
+
+      // Detect gzip (magic bytes 0x1f8b at start)
+      const isGzipped = u8.length > 2 && u8[0] === 0x1f && u8[1] === 0x8b;
+      console.log(`📦 Tile fetch: ${url} | size=${u8.length} | gzipped=${isGzipped}`);
+
+      if (isGzipped) {
+        try {
+          const decompressed = pako.inflate(u8);
+          console.log(`✅ Decompressed tile: ${url} | new size=${decompressed.length}`);
+          return new Response(decompressed, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: {
+              "Content-Type": "application/x-protobuf",
+              "Cache-Control": "public, max-age=3600",
+            },
+          });
+        } catch (e) {
+          console.error("❌ Gzip decompression failed:", url, e);
+        }
+      }
+
+      // Not gzipped → return as-is
+      return new Response(buf, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: {
+          "Content-Type": "application/x-protobuf",
+          "Cache-Control": "public, max-age=3600",
+        },
+      });
+    } catch (err) {
+      console.error("🚨 Tile fetch failed:", url, err);
+      throw err;
+    }
   };
-  
-  isPatched = true;
 }
 
 /**
