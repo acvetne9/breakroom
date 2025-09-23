@@ -1,4 +1,5 @@
 import { decompressTile, isCapacitor } from './tileDecompression';
+import pako from "pako";
 
 let originalFetch: typeof fetch;
 let isPatched = false;
