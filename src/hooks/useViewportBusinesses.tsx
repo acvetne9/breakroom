@@ -4,6 +4,7 @@ import { getBusinessesInViewport, getFullBusinessDetails as getFullBusinessDetai
 import { progressiveSearch } from '@/services/progressiveSearch';
 import { isPointInPolygon } from '@/utils/nyc_neighborhoods'
 import { useTileCache } from './useTileCache';
+import { useMapWorker } from './useMapWorker';
 
 // Preloading and caching
 const inflightRequests = new Map<string, Promise<Business[]>>();
@@ -24,6 +25,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
   const preloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { getCachedBusinesses, setCachedBusinesses } = useTileCache();
+  const { clusterBusinesses } = useMapWorker();
 
   // ----------------- Helpers -----------------
   const calculateBoundsFromPoints = (points: MapPoint[], padding = 0.02): MapBounds => {
@@ -187,6 +189,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
     isSearching,
     loadBusinessesInViewport,
     fetchFullBusinessDetails,
-    clearBusinesses
+    clearBusinesses,
+    clusterBusinesses
   };
 };
