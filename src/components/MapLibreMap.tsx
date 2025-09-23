@@ -220,24 +220,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'all',
             ['==', ['geometry-type'], 'Polygon'],
             ['any',
-              // Parks & playgrounds
+              // leisure-based green spaces
               ['==', ['get', 'leisure'], 'park'],
               ['==', ['get', 'leisure'], 'garden'],
               ['==', ['get', 'leisure'], 'playground'],
               ['==', ['get', 'leisure'], 'recreation_ground'],
               ['==', ['get', 'leisure'], 'nature_reserve'],
+              ['==', ['get', 'leisure'], 'sports_centre'],
+              ['==', ['get', 'leisure'], 'pitch'],
         
-              // ✅ Cemeteries (force same green style as parks)
-              ['==', ['get', 'landuse'], 'cemetery'],
-              ['==', ['get', 'amenity'], 'cemetery'],
-              ['==', ['get', 'historic'], 'cemetery'],
-              ['match', ['downcase', ['get', 'name']], ['cemetery', 'graveyard'], true, false],
-        
-              // Extra green areas
+              // landuse-based greens
               ['==', ['get', 'landuse'], 'grass'],
               ['==', ['get', 'landuse'], 'meadow'],
-              ['==', ['get', 'leisure'], 'sports_centre'],
-              ['==', ['get', 'leisure'], 'pitch']
+              ['==', ['get', 'landuse'], 'cemetery'],   // 👈 landuse cemeteries
+        
+              // name contains "cemetery" (case-insensitive)
+              ['>=',
+                ['index-of', 'cemetery', ['downcase', ['coalesce', ['get', 'name'], '']]],
+                0
+              ]
             ]
           ] as any
         },
