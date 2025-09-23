@@ -139,7 +139,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
       trackCommentedPost(expandedPost);
       setCommentText('');
       setCommentPlaceholder("Leave a comment!");
-      onCommentSubmit?.(expandedPost, commentText);
+      // No need to call onCommentSubmit since comments are now in the database
     } else {
       setCommentPlaceholder("Connection error. Please try again.");
       setCommentText('');
@@ -216,12 +216,13 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     let filtered: Post[] = [];
   
     if (filteredBusinessId) {
-      // Include all posts for this business (including system)
-      filtered = posts.filter(post => post.businessId === filteredBusinessId && !post.isJobUpdate);
+      // Include all posts for this business (including system) but exclude comments
+      filtered = posts.filter(post => post.businessId === filteredBusinessId && !post.isJobUpdate && !post.isComment);
     } else if (filteredUserStories) {
-      filtered = posts.filter(post => post.author === 'You' && !post.isJobUpdate);
+      filtered = posts.filter(post => post.author === 'You' && !post.isJobUpdate && !post.isComment);
     } else {
-      filtered = posts;
+      // Filter out comments from main feed
+      filtered = posts.filter(post => !post.isComment);
     }
   
     // Check for real (non-system) posts for this business
@@ -245,6 +246,11 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   
     return filtered;
   }, [posts, filteredBusinessId, filteredUserStories]);
+
+  // Get comments for a specific post
+  const getPostComments = (postId: string) => {
+    return posts.filter(post => post.isComment === postId);
+  };
 
 
   if (loading) {
@@ -344,8 +350,11 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                 {expandedPost === post.id && (
                   <div className="mt-4 pt-4 border-t border-app-gray-light space-y-2">
                     {(() => {
+                      // Get comments from database instead of local state
+                      const postComments = getPostComments(post.id);
+                      
                       // Order comments: post author's comments first
-                      const orderedComments = (comments[post.id] || []).slice().sort((a, b) => {
+                      const orderedComments = postComments.slice().sort((a, b) => {
                         if (a.author === post.author && b.author !== post.author) return -1;
                         if (b.author === post.author && a.author !== post.author) return 1;
                         return a.createdAt.getTime() - b.createdAt.getTime();
@@ -364,12 +373,12 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                           <TranslatedText text={comment.text} className="text-sm text-app-gray-dark pr-2" />
                           <div className="flex-shrink-0">
                             <VotingComponent
-                              upvotes={0}
-                              downvotes={0}
-                              userVote={null}
-                              onVote={() => {}}
+                              upvotes={comment.upvotes}
+                              downvotes={comment.downvotes}
+                              userVote={comment.userVote}
+                              onVote={(voteType) => handlePostVote(comment.id, voteType)}
                               isOwner={comment.author === 'You'}
-                              onDelete={() => handleCommentDelete(post.id, comment.id)}
+                              onDelete={() => removePost(comment.id)}
                             />
                           </div>
                         </div>
