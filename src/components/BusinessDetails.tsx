@@ -74,6 +74,8 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
     }
   };
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
   // Handle help button click with scroll to bottom
   const handleHelpButtonClick = (e: React.MouseEvent) => {
     e.stopPropagation();
