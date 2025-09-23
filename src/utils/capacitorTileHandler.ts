@@ -6,7 +6,7 @@ let isPatched = false;
 /**
  * Patch fetch to handle tile decompression in Capacitor environments
  */
-function patchTileLoading() {
+export function patchTileLoading() {
   const originalFetch = window.fetch;
   window.fetch = async (input: RequestInfo, init?: RequestInit): Promise<Response> => {
     const url = typeof input === 'string' ? input : input.url;
