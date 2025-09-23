@@ -220,7 +220,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'all',
             ['==', ['geometry-type'], 'Polygon'],
             ['any',
-              // leisure-based green spaces
               ['==', ['get', 'leisure'], 'park'],
               ['==', ['get', 'leisure'], 'garden'],
               ['==', ['get', 'leisure'], 'playground'],
@@ -228,13 +227,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ['==', ['get', 'leisure'], 'nature_reserve'],
               ['==', ['get', 'leisure'], 'sports_centre'],
               ['==', ['get', 'leisure'], 'pitch'],
-        
-              // landuse-based greens
               ['==', ['get', 'landuse'], 'grass'],
               ['==', ['get', 'landuse'], 'meadow'],
-              ['==', ['get', 'landuse'], 'cemetery'],   // 👈 landuse cemeteries
-        
-              // name contains "cemetery" (case-insensitive)
+              ['==', ['get', 'landuse'], 'cemetery'],
               ['>=',
                 ['index-of', 'cemetery', ['downcase', ['coalesce', ['get', 'name'], '']]],
                 0
