@@ -284,7 +284,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ['has', 'name'],          // if the feature has a 'name' property
               ['get', 'name'],           // use the name
               ''                         // otherwise, just render empty string
-            ]
+            ],
             'text-font': ['Open Sans Regular'],
             'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
             'text-max-width': 8,
