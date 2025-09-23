@@ -547,15 +547,15 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   };
   return <div className="relative w-full h-full flex items-center justify-center">
       <div ref={scrollContainerRef} className="app-card p-6 overflow-y-auto relative">
-        <h1 className="text-xl font-medium text-app-black mb-8">Your Page! 😊</h1>
+        <h1 className="text-xl font-medium text-app-black mb-2">Your Page! 😊</h1>
 
-        {/* Neighborhoods */}
+        {/* Neighborhoods
         <div className="mb-6">
           <h3 className="text-lg font-semibold mb-2">Neighborhoods</h3>
           <div className="flex flex-wrap gap-x-3 gap-y-2">
             {Object.values(nycNeighborhoods).flat().map(n => <button key={n.name} onClick={() => onSearchTrigger?.(n.name)} className="px-1.5 py-0.5 bg-app-yellow text-app-black rounded text-xs hover:bg-app-yellow/90 transition-colors">{n.name}</button>)}
           </div>
-        </div>
+        </div> */}
 
         {/* Current Job */}
         <div className="mb-8">
