@@ -133,7 +133,14 @@ export const nycNeighborhoodBoundaries = {
       { lat: 40.697987445327776, lon: -73.96199784588514 },
       { lat: 40.679569196635924, lon: -73.95830712634846 }
     ],
-    "Bed Stuy": [],
+    "Bed Stuy": [
+      { lat: 40.679569196635924, lon: -73.95830712634846 },
+      { lat: 40.676509842634786, lon: -73.90826783588624 },
+      { lat: 40.679569196635924, lon: -73.90534959253166 },
+      { lat: 40.70098074328471, lon: -73.94208512652452 },
+      { lat: 40.697987445327776, lon: -73.96199784588514 },
+      { lat: 40.679569196635924, lon: -73.95830712634846 }
+    ],
     "Crown Heights": [
       { lat: 40.66341263022619, lon: -73.96100835994925 },
       { lat: 40.664300057611925, lon: -73.94554524756434 },
@@ -382,8 +389,6 @@ export const nycNeighborhoodBoundaries = {
 
 // ---------------- Public helper ----------------
 export function getNeighborhoodBoundary(borough: string, neighborhood: string) {
-  if (neighborhood === "Bed Stuy") neighborhood = "Bedford-Stuyvesant";
-
   const boroughData = nycNeighborhoodBoundaries[borough];
   if (!boroughData) throw new Error(`Borough "${borough}" not found`);
 
