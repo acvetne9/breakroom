@@ -303,10 +303,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           filter: [
             'all',
             ['==', ['geometry-type'], 'LineString'],
-            ['has', 'name'],
-            ['has', 'highway'],
-            ['!=', ['coalesce', ['get', 'name'], ''], '']
-          ],
+            ['has', 'highway']
+          ]
           minzoom: 12
         }
       ];
