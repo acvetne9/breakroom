@@ -8,6 +8,7 @@ import { useViewportMapData } from '../hooks/useViewportMapData';
 import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
 import { createTileBlobUrl, isCapacitor } from '@/utils/tileDecompression';
 import { patchTileLoading } from '@/utils/capacitorTileHandler';
+import { addTileDebugLogs, logCapacitorEnvironment } from '@/utils/debugCapacitorTiles';
 import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods';
 import type { GeoJSONFeature } from 'maplibre-gl';
 import type { Business } from '@/types/business';
@@ -449,13 +450,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // initialize map once
   useEffect(() => {
-    // Patch tile loading for Capacitor environments
-    if (isCapacitor()) {
-      patchTileLoading();
-    }
-    
     const initializeMap = async () => {
       if (!mapContainerRef.current || mapRef.current) return;
+      
+      // Enhanced Capacitor setup with debugging
+      if (isCapacitor()) {
+        console.log('🔧 Setting up Capacitor tile handling');
+        logCapacitorEnvironment();
+        addTileDebugLogs();
+        patchTileLoading();
+        
+        // Add a small delay to ensure patching is complete
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
 
       const vectorSource = {
         type: 'vector' as const,
@@ -491,11 +498,26 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       mapInstance.on('error', (e) => {
         console.error('🗺️ Map error:', e.error || e);
-        // Try to continue despite errors
-        if (!mapLoaded) {
-          console.log('🗺️ Setting map as loaded despite error');
-          setMapLoaded(true);
-          callbackRefs.current.onMapLoaded?.();
+        
+        // Handle tile loading errors more gracefully in Capacitor
+        if (isCapacitor() && e.error?.message?.includes('Unable to parse the tile')) {
+          console.log('🔧 Tile parsing error in Capacitor - attempting recovery');
+          
+          // Don't mark as loaded immediately, give tiles another chance
+          setTimeout(() => {
+            if (!mapLoaded && mapRef.current) {
+              console.log('🗺️ Setting map as loaded after tile error recovery attempt');
+              setMapLoaded(true);
+              callbackRefs.current.onMapLoaded?.();
+            }
+          }, 2000);
+        } else {
+          // For other errors, continue as before
+          if (!mapLoaded) {
+            console.log('🗺️ Setting map as loaded despite error');
+            setMapLoaded(true);
+            callbackRefs.current.onMapLoaded?.();
+          }
         }
       });
 

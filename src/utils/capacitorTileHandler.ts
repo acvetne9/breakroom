@@ -16,8 +16,13 @@ export function patchTileLoading() {
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = typeof input === 'string' ? input : input.toString();
     
-    // Only intercept .pbf tile requests
-    if (url.includes('/data/tiles/') && url.endsWith('.pbf')) {
+    // More comprehensive URL matching for Capacitor environments
+    const isTileRequest = (
+      (url.includes('/data/tiles/') || url.includes('data/tiles/')) && 
+      url.endsWith('.pbf')
+    );
+    
+    if (isTileRequest) {
       try {
         console.log('🔧 Intercepting tile request:', url);
         
