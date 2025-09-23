@@ -54,7 +54,8 @@ export const usePosts = () => {
     isComment?: string
   ): Promise<boolean> => {
     try {
-      const postType = isJobUpdate ? 'job_update' : (isComment ? 'comment' : 'story');
+      // Always use 'story' as post_type since that's what the database allows
+      const postType = 'story';
       
       const { data, error } = await createPost(
         text,

@@ -73,6 +73,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   const [comments, setComments] = useState<{ [postId: string]: Comment[] }>({});
   const [postText, setPostText] = useState('');
   const [commentText, setCommentText] = useState('');
+  const [commentPlaceholder, setCommentPlaceholder] = useState("Leave a comment!");
   const { toast } = useToast();
 
   // Check if we need to fade out the system post when real posts are added
@@ -137,13 +138,11 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
       // Track that user commented on this post
       trackCommentedPost(expandedPost);
       setCommentText('');
+      setCommentPlaceholder("Leave a comment!");
       onCommentSubmit?.(expandedPost, commentText);
     } else {
-      toast({
-        title: "Failed to submit comment",
-        description: "Please try again.",
-        variant: "destructive",
-      });
+      setCommentPlaceholder("Connection error. Please try again.");
+      setCommentText('');
     }
   };
 
@@ -393,7 +392,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
               type="text"
               value={commentText}
               onChange={e => setCommentText(e.target.value)}
-              placeholder="Leave a comment!"
+              placeholder={commentPlaceholder}
               className="search-bar pr-14"
               onKeyPress={e => {
                 if (e.key === 'Enter') {
