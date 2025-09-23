@@ -122,7 +122,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
     >
       <div className="app-card p-6 overflow-y-auto animate-fade-in" onClick={handleCardClick}>
         
-        <div className="flex justify-between items-start mb-2">
+        <div className="flex justify-between items-start mb-4">
           <div>
             <TranslatedText 
               text={business.name}
@@ -253,7 +253,8 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
           </div>
         </div>
 
-        <div className="mt-auto pt-4 flex justify-start">
+        {/* Sticky footer with Help Button */}
+        <div className="sticky bottom-0 pt-4 bg-white flex justify-start">
           <button 
             onClick={handleHelpButtonClick}
             className="w-6 h-6 bg-app-gray-light rounded-full flex items-center justify-center hover:bg-app-gray-medium transition-colors text-app-black font-bold text-sm"
@@ -261,7 +262,8 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
             ?
           </button>
         </div>
-        
+    
+        {/* Help Popup (renders under footer) */}
         {showHelpPopup && (
           <div 
             className="mt-2 w-full bg-white border-2 border-app-yellow rounded-xl p-4 shadow-lg"
