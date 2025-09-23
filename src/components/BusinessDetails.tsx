@@ -119,12 +119,13 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
       className="fixed inset-0 z-40 flex items-start justify-center"
       style={{ paddingTop: '8vh' }}
       onClick={handleBackgroundClick}
-    >
-      <div className="app-card p-6 overflow-y-auto animate-fade-in" onClick={handleCardClick}>
-        
-        {/* Name + Address + Atmosphere */}
-        <div className="flex justify-between items-start mb-4"> {/* was mb-6 */}
-          <div>
+    >    
+      <div 
+        className="app-card p-6 flex flex-col max-h-[80vh] w-full md:w-[600px] animate-fade-in"
+        onClick={handleCardClick}
+      >  
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pr-1">
+          <div className="flex justify-between items-start mb-4">
             <TranslatedText 
               text={business.name}
               className="text-xl font-medium text-app-black"
@@ -254,8 +255,8 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
           </div>
         </div>
 
-        {/* Help Button - At the bottom left of scrollable content */}
-        <div className="mt-8 flex justify-start relative">
+        {/* Sticky footer with Help Button */}
+        <div className="mt-4 flex justify-start">
           <button 
             onClick={handleHelpButtonClick}
             className="w-6 h-6 bg-app-gray-light rounded-full flex items-center justify-center hover:bg-app-gray-medium transition-colors text-app-black font-bold text-sm"
@@ -263,11 +264,11 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
             ?
           </button>
         </div>
-
-        {/* Help Popup - Styled like other cards with rounded edges */}
+    
+        {/* Help Popup (renders under footer) */}
         {showHelpPopup && (
           <div 
-            className="mt-4 w-full bg-white border-2 border-app-yellow rounded-xl p-4 shadow-lg"
+            className="mt-2 w-full bg-white border-2 border-app-yellow rounded-xl p-4 shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
             <p className="text-sm text-app-gray-dark">
@@ -275,7 +276,6 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
             </p>
           </div>
         )}
-
       </div>
     </div>
   );
