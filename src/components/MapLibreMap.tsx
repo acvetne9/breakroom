@@ -197,7 +197,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       callbackRefs.current.onBusinessesLoaded?.();
     }
   }, [businesses]);
-  
+
+  // Debug glyph requests
+  (function debugGlyphs() {
+    const origFetch = window.fetch;
+    window.fetch = async (input: RequestInfo, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.url;
+      if (url.includes("/assets/fonts/")) {
+        console.log("🔡 Glyph request:", url);
+      }
+      const res = await origFetch(input, init);
+      if (!res.ok) {
+        console.error("⚠️ Glyph request failed:", url, res.status);
+      }
+      return res;
+    };
+  })();
+
   // vector layers (styling restored exactly as requested)
   const addVectorLayers = useCallback((map: maplibregl.Map) => {
     try {
