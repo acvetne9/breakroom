@@ -281,7 +281,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           layout: {
             'text-field': [
               'case',
-              ['all', ['has', 'properties'], ['has', 'name']],
+              ['has', 'name'],
               ['get', 'name'],
               ''
             ],
