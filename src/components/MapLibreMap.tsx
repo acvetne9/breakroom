@@ -207,7 +207,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: 'fill',
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
-          layout: {},
           paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
           filter: ['all', ['==', ['geometry-type'], 'Polygon']]
         },
@@ -216,7 +215,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: 'fill',
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
-          layout: {},
           paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
           filter: [
             'all',
@@ -244,7 +242,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: 'fill',
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
-          layout: {},
           paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
           filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']]
         },
@@ -253,7 +250,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: 'line',
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
-          layout: {},
           paint: {
             'line-color': '#666666',
             'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
