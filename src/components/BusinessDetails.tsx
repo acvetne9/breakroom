@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useRef, useState } from 'react';
 import { Compass } from 'lucide-react';
 import VotingComponent from './VotingComponent';
 import { formatTimeAgo } from '../utils/timeAgo';
@@ -54,6 +54,10 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
   onPostClick,
   onRoleVote
 }) => {
+
+  const [showHelpPopup, setShowHelpPopup] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
   const handleBackgroundClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       onClose();
@@ -73,9 +77,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
       window.open(destination, "_blank");
     }
   };
-
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-
+  
   // Handle help button click with scroll to bottom
   const handleHelpButtonClick = (e: React.MouseEvent) => {
     e.stopPropagation();
