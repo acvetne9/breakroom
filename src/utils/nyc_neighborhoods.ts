@@ -381,10 +381,13 @@ export const nycNeighborhoodBoundaries = {
 
 // ---------------- Public helper ----------------
 export function getNeighborhoodBoundary(borough: string, neighborhood: string) {
+  if (neighborhood === "Bed Stuy") neighborhood = "Bedford-Stuyvesant";
+
   const boroughData = nycNeighborhoodBoundaries[borough];
   if (!boroughData) throw new Error(`Borough "${borough}" not found`);
+
   const boundary = boroughData[neighborhood];
-  if (!boundary) throw new Error(`Neighborhood "${neighborhood}" not found in ${borough}`)
+  if (!boundary) throw new Error(`Neighborhood "${neighborhood}" not found in ${borough}`);
   return boundary;
 }
 
