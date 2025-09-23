@@ -565,6 +565,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         setTimeout(() => handleViewportChange(), 1500);
       });
 
+      mapInstance.on("styledata", () => {
+        const allLayers = mapInstance.getStyle().layers || [];
+        allLayers.forEach(l => {
+          if (l.type === "symbol" && !("layout" in l)) {
+            console.warn("⚠️ Symbol layer missing layout:", l.id, l);
+          }
+        });
+      });
+
+
       // fallback if load event didn't fire timely
       setTimeout(() => {
         try {
