@@ -425,15 +425,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   
     if (!validBusinesses.length) return [];
   
-    // Return DeckGL layer
-    return [
-      createBusinessScatterplotLayer({
+    let safeLayer: any = null;
+    try {
+      safeLayer = createBusinessScatterplotLayer({
         businesses: validBusinesses,
         selectedBusinessId: selectedBusiness?.id,
         onBusinessClick: handleBusinessClick,
         neighborhoodBoundary: searchFilters?.neighborhoodFilter?.boundary || null
-      })
-    ];
+      });
+      console.log("✅ Created scatterplot layer:", safeLayer);
+    } catch (err) {
+      console.error("❌ Failed to create scatterplot layer", err);
+    }
+    
+    return safeLayer ? [safeLayer] : [];
   }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, businesses]);
   
   const lastLoadTimeRef = useRef(0);
