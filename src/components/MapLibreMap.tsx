@@ -444,7 +444,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const lastLoadTimeRef = useRef(0);
 
   const handleViewportChange = useCallback(async () => {
-    if (!mapRef.current || !mapLoaded || loading) return;
+    if (!mapRef.current || !mapLoaded) return;
+    if (loading) {
+      console.log("⏸️ Skipping viewport change while loading...");
+      return;
+    }
   
     const map = mapRef.current;
     const zoom = map.getZoom();
@@ -639,6 +643,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (!deckOverlay || !overlayReady) return;
     deckOverlay.setProps({ layers: deckGLLayers });
   }, [deckOverlay, overlayReady, deckGLLayers]);
+
+  useEffect(() => {
+    if (deckOverlay && overlayReady) {
+      console.log(`🔄 Refreshing Deck overlay with ${businesses.length} businesses`);
+      deckOverlay.setProps({ layers: deckGLLayers });
+    }
+  }, [businesses, deckOverlay, overlayReady, deckGLLayers]);
 
   // Initial load when map is ready - SINGLE TRIGGER
   useEffect(() => {
