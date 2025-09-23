@@ -304,7 +304,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'all',
             ['==', ['geometry-type'], 'LineString'],
             ['has', 'highway']
-          ]
+          ],
           minzoom: 12
         }
       ];
