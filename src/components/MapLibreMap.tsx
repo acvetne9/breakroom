@@ -307,8 +307,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       ];
   
       console.log('🗺️ Adding vector layers...');
+      
       layers.forEach(layer => {
         try {
+          // Debug: log the layer before adding
+          console.log("🔍 Validating layer:", layer.id, layer);
+      
+          // Ensure layout object exists for symbol layers
+          if (layer.type === "symbol" && !("layout" in layer)) {
+            console.warn(`⚠️ Missing layout for symbol layer: ${layer.id}`);
+            (layer as any).layout = { "text-field": "" }; // minimal fallback
+          }
+      
           if (!map.getLayer(layer.id)) {
             map.addLayer(layer);
             console.log(`✅ Layer added: ${layer.id}`);
