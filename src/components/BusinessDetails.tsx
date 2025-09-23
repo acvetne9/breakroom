@@ -114,43 +114,41 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
   const roles = Array.isArray(business.roles) ? business.roles : [];
   const shouldScroll = roles.length > 6;
 
-  return (
+return (
+  <div
+    className="fixed inset-0 z-40 flex items-start justify-center"
+    style={{ paddingTop: '8vh' }}
+    onClick={handleBackgroundClick}
+  >
     <div
-      className="fixed inset-0 z-40 flex items-start justify-center"
-      style={{ paddingTop: '8vh' }}
-      onClick={handleBackgroundClick}
+      className="app-card p-6 animate-fade-in flex flex-col max-h-[80vh] w-full md:w-[600px] relative"
+      onClick={handleCardClick}
     >
-      {/* make card a column flex with constrained height and relative for popup positioning */}
-      <div
-        className="app-card p-6 animate-fade-in flex flex-col max-h-[80vh] w-full md:w-[600px] relative"
-        onClick={handleCardClick}
-      >
-        {/* scrollable area: everything that should scroll goes inside here */}
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pr-2">
-          <div className="flex justify-between items-start mb-2">
-            <div>
-              <TranslatedText 
-                text={business.name}
-                className="text-xl font-medium text-app-black"
-              />
-              {(
-                business.address?.trim() || (Array.isArray(business.atmosphere) && business.atmosphere.length > 0)
-              ) && (
-                <div className="mt-1 flex flex-col gap-0.5">
-                  {business.address && (
-                    <span className="text-sm text-app-gray-medium">
-                      {business.address}
-                    </span>
-                  )}
-                  {Array.isArray(business.atmosphere) && business.atmosphere.length > 0 && (
-                    <span className="text-sm text-app-gray-medium">
-                      {business.atmosphere.join(' • ')}
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          
+      {/* Scrollable content area */}
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pr-2">
+        <div className="flex justify-between items-start mb-2">
+          <div>
+            <TranslatedText
+              text={business.name}
+              className="text-xl font-medium text-app-black"
+            />
+
+            {(business.address?.trim() || (Array.isArray(business.atmosphere) && business.atmosphere.length > 0)) && (
+              <div className="mt-1 flex flex-col gap-0.5">
+                {business.address && (
+                  <span className="text-sm text-app-gray-medium">
+                    {business.address}
+                  </span>
+                )}
+                {Array.isArray(business.atmosphere) && business.atmosphere.length > 0 && (
+                  <span className="text-sm text-app-gray-medium">
+                    {business.atmosphere.join(' • ')}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
           <button
             onClick={handleCompassClick}
             className="compass-button p-2 rounded-lg bg-gray-100/0 py-0"
@@ -161,14 +159,18 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
 
         {/* Job roles and salaries */}
         <div className="mb-2">
-          <h3 className="text-lg font-medium text-app-black mb-2">Roles & Salaries</h3>
-          <div 
-            className={`space-y-2 ${roles.length > 6 ? 'max-h-64 overflow-y-auto pr-2' : ''}`}
-            style={roles.length > 6 ? { scrollbarWidth: 'thin' } : {}}
+          <h3 className="text-lg font-medium text-app-black mb-2">
+            Roles & Salaries
+          </h3>
+
+          <div
+            className={`space-y-2 ${shouldScroll ? 'max-h-64 overflow-y-auto pr-2' : ''}`}
+            style={shouldScroll ? { scrollbarWidth: 'thin' } : undefined}
           >
             {business.roles ? business.roles.map((role, index) => (
               <div key={index} className="flex justify-between items-center py-1">
                 <span className="text-app-black">{role.role}</span>
+
                 <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
                   <span className="font-medium text-app-black">
                     {typeof role.salary === 'string' ? role.salary : (business.salary || '$13.6')}
@@ -176,6 +178,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
                       <span className="text-xs text-app-gray-medium ml-1">/hr</span>
                     )}
                   </span>
+
                   <VotingComponent
                     upvotes={role.upvotes || 0}
                     downvotes={role.downvotes || 0}
@@ -199,6 +202,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
               </div>
             )}
           </div>
+
           <div className="flex justify-end mt-2">
             <span className="text-xs text-app-gray-medium">Do these seem right?</span>
           </div>
@@ -206,8 +210,11 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
 
         {/* Stories section */}
         <div>
-          <h3 className="text-lg font-medium text-app-black mb-3">More Stories 📖</h3>
-            <div className="space-y-4">
+          <h3 className="text-lg font-medium text-app-black mb-3">
+            More Stories 📖
+          </h3>
+
+          <div className="space-y-4">
             {Array.isArray(businessStories) && businessStories.length > 0 ? (
               <>
                 {businessStories.slice(0, 5).map(story => (
@@ -216,8 +223,10 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
                     className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded relative"
                     onClick={(e) => handleStoryClick(story, e)}
                   >
-                    <TranslatedText 
-                      text={(story.text && story.text.length > 100) ? `${story.text.substring(0, 100)}...` : (story.text || '')}
+                    <TranslatedText
+                      text={(story.text && story.text.length > 100)
+                        ? `${story.text.substring(0, 100)}...`
+                        : (story.text || '')}
                       className="text-app-gray-dark text-sm pb-4"
                     />
                     <span className="absolute bottom-2 left-4 text-xs text-gray-400">
@@ -225,12 +234,10 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
                     </span>
                   </div>
                 ))}
+
                 {Array.isArray(businessStories) && businessStories.length > 5 && (
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onStoriesClick?.();
-                    }} 
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onStoriesClick?.(); }}
                     className="w-full mt-3 px-4 py-2 bg-app-yellow text-app-black rounded hover:bg-app-yellow/90 transition-colors"
                   >
                     View all Stories ({businessStories.length})
@@ -240,10 +247,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
             ) : (
               <div
                 className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onStoriesClick?.();
-                }}
+                onClick={(e) => { e.stopPropagation(); onStoriesClick?.(); }}
               >
                 <p className="text-app-gray-dark text-sm font-medium">
                   Be the first to post! 🚀
@@ -252,31 +256,31 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
             )}
           </div>
         </div>
-
-        {/* sticky footer: stays at bottom (shrink-0 prevents it from being squished) */}
-        <div className="pt-4 flex justify-start shrink-0">
-          <button 
-            onClick={handleHelpButtonClick}
-            className="w-6 h-6 bg-app-gray-light rounded-full flex items-center justify-center hover:bg-app-gray-medium transition-colors text-app-black font-bold text-sm"
-          >
-            ?
-          </button>
-        </div>
-
-        {/* help popup is absolutely positioned above the button so it doesn't push layout */}
-        {showHelpPopup && (
-          <div 
-            className="absolute left-6 right-6 bottom-16 bg-white border-2 border-app-yellow rounded-xl p-4 shadow-lg z-50"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p className="text-sm text-app-gray-dark">
-              <strong>Disclaimer:</strong> The information presented in this app is based on surveys, user input, and publicly available sources. We do not independently verify all information, and it should not be taken as factual statements about any individual or organization.
-            </p>
-          </div>
-        )}
       </div>
+
+      {/* Sticky footer with ? button (never inside the scrollable area) */}
+      <div className="pt-4 flex justify-start shrink-0">
+        <button
+          onClick={handleHelpButtonClick}
+          className="w-6 h-6 bg-app-gray-light rounded-full flex items-center justify-center hover:bg-app-gray-medium transition-colors text-app-black font-bold text-sm"
+        >
+          ?
+        </button>
+      </div>
+
+      {/* Help popup is absolutely positioned so it doesn't push the footer down */}
+      {showHelpPopup && (
+        <div
+          className="absolute left-6 right-6 bottom-16 bg-white border-2 border-app-yellow rounded-xl p-4 shadow-lg z-50"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="text-sm text-app-gray-dark">
+            <strong>Disclaimer:</strong> The information presented in this app is based on surveys, user input, and publicly available sources. We do not independently verify all information, and it should not be taken as factual statements about any individual or organization.
+          </p>
+        </div>
+      )}
     </div>
-  );
-});
+  </div>
+);
 
 export default BusinessDetails;
