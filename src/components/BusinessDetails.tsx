@@ -122,7 +122,8 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
     >
       <div className="app-card p-6 overflow-y-auto animate-fade-in" onClick={handleCardClick}>
         
-          <div className="flex justify-between items-start mb-4">
+        <div className="flex justify-between items-start mb-4">
+          <div>
             <TranslatedText 
               text={business.name}
               className="text-xl font-medium text-app-black"
