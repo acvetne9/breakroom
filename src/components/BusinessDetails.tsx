@@ -120,33 +120,37 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
       style={{ paddingTop: '8vh' }}
       onClick={handleBackgroundClick}
     >
-      <div className="app-card p-6 overflow-y-auto animate-fade-in" onClick={handleCardClick}>
-        
-        <div className="flex justify-between items-start mb-2">
-          <div>
-            <TranslatedText 
-              text={business.name}
-              className="text-xl font-medium text-app-black"
-            />
-
-            {(
-              business.address?.trim() || (Array.isArray(business.atmosphere) && business.atmosphere.length > 0)
-            ) && (
-              <div className="mt-1 flex flex-col gap-0.5">
-                {business.address && (
-                  <span className="text-sm text-app-gray-medium">
-                    {business.address}
-                  </span>
-                )}
-                {Array.isArray(business.atmosphere) && business.atmosphere.length > 0 && (
-                  <span className="text-sm text-app-gray-medium">
-                    {business.atmosphere.join(' • ')}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-
+      {/* make card a column flex with constrained height and relative for popup positioning */}
+      <div
+        className="app-card p-6 animate-fade-in flex flex-col max-h-[80vh] w-full md:w-[600px] relative"
+        onClick={handleCardClick}
+      >
+        {/* scrollable area: everything that should scroll goes inside here */}
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pr-2">
+          <div className="flex justify-between items-start mb-2">
+            <div>
+              <TranslatedText 
+                text={business.name}
+                className="text-xl font-medium text-app-black"
+              />
+              {(
+                business.address?.trim() || (Array.isArray(business.atmosphere) && business.atmosphere.length > 0)
+              ) && (
+                <div className="mt-1 flex flex-col gap-0.5">
+                  {business.address && (
+                    <span className="text-sm text-app-gray-medium">
+                      {business.address}
+                    </span>
+                  )}
+                  {Array.isArray(business.atmosphere) && business.atmosphere.length > 0 && (
+                    <span className="text-sm text-app-gray-medium">
+                      {business.atmosphere.join(' • ')}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          
           <button
             onClick={handleCompassClick}
             className="compass-button p-2 rounded-lg bg-gray-100/0 py-0"
@@ -156,13 +160,11 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
         </div>
 
         {/* Job roles and salaries */}
-        <div className="mb-2"> {/* was mb-8 */}
-          <h3 className="text-lg font-medium text-app-black mb-2"> {/* was mb-4 */}
-            Roles & Salaries
-          </h3>
+        <div className="mb-2">
+          <h3 className="text-lg font-medium text-app-black mb-2">Roles & Salaries</h3>
           <div 
-            className={`space-y-2 ${shouldScroll ? 'max-h-64 overflow-y-auto pr-2' : ''}`}
-            style={shouldScroll ? { scrollbarWidth: 'thin' } : {}}
+            className={`space-y-2 ${roles.length > 6 ? 'max-h-64 overflow-y-auto pr-2' : ''}`}
+            style={roles.length > 6 ? { scrollbarWidth: 'thin' } : {}}
           >
             {business.roles ? business.roles.map((role, index) => (
               <div key={index} className="flex justify-between items-center py-1">
@@ -197,17 +199,15 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
               </div>
             )}
           </div>
-          <div className="flex justify-end mt-2"> {/* was mt-3 */}
+          <div className="flex justify-end mt-2">
             <span className="text-xs text-app-gray-medium">Do these seem right?</span>
           </div>
         </div>
 
         {/* Stories section */}
         <div>
-          <h3 className="text-lg font-medium text-app-black mb-3"> {/* was mb-4 */}
-            More Stories 📖
-          </h3>
-          <div className="space-y-4">
+          <h3 className="text-lg font-medium text-app-black mb-3">More Stories 📖</h3>
+            <div className="space-y-4">
             {Array.isArray(businessStories) && businessStories.length > 0 ? (
               <>
                 {businessStories.slice(0, 5).map(story => (
@@ -253,6 +253,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
           </div>
         </div>
 
+        {/* sticky footer: stays at bottom (shrink-0 prevents it from being squished) */}
         <div className="pt-4 flex justify-start shrink-0">
           <button 
             onClick={handleHelpButtonClick}
@@ -261,10 +262,11 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
             ?
           </button>
         </div>
-    
+
+        {/* help popup is absolutely positioned above the button so it doesn't push layout */}
         {showHelpPopup && (
           <div 
-            className="mt-2 w-full bg-white border-2 border-app-yellow rounded-xl p-4 shadow-lg shrink-0"
+            className="absolute left-6 right-6 bottom-16 bg-white border-2 border-app-yellow rounded-xl p-4 shadow-lg z-50"
             onClick={(e) => e.stopPropagation()}
           >
             <p className="text-sm text-app-gray-dark">
