@@ -470,7 +470,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       const style = {
         version: 8 as const,
-        glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf", // 👈 required
+        glyphs: `${window.location.origin}/assets/fonts/{fontstack}/{range}.pbf`
         sources: { 'nyc-tiles': vectorSource },
         layers: [
           { id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } }

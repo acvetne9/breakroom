@@ -42,7 +42,8 @@ export function patchTileLoading() {
           status: response.status,
           statusText: response.statusText,
           headers: {
-            'Content-Type': 'application/x-protobuf',
+            'Content-Type: application/x-protobuf',
+            'Content-Encoding: gzip',
             'Cache-Control': 'public, max-age=3600'
           }
         });
