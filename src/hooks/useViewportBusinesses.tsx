@@ -109,7 +109,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
       inflightRequests.set(requestKey, requestPromise);
 
       try {
-        let viewportBusinesses = await getBusinessesInViewport(viewportBounds, limit, searchFilters, undefined, zoom);
+        let viewportBusinesses = await requestPromise;
 
         // If a neighborhood polygon exists, only keep businesses inside
         if (searchPolygon) {
@@ -118,20 +118,14 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
           );
         }
 
-        setBusinesses(prev => {
-          // If this is a search with filters, replace all businesses
-          if (searchFilters) {
-            console.log('🔍 Search with filters - replacing businesses:', viewportBusinesses.length);
-            return viewportBusinesses;
-          }
-          
-          // For normal viewport loading, accumulate businesses but avoid duplicates
-          const existingIds = new Set(prev.map(b => b.id));
+        const updatedBusinesses = searchFilters ? viewportBusinesses : (() => {
+          const existingIds = new Set(businesses.map(b => b.id));
           const newBusinesses = viewportBusinesses.filter(b => !existingIds.has(b.id));
-          const combined = [...prev, ...newBusinesses];
-          console.log('🗺️ Combined businesses:', combined.length, '(', prev.length, 'existing +', newBusinesses.length, 'new )');
-          return combined;
-        });
+          return [...businesses, ...newBusinesses];
+        })();
+        
+        console.log('🔄 useViewportBusinesses: updating businesses state to:', updatedBusinesses.length, 'businesses');
+        setBusinesses(updatedBusinesses);
 
         if (!searchFilters) setCachedBusinesses(viewportBounds, viewportBusinesses);
         setCurrentBounds(viewportBounds);

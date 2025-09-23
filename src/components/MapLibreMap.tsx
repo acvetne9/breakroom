@@ -97,11 +97,9 @@ const createOptimizedGridSampling = (bounds: Bounds, businesses: Business[], max
 
 class BusinessCache {
   private cache = new Map<string, Business & { detailsLoaded?: boolean }>();
-  private maxSize: number;
   private storageKey = 'businessCache';
 
-  constructor(maxSize = Infinity) {
-    this.maxSize = maxSize;
+  constructor() {
     this.loadFromStorage();
   }
 
@@ -116,54 +114,49 @@ class BusinessCache {
 
   private loadFromStorage() {
     try {
-      const raw = localStorage.getItem(this.storageKey);
-      if (!raw) return;
-      const arr: Business[] = JSON.parse(raw);
-      arr.forEach(b => {
-        if (b?.id) this.cache.set(b.id, b);
-      });
-      console.log(`📦 Loaded ${this.cache.size} businesses from localStorage`);
+      const stored = localStorage.getItem(this.storageKey);
+      if (stored) {
+        const arr: (Business & { detailsLoaded?: boolean })[] = JSON.parse(stored);
+        arr.forEach(b => {
+          if (b?.id) this.cache.set(b.id, b);
+        });
+        console.log(`✅ Restored ${this.cache.size} businesses from localStorage`);
+      }
     } catch (err) {
-      console.warn('⚠️ Failed to load business cache from localStorage', err);
+      console.warn('⚠️ Failed to restore business cache', err);
     }
   }
 
   set(id: string, business: Business & { detailsLoaded?: boolean }) {
     if (!id || !business) return;
-    // remove eviction completely
     this.cache.set(id, business);
     this.persist();
   }
 
-  get(id: string): (Business & { detailsLoaded?: boolean }) | undefined {
-    const business = this.cache.get(id);
-    if (!business) return undefined;
-    // Move to the end (LRU)
-    this.cache.delete(id);
-    this.cache.set(id, business);
-    return business;
+  get(id: string) {
+    return this.cache.get(id);
   }
 
-  getAll(): (Business & { detailsLoaded?: boolean })[] {
+  getAll() {
     return Array.from(this.cache.values());
   }
 
-  addMultiple(businesses: Business[]) {
-    if (!Array.isArray(businesses) || businesses.length === 0) return;
-
-    const validBusinesses = businesses.filter(b =>
-      b?.id &&
-      b?.position?.lat != null &&
-      b?.position?.lng != null &&
-      !isNaN(b.position.lat) &&
-      !isNaN(b.position.lng)
-    );
-
-    validBusinesses.forEach(b => this.set(b.id, { ...b, detailsLoaded: !!b.detailsLoaded }));
-    console.log(`✅ Added ${validBusinesses.length}/${businesses.length} valid businesses. Cache size: ${this.cache.size}`);
+  addMultiple(businesses: Business[], replace = false) {
+    if (!Array.isArray(businesses)) return;
+  
+    if (replace) {
+      // build a set of incoming IDs
+      const incomingIds = new Set(businesses.map(b => b.id));
+      // remove anything not in incoming
+      for (const id of this.cache.keys()) {
+        if (!incomingIds.has(id)) this.cache.delete(id);
+      }
+    }
+  
+    businesses.forEach(b => {
+      if (b?.id) this.set(b.id, { ...b, detailsLoaded: !!b.detailsLoaded });
+    });
   }
-
-  // we can remove clear() entirely if we never need it
 }
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
@@ -182,40 +175,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [deckOverlay, setDeckOverlay] = useState<MapboxOverlay | null>(null);
   const [overlayReady, setOverlayReady] = useState(false);
 
+  // refs - simplified
+  const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
-  const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const businessCacheRef = useRef(new BusinessCache(15000));
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
   const layersAddedRef = useRef(false);
-  const isLoadingRef = useRef(false);
-  const lastViewportRef = useRef<ViewportState | null>(null);
-  const lastSearchFiltersRef = useRef(searchFilters);
-  const handleViewportChangeRef = useRef<() => void>(() => {});
+  // Add loading state ref to prevent multiple calls
+  const lastBoundsRef = useRef<string>('');
 
   const callbackRefs = useRef({ onBusinessClick, onMapLoaded, onBusinessesLoaded });
   useEffect(() => { callbackRefs.current = { onBusinessClick, onMapLoaded, onBusinessesLoaded }; }, [onBusinessClick, onMapLoaded, onBusinessesLoaded]);
 
-  // hooks
-  const mapDataHook = useViewportMapData();
-  const businessesHook = useViewportBusinesses(searchFilters);
-  const { isProcessing, setIsProcessing } = mapDataHook;
-  const { businesses: rawBusinesses, loading: businessesLoading, loadBusinessesInViewport, fetchFullBusinessDetails, isSearching } = businessesHook;
-  const businesses = Array.isArray(rawBusinesses) ? rawBusinesses : [];
-  const [cacheVersion, setCacheVersion] = useState(0);
+  // hooks - simplified to single source of truth
+  const { businesses, loading, loadBusinessesInViewport, fetchFullBusinessDetails, isSearching } = useViewportBusinesses(searchFilters);
 
+  // Simplified: Just trigger callback when businesses are loaded
   useEffect(() => {
-    if (Array.isArray(businesses) && businesses.length > 0) {
-      console.log("📦 Adding businesses to cache:", businesses.length);
-  
-      // Merge new businesses into cache
-      businessCacheRef.current.addMultiple(businesses);
-  
-      // Force DeckGL re-render
-      setCacheVersion(prev => prev + 1);
-  
+    if (businesses && businesses.length > 0) {
       callbackRefs.current.onBusinessesLoaded?.();
-    } else {
-      console.log("⚠️ Businesses array empty — keeping previous cache intact");
     }
   }, [businesses]);
   
@@ -243,17 +220,28 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'all',
             ['==', ['geometry-type'], 'Polygon'],
             ['any',
-              ['all', ['has', 'leisure'], ['==', ['get', 'leisure'], 'park']],
-              ['all', ['has', 'landuse'], ['==', ['get', 'landuse'], 'cemetery']],
-              ['all', ['has', 'amenity'], ['==', ['get', 'amenity'], 'cemetery']],
-              ['all', ['has', 'amenity'], ['==', ['get', 'amenity'], 'grave_yard']],
-              ['all', ['has', 'landuse'], ['==', ['get', 'landuse'], 'recreation_ground']],
-              ['all', ['has', 'leisure'], ['==', ['get', 'leisure'], 'recreation_ground']],
-              ['all', ['has', 'name'], ['in', ['get', 'name'], ['literal', ['cemetery', 'Cemetery', 'graveyard']]]],
-              ['all', ['has', 'place'], ['==', ['get', 'place'], 'cemetery']],
-              ['all', ['has', 'historic'], ['==', ['get', 'historic'], 'cemetery']]
+              // Parks & playgrounds
+              ['==', ['get', 'leisure'], 'park'],
+              ['==', ['get', 'leisure'], 'garden'],
+              ['==', ['get', 'leisure'], 'playground'],
+              ['==', ['get', 'leisure'], 'recreation_ground'],
+              ['==', ['get', 'leisure'], 'nature_reserve'],
+          
+              // Cemeteries by tag
+              ['==', ['get', 'landuse'], 'cemetery'],
+              ['==', ['get', 'amenity'], 'cemetery'],
+              ['==', ['get', 'historic'], 'cemetery'],
+          
+              // Cemeteries by name
+              ['match', ['downcase', ['get', 'name']], ['cemetery', 'graveyard'], true, false],
+          
+              // Extra green areas
+              ['==', ['get', 'landuse'], 'grass'],
+              ['==', ['get', 'landuse'], 'meadow'],
+              ['==', ['get', 'leisure'], 'sports_centre'],
+              ['==', ['get', 'leisure'], 'pitch']
             ]
-          ]
+          ] as any
         },
         {
           id: 'nyc-water',
@@ -330,25 +318,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, []);
 
-  // Business density heuristic (unchanged)
-  const getBusinessLimitForViewport = useCallback((zoom: number, bounds: Bounds): number => {
-    if (!bounds) return 200;
-    const latDiff = bounds.north - bounds.south;
-    const lngDiff = bounds.east - bounds.west;
-    const avgLat = (bounds.north + bounds.south) / 2;
-    const latKm = latDiff * 111;
-    const lngKm = lngDiff * 111 * Math.cos(avgLat * Math.PI / 180);
-    const areaKm2 = Math.max(0.00001, latKm * lngKm);
-
-    let baseDensity = 80;
-    if (zoom >= 16) baseDensity = 500;
-    else if (zoom >= 14) baseDensity = 250;
-    else if (zoom >= 12) baseDensity = 150;
-
-    const target = Math.ceil(areaKm2 * baseDensity);
-    const maxLimit = 40000;
-    const minLimit = 5000;
-    return Math.max(minLimit, Math.min(maxLimit, target));
+  const getBusinessLimitForViewport = useCallback((zoom: number) => {
+    if (zoom < 10) return 500;   // far zoomed out → fewer
+    if (zoom < 12) return 1500;
+    if (zoom < 14) return 4000;
+    if (zoom < 16) return 8000;
+    if (zoom < 18) return 15000; // very close → many
+    return 20000; // max cap
   }, []);
 
   // Updated handleBusinessClick with fly-to behavior
@@ -369,18 +345,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         });
       }
   
-      // Load full details if needed
+      // Load full details if needed  
       if (business.id && !business.id.startsWith('vector_') && fetchFullBusinessDetails) {
-        const cached = businessCacheRef.current.get(business.id);
-        if (cached && (cached as any).detailsLoaded) {
-          businessToReturn = cached;
-        } else {
-          const full = await fetchFullBusinessDetails(business.id);
-          if (full) {
-            const extended = { ...full, detailsLoaded: true } as Business & { detailsLoaded: true };
-            businessCacheRef.current.set(business.id, extended);
-            businessToReturn = extended;
-          }
+        const full = await fetchFullBusinessDetails(business.id);
+        if (full) {
+          businessToReturn = full;
         }
       }
   
@@ -392,76 +361,35 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [fetchFullBusinessDetails]);
 
+  // Trigger load ONLY on search filter changes - prevent multiple calls
   useEffect(() => {
-    if (mapLoaded) handleViewportChangeRef.current();
-  }, [mapLoaded, searchFilters]);
-
-  const handleViewportChange = useCallback(async () => {
-    if (!mapRef.current || !mapLoaded || isLoadingRef.current) return;
-    
-    // Don't load if we already have businesses from the hook
-    if (businesses && businesses.length > 0) {
-      console.log('🏢 Skipping viewport load - businesses already loaded from hook:', businesses.length);
-      return;
+    if (mapLoaded && mapRef.current && searchFilters) {
+      const timeout = setTimeout(() => {
+        const map = mapRef.current!;
+        const bounds = map.getBounds();
+        const viewportBounds = {
+          north: bounds.getNorth(),
+          south: bounds.getSouth(),
+          east: bounds.getEast(),
+          west: bounds.getWest()
+        };
+        loadBusinessesInViewport?.(viewportBounds, 8000);
+      }, 500);
+      return () => clearTimeout(timeout);
     }
-    
-    isLoadingRef.current = true;
-  
-    try {
-      const map = mapRef.current;
-      const zoom = map.getZoom();
-  
-      // Handle standard rectangular viewport only if no businesses from hook
-      const bounds = map.getBounds();
-      const viewportBounds = {
-        north: bounds.getNorth(),
-        south: bounds.getSouth(),
-        east: bounds.getEast(),
-        west: bounds.getWest()
-      };
-  
-      const businessLimit = getBusinessLimitForViewport(zoom, viewportBounds);
-  
-      try {
-        console.log('🗺️ Loading businesses for viewport (fallback):', businessLimit);
-        const viewportBusinesses = await loadBusinessesInViewport?.(viewportBounds, businessLimit) || [];
-        if (viewportBusinesses.length) {
-          businessCacheRef.current.addMultiple(viewportBusinesses);
-          setCacheVersion(prev => prev + 1);
-          console.log(`🗺️ Fallback loaded ${viewportBusinesses.length} businesses for viewport`);
-        } else {
-          console.warn("⚠️ No businesses returned for viewport");
-        }
-      } catch (err) {
-        console.error("Error loading viewport businesses:", err);
-      }
-  
-    } finally {
-      isLoadingRef.current = false;
-    }
-  }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport, searchFilters, businesses]);
+  }, [searchFilters, mapLoaded, loadBusinessesInViewport]);
 
   const deckGLLayers = useMemo(() => {
-    console.log('🎯 deckGLLayers useMemo triggered - cacheVersion:', cacheVersion);
-    
-    // Get all businesses from cache
-    const allBusinesses = businessCacheRef.current.getAll();
-    console.log('🎯 Retrieved from cache:', allBusinesses.length, 'businesses');
-    
-    if (!allBusinesses.length) {
-      console.log('🎯 No businesses in cache, returning empty layers');
+    if (!businesses || !businesses.length) {
       return [];
     }
   
     // Ensure each business has valid lat/lng
-    let validBusinesses = allBusinesses.filter(
+    let validBusinesses = businesses.filter(
       b => b?.position?.lat != null && b?.position?.lng != null
     );
     
-    console.log('🎯 Valid businesses after filtering:', validBusinesses.length);
-    
     if (!validBusinesses.length) {
-      console.log('🎯 No valid businesses after filtering, returning empty layers');
       return [];
     }
   
@@ -477,8 +405,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     }
   
-    console.log('🎯 Rendering', validBusinesses.length, 'businesses');
-  
     if (!validBusinesses.length) return [];
   
     // Return DeckGL layer
@@ -490,7 +416,41 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         neighborhoodBoundary: searchFilters?.neighborhoodFilter?.boundary || null
       })
     ];
-  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, cacheVersion]);
+  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, businesses]);
+  
+  const lastLoadTimeRef = useRef(0);
+
+  const handleViewportChange = useCallback(async () => {
+    if (!mapRef.current || !mapLoaded || loading) return;
+  
+    const map = mapRef.current;
+    const zoom = map.getZoom();
+    const bounds = map.getBounds();
+    const viewportBounds = {
+      north: bounds.getNorth(),
+      south: bounds.getSouth(),
+      east: bounds.getEast(),
+      west: bounds.getWest()
+    };
+  
+    const boundsKey = `${viewportBounds.north.toFixed(4)}-${viewportBounds.south.toFixed(4)}-${viewportBounds.east.toFixed(4)}-${viewportBounds.west.toFixed(4)}`;
+  
+    // Prevent duplicate calls for same viewport within 2s
+    const now = Date.now();
+    if (lastBoundsRef.current === boundsKey && now - lastLoadTimeRef.current < 2000) {
+      return;
+    }
+  
+    lastBoundsRef.current = boundsKey;
+    lastLoadTimeRef.current = now;
+  
+    try {
+      const limit = getBusinessLimitForViewport(zoom);
+      await loadBusinessesInViewport?.(viewportBounds, limit);
+    } catch (err) {
+      console.error("❌ Error loading businesses:", err);
+    }
+  }, [mapLoaded, loading, loadBusinessesInViewport, getBusinessLimitForViewport]);
 
   // initialize map once
   useEffect(() => {
@@ -528,7 +488,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
 
       mapRef.current = mapInstance;
-      handleViewportChangeRef.current = handleViewportChange;
 
       mapInstance.on('error', (e) => {
         console.error('🗺️ Map error:', e.error || e);
@@ -553,11 +512,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           console.error('🗺️ Error adding vector layers:', err);
         }
       
-        // Initial data load
-        setTimeout(() => { 
-          console.log('🗺️ Triggering initial viewport load');
-          handleViewportChangeRef.current(); 
-        }, 1500);
+        // Initial load
+        setTimeout(() => handleViewportChange(), 1500);
       });
 
       // fallback if load event didn't fire timely
@@ -567,10 +523,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             console.log('🗺️ Map load timeout - forcing loaded state');
             setMapLoaded(true);
             callbackRefs.current.onMapLoaded?.();
-            setTimeout(() => {
-              console.log('🗺️ Fallback viewport load');
-              handleViewportChangeRef.current();
-            }, 100);
+            setTimeout(() => handleViewportChange(), 200);
           }
         } catch (err) {
           console.error('🗺️ Error in fallback load:', err);
@@ -582,12 +535,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         let t: any = 0;
         return () => {
           clearTimeout(t);
-          t = setTimeout(() => handleViewportChangeRef.current(), 150);
+          t = setTimeout(() => handleViewportChange(), 150);
         };
       })();
 
-      mapInstance.on('moveend', () => handleViewportChangeRef.current());
-      mapInstance.on('zoomend', () => handleViewportChangeRef.current());
+      mapInstance.on('moveend', handleViewportChange);
+      mapInstance.on('zoomend', handleViewportChange);
       mapInstance.on('move', debouncedMove);
 
       mapInstance.on('sourcedata', (e: any) => {
@@ -625,16 +578,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // update deck layers
   useEffect(() => {
     if (!deckOverlay || !overlayReady) return;
-    console.log('🎯 Updating DeckGL layers, business count:', deckGLLayers.length > 0 ? deckGLLayers[0]?.props?.data?.length || 0 : 0);
     deckOverlay.setProps({ layers: deckGLLayers });
   }, [deckOverlay, overlayReady, deckGLLayers]);
 
-  // initial load trigger when map ready
+  // Initial load when map is ready - SINGLE TRIGGER
   useEffect(() => {
-    if (mapLoaded && mapRef.current) {
-      setTimeout(() => handleViewportChangeRef.current(), 500);
+    if (mapLoaded && !businesses?.length && !loading) {
+      const timeout = setTimeout(() => handleViewportChange(), 2000);
+      return () => clearTimeout(timeout);
     }
-  }, [mapLoaded]);
+  }, [mapLoaded, handleViewportChange]); // Removed businesses and loading from deps to prevent loops
 
   // center/load neighborhood center
   const isUserInteractingRef = useRef(false);
@@ -685,12 +638,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return () => clearTimeout(timeout);
   }, [searchFilters?.neighborhoodFilter, neighborhoodCenter, mapLoaded]);
 
-  // center/load neighborhood businesses on searchFilters change (stable)
+  // Load businesses ONLY when search filters change
   useEffect(() => {
-    if (!mapRef.current || !mapLoaded || !searchFilters?.neighborhoodFilter) return;
-    const load = async () => { handleViewportChangeRef.current(); };
-    setTimeout(load, 500);
-  }, [mapLoaded, searchFilters?.neighborhoodFilter]);
+    if (mapLoaded && searchFilters?.neighborhoodFilter) {
+      const timeout = setTimeout(() => handleViewportChange(), 500);
+      return () => clearTimeout(timeout);
+    }
+  }, [mapLoaded, searchFilters?.neighborhoodFilter, handleViewportChange]);
 
   // landmarks handling (unchanged)
   useEffect(() => {
