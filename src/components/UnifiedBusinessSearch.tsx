@@ -515,6 +515,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                           <span className="text-xs opacity-70">{result.borough}</span>
                         </div>
                       ) : (
+                        {/* Business result */}
                         <div className="flex flex-col">
                           <div className="flex justify-between items-center">
                             <span className="font-medium">{(result as EnhancedBusiness).name}</span>
@@ -522,7 +523,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                               {(result as EnhancedBusiness).businessType || "Business"}
                             </span>
                           </div>
-                      
+                        
                           {/* Only show address if available */}
                           {((result as EnhancedBusiness).formatted_address || (result as EnhancedBusiness).vicinity) && (
                             <span className="text-xs text-gray-500 truncate mt-0.5">
@@ -532,8 +533,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                           )}
                         </div>
                       )}
-                      
                     </div>
+                
                     {/* Divider between results */}
                     {index < (Array.isArray(searchResults) ? searchResults.length - 1 : -1) && (
                       <div className="h-px bg-border/30 my-1.5"></div>
