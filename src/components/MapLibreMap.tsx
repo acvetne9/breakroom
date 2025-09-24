@@ -298,7 +298,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ['get', 'name'],
               ''
             ],
-            'text-font': "Open Sans Regular",
+            'text-font': ["Open Sans Regular"],
             'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
             'text-max-width': 8,
             'text-line-height': 1.2,
