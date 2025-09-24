@@ -581,22 +581,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         });
       });
 
-
-      // fallback if load event didn't fire timely
-      setTimeout(() => {
-        try {
-          if (!mapInstance.loaded() && !mapLoaded) {
-            console.log('🗺️ Map load timeout - forcing loaded state');
-            setMapLoaded(true);
-            callbackRefs.current.onMapLoaded?.();
-            setTimeout(() => handleViewportChange(), 200);
-          }
-        } catch (err) {
-          console.error('🗺️ Error in fallback load:', err);
-        }
-      }, 3000); // Increased timeout
-
-      // events
       const debouncedMove = (() => {
         let t: any = 0;
         return () => {
