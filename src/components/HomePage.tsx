@@ -191,7 +191,7 @@ const HomePage: React.FC<HomePageProps> = ({
     
     if (onLocationSave && business.name) {
       const fullLocation = business.formatted_address || business.vicinity || business.name;
-      onLocationSave(business.name, fullLocation);
+      onLocationSave(fullLocation, fullLocation);
     }
   };
 

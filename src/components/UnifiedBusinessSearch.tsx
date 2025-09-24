@@ -356,7 +356,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       // Save the clicked business location
       if (onLocationSave && business.name) {
         const fullLocation = business.formatted_address || business.vicinity || business.name;
-        onLocationSave(business.name, fullLocation);
+        onLocationSave(fullLocation, fullLocation);
       }
     }
     
@@ -515,7 +515,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                           <span className="text-xs opacity-70">{result.borough}</span>
                         </div>
                       ) : (
-                        {/* Business result */}
+                        // Business result
                         <div className="flex flex-col">
                           <div className="flex justify-between items-center">
                             <span className="font-medium">{(result as EnhancedBusiness).name}</span>
@@ -523,14 +523,12 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                               {(result as EnhancedBusiness).businessType || "Business"}
                             </span>
                           </div>
-                        
-                          {/* Only show address if available */}
-                          {((result as EnhancedBusiness).formatted_address || (result as EnhancedBusiness).vicinity) && (
-                            <span className="text-xs text-gray-500 truncate mt-0.5">
-                              {(result as EnhancedBusiness).formatted_address ||
-                               (result as EnhancedBusiness).vicinity}
-                            </span>
-                          )}
+                          {/* Always render address in small gray text */}
+                          <span className="text-xs text-gray-500 truncate mt-0.5">
+                            {(result as EnhancedBusiness).formatted_address || 
+                             (result as EnhancedBusiness).vicinity || 
+                             (result as EnhancedBusiness).name}
+                          </span>
                         </div>
                       )}
                     </div>
