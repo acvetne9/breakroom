@@ -356,7 +356,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       // Save the clicked business location
       if (onLocationSave && business.name) {
         const fullLocation = business.formatted_address || business.vicinity || business.name;
-        onLocationSave(fullLocation, fullLocation);
+        onLocationSave(business.name, fullLocation);
       }
     }
     
