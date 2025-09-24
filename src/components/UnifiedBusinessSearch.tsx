@@ -515,10 +515,22 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                           <span className="text-xs opacity-70">{result.borough}</span>
                         </div>
                       ) : (
-                        // Business result
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium">{result.name}</span>
-                          <span className="text-sm opacity-70">{(result as EnhancedBusiness).businessType || 'Business'}</span>
+                        {/* Business result */}
+                        <div className="cursor-pointer py-1.5 px-0 rounded transition-colors hover:bg-accent/20"
+                             onClick={() => handleResultClick(result)}>
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">{result.name}</span>
+                            <span className="text-sm opacity-70">
+                              {(result as EnhancedBusiness).businessType || 'Business'}
+                            </span>
+                          </div>
+                        
+                          {/* Address under business name */}
+                          {(result as EnhancedBusiness).formatted_address && (
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {(result as EnhancedBusiness).formatted_address}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
