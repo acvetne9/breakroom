@@ -30,6 +30,16 @@ export interface SearchFilters {
   textTerms?: string[];
 }
 
+export function getBusinessAddress(business: EnhancedBusiness | { address?: string, name?: string }) {
+  return (
+    business.address ||
+    (business as EnhancedBusiness).formatted_address ||
+    (business as EnhancedBusiness).vicinity ||
+    business.name ||
+    ""
+  );
+}
+
 function parseSalaryToNumber(salary: string): number | null {
   if (!salary) return null;
   
