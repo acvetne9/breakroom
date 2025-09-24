@@ -274,12 +274,24 @@ return (
       {/* Help popup is absolutely positioned so it doesn't push the footer down */}
       {showHelpPopup && (
         <div
-          className="absolute left-6 right-6 bottom-16 bg-white border-2 border-app-yellow rounded-xl p-4 shadow-lg z-50"
+          className="mt-4 w-full bg-white border-2 border-app-yellow rounded-xl p-4 shadow-lg space-y-3"
           onClick={(e) => e.stopPropagation()}
         >
-          <p className="text-sm text-app-gray-dark">
-            <strong>Disclaimer:</strong> The information presented in this app is based on surveys, user input, and publicly available sources. We do not independently verify all information, and it should not be taken as factual statements about any individual or organization.
-          </p>
+          <input
+            type="text"
+            placeholder="Business name incorrect?"
+            className="app-input w-full"
+          />
+          <input
+            type="text"
+            placeholder="Address incorrect?"
+            className="app-input w-full"
+          />
+          <input
+            type="text"
+            placeholder="Link incorrect?"
+            className="app-input w-full"
+          />
         </div>
       )}
     </div>
