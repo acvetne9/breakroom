@@ -6,7 +6,9 @@ import { MapboxOverlay } from '@deck.gl/mapbox'; // use this package
 import { createBusinessScatterplotLayer } from '@/utils/deckGLLayers';
 import { useViewportMapData } from '../hooks/useViewportMapData';
 import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
-import { createTileBlobUrl } from '@/utils/tileDecompression';
+import { createTileBlobUrl, isCapacitor } from '@/utils/tileDecompression';
+import { patchTileLoading } from '@/utils/capacitorTileHandler';
+import { addTileDebugLogs, logCapacitorEnvironment } from '@/utils/debugCapacitorTiles';
 import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods';
 import type { GeoJSONFeature } from 'maplibre-gl';
 import type { Business } from '@/types/business';
@@ -195,7 +197,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       callbackRefs.current.onBusinessesLoaded?.();
     }
   }, [businesses]);
-  
+
+  // Debug glyph requests
+  (function debugGlyphs() {
+    const origFetch = window.fetch;
+    window.fetch = async (input: RequestInfo, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.url;
+      if (url.includes("/assets/fonts/")) {
+        console.log("🔡 Glyph request:", url);
+      }
+      const res = await origFetch(input, init);
+      if (!res.ok) {
+        console.error("⚠️ Glyph request failed:", url, res.status);
+      }
+      return res;
+    };
+  })();
+
   // vector layers (styling restored exactly as requested)
   const addVectorLayers = useCallback((map: maplibregl.Map) => {
     try {
@@ -205,7 +223,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: 'fill',
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
-          layout: {},
           paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
           filter: ['all', ['==', ['geometry-type'], 'Polygon']]
         },
@@ -214,32 +231,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: 'fill',
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
-          layout: {},
           paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
           filter: [
             'all',
             ['==', ['geometry-type'], 'Polygon'],
             ['any',
-              // Parks & playgrounds
               ['==', ['get', 'leisure'], 'park'],
               ['==', ['get', 'leisure'], 'garden'],
               ['==', ['get', 'leisure'], 'playground'],
               ['==', ['get', 'leisure'], 'recreation_ground'],
               ['==', ['get', 'leisure'], 'nature_reserve'],
-          
-              // Cemeteries by tag
-              ['==', ['get', 'landuse'], 'cemetery'],
-              ['==', ['get', 'amenity'], 'cemetery'],
-              ['==', ['get', 'historic'], 'cemetery'],
-          
-              // Cemeteries by name
-              ['match', ['downcase', ['get', 'name']], ['cemetery', 'graveyard'], true, false],
-          
-              // Extra green areas
+              ['==', ['get', 'leisure'], 'sports_centre'],
+              ['==', ['get', 'leisure'], 'pitch'],
               ['==', ['get', 'landuse'], 'grass'],
               ['==', ['get', 'landuse'], 'meadow'],
-              ['==', ['get', 'leisure'], 'sports_centre'],
-              ['==', ['get', 'leisure'], 'pitch']
+              ['==', ['get', 'landuse'], 'cemetery'],
+              ['>=',
+                ['index-of', 'cemetery', ['downcase', ['coalesce', ['get', 'name'], '']]],
+                0
+              ]
             ]
           ] as any
         },
@@ -248,7 +258,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: 'fill',
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
-          layout: {},
           paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
           filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']]
         },
@@ -257,7 +266,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: 'line',
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
-          layout: {},
           paint: {
             'line-color': '#666666',
             'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
@@ -271,8 +279,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           layout: {
-            'text-field': ['coalesce', ['get', 'name'], ''],
-            'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+            'text-field': [
+              'case',
+              ['has', 'name'],
+              ['get', 'name'],
+              ''
+            ],
+            'text-font': ['Open Sans Regular'],
             'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
             'text-max-width': 8,
             'text-line-height': 1.2,
@@ -290,17 +303,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           filter: [
             'all',
             ['==', ['geometry-type'], 'LineString'],
-            ['has', 'name'],
-            ['has', 'highway'],
-            ['!=', ['coalesce', ['get', 'name'], ''], '']
+            ['has', 'highway']
           ],
           minzoom: 12
         }
       ];
   
       console.log('🗺️ Adding vector layers...');
+      
       layers.forEach(layer => {
         try {
+          // Debug: log the layer before adding
+          console.log("🔍 Validating layer:", layer.id, layer);
+      
+          // Ensure layout object exists for symbol layers
+          if (layer.type === "symbol" && !("layout" in layer)) {
+            console.warn(`⚠️ Missing layout for symbol layer: ${layer.id}`);
+            (layer as any).layout = { "text-field": "" }; // minimal fallback
+          }
+      
           if (!map.getLayer(layer.id)) {
             map.addLayer(layer);
             console.log(`✅ Layer added: ${layer.id}`);
@@ -407,21 +428,30 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   
     if (!validBusinesses.length) return [];
   
-    // Return DeckGL layer
-    return [
-      createBusinessScatterplotLayer({
+    let safeLayer: any = null;
+    try {
+      safeLayer = createBusinessScatterplotLayer({
         businesses: validBusinesses,
         selectedBusinessId: selectedBusiness?.id,
         onBusinessClick: handleBusinessClick,
         neighborhoodBoundary: searchFilters?.neighborhoodFilter?.boundary || null
-      })
-    ];
+      });
+      console.log("✅ Created scatterplot layer:", safeLayer);
+    } catch (err) {
+      console.error("❌ Failed to create scatterplot layer", err);
+    }
+    
+    return safeLayer ? [safeLayer] : [];
   }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, businesses]);
   
   const lastLoadTimeRef = useRef(0);
 
   const handleViewportChange = useCallback(async () => {
-    if (!mapRef.current || !mapLoaded || loading) return;
+    if (!mapRef.current || !mapLoaded) return;
+    if (loading) {
+      console.log("⏸️ Skipping viewport change while loading...");
+      return;
+    }
   
     const map = mapRef.current;
     const zoom = map.getZoom();
@@ -456,6 +486,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     const initializeMap = async () => {
       if (!mapContainerRef.current || mapRef.current) return;
+      
+      // Enhanced Capacitor setup with debugging
+      if (isCapacitor()) {
+        console.log('🔧 Setting up Capacitor tile handling');
+        logCapacitorEnvironment();
+        addTileDebugLogs();
+        patchTileLoading();
+        
+        // Add a small delay to ensure patching is complete
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
 
       const vectorSource = {
         type: 'vector' as const,
@@ -467,7 +508,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       const style = {
         version: 8 as const,
-        glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf", // 👈 required
+        glyphs: `${window.location.origin}/assets/fonts/{fontstack}/{range}.pbf`,
         sources: { 'nyc-tiles': vectorSource },
         layers: [
           { id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } }
@@ -491,11 +532,26 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       mapInstance.on('error', (e) => {
         console.error('🗺️ Map error:', e.error || e);
-        // Try to continue despite errors
-        if (!mapLoaded) {
-          console.log('🗺️ Setting map as loaded despite error');
-          setMapLoaded(true);
-          callbackRefs.current.onMapLoaded?.();
+        
+        // Handle tile loading errors more gracefully in Capacitor
+        if (isCapacitor() && e.error?.message?.includes('Unable to parse the tile')) {
+          console.log('🔧 Tile parsing error in Capacitor - attempting recovery');
+          
+          // Don't mark as loaded immediately, give tiles another chance
+          setTimeout(() => {
+            if (!mapLoaded && mapRef.current) {
+              console.log('🗺️ Setting map as loaded after tile error recovery attempt');
+              setMapLoaded(true);
+              callbackRefs.current.onMapLoaded?.();
+            }
+          }, 2000);
+        } else {
+          // For other errors, continue as before
+          if (!mapLoaded) {
+            console.log('🗺️ Setting map as loaded despite error');
+            setMapLoaded(true);
+            callbackRefs.current.onMapLoaded?.();
+          }
         }
       });
 
@@ -515,6 +571,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         // Initial load
         setTimeout(() => handleViewportChange(), 1500);
       });
+
+      mapInstance.on("styledata", () => {
+        const allLayers = mapInstance.getStyle().layers || [];
+        allLayers.forEach(l => {
+          if (l.type === "symbol" && !("layout" in l)) {
+            console.warn("⚠️ Symbol layer missing layout:", l.id, l);
+          }
+        });
+      });
+
 
       // fallback if load event didn't fire timely
       setTimeout(() => {
@@ -580,6 +646,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (!deckOverlay || !overlayReady) return;
     deckOverlay.setProps({ layers: deckGLLayers });
   }, [deckOverlay, overlayReady, deckGLLayers]);
+
+  useEffect(() => {
+    if (deckOverlay && overlayReady) {
+      console.log(`🔄 Refreshing Deck overlay with ${businesses.length} businesses`);
+      deckOverlay.setProps({ layers: deckGLLayers });
+    }
+  }, [businesses, deckOverlay, overlayReady, deckGLLayers]);
 
   // Initial load when map is ready - SINGLE TRIGGER
   useEffect(() => {

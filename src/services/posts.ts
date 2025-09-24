@@ -13,6 +13,7 @@ export interface PostData {
   downvotes: number;
   created_at: string;
   updated_at: string;
+  is_comment?: string;
 }
 
 export interface Post {
@@ -29,6 +30,8 @@ export interface Post {
   downvotes: number;
   userVote?: 'up' | 'down' | null;
   createdAt: Date;
+  timestamp?: string;
+  isComment?: string;
 }
 
 // Transform database post to frontend post format
@@ -47,7 +50,9 @@ export const transformPost = (dbPost: PostData, businesses: any[] = []): Post =>
     upvotes: dbPost.upvotes,
     downvotes: dbPost.downvotes,
     userVote: null, // Will be determined by votes table
-    createdAt: new Date(dbPost.created_at)
+    createdAt: new Date(dbPost.created_at),
+    timestamp: dbPost.created_at,
+    isComment: dbPost.is_comment,
   };
 };
 
@@ -68,7 +73,8 @@ export const createPost = async (
   businessId?: string,
   jobRole?: string,
   timePeriod?: string,
-  salary?: number
+  salary?: number,
+  isComment?: string
 ): Promise<{ data: PostData | null; error: any }> => {
   // Generate a proper UUID format for temp user
   const tempUserId = crypto.randomUUID();
@@ -83,6 +89,7 @@ export const createPost = async (
       job_role: jobRole,
       time_period: timePeriod,
       salary,
+      is_comment: isComment,
     })
     .select()
     .single();

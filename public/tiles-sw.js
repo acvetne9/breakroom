@@ -27,7 +27,7 @@ self.addEventListener('message', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   const isTile = url.pathname.startsWith('/data/tiles/') && url.pathname.endsWith('.pbf');
-  if (!isTile) return; // Only intercept vector tile requests
+  if (!isTile) return;
 
   event.respondWith((async () => {
     try {
@@ -36,7 +36,6 @@ self.addEventListener('fetch', (event) => {
       const type = resp.headers.get('content-type') || '';
       log('Fetch tile:', url.pathname, '| encoding:', enc || 'none', '| type:', type || 'unknown');
 
-      // Always read the body and normalize to raw (un-gzipped) protobuf bytes
       const buf = await resp.arrayBuffer();
       let bytes = new Uint8Array(buf);
 
@@ -44,7 +43,7 @@ self.addEventListener('fetch', (event) => {
       if (isGzip) {
         try {
           log('Decompressing gzipped tile:', url.pathname);
-          bytes = self.pako.ungzip(bytes); // Uint8Array
+          bytes = self.pako.ungzip(bytes);
         } catch (e) {
           log('Decompression failed, returning original bytes:', e);
         }
@@ -57,9 +56,13 @@ self.addEventListener('fetch', (event) => {
         }
       });
     } catch (err) {
-      log('Fetch handler error:', err);
-      // Last resort: let the request go through
-      return fetch(event.request);
+      log('Fetch handler error (falling back):', err);
+      // Always return a valid Response to avoid DataCloneError
+      try {
+        return await fetch(event.request);
+      } catch (err2) {
+        return new Response('', { status: 500 });
+      }
     }
   })());
 });

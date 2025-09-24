@@ -50,10 +50,12 @@ export const usePosts = () => {
     isJobUpdate: boolean = false,
     jobRole?: string,
     timePeriod?: string,
-    salary?: number
+    salary?: number,
+    isComment?: string
   ): Promise<boolean> => {
     try {
-      const postType = isJobUpdate ? 'job_update' : 'story';
+      // Always use 'story' as post_type since that's what the database allows
+      const postType = 'story';
       
       const { data, error } = await createPost(
         text,
@@ -61,7 +63,8 @@ export const usePosts = () => {
         businessId,
         jobRole,
         timePeriod,
-        salary
+        salary,
+        isComment
       );
 
       if (error) {
