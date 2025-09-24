@@ -260,15 +260,15 @@ return (
 
       {/* Sticky footer with ? button (never inside the scrollable area) */}
       <div className="pt-4 flex items-center shrink-0">
+        <p className="text-xs text-app-gray-medium mr-3">
+          Is this business accurate?
+        </p>
         <button
           onClick={handleHelpButtonClick}
           className="w-6 h-6 bg-app-gray-light rounded-full flex items-center justify-center hover:bg-app-gray-medium transition-colors text-app-white font-bold text-sm"
         >
           ?
         </button>
-        <p className="text-xs text-app-gray-medium mr-2">
-          Is this business accurate?
-        </p>
       </div>
 
       {/* Help popup is absolutely positioned so it doesn't push the footer down */}
