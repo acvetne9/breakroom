@@ -523,12 +523,12 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                               {(result as EnhancedBusiness).businessType || "Business"}
                             </span>
                           </div>
-                          {/* Render address if available */}
-                          {((result as EnhancedBusiness).formatted_address || (result as EnhancedBusiness).vicinity) && (
-                            <span className="text-xs text-gray-500 truncate mt-0.5">
-                              {(result as EnhancedBusiness).formatted_address || (result as EnhancedBusiness).vicinity}
-                            </span>
-                          )}
+                          {/* Always show address if available */}
+                          <span className="text-xs text-muted-foreground truncate mt-0.5">
+                            {(result as EnhancedBusiness).formatted_address || 
+                             (result as EnhancedBusiness).vicinity || 
+                             'Address not available'}
+                          </span>
                         </div>
                       )}
                     </div>

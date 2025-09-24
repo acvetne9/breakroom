@@ -160,11 +160,29 @@ const HomePage: React.FC<HomePageProps> = ({
     console.log('🔍 DEBUG: handleSearchBusinessSelect deps check', { 
       searchFilters: typeof searchFilters 
     });
+    
     const mapBusiness = {
       ...business,
       businessType: business.businessType || business.business_type,
-      formatted_address: business.formatted_address || business.vicinity || business.name
+      formatted_address: business.formatted_address || business.vicinity || business.name,
+      position: {
+        lat: business.position?.lat || business.lat,
+        lng: business.position?.lng || business.lng
+      }
     };
+    
+    // Trigger map flyTo by dispatching a custom event
+    if (mapBusiness.position?.lat && mapBusiness.position?.lng) {
+      const flyToEvent = new CustomEvent('flyToBusiness', {
+        detail: {
+          lat: mapBusiness.position.lat,
+          lng: mapBusiness.position.lng,
+          business: mapBusiness
+        }
+      });
+      window.dispatchEvent(flyToEvent);
+    }
+    
     handleBusinessClick(mapBusiness);
     console.log('🔍 Business selected from search - keeping filters active:', searchFilters);
   };

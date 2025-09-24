@@ -670,6 +670,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, [mapLoaded]);
   
+  // Listen for flyToBusiness events from search business selection
+  useEffect(() => {
+    const handleFlyToBusiness = (event: CustomEvent) => {
+      if (!mapRef.current) return;
+      
+      const { lat, lng, business } = event.detail;
+      console.log('🗺️ Flying to business from search:', business?.name);
+      
+      mapRef.current.flyTo({
+        center: [lng, lat],
+        zoom: 16,
+        speed: 1.2,
+        curve: 1.2,
+        essential: true
+      });
+    };
+
+    window.addEventListener('flyToBusiness', handleFlyToBusiness as EventListener);
+    return () => window.removeEventListener('flyToBusiness', handleFlyToBusiness as EventListener);
+  }, [mapLoaded]);
+  
   useEffect(() => {
     if (!mapRef.current || !mapLoaded || !searchFilters?.neighborhoodFilter || !neighborhoodCenter) return;
   
