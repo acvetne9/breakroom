@@ -51,7 +51,7 @@ const featureToLatLon = (feature: Feature<Point> | { lat: number; lon: number })
   throw new Error('Invalid feature for conversion to lat/lon');
 };
 
-const createOptimizedGridSampling = (bounds: Bounds, businesses: Business[], maxBusinesses: number, prioritizeVisible: boolean = false): Business[] => {
+const createOptimizedGridSampling = (bounds: Bounds, businesses: Business[], maxBusinesses: number = 1000000, prioritizeVisible: boolean = false): Business[] => {
   if (!businesses || businesses.length <= maxBusinesses) return businesses;
 
   if (prioritizeVisible) {
