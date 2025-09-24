@@ -258,7 +258,6 @@ return (
         </div>
       </div>
 
-      {/* Sticky footer with ? button (never inside the scrollable area) */}
       <div className="pt-4 flex items-center shrink-0">
         <button
           onClick={handleHelpButtonClick}
@@ -266,7 +265,7 @@ return (
         >
           ?
         </button>
-        <p className="text-xs text-app-gray-medium mr-3">
+        <p className="text-xs text-app-gray-medium ml-4">
           Is this business accurate?
         </p>
       </div>
@@ -298,7 +297,7 @@ return (
           <div className="flex items-center justify-between pt-2">
             <label className="flex items-center text-xs text-app-gray-dark">
               <input type="checkbox" className="mr-2" />
-              Does this business exist?
+              Did this business close?
             </label>
             <button
               className="px-3 py-1 bg-app-yellow text-app-black rounded text-xs hover:bg-app-yellow/90 transition-colors"
