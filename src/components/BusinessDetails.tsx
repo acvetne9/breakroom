@@ -271,27 +271,41 @@ return (
         </p>
       </div>
 
-      {/* Help popup is absolutely positioned so it doesn't push the footer down */}
+      {/* Help Popup - Styled like other cards with rounded edges */}
       {showHelpPopup && (
         <div
-          className="mt-4 w-full bg-white border-2 border-app-yellow rounded-xl p-4 shadow-lg space-y-3"
+          className="mt-4 w-full bg-white border-2 border-app-yellow rounded-xl p-4 shadow-lg space-y-2"
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Condensed input fields */}
           <input
             type="text"
-            placeholder="Business name incorrect?"
-            className="app-input w-full"
+            placeholder="Business name..."
+            className="app-input w-full h-10 text-sm"
           />
           <input
             type="text"
-            placeholder="Address incorrect?"
-            className="app-input w-full"
+            placeholder="Job role..."
+            className="app-input w-full h-10 text-sm"
           />
           <input
             type="text"
-            placeholder="Link incorrect?"
-            className="app-input w-full"
+            placeholder="Salary..."
+            className="app-input w-full h-10 text-sm"
           />
+      
+          {/* Footer row with checkbox + submit */}
+          <div className="flex items-center justify-between pt-2">
+            <label className="flex items-center text-xs text-app-gray-dark">
+              <input type="checkbox" className="mr-2" />
+              Does this business exist?
+            </label>
+            <button
+              className="px-3 py-1 bg-app-yellow text-app-black rounded text-xs hover:bg-app-yellow/90 transition-colors"
+            >
+              Submit
+            </button>
+          </div>
         </div>
       )}
     </div>
