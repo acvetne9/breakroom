@@ -165,6 +165,18 @@ const HomePage: React.FC<HomePageProps> = ({
       businessType: business.businessType || business.business_type,
       formatted_address: business.formatted_address || business.vicinity || business.name
     };
+    
+    // Dispatch custom event to trigger map flyTo
+    if (business?.position?.lat && business?.position?.lng) {
+      window.dispatchEvent(new CustomEvent('flyToBusiness', {
+        detail: {
+          lat: business.position.lat,
+          lng: business.position.lng,
+          business: mapBusiness
+        }
+      }));
+    }
+    
     handleBusinessClick(mapBusiness);
     console.log('🔍 Business selected from search - keeping filters active:', searchFilters);
   };

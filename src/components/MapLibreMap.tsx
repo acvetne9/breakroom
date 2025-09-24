@@ -42,6 +42,19 @@ interface ViewportState {
 
 let overlayInstance: MapboxOverlay | null = null;
 
+// Debounce utility function
+const debounce = (func: Function, wait: number) => {
+  let timeout: NodeJS.Timeout;
+  return function executedFunction(...args: any[]) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+};
+
 // Convert GeoJSON Point Feature -> { lat, lon }
 const featureToLatLon = (feature: Feature<Point> | { lat: number; lon: number }) => {
   if ('geometry' in feature && feature.geometry?.type === 'Point') {
@@ -530,6 +543,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       mapRef.current = mapInstance;
 
+      // Add event listener for flyToBusiness custom event
+      const handleFlyToBusiness = (event: CustomEvent) => {
+        const { lat, lng } = event.detail;
+        if (mapRef.current && lat != null && lng != null) {
+          mapRef.current.flyTo({
+            center: [lng, lat],
+            zoom: 16,
+            speed: 1.2,
+            curve: 1.2,
+            essential: true
+          });
+        }
+      };
+
+      window.addEventListener('flyToBusiness', handleFlyToBusiness as EventListener);
+
       mapInstance.on('error', (e) => {
         console.error('🗺️ Map error:', e.error || e);
         
@@ -565,65 +594,63 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             addVectorLayers(mapInstance);
           }
         } catch (err) {
-          console.error('🗺️ Error adding vector layers:', err);
+          console.error('❌ Error adding layers:', err);
         }
-      
-        // Initial load
-        setTimeout(() => handleViewportChange(), 1500);
-      });
-
-      mapInstance.on("styledata", () => {
-        const allLayers = mapInstance.getStyle().layers || [];
-        allLayers.forEach(l => {
-          if (l.type === "symbol" && !("layout" in l)) {
-            console.warn("⚠️ Symbol layer missing layout:", l.id, l);
+        
+        // Load businesses for the initial viewport
+        setTimeout(() => {
+          if (mapRef.current && !loading) {
+            handleViewportChange();
           }
+        }, 1000);
+      });
+
+      // Add interaction event listeners
+      mapInstance.on('click', (e) => {
+        const features = mapInstance.queryRenderedFeatures(e.point);
+        if (features && features.length > 0) {
+          features.forEach(feature => {
+            if (feature.properties && feature.properties.name) {
+              console.log(`🔍 Clicked feature: ${feature.properties.name}`);
+            }
+          });
+        }
+      });
+
+      const debounceViewportChange = debounce(() => {
+        handleViewportChange();
+      }, 800);
+      
+      mapInstance.on('moveend', debounceViewportChange);
+      mapInstance.on('zoomend', debounceViewportChange);
+
+      // Handle deck.gl overlay initialization
+      try {
+        const overlay = new MapboxOverlay({
+          interleaved: true,
+          layers: []
         });
-      });
+        mapInstance.addControl(overlay as any);
+        setDeckOverlay(overlay);
+        overlayInstance = overlay;
+        
+        setTimeout(() => setOverlayReady(true), 100);
+      } catch (overlayError) {
+        console.error('❌ Failed to initialize Deck.GL overlay:', overlayError);
+      }
 
-      const debouncedMove = (() => {
-        let t: any = 0;
-        return () => {
-          clearTimeout(t);
-          t = setTimeout(() => handleViewportChange(), 150);
-        };
-      })();
-
-      mapInstance.on('moveend', handleViewportChange);
-      mapInstance.on('zoomend', handleViewportChange);
-      mapInstance.on('move', debouncedMove);
-
-      mapInstance.on('sourcedata', (e: any) => {
-        if (e.sourceId === 'nyc-tiles' && e.isSourceLoaded && !layersAddedRef.current) {
-          addVectorLayers(mapInstance);
+      // Cleanup function
+      return () => {
+        window.removeEventListener('flyToBusiness', handleFlyToBusiness as EventListener);
+        if (mapRef.current) {
+          mapRef.current.remove();
+          mapRef.current = null;
         }
-      });
-
-      // deck overlay
-      setTimeout(() => {
-        if (mapRef.current && !overlayInstance) {
-          overlayInstance = new MapboxOverlay({ interleaved: true, pickingRadius: 10 });
-          mapRef.current.addControl(overlayInstance);
-          setDeckOverlay(overlayInstance);
-          setOverlayReady(true);
-        }
-      }, 500);
+      };
     };
 
     initializeMap();
-
-    return () => {
-      try {
-        if (overlayInstance && mapRef.current) { mapRef.current.removeControl(overlayInstance); overlayInstance = null; }
-      } catch {}
-      try { mapRef.current?.remove(); } catch {}
-      layersAddedRef.current = false;
-      setMapLoaded(false);
-      setDeckOverlay(null);
-      setOverlayReady(false);
-      mapRef.current = null;
-    };
-  }, []); // run once
+  }, []);
 
   // update deck layers
   useEffect(() => {
