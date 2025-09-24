@@ -278,7 +278,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           id: 'nyc-roads',
           type: 'line',
           source: 'nyc-tiles',
-          //'source-layer': 'examplepoints',
+          'source-layer': 'examplepoints',
           paint: {
             'line-color': '#666666',
             'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
@@ -298,7 +298,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ['get', 'name'],
               ''
             ],
-            'text-font': ['Open Sans Regular'],
+            'text-font': ["Open Sans Regular", "Arial Unicode MS Regular"],
             'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
             'text-max-width': 8,
             'text-line-height': 1.2,
