@@ -340,12 +340,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, []);
 
   const getBusinessLimitForViewport = useCallback((zoom: number) => {
-    if (zoom < 10) return 500;   // far zoomed out → fewer
-    if (zoom < 12) return 1500;
-    if (zoom < 14) return 4000;
-    if (zoom < 16) return 8000;
-    if (zoom < 18) return 15000; // very close → many
-    return 20000; // max cap
+    if (zoom < 10) return 5000;
+    if (zoom < 12) return 15000;
+    if (zoom < 14) return 40000;
+    if (zoom < 16) return 80000;
+    if (zoom < 18) return 150000;
+    return 200000;
   }, []);
 
   // Updated handleBusinessClick with fly-to behavior
