@@ -285,7 +285,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ['get', 'name'],
               ''
             ],
-            'text-font': ["Noto Sans Regular"],
+            // 'text-font': removed to prevent glyph loading issues
             'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
             'text-max-width': 8,
             'text-line-height': 1.2,
@@ -401,19 +401,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [searchFilters, mapLoaded, loadBusinessesInViewport]);
 
   const deckGLLayers = useMemo(() => {
+    console.log('🔍 Creating deck layers with businesses:', businesses?.length || 0);
+    
     if (!businesses || !businesses.length) {
+      console.log('❌ No businesses for deck layers');
       return [];
     }
-  
+
     // Ensure each business has valid lat/lng
     let validBusinesses = businesses.filter(
       b => b?.position?.lat != null && b?.position?.lng != null
     );
     
+    console.log('🔍 Valid businesses after lat/lng filter:', validBusinesses.length);
+    
     if (!validBusinesses.length) {
+      console.log('❌ No valid business coordinates');
       return [];
     }
-  
+
     // Handle neighborhood filter if present
     if (searchFilters?.neighborhoodFilter?.boundary?.length) {
       const neighborhoodCoords = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
@@ -424,10 +430,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           return turf.booleanPointInPolygon(point, turfPolygon);
         });
       }
+      console.log('🔍 Valid businesses after neighborhood filter:', validBusinesses.length);
     }
-  
-    if (!validBusinesses.length) return [];
-  
+
+    if (!validBusinesses.length) {
+      console.log('❌ No businesses after filters');
+      return [];
+    }
+
     let safeLayer: any = null;
     try {
       safeLayer = createBusinessScatterplotLayer({
@@ -436,7 +446,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         onBusinessClick: handleBusinessClick,
         neighborhoodBoundary: searchFilters?.neighborhoodFilter?.boundary || null
       });
-      console.log("✅ Created scatterplot layer:", safeLayer);
+      console.log("✅ Created scatterplot layer with businesses:", validBusinesses.length);
     } catch (err) {
       console.error("❌ Failed to create scatterplot layer", err);
     }
@@ -633,7 +643,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   useEffect(() => {
     if (deckOverlay && overlayReady) {
-      console.log(`🔄 Refreshing Deck overlay with ${businesses.length} businesses`);
+      console.log(`🔄 Refreshing Deck overlay with ${businesses?.length || 0} businesses`);
+      console.log('🔍 Businesses sample:', businesses?.slice(0, 2));
+      console.log('🔍 DeckGL layers:', deckGLLayers?.length);
       deckOverlay.setProps({ layers: deckGLLayers });
     }
   }, [businesses, deckOverlay, overlayReady, deckGLLayers]);
