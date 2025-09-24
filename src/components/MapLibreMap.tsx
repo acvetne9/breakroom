@@ -298,8 +298,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ['get', 'name'],
               ''
             ],
-            'text-font': ["Open Sans Regular"],
-            'text-size': ['interpolate', ['linear'], ['zoom'], 10, 9, 16, 12],
+            'text-font': ["Open Sans Regular", "Arial Unicode MS Regular"],
+            'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
             'text-max-width': 8,
             'text-line-height': 1.2,
             'symbol-placement': 'line',
@@ -311,7 +311,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'text-color': '#333333',
             'text-halo-color': '#FFFFFF',
             'text-halo-width': 1.5,
-            'text-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0.6, 16, 1]
+            'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 1]
           },
           filter: [
             'all',
