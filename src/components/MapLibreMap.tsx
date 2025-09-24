@@ -638,6 +638,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [businesses, deckOverlay, overlayReady, deckGLLayers]);
 
+  // Initial load when map is ready - SINGLE TRIGGER
+  // useEffect(() => {
+  //   if (mapLoaded && !businesses?.length && !loading) {
+  //     const timeout = setTimeout(() => handleViewportChange(), 2000);
+  //     return () => clearTimeout(timeout);
+  //   }
+  // }, [mapLoaded, handleViewportChange]); // Removed businesses and loading from deps to prevent loops
+
   // center/load neighborhood center
   const isUserInteractingRef = useRef(false);
   useEffect(() => {
@@ -686,6 +694,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   
     return () => clearTimeout(timeout);
   }, [searchFilters?.neighborhoodFilter, neighborhoodCenter, mapLoaded]);
+
+  // Load businesses ONLY when search filters change
+  // useEffect(() => {
+  //   if (mapLoaded && searchFilters?.neighborhoodFilter) {
+  //     const timeout = setTimeout(() => handleViewportChange(), 500);
+  //     return () => clearTimeout(timeout);
+  //   }
+  // }, [mapLoaded, searchFilters?.neighborhoodFilter, handleViewportChange]);
 
   // landmarks handling (unchanged)
   useEffect(() => {

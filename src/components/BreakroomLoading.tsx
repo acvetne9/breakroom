@@ -177,14 +177,12 @@ const BreakroomLoading = ({ onComplete }: { onComplete?: () => void }) => {
         @media (max-width: 480px) {
           div[style*="fontFamily"] {
             font-weight: 900 !important;
-            -webkit-text-stroke: 2px #8B1A1A !important;
-            text-shadow: 2px 2px 0px rgba(178, 34, 34, 0.8), 4px 4px 0px rgba(139, 26, 26, 0.6), 0 0 25px rgba(178, 34, 34, 0.5) !important;
+            text-shadow: 2px 2px 0px rgba(178, 34, 34, 0.6), 0 0 25px rgba(178, 34, 34, 0.5) !important;
             transform: perspective(500px) rotateX(-5deg) translateX(0px) !important;
           }
           
           div[style*="fontFamily"] span {
             font-weight: 900 !important;
-            -webkit-text-stroke: 2px #8B1A1A !important;
           }
         }
       `}</style>
