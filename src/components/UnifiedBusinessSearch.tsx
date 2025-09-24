@@ -516,18 +516,18 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                         </div>
                       ) : (
                         // Business result
-                        <div>
+                        <div className="flex flex-col">
                           <div className="flex justify-between items-center">
                             <span className="font-medium">{(result as EnhancedBusiness).name}</span>
                             <span className="text-sm opacity-70">
                               {(result as EnhancedBusiness).businessType || "Business"}
                             </span>
                           </div>
-                          {(result as EnhancedBusiness).formatted_address && (
-                            <div className="text-xs text-gray-500 mt-0.5 truncate">
-                              {(result as EnhancedBusiness).formatted_address ||
-                                (result as EnhancedBusiness).vicinity}
-                            </div>
+                          {/* Render address if available */}
+                          {((result as EnhancedBusiness).formatted_address || (result as EnhancedBusiness).vicinity) && (
+                            <span className="text-xs text-gray-500 truncate mt-0.5">
+                              {(result as EnhancedBusiness).formatted_address || (result as EnhancedBusiness).vicinity}
+                            </span>
                           )}
                         </div>
                       )}
