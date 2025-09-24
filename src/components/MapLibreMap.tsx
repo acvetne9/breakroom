@@ -298,7 +298,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ['get', 'name'],
               ''
             ],
-            'text-font': ["Open Sans Regular", "Arial Unicode MS Regular"],
+            'text-font': ["Open Sans Regular"],
             'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
             'text-max-width': 8,
             'text-line-height': 1.2,
@@ -520,8 +520,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       };
 
       const style = {
-        version: 8 as const,
-        glyphs: `${window.location.origin}/assets/fonts/{fontstack}/{range}.pbf`,
+        version: 8,
+        glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
         sources: { 'nyc-tiles': vectorSource },
         layers: [
           { id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } }
