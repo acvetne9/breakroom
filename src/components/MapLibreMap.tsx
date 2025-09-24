@@ -285,7 +285,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               ['get', 'name'],
               ''
             ],
-            // 'text-font': removed to prevent glyph loading issues
+            'text-font': ["Open Sans Regular", "Arial Unicode MS Regular"],
             'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
             'text-max-width': 8,
             'text-line-height': 1.2,
@@ -401,25 +401,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [searchFilters, mapLoaded, loadBusinessesInViewport]);
 
   const deckGLLayers = useMemo(() => {
-    console.log('🔍 Creating deck layers with businesses:', businesses?.length || 0);
-    
     if (!businesses || !businesses.length) {
-      console.log('❌ No businesses for deck layers');
       return [];
     }
-
+  
     // Ensure each business has valid lat/lng
     let validBusinesses = businesses.filter(
       b => b?.position?.lat != null && b?.position?.lng != null
     );
     
-    console.log('🔍 Valid businesses after lat/lng filter:', validBusinesses.length);
-    
     if (!validBusinesses.length) {
-      console.log('❌ No valid business coordinates');
       return [];
     }
-
+  
     // Handle neighborhood filter if present
     if (searchFilters?.neighborhoodFilter?.boundary?.length) {
       const neighborhoodCoords = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
@@ -430,14 +424,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           return turf.booleanPointInPolygon(point, turfPolygon);
         });
       }
-      console.log('🔍 Valid businesses after neighborhood filter:', validBusinesses.length);
     }
-
-    if (!validBusinesses.length) {
-      console.log('❌ No businesses after filters');
-      return [];
-    }
-
+  
+    if (!validBusinesses.length) return [];
+  
     let safeLayer: any = null;
     try {
       safeLayer = createBusinessScatterplotLayer({
@@ -446,7 +436,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         onBusinessClick: handleBusinessClick,
         neighborhoodBoundary: searchFilters?.neighborhoodFilter?.boundary || null
       });
-      console.log("✅ Created scatterplot layer with businesses:", validBusinesses.length);
+      console.log("✅ Created scatterplot layer:", safeLayer);
     } catch (err) {
       console.error("❌ Failed to create scatterplot layer", err);
     }
@@ -643,20 +633,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   useEffect(() => {
     if (deckOverlay && overlayReady) {
-      console.log(`🔄 Refreshing Deck overlay with ${businesses?.length || 0} businesses`);
-      console.log('🔍 Businesses sample:', businesses?.slice(0, 2));
-      console.log('🔍 DeckGL layers:', deckGLLayers?.length);
+      console.log(`🔄 Refreshing Deck overlay with ${businesses.length} businesses`);
       deckOverlay.setProps({ layers: deckGLLayers });
     }
   }, [businesses, deckOverlay, overlayReady, deckGLLayers]);
-
-  // Initial load when map is ready - SINGLE TRIGGER
-  // useEffect(() => {
-  //   if (mapLoaded && !businesses?.length && !loading) {
-  //     const timeout = setTimeout(() => handleViewportChange(), 2000);
-  //     return () => clearTimeout(timeout);
-  //   }
-  // }, [mapLoaded, handleViewportChange]); // Removed businesses and loading from deps to prevent loops
 
   // center/load neighborhood center
   const isUserInteractingRef = useRef(false);
@@ -680,27 +660,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       map.off("zoomstart", onZoomStart);
       map.off("zoomend", onZoomEnd);
     };
-  }, [mapLoaded]);
-  
-  // Listen for flyToBusiness events from search business selection
-  useEffect(() => {
-    const handleFlyToBusiness = (event: CustomEvent) => {
-      if (!mapRef.current) return;
-      
-      const { lat, lng, business } = event.detail;
-      console.log('🗺️ Flying to business from search:', business?.name);
-      
-      mapRef.current.flyTo({
-        center: [lng, lat],
-        zoom: 16,
-        speed: 1.2,
-        curve: 1.2,
-        essential: true
-      });
-    };
-
-    window.addEventListener('flyToBusiness', handleFlyToBusiness as EventListener);
-    return () => window.removeEventListener('flyToBusiness', handleFlyToBusiness as EventListener);
   }, [mapLoaded]);
   
   useEffect(() => {
@@ -727,14 +686,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   
     return () => clearTimeout(timeout);
   }, [searchFilters?.neighborhoodFilter, neighborhoodCenter, mapLoaded]);
-
-  // Load businesses ONLY when search filters change
-  // useEffect(() => {
-  //   if (mapLoaded && searchFilters?.neighborhoodFilter) {
-  //     const timeout = setTimeout(() => handleViewportChange(), 500);
-  //     return () => clearTimeout(timeout);
-  //   }
-  // }, [mapLoaded, searchFilters?.neighborhoodFilter, handleViewportChange]);
 
   // landmarks handling (unchanged)
   useEffect(() => {
