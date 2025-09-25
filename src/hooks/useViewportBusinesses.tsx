@@ -8,8 +8,49 @@ import { useMapWorker } from './useMapWorker';
 
 // Preloading and caching
 const inflightRequests = new Map<string, Promise<Business[]>>();
-const detailsCache = new Map<string, Business>();
-const MAX_DETAILS_CACHE = 200;
+
+// Persistent details cache using localStorage
+class PersistentDetailsCache {
+  private static CACHE_KEY = 'business_details_cache';
+  private static MAX_CACHE_SIZE = 500; // increased limit
+
+  static get(key: string): Business | null {
+    try {
+      const cache = localStorage.getItem(this.CACHE_KEY);
+      if (!cache) return null;
+      const parsed = JSON.parse(cache);
+      return parsed[key] || null;
+    } catch {
+      return null;
+    }
+  }
+
+  static set(key: string, business: Business): void {
+    try {
+      const cache = localStorage.getItem(this.CACHE_KEY);
+      const parsed = cache ? JSON.parse(cache) : {};
+      
+      // If over limit, remove oldest entries
+      const keys = Object.keys(parsed);
+      if (keys.length >= this.MAX_CACHE_SIZE) {
+        keys.slice(0, keys.length - this.MAX_CACHE_SIZE + 50).forEach(k => delete parsed[k]);
+      }
+      
+      parsed[key] = business;
+      localStorage.setItem(this.CACHE_KEY, JSON.stringify(parsed));
+    } catch (e) {
+      console.warn('Failed to cache business details:', e);
+    }
+  }
+
+  static has(key: string): boolean {
+    return this.get(key) !== null;
+  }
+
+  static clear(): void {
+    localStorage.removeItem(this.CACHE_KEY);
+  }
+}
 
 type MapBounds = { north: number; south: number; east: number; west: number };
 type MapPoint = { lat: number; lon: number };
@@ -145,8 +186,8 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
 
   // ----------------- Full Details -----------------
   const fetchFullBusinessDetails = async (businessId: string) => {
-    if (detailsCache.has(businessId)) {
-      const cached = detailsCache.get(businessId)!;
+    if (PersistentDetailsCache.has(businessId)) {
+      const cached = PersistentDetailsCache.get(businessId)!;
       setBusinesses(prev => prev.map(b => b.id === businessId ? cached : b));
       return cached;
     }
@@ -155,11 +196,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
       const fullBusiness = await getFullBusinessDetailsService(businessId);
       if (!fullBusiness) return null;
 
-      if (detailsCache.size >= MAX_DETAILS_CACHE) {
-        detailsCache.delete(detailsCache.keys().next().value);
-      }
-      detailsCache.set(businessId, fullBusiness);
-
+      PersistentDetailsCache.set(businessId, fullBusiness);
       setBusinesses(prev => prev.map(b => b.id === businessId ? fullBusiness : b));
       return fullBusiness;
     } catch (err) {
