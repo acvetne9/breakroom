@@ -644,7 +644,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         }
 
         debugTileData(mapInstance);
-        
+        console.log('🔍 Debug click handler added - click anywhere on the map to see tile data');
+  
         // Load businesses for the initial viewport
         setTimeout(() => {
           if (mapRef.current && !loading) {
