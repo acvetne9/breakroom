@@ -227,6 +227,56 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   })();
 
+  const debugTileData = useCallback((map: maplibregl.Map) => {
+    // Add click handler to inspect features
+    const handleDebugClick = (e: maplibregl.MapMouseEvent) => {
+      console.log('🔍 DEBUG: Clicked at', e.lngLat);
+      
+      // Query all features at click point
+      const features = map.queryRenderedFeatures(e.point);
+      console.log('🔍 All features found:', features);
+      
+      // Query specifically from your source
+      const sourceFeatures = map.queryRenderedFeatures(e.point, {
+        layers: ['nyc-roads'] // Check if your road layer has data
+      });
+      console.log('🔍 Road features:', sourceFeatures);
+      
+      // Check what's in your source-layer
+      const allFromSource = map.queryRenderedFeatures(e.point, {
+        sourceLayer: 'examplepoints'
+      });
+      console.log('🔍 All from examplepoints layer:', allFromSource);
+      
+      // Filter for LineString geometries with highway property
+      const roadCandidates = allFromSource.filter(f => 
+        f.geometry.type === 'LineString' && 
+        f.properties && 
+        f.properties.highway
+      );
+      console.log('🔍 Road candidates:', roadCandidates);
+      
+      // Check for name properties
+      const namedRoads = roadCandidates.filter(f => 
+        f.properties && 
+        f.properties.name && 
+        f.properties.name !== '' && 
+        f.properties.name !== null
+      );
+      console.log('🔍 Named roads:', namedRoads);
+      
+      if (namedRoads.length > 0) {
+        console.log('✅ Found named roads! Properties:', namedRoads.map(r => r.properties));
+      } else {
+        console.log('❌ No named roads found at this location');
+      }
+    };
+    
+    map.on('click', handleDebugClick);
+    
+    return () => map.off('click', handleDebugClick);
+  }, []);
+
   // vector layers (styling restored exactly as requested)
   const addVectorLayers = useCallback((map: maplibregl.Map) => {
     try {
