@@ -330,40 +330,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
         },
         {
-          id: 'nyc-road-labels',
+          id: 'nyc-road-labels-test',
           type: 'symbol' as const,
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           layout: {
-            'text-field': ['get', 'name'], // Simplified - remove coalesce wrapper
-            'text-font': ['Open Sans Regular'], // Simplified font stack
-            'text-size': ['interpolate', ['linear'], ['zoom'], 12, 10, 16, 14],
-            'text-max-width': 10,
-            'text-line-height': 1.1,
-            'symbol-placement': 'line',
-            'text-rotation-alignment': 'map',
-            'text-pitch-alignment': 'viewport',
-            'text-allow-overlap': false,
-            'text-ignore-placement': false,
-            'text-padding': 2,
-            'text-anchor': 'center',
-            'text-justify': 'center'
+            'text-field': ['get', 'name'],
+            'text-size': 16
           },
           paint: {
-            'text-color': '#2C2C2C',
-            'text-halo-color': 'rgba(255,255,255,0.9)',
-            'text-halo-width': 2,
-            'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.7, 16, 1]
+            'text-color': 'red' // Make it very obvious
           },
-          filter: [
-            'all',
-            ['==', ['geometry-type'], 'LineString'],
-            ['has', 'name'],
-            ['has', 'highway'],
-            ['!=', ['get', 'name'], ''],
-            ['!', ['==', ['get', 'name'], null]]
-          ],
-          minzoom: 12
+          filter: ['has', 'name'] // Super simple filter
         }
       ];
   
