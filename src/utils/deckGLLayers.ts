@@ -70,7 +70,7 @@ export const createBusinessScatterplotLayer = ({
     filled: true,
     opacity: 1.0,
     radiusMinPixels: 10, // Bigger dots for better visibility
-    radiusMaxPixels: 20, // Much larger maximum for visibility across zoom levels
+    radiusMaxPixels: 14, // Much larger maximum for visibility across zoom levels
     lineWidthMinPixels: 2,
     getPosition: (d: Business) => [d.position.lng, d.position.lat],
     getRadius: (_d: Business) => 15, // Bigger base radius
@@ -105,8 +105,8 @@ export const createBusinessClusterLayer = (
     filled: true,
     opacity: 1.0,
     radiusScale: 1,
-    radiusMinPixels: 12,
-    radiusMaxPixels: 20,
+    radiusMinPixels: 10,
+    radiusMaxPixels: 14,
     lineWidthMinPixels: 2,
     getPosition: (d: any) => [d.position.lng, d.position.lat],
     getRadius: (d: any) =>
