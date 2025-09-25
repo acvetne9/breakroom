@@ -69,11 +69,11 @@ export const createBusinessScatterplotLayer = ({
     stroked: true,
     filled: true,
     opacity: 1.0,
-    radiusMinPixels: 8,
-    radiusMaxPixels: 8,
+    radiusMinPixels: 6, // Larger minimum for better visibility
+    radiusMaxPixels: 12, // Larger maximum for better visibility across zoom levels
     lineWidthMinPixels: 2,
     getPosition: (d: Business) => [d.position.lng, d.position.lat],
-    getRadius: (_d: Business) => 8,
+    getRadius: (_d: Business) => 10, // Increased base radius
     getFillColor: (_d: Business) => [250, 204, 21, 255],
     getLineColor: (_d: Business) => [255, 255, 255, 255],
     onClick: onBusinessClick ? (info) => info.object && onBusinessClick(info.object as Business) : undefined,

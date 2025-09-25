@@ -354,13 +354,21 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, []);
 
   const getBusinessLimitForViewport = useCallback((zoom: number) => {
+    // For search results, show more businesses across all zoom levels
+    if (searchFilters) {
+      if (zoom < 10) return 20000;
+      if (zoom < 12) return 35000;
+      if (zoom < 14) return 50000;
+      return 80000;
+    }
+    // Regular browsing limits
     if (zoom < 10) return 5000;
     if (zoom < 12) return 15000;
     if (zoom < 14) return 40000;
     if (zoom < 16) return 80000;
     if (zoom < 18) return 150000;
     return 200000;
-  }, []);
+  }, [searchFilters]);
 
   // Updated handleBusinessClick with fly-to behavior
   const handleBusinessClick = useCallback(async (business: any) => {

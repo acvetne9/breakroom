@@ -105,16 +105,18 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
     filters.neighborhoodFilter = neighborhood;
   }
 
-  // Always include text terms for name-based filtering
-  if (filteredTextTerms && filteredTextTerms.length > 0) {
-    filters.textTerms = filteredTextTerms;
+  // ALWAYS include the original search terms for comprehensive search
+  // This ensures we search across ALL categories: name, type, roles, etc.
+  const originalTerms = parseSearchTerms(searchQuery).textTerms || [];
+  if (originalTerms && originalTerms.length > 0) {
+    filters.textTerms = originalTerms; // Use original terms, not filtered ones
   }
 
-  console.log('🔍 [parseSearchFilters] Final filters:', filters);
+  console.log('🔍 [parseSearchFilters] Final filters (comprehensive search):', filters);
 
-  // Return null if no meaningful filters at all
-  if ((!filteredTextTerms || filteredTextTerms.length === 0) && !salaryQuery && !roleFilter && !businessTypeFilter && !neighborhood) {
-    console.log('🔍 [parseSearchFilters] No meaningful filters found, returning null');
+  // Return null only if completely empty search
+  if (!searchQuery.trim()) {
+    console.log('🔍 [parseSearchFilters] Empty search, returning null');
     return null;
   }
 
@@ -175,41 +177,37 @@ export function applyBusinessFilters(businesses: Business[], filters: SearchFilt
 
     const searchableText = [name, type, ...roles.map(r => r.role || '')].join(' ').toLowerCase();
 
-    // Text terms for keyword search - prioritize business name matching
+    // COMPREHENSIVE SEARCH: Check ALL text terms across ALL searchable fields
+    // Any term matching ANY field (name, type, roles) will include the business
     if (filters.textTerms && filters.textTerms.length > 0) {
-      const allTermsMatch = filters.textTerms.every(term => {
-        // Check if term matches business name (highest priority)
+      const hasAnyMatch = filters.textTerms.some(term => {
+        // Check business name
         if (variantsOf(term).some(v => name.toLowerCase().includes(v))) {
           return true;
         }
-        // Fallback to checking all searchable text (name, type, roles)
-        return variantsOf(term).some(v => searchableText.includes(v));
+        // Check business type
+        if (variantsOf(term).some(v => type.toLowerCase().includes(v))) {
+          return true;
+        }
+        // Check roles
+        if (roles.some(r => variantsOf(term).some(v => (r.role || '').toLowerCase().includes(v)))) {
+          return true;
+        }
+        return false;
       });
-      if (!allTermsMatch) return false;
+      if (!hasAnyMatch) return false;
     }
 
-    // Role filter - also check if any text terms match roles when no specific roleFilter
+    // Additional specific filters (these are AND conditions with the comprehensive search above)
+    // Role filter - only apply if specifically identified as a role search
     if (filters.roleFilter) {
-      console.log('🔍 [roleFilter] Checking business:', business.name, 'for role:', filters.roleFilter);
-      console.log('🔍 [roleFilter] Business roles:', roles.map(r => r.role));
-      
       const roleMatch = roles.some(r => {
-        const match = matchesTermVariants(r.role || '', filters.roleFilter!);
-        console.log('🔍 [roleFilter] Role:', r.role, 'vs filter:', filters.roleFilter, 'match:', match);
-        return match;
+        return matchesTermVariants(r.role || '', filters.roleFilter!);
       });
-      
-      console.log('🔍 [roleFilter] Final roleMatch for', business.name + ':', roleMatch);
       if (!roleMatch) return false;
-    } else if (filters.textTerms && filters.textTerms.length > 0) {
-      // If no specific role filter but we have text terms, check if any match roles
-      const hasRoleMatch = filters.textTerms.some(term =>
-        roles.some(r => matchesTermVariants(r.role || '', term))
-      );
-      // Don't filter out if roles match any text terms - let other filters handle it
     }
 
-    // Business type filter
+    // Business type filter - only apply if specifically identified as a business type search
     if (filters.businessTypeFilter) {
       const typeMatch = matchesTermVariants(type, filters.businessTypeFilter!);
       if (!typeMatch) return false;
