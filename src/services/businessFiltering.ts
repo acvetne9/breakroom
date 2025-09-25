@@ -105,9 +105,14 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
     filters.neighborhoodFilter = neighborhood;
   }
 
+  // Always include text terms for name-based filtering
+  if (filteredTextTerms && filteredTextTerms.length > 0) {
+    filters.textTerms = filteredTextTerms;
+  }
+
   console.log('🔍 [parseSearchFilters] Final filters:', filters);
 
-  // Return null if no meaningful filters (only empty textTerms)
+  // Return null if no meaningful filters at all
   if ((!filteredTextTerms || filteredTextTerms.length === 0) && !salaryQuery && !roleFilter && !businessTypeFilter && !neighborhood) {
     console.log('🔍 [parseSearchFilters] No meaningful filters found, returning null');
     return null;
@@ -170,11 +175,16 @@ export function applyBusinessFilters(businesses: Business[], filters: SearchFilt
 
     const searchableText = [name, type, ...roles.map(r => r.role || '')].join(' ').toLowerCase();
 
-    // Text terms across name, type, and roles with plural handling
+    // Text terms for keyword search - prioritize business name matching
     if (filters.textTerms && filters.textTerms.length > 0) {
-      const allTermsMatch = filters.textTerms.every(term =>
-        variantsOf(term).some(v => searchableText.includes(v))
-      );
+      const allTermsMatch = filters.textTerms.every(term => {
+        // Check if term matches business name (highest priority)
+        if (variantsOf(term).some(v => name.toLowerCase().includes(v))) {
+          return true;
+        }
+        // Fallback to checking all searchable text (name, type, roles)
+        return variantsOf(term).some(v => searchableText.includes(v));
+      });
       if (!allTermsMatch) return false;
     }
 
