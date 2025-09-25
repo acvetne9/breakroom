@@ -288,16 +288,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         },
         {
           id: 'nyc-road-labels',
-          type: 'symbol' as const,
+          type: 'symbol',
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           layout: {
             'text-field': [
-              'coalesce',
+              'case',
+              ['has', 'name'],
               ['get', 'name'],
               ''
             ],
-            'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+            'text-font': ["Open Sans Regular", "Arial Unicode MS Regular"],
             'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
             'text-max-width': 8,
             'text-line-height': 1.2,
@@ -315,10 +316,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           filter: [
             'all',
             ['==', ['geometry-type'], 'LineString'],
-            ['has', 'name'],
-            ['has', 'highway'],
-            ['!=', ['get', 'name'], '']
-          ] as any,
+            ['has', 'highway']
+          ],
           minzoom: 12
         }
       ];

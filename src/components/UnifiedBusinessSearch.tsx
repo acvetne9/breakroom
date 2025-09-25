@@ -520,9 +520,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                           <div className="flex justify-between items-center">
                             <span className="font-medium">{(result as EnhancedBusiness).name}</span>
                             <span className="text-sm opacity-70">
-                              {(result as EnhancedBusiness).businessType === "Other"
-                                ? ""
-                                : (result as EnhancedBusiness).businessType || "Business"}
+                              {(result as EnhancedBusiness).businessType || "Business"}
                             </span>
                           </div>
                            {/* Show Supabase address if it exists, otherwise nothing */}
