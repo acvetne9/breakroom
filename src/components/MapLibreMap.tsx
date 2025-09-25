@@ -292,33 +292,34 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           layout: {
-            'text-field': [
-              'coalesce',
-              ['get', 'name'],
-              ''
-            ],
-            'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
-            'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
-            'text-max-width': 8,
-            'text-line-height': 1.2,
+            'text-field': ['get', 'name'], // Simplified - remove coalesce wrapper
+            'text-font': ['Open Sans Regular'], // Simplified font stack
+            'text-size': ['interpolate', ['linear'], ['zoom'], 12, 10, 16, 14],
+            'text-max-width': 10,
+            'text-line-height': 1.1,
             'symbol-placement': 'line',
             'text-rotation-alignment': 'map',
+            'text-pitch-alignment': 'viewport',
             'text-allow-overlap': false,
-            'text-ignore-placement': false
+            'text-ignore-placement': false,
+            'text-padding': 2,
+            'text-anchor': 'center',
+            'text-justify': 'center'
           },
           paint: {
-            'text-color': '#333333',
-            'text-halo-color': '#FFFFFF',
-            'text-halo-width': 1.5,
-            'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 1]
+            'text-color': '#2C2C2C',
+            'text-halo-color': 'rgba(255,255,255,0.9)',
+            'text-halo-width': 2,
+            'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.7, 16, 1]
           },
           filter: [
             'all',
             ['==', ['geometry-type'], 'LineString'],
             ['has', 'name'],
             ['has', 'highway'],
-            ['!=', ['get', 'name'], '']
-          ] as any,
+            ['!=', ['get', 'name'], ''],
+            ['!', ['==', ['get', 'name'], null]]
+          ],
           minzoom: 12
         }
       ];
