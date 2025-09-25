@@ -661,7 +661,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           
           // Check all layers in the map
           const style = mapInstance.getStyle();
-          console.log('🔍 Map style layers:', style.layers.map(l => ({ id: l.id, type: l.type, source: l.source })));
+          console.log('🔍 Map style layers:', style.layers.map(l => ({ 
+            id: l.id, 
+            type: l.type, 
+            source: 'source' in l ? l.source : 'no-source' 
+          })));
           
           // Check specifically for your layers
           const roadLayer = mapInstance.getLayer('nyc-roads');
