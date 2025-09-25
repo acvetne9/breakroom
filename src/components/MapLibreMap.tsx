@@ -615,12 +615,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         }
       });
 
-      const debounceViewportChange = debounce(() => {
-        handleViewportChange();
-      }, 800);
-      
-      mapInstance.on('moveend', debounceViewportChange);
-      mapInstance.on('zoomend', debounceViewportChange);
+      // Initial event listeners will be set up in separate useEffect
 
       // Handle deck.gl overlay initialization
       try {
@@ -663,13 +658,32 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [businesses, deckOverlay, overlayReady, deckGLLayers]);
 
+  // Set up move/zoom event listeners - updates when handleViewportChange changes
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded) return;
+
+    const debounceViewportChange = debounce(() => {
+      handleViewportChange();
+    }, 800);
+    
+    mapRef.current.on('moveend', debounceViewportChange);
+    mapRef.current.on('zoomend', debounceViewportChange);
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.off('moveend', debounceViewportChange);
+        mapRef.current.off('zoomend', debounceViewportChange);
+      }
+    };
+  }, [mapLoaded, handleViewportChange]);
+
   // Initial load when map is ready - SINGLE TRIGGER
   useEffect(() => {
     if (mapLoaded && !businesses?.length && !loading) {
       const timeout = setTimeout(() => handleViewportChange(), 2000);
       return () => clearTimeout(timeout);
     }
-  }, [mapLoaded, handleViewportChange]); // Removed businesses and loading from deps to prevent loops
+  }, [mapLoaded, handleViewportChange]);
 
   // center/load neighborhood center
   const isUserInteractingRef = useRef(false);
