@@ -330,18 +330,28 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
         },
         {
-          id: 'nyc-road-labels-test',
+          id: 'nyc-road-labels-simple',
           type: 'symbol' as const,
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           layout: {
             'text-field': ['get', 'name'],
-            'text-size': 16
+            'text-size': 14,
+            'symbol-placement': 'line',
+            'text-rotation-alignment': 'map'
           },
           paint: {
-            'text-color': 'red' // Make it very obvious
+            'text-color': '#000000',
+            'text-halo-color': '#FFFFFF',
+            'text-halo-width': 2
           },
-          filter: ['has', 'name'] // Super simple filter
+          filter: [
+            'all',
+            ['==', ['geometry-type'], 'LineString'],
+            ['has', 'highway'],
+            ['has', 'name']
+          ],
+          minzoom: 12
         }
       ];
   
