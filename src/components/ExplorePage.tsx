@@ -339,7 +339,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                         downvotes={post.downvotes} 
                         userVote={post.userVote} 
                         onVote={voteType => handlePostVote(post.id, voteType)}
-                        isOwner={post.author === 'You'}
+                        isOwner={true} // Always show delete button, server will handle authorization
                         onDelete={() => handlePostDelete(post.id)}
                       />
                     </div>
@@ -377,7 +377,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                               downvotes={comment.downvotes}
                               userVote={comment.userVote}
                               onVote={(voteType) => handlePostVote(comment.id, voteType)}
-                              isOwner={comment.author === 'You'}
+                              isOwner={true} // Always show delete button, server will handle authorization
                               onDelete={() => removePost(comment.id)}
                             />
                           </div>

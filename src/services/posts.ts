@@ -171,8 +171,30 @@ export const getUserVotes = async (postIds: string[]): Promise<{ [postId: string
 
 // Delete a post
 export const deletePost = async (postId: string): Promise<{ success: boolean; error?: any }> => {
-  // For now, allow deleting any post since authentication isn't implemented
-  // TODO: Restrict to own posts when authentication is added
+  // First, get the current user
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    return { success: false, error: 'User not authenticated' };
+  }
+
+  // Get the post to check ownership
+  const { data: post, error: fetchError } = await supabase
+    .from('posts')
+    .select('user_id')
+    .eq('id', postId)
+    .single();
+
+  if (fetchError) {
+    return { success: false, error: fetchError };
+  }
+
+  // Check if user owns the post
+  if (post.user_id !== user.id) {
+    return { success: false, error: 'Not authorized to delete this post' };
+  }
+
+  // Delete the post
   const { error } = await supabase
     .from('posts')
     .delete()
