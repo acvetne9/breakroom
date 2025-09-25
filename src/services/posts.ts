@@ -1,5 +1,15 @@
 import { supabase } from "@/integrations/supabase/client";
 
+// Get or create a consistent temporary user ID
+const getTempUserId = (): string => {
+  let tempUserId = localStorage.getItem('tempUserId');
+  if (!tempUserId) {
+    tempUserId = crypto.randomUUID();
+    localStorage.setItem('tempUserId', tempUserId);
+  }
+  return tempUserId;
+};
+
 export interface PostData {
   id: string;
   content: string;
@@ -76,8 +86,8 @@ export const createPost = async (
   salary?: number,
   isComment?: string
 ): Promise<{ data: PostData | null; error: any }> => {
-  // Generate a proper UUID format for temp user
-  const tempUserId = crypto.randomUUID();
+  // Get consistent temp user ID
+  const tempUserId = getTempUserId();
   
   const { data, error } = await supabase
     .from('posts')
@@ -102,8 +112,8 @@ export const voteOnPost = async (
   postId: string,
   voteType: 'upvote' | 'downvote'
 ): Promise<{ success: boolean; error?: any }> => {
-  // Generate a proper UUID format for temp user
-  const tempUserId = crypto.randomUUID();
+  // Get consistent temp user ID
+  const tempUserId = getTempUserId();
   
   // Check if user already voted
   const { data: existingVote } = await supabase
@@ -151,9 +161,8 @@ export const getUserVotes = async (postIds: string[]): Promise<{ [postId: string
     return {};
   }
 
-  // Generate a proper UUID format for temp user (for consistency, we'll use the same one per session)
-  // Note: This won't work for tracking votes across sessions, but it's temporary until auth is implemented
-  const tempUserId = crypto.randomUUID();
+  // Get consistent temp user ID
+  const tempUserId = getTempUserId();
   
   const { data: votes } = await supabase
     .from('votes')
@@ -171,12 +180,8 @@ export const getUserVotes = async (postIds: string[]): Promise<{ [postId: string
 
 // Delete a post
 export const deletePost = async (postId: string): Promise<{ success: boolean; error?: any }> => {
-  // First, get the current user
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    return { success: false, error: 'User not authenticated' };
-  }
+  // Get consistent temp user ID
+  const tempUserId = getTempUserId();
 
   // Get the post to check ownership
   const { data: post, error: fetchError } = await supabase
@@ -190,7 +195,7 @@ export const deletePost = async (postId: string): Promise<{ success: boolean; er
   }
 
   // Check if user owns the post
-  if (post.user_id !== user.id) {
+  if (post.user_id !== tempUserId) {
     return { success: false, error: 'Not authorized to delete this post' };
   }
 
