@@ -228,52 +228,41 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   })();
 
   const debugTileData = useCallback((map: maplibregl.Map) => {
-    // Add click handler to inspect features
     const handleDebugClick = (e: maplibregl.MapMouseEvent) => {
       console.log('🔍 DEBUG: Clicked at', e.lngLat);
       
       // Query all features at click point
       const features = map.queryRenderedFeatures(e.point);
-      console.log('🔍 All features found:', features);
+      console.log('🔍 All features found:', features.length);
       
-      // Query specifically from your source
-      const sourceFeatures = map.queryRenderedFeatures(e.point, {
-        layers: ['nyc-roads'] // Check if your road layer has data
-      });
-      console.log('🔍 Road features:', sourceFeatures);
-      
-      // Check what's in your source-layer
-      const allFromSource = map.queryRenderedFeatures(e.point, {
-        sourceLayer: 'examplepoints'
-      });
-      console.log('🔍 All from examplepoints layer:', allFromSource);
-      
-      // Filter for LineString geometries with highway property
-      const roadCandidates = allFromSource.filter(f => 
-        f.geometry.type === 'LineString' && 
-        f.properties && 
-        f.properties.highway
+      // Look specifically at road features
+      const roadFeatures = features.filter(f => 
+        f.source === 'nyc-tiles' && 
+        f.sourceLayer === 'examplepoints' &&
+        f.geometry?.type === 'LineString'
       );
-      console.log('🔍 Road candidates:', roadCandidates);
+      console.log('🔍 Road features from examplepoints:', roadFeatures);
       
-      // Check for name properties
-      const namedRoads = roadCandidates.filter(f => 
-        f.properties && 
-        f.properties.name && 
-        f.properties.name !== '' && 
-        f.properties.name !== null
+      // Check for highway/road properties
+      const roadsWithHighway = roadFeatures.filter(f => f.properties?.highway);
+      console.log('🔍 Roads with highway property:', roadsWithHighway);
+      
+      // Check for names
+      const namedRoads = roadsWithHighway.filter(f => 
+        f.properties?.name && f.properties.name !== ''
       );
       console.log('🔍 Named roads:', namedRoads);
       
       if (namedRoads.length > 0) {
-        console.log('✅ Found named roads! Properties:', namedRoads.map(r => r.properties));
+        console.log('✅ Found named roads! Sample properties:', namedRoads[0].properties);
+      } else if (roadsWithHighway.length > 0) {
+        console.log('❌ Found roads but no names. Sample properties:', roadsWithHighway[0].properties);
       } else {
-        console.log('❌ No named roads found at this location');
+        console.log('❌ No road features found');
       }
     };
     
     map.on('click', handleDebugClick);
-    
     return () => map.off('click', handleDebugClick);
   }, []);
 
