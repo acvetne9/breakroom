@@ -233,7 +233,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       
       // Query all features at click point
       const features = map.queryRenderedFeatures(e.point);
-      console.log('🔍 All features found:', features.length);
+      console.log('🔍 All features found:', features.length, features);
       
       // Look specifically at road features
       const roadFeatures = features.filter(f => 
@@ -259,6 +259,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         console.log('❌ Found roads but no names. Sample properties:', roadsWithHighway[0].properties);
       } else {
         console.log('❌ No road features found');
+        // Log ALL feature properties to see what's available
+        features.forEach((f, i) => {
+          console.log(`Feature ${i}:`, f.properties);
+        });
       }
     };
     
@@ -642,10 +646,69 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         } catch (err) {
           console.error('❌ Error adding layers:', err);
         }
-
+        
+        // ADD THIS LINE - Call the debug function
         debugTileData(mapInstance);
         console.log('🔍 Debug click handler added - click anywhere on the map to see tile data');
-  
+        
+        // Add more debugging for source and layers
+        setTimeout(() => {
+          console.log('🔍 Checking map sources and layers...');
+          
+          // Check if source exists and is loaded
+          const source = mapInstance.getSource('nyc-tiles');
+          console.log('🔍 NYC tiles source:', source);
+          
+          // Check all layers in the map
+          const style = mapInstance.getStyle();
+          console.log('🔍 Map style layers:', style.layers.map(l => ({ id: l.id, type: l.type, source: l.source })));
+          
+          // Check specifically for your layers
+          const roadLayer = mapInstance.getLayer('nyc-roads');
+          const labelLayer = mapInstance.getLayer('nyc-road-labels');
+          console.log('🔍 Road layer exists:', !!roadLayer, roadLayer);
+          console.log('🔍 Label layer exists:', !!labelLayer, labelLayer);
+          
+          // Try to query a larger area to see if ANY features exist
+          const bounds = mapInstance.getBounds();
+          const bbox = [
+            [bounds.getWest(), bounds.getSouth()],
+            [bounds.getEast(), bounds.getNorth()]
+          ];
+          
+          try {
+            const allFeatures = mapInstance.queryRenderedFeatures(undefined, { layers: ['nyc-roads'] });
+            console.log('🔍 All road features in viewport:', allFeatures.length, allFeatures);
+          } catch (e) {
+            console.log('❌ Could not query road features:', e);
+          }
+          
+          // Test tile URL directly
+          const zoom = Math.floor(mapInstance.getZoom());
+          const center = mapInstance.getCenter();
+          const tileZ = zoom;
+          const tileX = Math.floor((center.lng + 180) / 360 * Math.pow(2, tileZ));
+          const tileY = Math.floor((1 - Math.log(Math.tan(center.lat * Math.PI / 180) + 1 / Math.cos(center.lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, tileZ));
+          
+          const testTileUrl = `${window.location.origin}/data/tiles/${tileZ}/${tileX}/${tileY}.pbf`;
+          console.log('🔍 Testing tile URL:', testTileUrl);
+          
+          // Test if the tile URL is accessible
+          fetch(testTileUrl)
+            .then(response => {
+              console.log('🔍 Tile fetch response:', response.status, response);
+              if (!response.ok) {
+                console.error('❌ Tile not found at:', testTileUrl);
+              } else {
+                console.log('✅ Tile exists and is accessible');
+              }
+            })
+            .catch(error => {
+              console.error('❌ Tile fetch error:', error);
+            });
+            
+        }, 2000);
+        
         // Load businesses for the initial viewport
         setTimeout(() => {
           if (mapRef.current && !loading) {
