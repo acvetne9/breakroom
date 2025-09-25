@@ -175,12 +175,12 @@ export function applyBusinessFilters(businesses: Business[], filters: SearchFilt
     const type = business.businessType || '';
     const roles = business.roles || [];
 
-    const searchableText = [name, type, ...roles.map(r => r.role || '')].join(' ').toLowerCase();
-
     // COMPREHENSIVE SEARCH: Check ALL text terms across ALL searchable fields
     // Any term matching ANY field (name, type, roles) will include the business
+    let hasMatch = false;
+    
     if (filters.textTerms && filters.textTerms.length > 0) {
-      const hasAnyMatch = filters.textTerms.some(term => {
+      hasMatch = filters.textTerms.some(term => {
         // Check business name
         if (variantsOf(term).some(v => name.toLowerCase().includes(v))) {
           return true;
@@ -195,22 +195,23 @@ export function applyBusinessFilters(businesses: Business[], filters: SearchFilt
         }
         return false;
       });
-      if (!hasAnyMatch) return false;
     }
 
-    // Additional specific filters (these are AND conditions with the comprehensive search above)
-    // Role filter - only apply if specifically identified as a role search
-    if (filters.roleFilter) {
-      const roleMatch = roles.some(r => {
+    // INCLUSIVE OR-based matching for specific filters when they overlap with text terms
+    // This prevents over-filtering when the same search term creates multiple filter types
+    if (filters.roleFilter && !hasMatch) {
+      hasMatch = roles.some(r => {
         return matchesTermVariants(r.role || '', filters.roleFilter!);
       });
-      if (!roleMatch) return false;
     }
 
-    // Business type filter - only apply if specifically identified as a business type search
-    if (filters.businessTypeFilter) {
-      const typeMatch = matchesTermVariants(type, filters.businessTypeFilter!);
-      if (!typeMatch) return false;
+    if (filters.businessTypeFilter && !hasMatch) {
+      hasMatch = matchesTermVariants(type, filters.businessTypeFilter!);
+    }
+
+    // If no match found from text/role/type searches, exclude
+    if (!hasMatch && (filters.textTerms?.length || filters.roleFilter || filters.businessTypeFilter)) {
+      return false;
     }
 
     // Salary filter: check roles first, then top-level salary as fallback
