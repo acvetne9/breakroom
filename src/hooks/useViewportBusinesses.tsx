@@ -120,8 +120,11 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
 
     const isNewSearch = JSON.stringify(searchFilters) !== JSON.stringify(lastSearchFilters);
 
-    // Avoid duplicate identical requests
-    if (loading && !isNewSearch) return;
+    // Only block if it's the exact same request (not just any loading)
+    if (loading && !isNewSearch && !isMoving) {
+      console.log('⏸️ Skipping duplicate request while loading');
+      return;
+    }
 
     setIsSearching(!!searchFilters);
     if (isNewSearch) setLastSearchFilters(searchFilters);

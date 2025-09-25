@@ -462,10 +462,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   const handleViewportChange = useCallback(async () => {
     if (!mapRef.current || !mapLoaded) return;
-    if (loading) {
-      console.log("⏸️ Skipping viewport change while loading...");
-      return;
-    }
   
     const map = mapRef.current;
     const zoom = map.getZoom();
@@ -479,9 +475,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   
     const boundsKey = `${viewportBounds.north.toFixed(4)}-${viewportBounds.south.toFixed(4)}-${viewportBounds.east.toFixed(4)}-${viewportBounds.west.toFixed(4)}`;
   
-    // Prevent duplicate calls for same viewport within 2s
+    // Prevent duplicate calls for same viewport within 1s (reduced from 2s)
     const now = Date.now();
-    if (lastBoundsRef.current === boundsKey && now - lastLoadTimeRef.current < 2000) {
+    if (lastBoundsRef.current === boundsKey && now - lastLoadTimeRef.current < 1000) {
       return;
     }
   
@@ -489,12 +485,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     lastLoadTimeRef.current = now;
   
     try {
+      console.log(`🗺️ Loading businesses for viewport: ${boundsKey}`);
       const limit = getBusinessLimitForViewport(zoom);
-      await loadBusinessesInViewport?.(viewportBounds, limit);
+      await loadBusinessesInViewport?.(viewportBounds, limit, true); // Pass isMoving=true
     } catch (err) {
       console.error("❌ Error loading businesses:", err);
     }
-  }, [mapLoaded, loading, loadBusinessesInViewport, getBusinessLimitForViewport]);
+  }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport]);
 
   // initialize map once
   useEffect(() => {
