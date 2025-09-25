@@ -356,7 +356,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       // Save the clicked business location
       if (onLocationSave && business.name) {
         const fullLocation = business.formatted_address || business.vicinity || business.name;
-        onLocationSave(business.name, fullLocation);
+        onLocationSave(fullLocation, fullLocation);
       }
     }
     
@@ -516,12 +516,26 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                         </div>
                       ) : (
                         // Business result
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium">{result.name}</span>
-                          <span className="text-sm opacity-70">{(result as EnhancedBusiness).businessType || 'Business'}</span>
+                        <div className="flex flex-col">
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">{(result as EnhancedBusiness).name}</span>
+                            <span className="text-sm opacity-70">
+                              {(result as EnhancedBusiness).businessType === "Other"
+                                ? ""
+                                : (result as EnhancedBusiness).businessType || "Business"}
+                            </span>
+                          </div>
+                           {/* Show Supabase address if it exists, otherwise nothing */}
+                           {(result as EnhancedBusiness).address && (
+                             <span className="text-xs text-gray-500 truncate mt-0.5">
+                               {(result as EnhancedBusiness).address}
+                             </span>
+                           )}
                         </div>
                       )}
                     </div>
+                
+                    {/* Divider between results */}
                     {index < (Array.isArray(searchResults) ? searchResults.length - 1 : -1) && (
                       <div className="h-px bg-border/30 my-1.5"></div>
                     )}

@@ -258,26 +258,53 @@ return (
         </div>
       </div>
 
-      {/* Sticky footer with ? button (never inside the scrollable area) */}
-      <div className="pt-4 flex justify-start shrink-0">
+      <div className="pt-4 flex items-center shrink-0">
         <button
           onClick={handleHelpButtonClick}
           className="w-6 h-6 bg-app-gray-light rounded-full flex items-center justify-center hover:bg-app-gray-medium transition-colors text-app-white font-bold text-sm"
         >
           ?
         </button>
-        <p>Is this business accurate?</p>
+        <p className="text-xs text-app-gray-medium ml-4">
+          Is this business accurate?
+        </p>
       </div>
 
-      {/* Help popup is absolutely positioned so it doesn't push the footer down */}
+      {/* Help Popup - Styled like other cards with rounded edges */}
       {showHelpPopup && (
         <div
-          className="absolute left-6 right-6 bottom-16 bg-white border-2 border-app-yellow rounded-xl p-4 shadow-lg z-50"
+          className="mt-4 w-full bg-white border-2 border-app-yellow rounded-xl p-4 shadow-lg space-y-2"
           onClick={(e) => e.stopPropagation()}
         >
-          <p className="text-sm text-app-gray-dark">
-            <strong>Disclaimer:</strong> The information presented in this app is based on surveys, user input, and publicly available sources. We do not independently verify all information, and it should not be taken as factual statements about any individual or organization.
-          </p>
+          {/* Condensed input fields */}
+          <input
+            type="text"
+            placeholder="Business name..."
+            className="app-input w-full h-10 text-sm"
+          />
+          <input
+            type="text"
+            placeholder="Job role..."
+            className="app-input w-full h-10 text-sm"
+          />
+          <input
+            type="text"
+            placeholder="Salary..."
+            className="app-input w-full h-10 text-sm"
+          />
+      
+          {/* Footer row with checkbox + submit */}
+          <div className="flex items-center justify-between pt-2">
+            <label className="flex items-center text-xs text-app-gray-dark">
+              <input type="checkbox" className="mr-2" />
+              Did this business close?
+            </label>
+            <button
+              className="px-3 py-1 bg-app-yellow text-app-black rounded text-xs hover:bg-app-yellow/90 transition-colors"
+            >
+              Submit
+            </button>
+          </div>
         </div>
       )}
     </div>

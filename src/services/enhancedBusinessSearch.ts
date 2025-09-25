@@ -11,6 +11,7 @@ export interface EnhancedBusiness {
   businessType?: string;
   business_type?: string;
   website?: string;
+  address?: string;
   roles?: Array<{
     id: string;
     role: string;
@@ -121,6 +122,7 @@ export async function searchBusinessesEnhanced(query: string, limit: number = 50
         name,
         lat,
         lng,
+        address,
         atmosphere,
         business_type,
         website,
@@ -153,6 +155,7 @@ export async function searchBusinessesEnhanced(query: string, limit: number = 50
         name,
         lat,
         lng,
+        address,
         atmosphere,
         business_type,
         website
@@ -173,6 +176,7 @@ export async function searchBusinessesEnhanced(query: string, limit: number = 50
         name,
         lat,
         lng,
+        address,
         atmosphere,
         business_type,
         website,
@@ -245,6 +249,7 @@ export async function searchBusinessesEnhanced(query: string, limit: number = 50
         businessType: business.business_type || 'Business',
         business_type: business.business_type || 'Business',
         website: business.website,
+        address: business.address,
         roles: filteredRoles.map(role => ({
           id: role.id,
           role: role.role,
