@@ -642,6 +642,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         } catch (err) {
           console.error('❌ Error adding layers:', err);
         }
+
+        debugTileData(mapInstance);
         
         // Load businesses for the initial viewport
         setTimeout(() => {
