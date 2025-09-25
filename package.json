@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@deck.gl/mapbox": "^8.9.35",
     "@googlemaps/js-api-loader": "^1.16.10",
     "@googlemaps/markerclusterer": "^2.6.2",
     "@hookform/resolvers": "^3.9.0",
@@ -50,13 +51,13 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
     "date-fns": "^4.1.0",
-    "deck.gl": "^9.1.14",
+    "deck.gl": "^8.9.35",
     "embla-carousel-react": "^8.3.0",
     "framer-motion": "^12.23.6",
     "geojson-vt": "^4.0.2",
     "input-otp": "^1.2.4",
     "lucide-react": "^0.462.0",
-    "maplibre-gl": "^5.6.1",
+    "maplibre-gl": "^3.6.2",
     "next-themes": "^0.3.0",
     "pako": "^2.1.0",
     "react": "^18.3.1",
