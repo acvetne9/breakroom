@@ -4,9 +4,11 @@ const BreakroomLoading = ({ onComplete }: { onComplete?: () => void }) => {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
+    // Call onComplete immediately to start background loading, then show animation
+    if (onComplete) onComplete();
+    
     const timer = setTimeout(() => {
       setIsVisible(false);
-      if (onComplete) setTimeout(onComplete, 500);
     }, 3000);
     return () => clearTimeout(timer);
   }, [onComplete]);
