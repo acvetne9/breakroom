@@ -246,7 +246,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return () => map.off('click', handleDebugClick);
   }, []);
 
-    const testLabelsVisibility = useCallback((map: maplibregl.Map) => {
+  const testLabelsVisibility = useCallback((map: maplibregl.Map) => {
     console.log('🧪 Testing labels visibility...');
     
     const zoom = map.getZoom();
@@ -279,6 +279,59 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const rendered = map.queryRenderedFeatures({ layers: ['nyc-road-labels'] });
     console.log(`Rendered label features: ${rendered.length}`);
   }, []);
+  
+  // Add this diagnostic function to test different filters
+  const testLabelFilters = useCallback((map: maplibregl.Map) => {
+    console.log('🧪 Testing different label filters...');
+    
+    // Test 1: All features with names (no geometry restriction)
+    const allNamed = map.querySourceFeatures('nyc-tiles', {
+      sourceLayer: 'examplepoints',
+      filter: ['all', ['has', 'name'], ['!=', ['get', 'name'], '']]
+    });
+    console.log(`🧪 All named features: ${allNamed.length}`);
+    
+    // Test 2: LineString features with names
+    const namedLines = map.querySourceFeatures('nyc-tiles', {
+      sourceLayer: 'examplepoints',
+      filter: [
+        'all',
+        ['==', ['geometry-type'], 'LineString'],
+        ['has', 'name'],
+        ['!=', ['get', 'name'], '']
+      ]
+    });
+    console.log(`🧪 Named LineString features: ${namedLines.length}`);
+    
+    // Test 3: Features with highway property
+    const withHighway = map.querySourceFeatures('nyc-tiles', {
+      sourceLayer: 'examplepoints',
+      filter: ['has', 'highway']
+    });
+    console.log(`🧪 Features with highway: ${withHighway.length}`);
+    
+    // Test 4: Current label filter
+    const labelMatch = map.querySourceFeatures('nyc-tiles', {
+      sourceLayer: 'examplepoints',
+      filter: [
+        'all',
+        ['has', 'name'],
+        ['!=', ['get', 'name'], '']
+      ]
+    });
+    console.log(`🧪 Current label filter matches: ${labelMatch.length}`);
+    
+    if (labelMatch.length > 0) {
+      console.log('🧪 Sample label candidates:', 
+        labelMatch.slice(0, 3).map(f => ({
+          name: f.properties?.name,
+          type: f.geometry?.type,
+          highway: f.properties?.highway
+        }))
+      );
+    }
+  }, []);
+
 
   // vector layers (styling restored exactly as requested)
   const addVectorLayers = useCallback((map: maplibregl.Map) => {
