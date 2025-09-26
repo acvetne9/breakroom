@@ -335,23 +335,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           source: "nyc-tiles",
           "source-layer": "examplepoints",
           layout: {
-            "text-field": ["get", "name"],  // pull road name
-            "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
+            "text-field": ["get", "name"],   // show street name
             "text-size": 12,
-            "symbol-placement": "line",     // follow road geometry
+            "symbol-placement": "line",
           },
           paint: {
             "text-color": "#333",
             "text-halo-color": "#fff",
             "text-halo-width": 2,
           },
-          filter: [
-            "any",
-            ["all", ["==", ["get", "highway"], "motorway"], [">=", ["zoom"], 8]],
-            ["all", ["==", ["get", "highway"], "primary"], [">=", ["zoom"], 10]],
-            ["all", ["==", ["get", "highway"], "secondary"], [">=", ["zoom"], 12]],
-            ["all", ["==", ["get", "highway"], "residential"], [">=", ["zoom"], 14]],
-          ],
         }
       ];
   
