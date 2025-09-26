@@ -325,24 +325,32 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
         },
         {
-          id: "nyc-road-labels-safer",
+          id: "street-labels",
           type: "symbol",
           source: "nyc-tiles",
-          "source-layer": "examplepoints", // same as roads
-          minzoom: 12,                     // allow labels earlier
+          "source-layer": "transportation", // adjust if your vector tiles use a different layer name
           layout: {
             "text-field": ["get", "name"],
-            "text-size": 12,
-            "text-anchor": "center",
+            "text-font": ["OpenSansArialUnicode"],
+            "text-size": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              10, 10,   // small at low zoom
+              16, 14    // scale up slightly at high zoom
+            ],
+            "symbol-placement": "line", // follow the road
+            "text-max-angle": 30,
+            "text-padding": 2,
             "text-allow-overlap": false,
-            "text-optional": true,
-            "symbol-placement": "line",   // important for road labels
+            "text-ignore-placement": false,
           },
           paint: {
-            "text-color": "#2C2C2C",
-            "text-halo-color": "#FFFFFF",
-            "text-halo-width": 1.5,
+            "text-color": "#444",
+            "text-halo-color": "#fff",
+            "text-halo-width": 1
           },
+          minzoom: 12 // only show labels after zoom 12 to reduce clutter
         }
       ];
   
