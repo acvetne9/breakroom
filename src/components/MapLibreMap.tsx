@@ -231,39 +231,62 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const handleDebugClick = (e: maplibregl.MapMouseEvent) => {
       console.log('🔍 DEBUG: Clicked at', e.lngLat);
       
-      // Query all features at click point
-      const features = map.queryRenderedFeatures(e.point);
-      console.log('🔍 All features found:', features.length, features);
+      // Query road features specifically
+      const roadFeatures = map.queryRenderedFeatures(e.point, { 
+        layers: ['nyc-roads'] 
+      });
       
-      // Look specifically at road features
-      const roadFeatures = features.filter(f => 
-        f.source === 'nyc-tiles' && 
-        f.sourceLayer === 'examplepoints' &&
-        f.geometry?.type === 'LineString'
-      );
-      console.log('🔍 Road features from examplepoints:', roadFeatures);
+      console.log(`🔍 Found ${roadFeatures.length} road features`);
       
-      // Check for highway/road properties
-      const roadsWithHighway = roadFeatures.filter(f => f.properties?.highway);
-      console.log('🔍 Roads with highway property:', roadsWithHighway);
-      
-      // Check for names
-      const namedRoads = roadsWithHighway.filter(f => 
-        f.properties?.name && f.properties.name !== ''
-      );
-      console.log('🔍 Named roads:', namedRoads);
-      
-      if (namedRoads.length > 0) {
-        console.log('✅ Found named roads! Sample properties:', namedRoads[0].properties);
-      } else if (roadsWithHighway.length > 0) {
-        console.log('❌ Found roads but no names. Sample properties:', roadsWithHighway[0].properties);
-      } else {
-        console.log('❌ No road features found');
-        // Log ALL feature properties to see what's available
-        features.forEach((f, i) => {
-          console.log(`Feature ${i}:`, f.properties);
+      if (roadFeatures.length > 0) {
+        // Log first few features with their exact properties
+        roadFeatures.slice(0, 5).forEach((feature, i) => {
+          console.log(`Road ${i}:`, {
+            id: feature.properties?.id,
+            name: feature.properties?.name,
+            highway: feature.properties?.highway,
+            hasName: !!feature.properties?.name,
+            nameLength: feature.properties?.name?.length,
+            nameValue: `"${feature.properties?.name}"`,
+            allProperties: feature.properties
+          });
         });
+        
+        // Check which ones should pass the label filter
+        const shouldHaveLabels = roadFeatures.filter(f => {
+          const hasName = f.properties?.name && f.properties.name !== '';
+          const hasHighway = f.properties?.highway;
+          const isValidHighway = hasHighway && [
+            'motorway', 'trunk', 'primary', 'secondary', 
+            'tertiary', 'residential', 'service'
+          ].includes(f.properties.highway);
+          
+          console.log(`  Feature check - hasName: ${hasName}, hasHighway: ${hasHighway}, isValidHighway: ${isValidHighway}`);
+          return hasName && isValidHighway;
+        });
+        
+        console.log(`🔍 Features that SHOULD show labels: ${shouldHaveLabels.length}`);
+        
+        if (shouldHaveLabels.length > 0) {
+          console.log('✅ Sample roads that should be labeled:', 
+            shouldHaveLabels.slice(0, 3).map(f => ({
+              name: f.properties?.name,
+              highway: f.properties?.highway
+            }))
+          );
+        } else {
+          console.log('❌ No roads found that match label criteria');
+          console.log('Available highway types:', [...new Set(roadFeatures.map(f => f.properties?.highway))]);
+        }
+      } else {
+        console.log('❌ No road features found at click point');
       }
+      
+      // Also check if any label features are rendered
+      const labelFeatures = map.queryRenderedFeatures(e.point, { 
+        layers: ['nyc-road-labels-safer'] 
+      });
+      console.log(`🔍 Label features at click: ${labelFeatures.length}`);
     };
     
     map.on('click', handleDebugClick);
@@ -330,36 +353,26 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
         },
         {
-          id: 'nyc-road-labels-safer',
+          id: 'test-labels-step1',
           type: 'symbol' as const,
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           layout: {
-            'text-field': ['get', 'name'],
-            'text-size': 12,
-            'text-anchor': 'center',
-            'text-allow-overlap': false,
-            'text-optional': true,
-            'text-padding': 2
+            'text-field': 'TEST',
+            'text-size': 16,
+            'text-allow-overlap': true
           },
           paint: {
-            'text-color': '#2C2C2C',
+            'text-color': '#FF0000',
             'text-halo-color': '#FFFFFF',
-            'text-halo-width': 1.5
+            'text-halo-width': 2
           },
           filter: [
             'all',
-            ['has', 'name'],
-            ['has', 'highway'],
-            ['!=', ['get', 'name'], ''],
-            ['in', ['get', 'highway'], 
-              ['literal', [
-                'motorway', 'trunk', 'primary', 'secondary', 
-                'tertiary', 'residential', 'service'
-              ]]
-            ]
+            ['==', ['geometry-type'], 'LineString'],
+            ['has', 'highway']
           ],
-          minzoom: 13
+          minzoom: 10
         }
       ];
   
