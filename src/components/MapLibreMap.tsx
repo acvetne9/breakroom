@@ -463,7 +463,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                 const center = map.getCenter();
                 const labelTest = map.querySourceFeatures('nyc-tiles', {
                   sourceLayer: 'examplepoints',
-                  filter: layer.filter
+                  ...(layer.type !== 'background' && 'filter' in layer && layer.filter ? { filter: layer.filter } : {})
                 });
                 console.log(`🏷️ Potential label features in source: ${labelTest.length}`);
                 
