@@ -550,6 +550,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       const style = {
         version: 8 as const,
+        glyphs: `${window.location.origin}/data/OpenSansArialUnicode/{range}.pbf`,
         sources: { 'nyc-tiles': vectorSource },
         layers: [
           { id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } }
@@ -707,8 +708,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         }
       });
 
-      // Initial event listeners will be set up in separate useEffect
-
       // Handle deck.gl overlay initialization
       try {
         const overlay = new MapboxOverlay({
@@ -736,6 +735,26 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     initializeMap();
   }, []);
+
+  mapInstance.on("load", () => {
+  // Roads already exist — now add road labels
+    mapInstance.addLayer({
+      id: "nyc-road-labels",
+      type: "symbol",
+      source: "nyc-tiles",
+      "source-layer": "examplepoints", // 🔑 must match your actual vector-tile layer name
+      layout: {
+        "text-field": ["get", "name"],
+        "text-font": ["OpenSansArialUnicode"], // must match your font folder
+        "text-size": 12,
+      },
+      paint: {
+        "text-color": "#333",
+        "text-halo-color": "#fff",
+        "text-halo-width": 2
+      }
+    });
+  });
 
   // update deck layers
   useEffect(() => {
