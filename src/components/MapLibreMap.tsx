@@ -211,22 +211,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [businesses]);
 
-  // Debug glyph requests
-  (function debugGlyphs() {
-    const origFetch = window.fetch;
-    window.fetch = async (input: RequestInfo, init?: RequestInit) => {
-      const url = typeof input === "string" ? input : input.url;
-      if (url.includes("/assets/fonts/")) {
-        console.log("🔡 Glyph request:", url);
-      }
-      const res = await origFetch(input, init);
-      if (!res.ok) {
-        console.error("⚠️ Glyph request failed:", url, res.status);
-      }
-      return res;
-    };
-  })();
-
   const debugTileData = useCallback((map: maplibregl.Map) => {
     const handleDebugClick = (e: maplibregl.MapMouseEvent) => {
       const roadFeatures = map.queryRenderedFeatures(e.point, { 
