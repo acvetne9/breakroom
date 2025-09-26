@@ -330,29 +330,37 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
         },
         {
-          id: 'nyc-road-labels-simple',
+          id: 'nyc-road-labels-safer',
           type: 'symbol' as const,
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
-          'text-optional': true,
           layout: {
             'text-field': ['get', 'name'],
-            'text-size': 14,
-            'symbol-placement': 'line',
-            'text-rotation-alignment': 'map'
+            'text-size': 12,
+            'text-anchor': 'center',
+            'text-allow-overlap': false,
+            'text-optional': true,
+            'text-padding': 2
           },
           paint: {
-            'text-color': '#000000',
+            'text-color': '#2C2C2C',
             'text-halo-color': '#FFFFFF',
-            'text-halo-width': 2
+            'text-halo-width': 1.5
           },
           filter: [
             'all',
-            ['==', ['geometry-type'], 'LineString'],
+            ['has', 'name'],
             ['has', 'highway'],
-            ['has', 'name']
+            ['!=', ['get', 'name'], ''],
+            // Only include major road types that are less likely to have geometry issues
+            ['in', ['get', 'highway'], 
+              ['literal', [
+                'motorway', 'trunk', 'primary', 'secondary', 
+                'tertiary', 'residential', 'service'
+              ]]
+            ]
           ],
-          minzoom: 12
+          minzoom: 13
         }
       ];
   
