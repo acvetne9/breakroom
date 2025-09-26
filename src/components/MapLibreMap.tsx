@@ -246,6 +246,40 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return () => map.off('click', handleDebugClick);
   }, []);
 
+    const testLabelsVisibility = useCallback((map: maplibregl.Map) => {
+    console.log('🧪 Testing labels visibility...');
+    
+    const zoom = map.getZoom();
+    console.log(`Current zoom: ${zoom}`);
+    
+    // Query all label features in viewport
+    const bbox = map.getBounds();
+    const labelFeatures = map.querySourceFeatures('nyc-tiles', {
+      sourceLayer: 'examplepoints',
+      filter: [
+        'all',
+        ['==', ['geometry-type'], 'LineString'],
+        ['has', 'name'],
+        ['has', 'highway'],
+        ['!=', ['get', 'name'], '']
+      ]
+    });
+    
+    console.log(`Total features matching label filter: ${labelFeatures.length}`);
+    
+    if (labelFeatures.length > 0) {
+      const sample = labelFeatures.slice(0, 5);
+      console.log('Sample features for labels:', sample.map(f => ({
+        name: f.properties?.name,
+        highway: f.properties?.highway
+      })));
+    }
+    
+    // Check rendered features
+    const rendered = map.queryRenderedFeatures({ layers: ['nyc-road-labels'] });
+    console.log(`Rendered label features: ${rendered.length}`);
+  }, []);
+
   // vector layers (styling restored exactly as requested)
   const addVectorLayers = useCallback((map: maplibregl.Map) => {
     try {
@@ -338,12 +372,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'text-halo-width': 2,
             'text-opacity': 1
           },
-          // Simplified filter - let's start basic
+          // Ultra-simplified filter - if you can click it, it should have a label
           filter: [
             'all',
-            ['==', ['geometry-type'], 'LineString'],
             ['has', 'name'],
-            ['has', 'highway'],
             ['!=', ['get', 'name'], '']
           ],
           minzoom: 12 // Lowered from 13 to see labels sooner
@@ -405,40 +437,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     } catch (err) {
       console.error('❌ addVectorLayers error:', err);
     }
-  }, []);
-
-  const testLabelsVisibility = useCallback((map: maplibregl.Map) => {
-    console.log('🧪 Testing labels visibility...');
-    
-    const zoom = map.getZoom();
-    console.log(`Current zoom: ${zoom}`);
-    
-    // Query all label features in viewport
-    const bbox = map.getBounds();
-    const labelFeatures = map.querySourceFeatures('nyc-tiles', {
-      sourceLayer: 'examplepoints',
-      filter: [
-        'all',
-        ['==', ['geometry-type'], 'LineString'],
-        ['has', 'name'],
-        ['has', 'highway'],
-        ['!=', ['get', 'name'], '']
-      ]
-    });
-    
-    console.log(`Total features matching label filter: ${labelFeatures.length}`);
-    
-    if (labelFeatures.length > 0) {
-      const sample = labelFeatures.slice(0, 5);
-      console.log('Sample features for labels:', sample.map(f => ({
-        name: f.properties?.name,
-        highway: f.properties?.highway
-      })));
-    }
-    
-    // Check rendered features
-    const rendered = map.queryRenderedFeatures({ layers: ['nyc-road-labels'] });
-    console.log(`Rendered label features: ${rendered.length}`);
   }, []);
 
   const getBusinessLimitForViewport = useCallback((zoom: number) => {
