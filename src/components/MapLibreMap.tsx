@@ -211,23 +211,58 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [businesses]);
 
+  // Debug glyph requests
+  (function debugGlyphs() {
+    const origFetch = window.fetch;
+    window.fetch = async (input: RequestInfo, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.url;
+      if (url.includes("/assets/fonts/")) {
+        console.log("🔡 Glyph request:", url);
+      }
+      const res = await origFetch(input, init);
+      if (!res.ok) {
+        console.error("⚠️ Glyph request failed:", url, res.status);
+      }
+      return res;
+    };
+  })();
+
   const debugTileData = useCallback((map: maplibregl.Map) => {
     const handleDebugClick = (e: maplibregl.MapMouseEvent) => {
-      const roadFeatures = map.queryRenderedFeatures(e.point, { 
-        layers: ['nyc-roads'] 
-      });
+      console.log('🔍 DEBUG: Clicked at', e.lngLat);
       
-      console.log(`Found ${roadFeatures.length} road features`);
+      // Query all features at click point
+      const features = map.queryRenderedFeatures(e.point);
+      console.log('🔍 All features found:', features.length, features);
       
-      if (roadFeatures.length > 0) {
-        console.log('Sample properties:', roadFeatures[0].properties);
-        
-        const withNames = roadFeatures.filter(f => f.properties?.name);
-        console.log(`Roads with names: ${withNames.length}`);
-        
-        if (withNames.length > 0) {
-          console.log('Sample names:', withNames.slice(0, 3).map(f => f.properties.name));
-        }
+      // Look specifically at road features
+      const roadFeatures = features.filter(f => 
+        f.source === 'nyc-tiles' && 
+        f.sourceLayer === 'examplepoints' &&
+        f.geometry?.type === 'LineString'
+      );
+      console.log('🔍 Road features from examplepoints:', roadFeatures);
+      
+      // Check for highway/road properties
+      const roadsWithHighway = roadFeatures.filter(f => f.properties?.highway);
+      console.log('🔍 Roads with highway property:', roadsWithHighway);
+      
+      // Check for names
+      const namedRoads = roadsWithHighway.filter(f => 
+        f.properties?.name && f.properties.name !== ''
+      );
+      console.log('🔍 Named roads:', namedRoads);
+      
+      if (namedRoads.length > 0) {
+        console.log('✅ Found named roads! Sample properties:', namedRoads[0].properties);
+      } else if (roadsWithHighway.length > 0) {
+        console.log('❌ Found roads but no names. Sample properties:', roadsWithHighway[0].properties);
+      } else {
+        console.log('❌ No road features found');
+        // Log ALL feature properties to see what's available
+        features.forEach((f, i) => {
+          console.log(`Feature ${i}:`, f.properties);
+        });
       }
     };
     
@@ -295,35 +330,36 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
         },
         {
-          id: 'nyc-road-labels',
+          id: 'nyc-road-labels-safer',
           type: 'symbol' as const,
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           layout: {
             'text-field': ['get', 'name'],
-            'text-size': ['interpolate', ['linear'], ['zoom'], 12, 10, 16, 14, 20, 18],
+            'text-size': 12,
             'text-anchor': 'center',
             'text-allow-overlap': false,
             'text-optional': true,
-            'text-padding': 1,
-            'symbol-placement': 'line',
-            'text-rotation-alignment': 'map',
-            'text-pitch-alignment': 'viewport'
+            'text-padding': 2
           },
           paint: {
-            'text-color': '#1a1a1a',
-            'text-halo-color': '#ffffff',
-            'text-halo-width': 2,
-            'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.7, 14, 0.9, 16, 1]
+            'text-color': '#2C2C2C',
+            'text-halo-color': '#FFFFFF',
+            'text-halo-width': 1.5
           },
           filter: [
             'all',
-            ['==', ['geometry-type'], 'LineString'],
-            ['has', 'highway'],
             ['has', 'name'],
-            ['!=', ['get', 'name'], '']
-          ] as any,
-          minzoom: 12
+            ['has', 'highway'],
+            ['!=', ['get', 'name'], ''],
+            ['in', ['get', 'highway'], 
+              ['literal', [
+                'motorway', 'trunk', 'primary', 'secondary', 
+                'tertiary', 'residential', 'service'
+              ]]
+            ]
+          ],
+          minzoom: 13
         }
       ];
   
@@ -331,24 +367,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       
       layers.forEach(layer => {
         try {
-          // Add this debugging for EACH layer
-          console.log(`🔍 Attempting to add layer: ${layer.id}`);
-          
+          // Debug: log the layer before adding
+          console.log("🔍 Validating layer:", layer.id, layer);
+      
+          // Ensure layout object exists for symbol layers
+          if (layer.type === "symbol" && !("layout" in layer)) {
+            console.warn(`⚠️ Missing layout for symbol layer: ${layer.id}`);
+            (layer as any).layout = { "text-field": "" }; // minimal fallback
+          }
+      
           if (!map.getLayer(layer.id)) {
-            console.log(`🔍 Layer ${layer.id} doesn't exist, adding...`);
             map.addLayer(layer);
-            console.log(`✅ Successfully added layer: ${layer.id}`);
-            
-            // Verify it was added
-            setTimeout(() => {
-              const check = map.getLayer(layer.id);
-              console.log(`🔍 Post-add verification: ${layer.id} exists = ${!!check}`);
-            }, 100);
+            console.log(`✅ Layer added: ${layer.id}`);
           } else {
-            console.log(`⚠️ Layer ${layer.id} already exists, skipping`);
+            console.log(`⚠️ Already exists, skipping: ${layer.id}`);
           }
         } catch (err) {
-          console.error(`❌ FAILED to add layer ${layer.id}:`, err);
+          console.error(`❌ Failed layer ${layer.id}:`, err);
         }
       });
   
@@ -544,8 +579,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         style,
         center: [-73.986104, 40.715245],
         zoom: 12.77,
-        maxZoom: 19,
-        minZoom: 8,
+        maxZoom: 18,
+        minZoom: 9,
         renderWorldCopies: false,
         attributionControl: false
       });
@@ -597,6 +632,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       mapInstance.on('load', () => {
         console.log('🗺️ Map loaded successfully');
+        setMapLoaded(true);
+        callbackRefs.current.onMapLoaded?.();
         
         try {
           if (!layersAddedRef.current) {
@@ -605,10 +642,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         } catch (err) {
           console.error('❌ Error adding layers:', err);
         }
-        
-        // Set map loaded state after layers are added
-        setMapLoaded(true);
-        callbackRefs.current.onMapLoaded?.();
         
         // ADD THIS LINE - Call the debug function
         debugTileData(mapInstance);
@@ -644,17 +677,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           ];
           
           try {
-            const allRoadFeatures = mapInstance.queryRenderedFeatures(undefined, { layers: ['nyc-roads'] });
-            const allLabelFeatures = mapInstance.queryRenderedFeatures(undefined, { layers: ['nyc-road-labels'] });
-            console.log('🔍 Road features in viewport:', allRoadFeatures.length);
-            console.log('🔍 Road label features in viewport:', allLabelFeatures.length);
-            
-            // Check some sample road features for names
-            const roadsWithNames = allRoadFeatures.filter(f => f.properties?.name && f.properties?.name.trim() !== '');
-            console.log('🔍 Roads with names:', roadsWithNames.length);
-            if (roadsWithNames.length > 0) {
-              console.log('🔍 Sample road names:', roadsWithNames.slice(0, 5).map(f => f.properties.name));
-            }
+            const allFeatures = mapInstance.queryRenderedFeatures(undefined, { layers: ['nyc-roads'] });
+            console.log('🔍 All road features in viewport:', allFeatures.length, allFeatures);
           } catch (e) {
             console.log('❌ Could not query road features:', e);
           }
@@ -685,13 +709,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             
         }, 2000);
         
-        // Load businesses for the initial viewport - ensure map is fully loaded first
+        // Load businesses for the initial viewport
         setTimeout(() => {
-          if (mapRef.current && mapLoaded && !loading) {
-            console.log('🔄 Loading initial businesses');
+          if (mapRef.current && !loading) {
             handleViewportChange();
           }
-        }, 1500);
+        }, 1000);
       });
 
       // Add interaction event listeners
@@ -711,7 +734,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       // Handle deck.gl overlay initialization
       try {
         const overlay = new MapboxOverlay({
-          interleaved: false, // Set to false to prevent interference with road labels
+          interleaved: true,
           layers: []
         });
         mapInstance.addControl(overlay as any);
