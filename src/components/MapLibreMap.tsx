@@ -497,11 +497,12 @@ const checkTileStatus = useCallback((map: maplibregl.Map) => {
   
   const source = map.getSource('nyc-tiles');
   if (source && source.type === 'vector') {
-    console.log('🔍 Vector source loaded:', source._loaded);
-    console.log('🔍 Vector source tiles count:', Object.keys(source._tiles || {}).length);
+    const vectorSource = source as any; // Type assertion for debugging
+    console.log('🔍 Vector source loaded:', vectorSource.loaded || false);
+    console.log('🔍 Vector source tiles count:', Object.keys(vectorSource._tiles || {}).length);
     
     // List loaded tiles
-    Object.values(source._tiles || {}).forEach((tile: any, index) => {
+    Object.values(vectorSource._tiles || {}).forEach((tile: any, index) => {
       console.log(`🔍 Tile ${index}:`, {
         loaded: tile.state === 'loaded',
         coord: tile.coord,
