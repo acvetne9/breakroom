@@ -778,30 +778,45 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       map.off("zoomstart", onZoomStart);
       map.off("zoomend", onZoomEnd);
       map.on("load", () => {
+      // Roads already exist — now add road labels
         map.addLayer({
-          id: "road-labels",
+          id: "nyc-road-labels",
           type: "symbol",
           source: "nyc-tiles",
-          "source-layer": "roads", // change to your actual source-layer
-          filter: ["all", ["has", "name"]],
+          "source-layer": "examplepoints", // <-- change to your real road source-layer name if different
+          minzoom: 13, // show labels only when zoomed in (tune to taste)
+          filter: [
+            "all",
+            ["has", "name"],
+            // keep only major roads; adjust types to match your tile property (could be 'highway', 'class', 'fclass' etc)
+            ["match", ["get", "highway"],
+              ["motorway", "trunk", "primary", "secondary", "tertiary"], true, false
+            ]
+          ],
           layout: {
-            "text-field": ["get", "name"],
-            "text-font": ["OpenSansArialUnicode"],
+            "text-field": ["coalesce", ["get", "name"], ""],
+            "text-font": ["OpenSansArialUnicode"],      // must match your fontstack (see glyphs config)
             "text-size": [
               "interpolate", ["linear"], ["zoom"],
-              8, 9,   // smaller at zoom 8
-              12, 12, // medium at zoom 12
-              16, 14, // bigger at zoom 16
-              18, 16  // largest at zoom 18+
+              13, 10,   // at zoom 13 -> 10px
+              16, 12    // at zoom 16 -> 12px
             ],
-            "symbol-placement": "line",      // follows the road
-            "symbol-spacing": 1000,          // fewer labels
-            "text-rotation-alignment": "map"
+            "symbol-placement": "line",                 // <-- makes labels follow the line geometry (curved)
+            "text-rotation-alignment": "map",           // align label direction to the map (and the line)
+            "text-pitch-alignment": "map",
+            "text-keep-upright": true,                  // avoid upside-down text on steep curves
+            "symbol-spacing": 900,                      // larger = fewer repeats along a single line (tune 600–1500)
+            "text-max-angle": 18,                       // limit how curvy the text can be
+            "text-allow-overlap": false,
+            "text-ignore-placement": false,
+            "text-optional": true,
+            "text-padding": 2,
+            "text-justify": "center"
           },
           paint: {
-            "text-color": "#333",
+            "text-color": "#222",
             "text-halo-color": "#fff",
-            "text-halo-width": 1
+            "text-halo-width": 1.2
           }
         } as any);
       });

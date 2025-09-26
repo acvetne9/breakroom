@@ -74,7 +74,6 @@ const HomePage: React.FC<HomePageProps> = ({
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
   const [showLoading, setShowLoading] = useState(true);
   const [searchCompleted, setSearchCompleted] = useState(false); // Track if a search has been completed
-  const [mapLoaded, setMapLoaded] = useState(false);
 
   // 👇 state for welcome banner
   const [showWelcome, setShowWelcome] = useState(false);
@@ -108,11 +107,6 @@ const HomePage: React.FC<HomePageProps> = ({
   // 👇 when loading completes, mark it closed
   const handleLoadingComplete = () => {
     setShowLoading(false);
-  };
-
-  // 👇 when map loads, track it
-  const handleMapLoaded = () => {
-    setMapLoaded(true);
   };
 
   // 👇 Show welcome banner ONLY after initiation card closes
@@ -269,14 +263,13 @@ const HomePage: React.FC<HomePageProps> = ({
       )}
 
       <div>
-        {/* MapLibre with OpenStreetMap base layer - loads immediately in background */}
+        {/* MapLibre with OpenStreetMap base layer */}
         <MapLibreMap
           onBusinessClick={handleBusinessClick}
           selectedBusiness={selectedBusiness}
           landmarks={LANDMARKS}
           searchFilters={searchFilters}
           neighborhoodCenter={neighborhoodCenter}
-          onMapLoaded={handleMapLoaded}
         />
       
         {/* Business Preview Popup */}
