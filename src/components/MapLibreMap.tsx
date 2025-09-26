@@ -328,7 +328,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           id: "street-labels",
           type: "symbol",
           source: "nyc-tiles",
-          "source-layer": "transportation", // adjust if your vector tiles use a different layer name
+          "source-layer": "transportation", // adjust if needed
           layout: {
             "text-field": ["get", "name"],
             "text-font": ["OpenSansArialUnicode"],
@@ -336,21 +336,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               "interpolate",
               ["linear"],
               ["zoom"],
-              10, 10,   // small at low zoom
-              16, 14    // scale up slightly at high zoom
+              12, 10,
+              16, 14
             ],
-            "symbol-placement": "line", // follow the road
-            "text-max-angle": 30,
-            "text-padding": 2,
+            "symbol-placement": "line",              // follow road
+            "text-rotation-alignment": "map",        // align to map, not viewport
+            "symbol-spacing": 600,                   // reduce repeat frequency
             "text-allow-overlap": false,
-            "text-ignore-placement": false,
+            "text-ignore-placement": false
           },
           paint: {
-            "text-color": "#444",
+            "text-color": "#333",
             "text-halo-color": "#fff",
             "text-halo-width": 1
           },
-          minzoom: 12 // only show labels after zoom 12 to reduce clutter
+          minzoom: 12,
+          filter: ["match", ["get", "class"], ["motorway", "primary", "secondary"], true, false]
         }
       ];
   
