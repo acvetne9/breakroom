@@ -301,16 +301,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           'source-layer': 'examplepoints',
           layout: {
             'text-field': ['get', 'name'],
-            'text-size': 12,
+            'text-size': ['interpolate', ['linear'], ['zoom'], 12, 10, 16, 14, 20, 18],
             'text-anchor': 'center',
             'text-allow-overlap': false,
             'text-optional': true,
-            'text-padding': 2
+            'text-padding': 1,
+            'symbol-placement': 'line',
+            'text-rotation-alignment': 'map',
+            'text-pitch-alignment': 'viewport'
           },
           paint: {
-            'text-color': '#2C2C2C',
-            'text-halo-color': '#FFFFFF',
-            'text-halo-width': 1.5
+            'text-color': '#1a1a1a',
+            'text-halo-color': '#ffffff',
+            'text-halo-width': 2,
+            'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.7, 14, 0.9, 16, 1]
           },
           filter: [
             'all',
@@ -320,11 +324,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             ['in', ['get', 'highway'], 
               ['literal', [
                 'motorway', 'trunk', 'primary', 'secondary', 
-                'tertiary', 'residential', 'service'
+                'tertiary', 'residential', 'unclassified', 'service'
               ]]
             ]
-          ],
-          minzoom: 13
+          ] as any,
+          minzoom: 12
         }
       ];
   
@@ -643,8 +647,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           ];
           
           try {
-            const allFeatures = mapInstance.queryRenderedFeatures(undefined, { layers: ['nyc-roads'] });
-            console.log('🔍 All road features in viewport:', allFeatures.length, allFeatures);
+            const allRoadFeatures = mapInstance.queryRenderedFeatures(undefined, { layers: ['nyc-roads'] });
+            const allLabelFeatures = mapInstance.queryRenderedFeatures(undefined, { layers: ['nyc-road-labels'] });
+            console.log('🔍 Road features in viewport:', allRoadFeatures.length);
+            console.log('🔍 Road label features in viewport:', allLabelFeatures.length);
+            
+            // Check some sample road features for names
+            const roadsWithNames = allRoadFeatures.filter(f => f.properties?.name && f.properties?.name.trim() !== '');
+            console.log('🔍 Roads with names:', roadsWithNames.length);
+            if (roadsWithNames.length > 0) {
+              console.log('🔍 Sample road names:', roadsWithNames.slice(0, 5).map(f => f.properties.name));
+            }
           } catch (e) {
             console.log('❌ Could not query road features:', e);
           }
@@ -700,7 +713,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       // Handle deck.gl overlay initialization
       try {
         const overlay = new MapboxOverlay({
-          interleaved: true,
+          interleaved: false, // Set to false to prevent interference with road labels
           layers: []
         });
         mapInstance.addControl(overlay as any);
