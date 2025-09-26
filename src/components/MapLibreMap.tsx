@@ -435,7 +435,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       ];
   
       console.log('🗺️ Adding vector layers...');
-      
+    
       layers.forEach(layer => {
         try {
           console.log(`🔍 Attempting to add layer: ${layer.id}`);
@@ -483,7 +483,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           console.error(`❌ FAILED to add layer ${layer.id}:`, err);
         }
       });
-      
   
       layersAddedRef.current = true;
     } catch (err) {
