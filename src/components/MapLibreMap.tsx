@@ -334,6 +334,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: 'symbol' as const,
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
+          'text-optional': true,
           layout: {
             'text-field': ['get', 'name'],
             'text-size': 14,
