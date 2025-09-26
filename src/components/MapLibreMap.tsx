@@ -345,7 +345,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'text-opacity': 1 // Full opacity
           },
           filter: ['has', 'name']
-        };
+        }
       ];
   
       console.log('🗺️ Adding vector layers...');
