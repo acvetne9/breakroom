@@ -367,23 +367,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       
       layers.forEach(layer => {
         try {
-          // Debug: log the layer before adding
-          console.log("🔍 Validating layer:", layer.id, layer);
-      
-          // Ensure layout object exists for symbol layers
-          if (layer.type === "symbol" && !("layout" in layer)) {
-            console.warn(`⚠️ Missing layout for symbol layer: ${layer.id}`);
-            (layer as any).layout = { "text-field": "" }; // minimal fallback
-          }
-      
+          // Add this debugging for EACH layer
+          console.log(`🔍 Attempting to add layer: ${layer.id}`);
+          
           if (!map.getLayer(layer.id)) {
+            console.log(`🔍 Layer ${layer.id} doesn't exist, adding...`);
             map.addLayer(layer);
-            console.log(`✅ Layer added: ${layer.id}`);
+            console.log(`✅ Successfully added layer: ${layer.id}`);
+            
+            // Verify it was added
+            setTimeout(() => {
+              const check = map.getLayer(layer.id);
+              console.log(`🔍 Post-add verification: ${layer.id} exists = ${!!check}`);
+            }, 100);
           } else {
-            console.log(`⚠️ Already exists, skipping: ${layer.id}`);
+            console.log(`⚠️ Layer ${layer.id} already exists, skipping`);
           }
         } catch (err) {
-          console.error(`❌ Failed layer ${layer.id}:`, err);
+          console.error(`❌ FAILED to add layer ${layer.id}:`, err);
         }
       });
   
