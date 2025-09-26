@@ -229,64 +229,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   const debugTileData = useCallback((map: maplibregl.Map) => {
     const handleDebugClick = (e: maplibregl.MapMouseEvent) => {
-      console.log('🔍 DEBUG: Clicked at', e.lngLat);
-      
-      // Query road features specifically
       const roadFeatures = map.queryRenderedFeatures(e.point, { 
         layers: ['nyc-roads'] 
       });
       
-      console.log(`🔍 Found ${roadFeatures.length} road features`);
+      console.log(`Found ${roadFeatures.length} road features`);
       
       if (roadFeatures.length > 0) {
-        // Log first few features with their exact properties
-        roadFeatures.slice(0, 5).forEach((feature, i) => {
-          console.log(`Road ${i}:`, {
-            id: feature.properties?.id,
-            name: feature.properties?.name,
-            highway: feature.properties?.highway,
-            hasName: !!feature.properties?.name,
-            nameLength: feature.properties?.name?.length,
-            nameValue: `"${feature.properties?.name}"`,
-            allProperties: feature.properties
-          });
-        });
+        console.log('Sample properties:', roadFeatures[0].properties);
         
-        // Check which ones should pass the label filter
-        const shouldHaveLabels = roadFeatures.filter(f => {
-          const hasName = f.properties?.name && f.properties.name !== '';
-          const hasHighway = f.properties?.highway;
-          const isValidHighway = hasHighway && [
-            'motorway', 'trunk', 'primary', 'secondary', 
-            'tertiary', 'residential', 'service'
-          ].includes(f.properties.highway);
-          
-          console.log(`  Feature check - hasName: ${hasName}, hasHighway: ${hasHighway}, isValidHighway: ${isValidHighway}`);
-          return hasName && isValidHighway;
-        });
+        const withNames = roadFeatures.filter(f => f.properties?.name);
+        console.log(`Roads with names: ${withNames.length}`);
         
-        console.log(`🔍 Features that SHOULD show labels: ${shouldHaveLabels.length}`);
-        
-        if (shouldHaveLabels.length > 0) {
-          console.log('✅ Sample roads that should be labeled:', 
-            shouldHaveLabels.slice(0, 3).map(f => ({
-              name: f.properties?.name,
-              highway: f.properties?.highway
-            }))
-          );
-        } else {
-          console.log('❌ No roads found that match label criteria');
-          console.log('Available highway types:', [...new Set(roadFeatures.map(f => f.properties?.highway))]);
+        if (withNames.length > 0) {
+          console.log('Sample names:', withNames.slice(0, 3).map(f => f.properties.name));
         }
-      } else {
-        console.log('❌ No road features found at click point');
       }
-      
-      // Also check if any label features are rendered
-      const labelFeatures = map.queryRenderedFeatures(e.point, { 
-        layers: ['nyc-road-labels-safer'] 
-      });
-      console.log(`🔍 Label features at click: ${labelFeatures.length}`);
     };
     
     map.on('click', handleDebugClick);
@@ -353,14 +311,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
         },
         {
-          id: 'test-labels-step1',
+          id: 'simple-road-test',
           type: 'symbol' as const,
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           layout: {
-            'text-field': 'TEST',
+            'text-field': ['get', 'name'],
             'text-size': 16,
-            'text-allow-overlap': true
+            'text-allow-overlap': true,
+            'text-optional': true
           },
           paint: {
             'text-color': '#FF0000',
@@ -370,7 +329,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           filter: [
             'all',
             ['==', ['geometry-type'], 'LineString'],
-            ['has', 'highway']
+            ['has', 'name']
           ],
           minzoom: 10
         }
@@ -593,8 +552,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         style,
         center: [-73.986104, 40.715245],
         zoom: 12.77,
-        maxZoom: 18,
-        minZoom: 9,
+        maxZoom: 19,
+        minZoom: 8,
         renderWorldCopies: false,
         attributionControl: false
       });
