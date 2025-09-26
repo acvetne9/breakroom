@@ -228,71 +228,41 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   })();
 
-  const debugTileData = useCallback((map: maplibregl.Map) => {
-    const handleDebugClick = (e: maplibregl.MapMouseEvent) => {
-      console.log('🔍 DEBUG: Clicked at', e.lngLat);
-      
-      // Query all features at click point
-      const features = map.queryRenderedFeatures(e.point);
-      console.log('🔍 All features found:', features.length, features);
-      
-      // Look specifically at road features
-      const roadFeatures = features.filter(f => 
-        f.source === 'nyc-tiles' && 
-        f.sourceLayer === 'examplepoints' &&
-        f.geometry?.type === 'LineString'
-      );
-      console.log('🔍 Road features from examplepoints:', roadFeatures);
-      
-      // Check for highway/road properties
-      const roadsWithHighway = roadFeatures.filter(f => f.properties?.highway);
-      console.log('🔍 Roads with highway property:', roadsWithHighway);
-      
-      // Check for names
-      const namedRoads = roadsWithHighway.filter(f => 
-        f.properties?.name && f.properties.name !== ''
-      );
-      console.log('🔍 Named roads:', namedRoads);
-      
-      if (namedRoads.length > 0) {
-        console.log('✅ Found named roads! Sample properties:', namedRoads[0].properties);
-      } else if (roadsWithHighway.length > 0) {
-        console.log('❌ Found roads but no names. Sample properties:', roadsWithHighway[0].properties);
-      } else {
-        console.log('❌ No road features found');
-        // Log ALL feature properties to see what's available
-        features.forEach((f, i) => {
-          console.log(`Feature ${i}:`, f.properties);
-        });
-      }
-    };
-    
-    map.on('click', handleDebugClick);
-    return () => map.off('click', handleDebugClick);
-  }, []);
-
   useEffect(() => {
     if (!mapRef.current) return;
     const map = mapRef.current;
   
-    const styleLayers = map.getStyle().layers || [];
-    console.log("🔍 Style layers:", styleLayers.map(l => l.id));
-  
-    styleLayers.forEach(layer => {
-      if ("source" in layer && layer.source === "nyc-tiles") {
-        const features = map.queryRenderedFeatures({ layers: [layer.id] });
-        if (features.length > 0) {
-          const f = features[0] as any;
-          console.log(`✅ Features in layer: ${layer.id}`, f);
-          console.log(
-            `   🔍 source-layer for ${layer.id}:`,
-            f.layer["source-layer"]
-          );
-        } else {
-          console.log(`❌ No features in layer: ${layer.id}`);
-        }
+    const handleLoad = () => {
+      const style = map.getStyle();
+      if (!style) {
+        console.warn("⚠️ No style yet, skipping");
+        return;
       }
-    });
+  
+      const styleLayers = style.layers || [];
+      console.log("🔍 Style layers:", styleLayers.map(l => l.id));
+  
+      styleLayers.forEach(layer => {
+        if ("source" in layer && layer.source === "nyc-tiles") {
+          const features = map.queryRenderedFeatures({ layers: [layer.id] });
+          if (features.length > 0) {
+            const f = features[0] as any;
+            console.log(`✅ Features in layer: ${layer.id}`, f);
+            console.log(
+              `   🔍 source-layer for ${layer.id}:`,
+              f.layer["source-layer"]
+            );
+          } else {
+            console.log(`❌ No features in layer: ${layer.id}`);
+          }
+        }
+      });
+    };
+  
+    map.on("load", handleLoad);
+    return () => {
+      map.off("load", handleLoad);
+    };
   }, []);
 
   // vector layers (styling restored exactly as requested)
