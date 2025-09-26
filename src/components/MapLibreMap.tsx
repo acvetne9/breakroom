@@ -352,7 +352,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             ['has', 'name'],
             ['has', 'highway'],
             ['!=', ['get', 'name'], ''],
-            // Only include major road types that are less likely to have geometry issues
             ['in', ['get', 'highway'], 
               ['literal', [
                 'motorway', 'trunk', 'primary', 'secondary', 
