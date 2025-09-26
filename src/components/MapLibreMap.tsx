@@ -211,284 +211,308 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [businesses]);
 
-  const debugTileData = useCallback((map: maplibregl.Map) => {
-    const handleDebugClick = (e: maplibregl.MapMouseEvent) => {
-      const roadFeatures = map.queryRenderedFeatures(e.point, { 
-        layers: ['nyc-roads'] 
-      });
+// Enhanced debugging and fixed road labels layer
+const debugTileData = useCallback((map: maplibregl.Map) => {
+  const handleDebugClick = (e: maplibregl.MapMouseEvent) => {
+    const roadFeatures = map.queryRenderedFeatures(e.point, { 
+      layers: ['nyc-roads'] 
+    });
+    
+    console.log(`Found ${roadFeatures.length} road features`);
+    
+    if (roadFeatures.length > 0) {
+      console.log('Sample properties:', roadFeatures[0].properties);
       
-      console.log(`Found ${roadFeatures.length} road features`);
+      const withNames = roadFeatures.filter(f => f.properties?.name);
+      console.log(`Roads with names: ${withNames.length}`);
       
-      if (roadFeatures.length > 0) {
-        console.log('Sample properties:', roadFeatures[0].properties);
-        
-        const withNames = roadFeatures.filter(f => f.properties?.name);
-        console.log(`Roads with names: ${withNames.length}`);
-        
-        if (withNames.length > 0) {
-          console.log('Sample names:', withNames.slice(0, 3).map(f => f.properties.name));
-        }
-  
-        // NEW: Debug label features specifically
-        const labelFeatures = map.queryRenderedFeatures(e.point, { 
-          layers: ['nyc-road-labels'] 
-        });
-        console.log(`Found ${labelFeatures.length} label features`);
-        
-        // Check if label layer exists
-        const labelLayer = map.getLayer('nyc-road-labels');
-        console.log('Label layer exists:', !!labelLayer);
-        console.log('Current zoom:', map.getZoom());
+      if (withNames.length > 0) {
+        console.log('Sample names:', withNames.slice(0, 3).map(f => f.properties.name));
       }
-    };
-    
-    map.on('click', handleDebugClick);
-    return () => map.off('click', handleDebugClick);
-  }, []);
 
-  const testLabelsVisibility = useCallback((map: maplibregl.Map) => {
-    console.log('🧪 Testing labels visibility...');
-    
-    const zoom = map.getZoom();
-    console.log(`Current zoom: ${zoom}`);
-    
-    // Query all label features in viewport
-    const bbox = map.getBounds();
-    const labelFeatures = map.querySourceFeatures('nyc-tiles', {
-      sourceLayer: 'examplepoints',
-      filter: [
-        'all',
-        ['==', ['geometry-type'], 'LineString'],
-        ['has', 'name'],
-        ['has', 'highway'],
-        ['!=', ['get', 'name'], '']
-      ]
-    });
-    
-    console.log(`Total features matching label filter: ${labelFeatures.length}`);
-    
-    if (labelFeatures.length > 0) {
-      const sample = labelFeatures.slice(0, 5);
-      console.log('Sample features for labels:', sample.map(f => ({
-        name: f.properties?.name,
-        highway: f.properties?.highway
-      })));
-    }
-    
-    // Check rendered features
-    const rendered = map.queryRenderedFeatures({ layers: ['nyc-road-labels'] });
-    console.log(`Rendered label features: ${rendered.length}`);
-  }, []);
-  
-  // Add this diagnostic function to test different filters
-  const testLabelFilters = useCallback((map: maplibregl.Map) => {
-    console.log('🧪 Testing different label filters...');
-    
-    // Test 1: All features with names (no geometry restriction)
-    const allNamed = map.querySourceFeatures('nyc-tiles', {
-      sourceLayer: 'examplepoints',
-      filter: ['all', ['has', 'name'], ['!=', ['get', 'name'], '']]
-    });
-    console.log(`🧪 All named features: ${allNamed.length}`);
-    
-    // Test 2: LineString features with names
-    const namedLines = map.querySourceFeatures('nyc-tiles', {
-      sourceLayer: 'examplepoints',
-      filter: [
-        'all',
-        ['==', ['geometry-type'], 'LineString'],
-        ['has', 'name'],
-        ['!=', ['get', 'name'], '']
-      ]
-    });
-    console.log(`🧪 Named LineString features: ${namedLines.length}`);
-    
-    // Test 3: Features with highway property
-    const withHighway = map.querySourceFeatures('nyc-tiles', {
-      sourceLayer: 'examplepoints',
-      filter: ['has', 'highway']
-    });
-    console.log(`🧪 Features with highway: ${withHighway.length}`);
-    
-    // Test 4: Current label filter
-    const labelMatch = map.querySourceFeatures('nyc-tiles', {
-      sourceLayer: 'examplepoints',
-      filter: [
-        'all',
-        ['has', 'name'],
-        ['!=', ['get', 'name'], '']
-      ]
-    });
-    console.log(`🧪 Current label filter matches: ${labelMatch.length}`);
-    
-    if (labelMatch.length > 0) {
-      console.log('🧪 Sample label candidates:', 
-        labelMatch.slice(0, 3).map(f => ({
-          name: f.properties?.name,
-          type: f.geometry?.type,
-          highway: f.properties?.highway
-        }))
-      );
-    }
-  }, []);
-
-
-  // vector layers (styling restored exactly as requested)
-  const addVectorLayers = useCallback((map: maplibregl.Map) => {
-    try {
-      const layers: LayerSpecification[] = [
-        {
-          id: 'nyc-land',
-          type: 'fill',
-          source: 'nyc-tiles',
-          'source-layer': 'examplepoints',
-          paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
-          filter: ['all', ['==', ['geometry-type'], 'Polygon']]
-        },
-        {
-          id: 'nyc-green-spaces',
-          type: 'fill',
-          source: 'nyc-tiles',
-          'source-layer': 'examplepoints',
-          paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
-          filter: [
-            'all',
-            ['==', ['geometry-type'], 'Polygon'],
-            ['any',
-              ['==', ['get', 'leisure'], 'park'],
-              ['==', ['get', 'leisure'], 'garden'],
-              ['==', ['get', 'leisure'], 'playground'],
-              ['==', ['get', 'leisure'], 'recreation_ground'],
-              ['==', ['get', 'leisure'], 'nature_reserve'],
-              ['==', ['get', 'leisure'], 'sports_centre'],
-              ['==', ['get', 'leisure'], 'pitch'],
-              ['==', ['get', 'landuse'], 'grass'],
-              ['==', ['get', 'landuse'], 'meadow'],
-              ['==', ['get', 'landuse'], 'cemetery'],
-              ['>=',
-                ['index-of', 'cemetery', ['downcase', ['coalesce', ['get', 'name'], '']]],
-                0
-              ]
-            ]
-          ] as any
-        },
-        {
-          id: 'nyc-water',
-          type: 'fill',
-          source: 'nyc-tiles',
-          'source-layer': 'examplepoints',
-          paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
-          filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']]
-        },
-        {
-          id: 'nyc-roads',
-          type: 'line',
-          source: 'nyc-tiles',
-          'source-layer': 'examplepoints',
-          paint: {
-            'line-color': '#666666',
-            'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
-            'line-opacity': 0.8
-          },
-          filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
-        },
-        {
-          id: 'nyc-road-labels',
-          type: 'symbol',
-          source: 'nyc-tiles',
-          'source-layer': 'examplepoints',
-          layout: {
-            'text-field': ['get', 'name'],
-            'text-size': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              13, 10,
-              16, 14,
-              18, 16
-            ],
-            'text-anchor': 'center',
-            'text-allow-overlap': false,
-            'text-ignore-placement': false,
-            'text-optional': false, // Changed from true
-            'text-padding': 4, // Increased padding
-            'symbol-placement': 'line',
-            'text-rotation-alignment': 'map',
-            'text-pitch-alignment': 'viewport',
-            'text-max-angle': 45,
-            'symbol-spacing': 250,
-            'text-font': ['Open Sans Regular', 'Arial Regular'] 
-          },
-          paint: {
-            'text-color': '#2C2C2C',
-            'text-halo-color': '#FFFFFF',
-            'text-halo-width': 2,
-            'text-opacity': 1
-          },
-          filter: [
-            'all',
-            ['has', 'name'],
-            ['!=', ['get', 'name'], '']
-          ],
-          minzoom: 12 // Lowered from 13 to see labels sooner
-        }
-      ];
-  
-      console.log('🗺️ Adding vector layers...');
-    
-      layers.forEach(layer => {
-        try {
-          console.log(`🔍 Attempting to add layer: ${layer.id}`);
-          
-          if (!map.getLayer(layer.id)) {
-            console.log(`🔍 Layer ${layer.id} doesn't exist, adding...`);
-            map.addLayer(layer);
-            console.log(`✅ Successfully added layer: ${layer.id}`);
-            
-            // Enhanced verification
-            setTimeout(() => {
-              const check = map.getLayer(layer.id);
-              console.log(`🔍 Post-add verification: ${layer.id} exists = ${!!check}`);
-              
-              // Special debugging for labels layer
-              if (layer.id === 'nyc-road-labels') {
-                console.log('🏷️ Label layer details:', {
-                  exists: !!check,
-                  zoom: map.getZoom(),
-                  minzoom: layer.minzoom,
-                  shouldBeVisible: map.getZoom() >= (layer.minzoom || 0)
-                });
-                
-                // Test query for label features
-                const center = map.getCenter();
-                const labelTest = map.querySourceFeatures('nyc-tiles', {
-                  sourceLayer: 'examplepoints',
-                  ...(layer.type !== 'background' && 'filter' in layer && layer.filter ? { filter: layer.filter } : {})
-                });
-                console.log(`🏷️ Potential label features in source: ${labelTest.length}`);
-                
-                if (labelTest.length > 0) {
-                  console.log('🏷️ Sample label feature:', {
-                    name: labelTest[0].properties?.name,
-                    highway: labelTest[0].properties?.highway,
-                    geometry: labelTest[0].geometry.type
-                  });
-                }
-              }
-            }, 500);
-          } else {
-            console.log(`⚠️ Layer ${layer.id} already exists, skipping`);
-          }
-        } catch (err) {
-          console.error(`❌ FAILED to add layer ${layer.id}:`, err);
-        }
+      // NEW: Debug label features specifically
+      const labelFeatures = map.queryRenderedFeatures(e.point, { 
+        layers: ['nyc-road-labels'] 
       });
-  
-      layersAddedRef.current = true;
-    } catch (err) {
-      console.error('❌ addVectorLayers error:', err);
+      console.log(`Found ${labelFeatures.length} label features`);
+      
+      // Check if label layer exists
+      const labelLayer = map.getLayer('nyc-road-labels');
+      console.log('Label layer exists:', !!labelLayer);
+      console.log('Current zoom:', map.getZoom());
     }
-  }, []);
+  };
+  
+  map.on('click', handleDebugClick);
+  return () => map.off('click', handleDebugClick);
+}, []);
+
+// Fixed vector layers with improved road labels
+const addVectorLayers = useCallback((map: maplibregl.Map) => {
+  try {
+    const layers: LayerSpecification[] = [
+      {
+        id: 'nyc-land',
+        type: 'fill',
+        source: 'nyc-tiles',
+        'source-layer': 'examplepoints',
+        paint: { 'fill-color': '#F5F5DC', 'fill-opacity': 1.0 },
+        filter: ['all', ['==', ['geometry-type'], 'Polygon']]
+      },
+      {
+        id: 'nyc-green-spaces',
+        type: 'fill',
+        source: 'nyc-tiles',
+        'source-layer': 'examplepoints',
+        paint: { 'fill-color': '#87C17A', 'fill-opacity': 1.0 },
+        filter: [
+          'all',
+          ['==', ['geometry-type'], 'Polygon'],
+          ['any',
+            ['==', ['get', 'leisure'], 'park'],
+            ['==', ['get', 'leisure'], 'garden'],
+            ['==', ['get', 'leisure'], 'playground'],
+            ['==', ['get', 'leisure'], 'recreation_ground'],
+            ['==', ['get', 'leisure'], 'nature_reserve'],
+            ['==', ['get', 'leisure'], 'sports_centre'],
+            ['==', ['get', 'leisure'], 'pitch'],
+            ['==', ['get', 'landuse'], 'grass'],
+            ['==', ['get', 'landuse'], 'meadow'],
+            ['==', ['get', 'landuse'], 'cemetery'],
+            ['>=',
+              ['index-of', 'cemetery', ['downcase', ['coalesce', ['get', 'name'], '']]],
+              0
+            ]
+          ]
+        ]
+      },
+      {
+        id: 'nyc-water',
+        type: 'fill',
+        source: 'nyc-tiles',
+        'source-layer': 'examplepoints',
+        paint: { 'fill-color': '#6CA4E1', 'fill-opacity': 1.0 },
+        filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['has', 'natural']]
+      },
+      {
+        id: 'nyc-roads',
+        type: 'line',
+        source: 'nyc-tiles',
+        'source-layer': 'examplepoints',
+        paint: {
+          'line-color': '#666666',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 1.5, 16, 3],
+          'line-opacity': 0.8
+        },
+        filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
+      },
+      {
+        id: 'nyc-road-labels',
+        type: 'symbol',
+        source: 'nyc-tiles',
+        'source-layer': 'examplepoints',
+        layout: {
+          'text-field': ['get', 'name'],
+          'text-size': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            13, 10,
+            16, 14,
+            18, 16
+          ],
+          'text-anchor': 'center',
+          'text-allow-overlap': false,
+          'text-ignore-placement': false,
+          'text-optional': false, // Changed from true
+          'text-padding': 4, // Increased padding
+          'symbol-placement': 'line',
+          'text-rotation-alignment': 'map',
+          'text-pitch-alignment': 'viewport',
+          'text-max-angle': 45,
+          'symbol-spacing': 250,
+          'text-font': ['Open Sans Regular', 'Arial Regular'] // Fallback fonts
+        },
+        paint: {
+          'text-color': '#2C2C2C',
+          'text-halo-color': '#FFFFFF',
+          'text-halo-width': 2,
+          'text-opacity': 1
+        },
+        // Ultra-simplified filter - if you can click it, it should have a label
+        filter: [
+          'all',
+          ['has', 'name'],
+          ['!=', ['get', 'name'], '']
+        ],
+        minzoom: 10 // Lowered even further to test
+      }
+    ];
+
+    console.log('🗺️ Adding vector layers...');
+    
+    layers.forEach(layer => {
+      try {
+        console.log(`🔍 Attempting to add layer: ${layer.id}`);
+        
+        if (!map.getLayer(layer.id)) {
+          console.log(`🔍 Layer ${layer.id} doesn't exist, adding...`);
+          map.addLayer(layer);
+          console.log(`✅ Successfully added layer: ${layer.id}`);
+          
+          // Enhanced verification
+          setTimeout(() => {
+            const check = map.getLayer(layer.id);
+            console.log(`🔍 Post-add verification: ${layer.id} exists = ${!!check}`);
+            
+            // Special debugging for labels layer
+            if (layer.id === 'nyc-road-labels') {
+              console.log('🏷️ Label layer details:', {
+                exists: !!check,
+                zoom: map.getZoom(),
+                minzoom: layer.minzoom,
+                shouldBeVisible: map.getZoom() >= (layer.minzoom || 0)
+              });
+              
+              // Test query for label features
+              const center = map.getCenter();
+              const labelTest = map.querySourceFeatures('nyc-tiles', {
+                sourceLayer: 'examplepoints',
+                filter: [
+                  'all',
+                  ['has', 'name'],
+                  ['!=', ['get', 'name'], '']
+                ]
+              });
+              console.log(`🏷️ Potential label features in source: ${labelTest.length}`);
+              
+              if (labelTest.length > 0) {
+                console.log('🏷️ Sample label feature:', {
+                  name: labelTest[0].properties?.name,
+                  highway: labelTest[0].properties?.highway,
+                  geometry: labelTest[0].geometry.type
+                });
+              }
+            }
+          }, 500);
+        } else {
+          console.log(`⚠️ Layer ${layer.id} already exists, skipping`);
+        }
+      } catch (err) {
+        console.error(`❌ FAILED to add layer ${layer.id}:`, err);
+      }
+    });
+
+    layersAddedRef.current = true;
+  } catch (err) {
+    console.error('❌ addVectorLayers error:', err);
+  }
+}, []);
+
+// Add this helper function to test labels visibility
+const testLabelsVisibility = useCallback((map: maplibregl.Map) => {
+  console.log('🧪 Testing labels visibility...');
+  
+  const zoom = map.getZoom();
+  console.log(`Current zoom: ${zoom}`);
+  
+  // Query all label features in viewport
+  const bbox = map.getBounds();
+  const labelFeatures = map.querySourceFeatures('nyc-tiles', {
+    sourceLayer: 'examplepoints',
+    filter: [
+      'all',
+      ['==', ['geometry-type'], 'LineString'],
+      ['has', 'name'],
+      ['has', 'highway'],
+      ['!=', ['get', 'name'], '']
+    ]
+  });
+  
+  console.log(`Total features matching label filter: ${labelFeatures.length}`);
+  
+  if (labelFeatures.length > 0) {
+    const sample = labelFeatures.slice(0, 5);
+    console.log('Sample features for labels:', sample.map(f => ({
+      name: f.properties?.name,
+      highway: f.properties?.highway
+    })));
+  }
+  
+  // Check rendered features
+  const rendered = map.queryRenderedFeatures({ layers: ['nyc-road-labels'] });
+  console.log(`Rendered label features: ${rendered.length}`);
+}, []);
+
+// Add this enhanced diagnostic function to test at different times
+const testLabelFiltersDelayed = useCallback((map: maplibregl.Map) => {
+  console.log('🧪 Testing filters with delay...');
+  
+  // Test after a delay to ensure tiles are loaded
+  setTimeout(() => {
+    console.log('🧪 [DELAYED] Testing different label filters...');
+    
+    // Test with specific tile coordinates
+    const zoom = map.getZoom();
+    const center = map.getCenter();
+    console.log(`🧪 Current zoom: ${zoom}, center: ${center.lng}, ${center.lat}`);
+    
+    // Try querying with no filter first
+    const allFeatures = map.querySourceFeatures('nyc-tiles', {
+      sourceLayer: 'examplepoints'
+    });
+    console.log(`🧪 [DELAYED] ALL features (no filter): ${allFeatures.length}`);
+    
+    if (allFeatures.length > 0) {
+      // Sample the first few features
+      const sample = allFeatures.slice(0, 5).map(f => ({
+        name: f.properties?.name,
+        highway: f.properties?.highway,
+        type: f.geometry?.type,
+        hasName: !!f.properties?.name,
+        nameNotEmpty: f.properties?.name !== ''
+      }));
+      console.log('🧪 [DELAYED] Sample features:', sample);
+      
+      // Count features with names
+      const withNames = allFeatures.filter(f => f.properties?.name && f.properties.name !== '');
+      console.log(`🧪 [DELAYED] Features with valid names: ${withNames.length}`);
+      
+      if (withNames.length > 0) {
+        console.log('🧪 [DELAYED] Sample named features:', 
+          withNames.slice(0, 3).map(f => ({
+            name: f.properties?.name,
+            type: f.geometry?.type,
+            highway: f.properties?.highway
+          }))
+        );
+      }
+    }
+  }, 2000); // Wait 2 seconds for tiles to load
+}, []);
+
+// Also add immediate tile checking
+const checkTileStatus = useCallback((map: maplibregl.Map) => {
+  console.log('🔍 Checking tile loading status...');
+  
+  const source = map.getSource('nyc-tiles');
+  if (source && source.type === 'vector') {
+    console.log('🔍 Vector source loaded:', source._loaded);
+    console.log('🔍 Vector source tiles count:', Object.keys(source._tiles || {}).length);
+    
+    // List loaded tiles
+    Object.values(source._tiles || {}).forEach((tile: any, index) => {
+      console.log(`🔍 Tile ${index}:`, {
+        loaded: tile.state === 'loaded',
+        coord: tile.coord,
+        hasData: !!tile.data
+      });
+    });
+  }
+}, []);
+
+// Usage: Call this function after map loads to test
+// testLabelFilters(map);
 
   const getBusinessLimitForViewport = useCallback((zoom: number) => {
     // For search results, show more businesses across all zoom levels
@@ -728,7 +752,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
 
       mapInstance.on('load', () => {
-        testLabelFilters(mapInstance);
+        checkTileStatus(mapInstance);
+        testLabelFiltersDelayed(mapInstance);
         testLabelsVisibility(mapInstance)
         console.log('🗺️ Map loaded successfully');
         setMapLoaded(true);
