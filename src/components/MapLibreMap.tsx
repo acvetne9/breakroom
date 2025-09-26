@@ -484,7 +484,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           console.error(`❌ FAILED to add layer ${layer.id}:`, err);
         }
       });
-      testLabelFilters(map);
+      
   
       layersAddedRef.current = true;
     } catch (err) {
@@ -730,6 +730,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       });
 
       mapInstance.on('load', () => {
+        testLabelFilters(mapInstance);
+        testLabelsVisibility(mapInstance)
         console.log('🗺️ Map loaded successfully');
         setMapLoaded(true);
         callbackRefs.current.onMapLoaded?.();
