@@ -270,6 +270,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return () => map.off('click', handleDebugClick);
   }, []);
 
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+  
+    const features = map.querySourceFeatures("nyc-tiles");
+    const layers = [...new Set(features.map(f => f.sourceLayer))];
+    console.log("🔍 source-layers in nyc-tiles:", layers);
+  
+    if (features.length) {
+      console.log("🔍 sample feature properties:", features[0].properties);
+    }
+  }, [mapRef.current]);
+
   // vector layers (styling restored exactly as requested)
   const addVectorLayers = useCallback((map: maplibregl.Map) => {
     try {
