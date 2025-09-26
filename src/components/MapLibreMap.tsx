@@ -323,6 +323,29 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'line-opacity': 0.8
           },
           filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
+        },
+        {
+          id: "nyc-road-labels",
+          type: "symbol",
+          source: "nyc-tiles",
+          "source-layer": "examplepoints", // ✅ must match the actual source-layer in your tiles
+          layout: {
+            "text-field": ["coalesce", ["get", "name"], ""], // use "name" if available
+            "text-size": [
+              "interpolate", ["linear"], ["zoom"],
+              10, 10,
+              14, 14,
+              16, 18
+            ],
+            "symbol-placement": "line", // follow the road geometry
+            "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"]
+          },
+          paint: {
+            "text-color": "#444",
+            "text-halo-color": "#fff",
+            "text-halo-width": 1
+          },
+          filter: ["all", ["==", ["geometry-type"], "LineString"], ["has", "highway"]]
         }
       ];
   
