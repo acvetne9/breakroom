@@ -318,15 +318,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           },
           filter: [
             'all',
-            ['has', 'name'],
+            ['==', ['geometry-type'], 'LineString'],
             ['has', 'highway'],
-            ['!=', ['get', 'name'], ''],
-            ['in', ['get', 'highway'], 
-              ['literal', [
-                'motorway', 'trunk', 'primary', 'secondary', 
-                'tertiary', 'residential', 'unclassified', 'service'
-              ]]
-            ]
+            ['has', 'name'],
+            ['!=', ['get', 'name'], '']
           ] as any,
           minzoom: 12
         }
@@ -602,8 +597,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       mapInstance.on('load', () => {
         console.log('🗺️ Map loaded successfully');
-        setMapLoaded(true);
-        callbackRefs.current.onMapLoaded?.();
         
         try {
           if (!layersAddedRef.current) {
@@ -612,6 +605,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         } catch (err) {
           console.error('❌ Error adding layers:', err);
         }
+        
+        // Set map loaded state after layers are added
+        setMapLoaded(true);
+        callbackRefs.current.onMapLoaded?.();
         
         // ADD THIS LINE - Call the debug function
         debugTileData(mapInstance);
@@ -688,12 +685,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             
         }, 2000);
         
-        // Load businesses for the initial viewport
+        // Load businesses for the initial viewport - ensure map is fully loaded first
         setTimeout(() => {
-          if (mapRef.current && !loading) {
+          if (mapRef.current && mapLoaded && !loading) {
+            console.log('🔄 Loading initial businesses');
             handleViewportChange();
           }
-        }, 1000);
+        }, 1500);
       });
 
       // Add interaction event listeners
