@@ -325,24 +325,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
         },
         {
-          id: "nyc-road-labels-safer",
-          type: "symbol",
-          source: "nyc-tiles",
-          "source-layer": "examplepoints", // same as roads
-          minzoom: 12,                     // allow labels earlier
+          id: 'nyc-road-labels-safer',
+          type: 'symbol',
+          source: 'nyc-tiles',
+          'source-layer': 'examplepoints', // or whatever your source layer is
           layout: {
-            "text-field": ["get", "name"],
-            "text-size": 12,
-            "text-anchor": "center",
-            "text-allow-overlap": false,
-            "text-optional": true,
-            "symbol-placement": "line",   // important for road labels
+            'text-field': ['get', 'name'],   // replace 'name' with the label property
+            'text-font': ['OpenSansArialUnicode'], // <- this must match your font stack
+            'text-size': 12
           },
           paint: {
-            "text-color": "#2C2C2C",
-            "text-halo-color": "#FFFFFF",
-            "text-halo-width": 1.5,
-          },
+            'text-color': '#333'
+          }
         }
       ];
   
@@ -550,11 +544,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       const style = {
         version: 8 as const,
+        glyphs: `${window.location.origin}/data/OpenSansArialUnicode/{fontstack}/{range}.pbf`,
         sources: { 'nyc-tiles': vectorSource },
         layers: [
           { id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } }
         ]
       } as any;
+
 
       const mapInstance = new maplibregl.Map({
         container: mapContainerRef.current!,
