@@ -275,17 +275,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (!mapRef.current) return;
     const map = mapRef.current;
   
-    // Loop through each visible style layer
     const styleLayers = map.getStyle().layers || [];
     console.log("🔍 Style layers:", styleLayers.map(l => l.id));
   
     styleLayers.forEach(layer => {
-      if (layer.source === "nyc-tiles") {
+      if ("source" in layer && layer.source === "nyc-tiles") {
         const features = map.queryRenderedFeatures({ layers: [layer.id] });
         if (features.length > 0) {
-          console.log(`✅ Features in layer: ${layer.id}`, features[0]);
-          const sourceLayer = (features[0] as any).layer["source-layer"];
-          console.log(`   🔍 source-layer for ${layer.id}:`, sourceLayer);
+          const f = features[0] as any;
+          console.log(`✅ Features in layer: ${layer.id}`, f);
+          console.log(
+            `   🔍 source-layer for ${layer.id}:`,
+            f.layer["source-layer"]
+          );
         } else {
           console.log(`❌ No features in layer: ${layer.id}`);
         }
