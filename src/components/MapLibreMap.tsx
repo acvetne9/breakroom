@@ -638,10 +638,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           console.error('❌ Error adding layers:', err);
         }
         
-        // ADD THIS LINE - Call the debug function
-        debugTileData(mapInstance);
-        console.log('🔍 Debug click handler added - click anywhere on the map to see tile data');
-        
         // Add more debugging for source and layers
         setTimeout(() => {
           console.log('🔍 Checking map sources and layers...');
