@@ -323,35 +323,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'line-opacity': 0.8
           },
           filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
-        },
-        {
-          id: "street-labels",
-          type: "symbol",
-          source: "nyc-tiles",
-          "source-layer": "transportation", // adjust if needed
-          layout: {
-            "text-field": ["get", "name"],
-            "text-font": ["OpenSansArialUnicode"],
-            "text-size": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              12, 10,
-              16, 14
-            ],
-            "symbol-placement": "line",              // follow road
-            "text-rotation-alignment": "map",        // align to map, not viewport
-            "symbol-spacing": 600,                   // reduce repeat frequency
-            "text-allow-overlap": false,
-            "text-ignore-placement": false
-          },
-          paint: {
-            "text-color": "#333",
-            "text-halo-color": "#fff",
-            "text-halo-width": 1
-          },
-          minzoom: 12,
-          filter: ["match", ["get", "class"], ["motorway", "primary", "secondary"], true, false]
         }
       ];
   
@@ -812,18 +783,42 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           id: "nyc-road-labels",
           type: "symbol",
           source: "nyc-tiles",
-          "source-layer": "examplepoints", // 🔑 must match your actual vector-tile layer name
+          "source-layer": "examplepoints", // <-- change to your real road source-layer name if different
+          minzoom: 13, // show labels only when zoomed in (tune to taste)
+          filter: [
+            "all",
+            ["has", "name"],
+            // keep only major roads; adjust types to match your tile property (could be 'highway', 'class', 'fclass' etc)
+            ["match", ["get", "highway"],
+              ["motorway", "trunk", "primary", "secondary", "tertiary"], true, false
+            ]
+          ],
           layout: {
-            "text-field": ["get", "name"],
-            "text-font": ["OpenSansArialUnicode"], // must match your font folder
-            "text-size": 12,
+            "text-field": ["coalesce", ["get", "name"], ""],
+            "text-font": ["OpenSansArialUnicode"],      // must match your fontstack (see glyphs config)
+            "text-size": [
+              "interpolate", ["linear"], ["zoom"],
+              13, 10,   // at zoom 13 -> 10px
+              16, 12    // at zoom 16 -> 12px
+            ],
+            "symbol-placement": "line",                 // <-- makes labels follow the line geometry (curved)
+            "text-rotation-alignment": "map",           // align label direction to the map (and the line)
+            "text-pitch-alignment": "map",
+            "text-keep-upright": true,                  // avoid upside-down text on steep curves
+            "symbol-spacing": 900,                      // larger = fewer repeats along a single line (tune 600–1500)
+            "text-max-angle": 18,                       // limit how curvy the text can be
+            "text-allow-overlap": false,
+            "text-ignore-placement": false,
+            "text-optional": true,
+            "text-padding": 2,
+            "text-justify": "center"
           },
           paint: {
-            "text-color": "#333",
+            "text-color": "#222",
             "text-halo-color": "#fff",
-            "text-halo-width": 2
+            "text-halo-width": 1.2
           }
-        });
+        } as any);
       });
     };
   }, [mapLoaded]);
