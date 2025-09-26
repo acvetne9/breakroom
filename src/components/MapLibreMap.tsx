@@ -517,7 +517,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   
     // Prevent duplicate calls for same viewport within 1s (reduced from 2s)
     const now = Date.now();
-    if (lastBoundsRef.current === boundsKey && now - lastLoadTimeRef.current < 1000) {
+    if (lastBoundsRef.current === boundsKey && now - lastLoadTimeRef.current < 250) {
       return;
     }
   
