@@ -778,32 +778,93 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       map.off("zoomstart", onZoomStart);
       map.off("zoomend", onZoomEnd);
       map.on("load", () => {
-        map.addLayer({
-          id: "road-labels",
+        // 1. Highways (visible from far out)
+        const highwayLabels = {
+          id: "road-labels-highway",
           type: "symbol",
           source: "nyc-tiles",
-          "source-layer": "roads", // change to your actual source-layer
-          filter: ["all", ["has", "name"]],
+          "source-layer": "roads", // change to your actual source-layer name
+          minzoom: 8, // start showing early
+          maxzoom: 24,
+          filter: [
+            "all",
+            ["has", "name"],
+            ["match", ["get", "highway"], ["motorway", "trunk"], true, false]
+          ],
           layout: {
             "text-field": ["get", "name"],
             "text-font": ["OpenSansArialUnicode"],
-            "text-size": [
-              "interpolate", ["linear"], ["zoom"],
-              8, 9,   // smaller at zoom 8
-              12, 12, // medium at zoom 12
-              16, 14, // bigger at zoom 16
-              18, 16  // largest at zoom 18+
-            ],
-            "symbol-placement": "line",      // follows the road
-            "symbol-spacing": 1000,          // fewer labels
+            "text-size": ["interpolate", ["linear"], ["zoom"], 8, 9, 12, 12],
+            "symbol-placement": "line",
+            "symbol-spacing": 1200,
             "text-rotation-alignment": "map"
+          },
+          paint: {
+            "text-color": "#222",
+            "text-halo-color": "#fff",
+            "text-halo-width": 1
+          }
+        };
+        
+        // 2. Primaries/secondaries (mid zooms)
+        const primaryLabels = {
+          id: "road-labels-primary",
+          type: "symbol",
+          source: "nyc-tiles",
+          "source-layer": "roads",
+          minzoom: 12,
+          maxzoom: 24,
+          filter: [
+            "all",
+            ["has", "name"],
+            ["match", ["get", "highway"], ["primary", "secondary"], true, false]
+          ],
+          layout: {
+            "text-field": ["get", "name"],
+            "text-font": ["OpenSansArialUnicode"],
+            "text-size": ["interpolate", ["linear"], ["zoom"], 12, 10, 16, 13],
+            "symbol-placement": "line",
+            "symbol-spacing": 1000
           },
           paint: {
             "text-color": "#333",
             "text-halo-color": "#fff",
             "text-halo-width": 1
           }
-        } as any);
+        };
+        
+        // 3. Local streets (only when zoomed in close)
+        const localLabels = {
+          id: "road-labels-local",
+          type: "symbol",
+          source: "nyc-tiles",
+          "source-layer": "roads",
+          minzoom: 15,
+          maxzoom: 24,
+          filter: [
+            "all",
+            ["has", "name"],
+            ["match", ["get", "highway"], ["residential", "unclassified", "service"], true, false]
+          ],
+          layout: {
+            "text-field": ["get", "name"],
+            "text-font": ["OpenSansArialUnicode"],
+            "text-size": ["interpolate", ["linear"], ["zoom"], 15, 9, 18, 12],
+            "symbol-placement": "line",
+            "symbol-spacing": 800
+          },
+          paint: {
+            "text-color": "#444",
+            "text-halo-color": "#fff",
+            "text-halo-width": 1
+          }
+        };
+        
+        // Add to map
+        map.addLayer(highwayLabels as any);
+        map.addLayer(primaryLabels as any);
+        map.addLayer(localLabels as any);
+
       });
     };
   }, [mapLoaded]);
