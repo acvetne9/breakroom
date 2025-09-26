@@ -399,6 +399,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           console.error(`❌ FAILED to add layer ${layer.id}:`, err);
         }
       });
+      testLabelFilters(map);
   
       layersAddedRef.current = true;
     } catch (err) {
