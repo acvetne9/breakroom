@@ -1,7 +1,7 @@
 import { Business } from '@/types/business';
 import { parseSearchTerms } from '@/utils/searchUtils';
 import { findNeighborhoodBoundaryByName, nycNeighborhoodBoundaries, filterBusinessesByNeighborhood } from '@/utils/nyc_neighborhoods';
-import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods'
+import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods';
 
 export interface SearchFilters {
   textTerms: string[];
@@ -105,11 +105,18 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
     filters.neighborhoodFilter = neighborhood;
   }
 
-  console.log('🔍 [parseSearchFilters] Final filters:', filters);
+  // ALWAYS include the original search terms for comprehensive search
+  // This ensures we search across ALL categories: name, type, roles, etc.
+  const originalTerms = parseSearchTerms(searchQuery).textTerms || [];
+  if (originalTerms && originalTerms.length > 0) {
+    filters.textTerms = originalTerms; // Use original terms, not filtered ones
+  }
 
-  // Return null if no meaningful filters (only empty textTerms)
-  if ((!filteredTextTerms || filteredTextTerms.length === 0) && !salaryQuery && !roleFilter && !businessTypeFilter && !neighborhood) {
-    console.log('🔍 [parseSearchFilters] No meaningful filters found, returning null');
+  console.log('🔍 [parseSearchFilters] Final filters (comprehensive search):', filters);
+
+  // Return null only if completely empty search
+  if (!searchQuery.trim()) {
+    console.log('🔍 [parseSearchFilters] Empty search, returning null');
     return null;
   }
 
@@ -168,41 +175,43 @@ export function applyBusinessFilters(businesses: Business[], filters: SearchFilt
     const type = business.businessType || '';
     const roles = business.roles || [];
 
-    const searchableText = [name, type, ...roles.map(r => r.role || '')].join(' ').toLowerCase();
-
-    // Text terms across name, type, and roles with plural handling
+    // COMPREHENSIVE SEARCH: Check ALL text terms across ALL searchable fields
+    // Any term matching ANY field (name, type, roles) will include the business
+    let hasMatch = false;
+    
     if (filters.textTerms && filters.textTerms.length > 0) {
-      const allTermsMatch = filters.textTerms.every(term =>
-        variantsOf(term).some(v => searchableText.includes(v))
-      );
-      if (!allTermsMatch) return false;
-    }
-
-    // Role filter - also check if any text terms match roles when no specific roleFilter
-    if (filters.roleFilter) {
-      console.log('🔍 [roleFilter] Checking business:', business.name, 'for role:', filters.roleFilter);
-      console.log('🔍 [roleFilter] Business roles:', roles.map(r => r.role));
-      
-      const roleMatch = roles.some(r => {
-        const match = matchesTermVariants(r.role || '', filters.roleFilter!);
-        console.log('🔍 [roleFilter] Role:', r.role, 'vs filter:', filters.roleFilter, 'match:', match);
-        return match;
+      hasMatch = filters.textTerms.some(term => {
+        // Check business name
+        if (variantsOf(term).some(v => name.toLowerCase().includes(v))) {
+          return true;
+        }
+        // Check business type
+        if (variantsOf(term).some(v => type.toLowerCase().includes(v))) {
+          return true;
+        }
+        // Check roles
+        if (roles.some(r => variantsOf(term).some(v => (r.role || '').toLowerCase().includes(v)))) {
+          return true;
+        }
+        return false;
       });
-      
-      console.log('🔍 [roleFilter] Final roleMatch for', business.name + ':', roleMatch);
-      if (!roleMatch) return false;
-    } else if (filters.textTerms && filters.textTerms.length > 0) {
-      // If no specific role filter but we have text terms, check if any match roles
-      const hasRoleMatch = filters.textTerms.some(term =>
-        roles.some(r => matchesTermVariants(r.role || '', term))
-      );
-      // Don't filter out if roles match any text terms - let other filters handle it
     }
 
-    // Business type filter
-    if (filters.businessTypeFilter) {
-      const typeMatch = matchesTermVariants(type, filters.businessTypeFilter!);
-      if (!typeMatch) return false;
+    // INCLUSIVE OR-based matching for specific filters when they overlap with text terms
+    // This prevents over-filtering when the same search term creates multiple filter types
+    if (filters.roleFilter && !hasMatch) {
+      hasMatch = roles.some(r => {
+        return matchesTermVariants(r.role || '', filters.roleFilter!);
+      });
+    }
+
+    if (filters.businessTypeFilter && !hasMatch) {
+      hasMatch = matchesTermVariants(type, filters.businessTypeFilter!);
+    }
+
+    // If no match found from text/role/type searches, exclude
+    if (!hasMatch && (filters.textTerms?.length || filters.roleFilter || filters.businessTypeFilter)) {
+      return false;
     }
 
     // Salary filter: check roles first, then top-level salary as fallback

@@ -69,11 +69,11 @@ export const createBusinessScatterplotLayer = ({
     stroked: true,
     filled: true,
     opacity: 1.0,
-    radiusMinPixels: 8,
-    radiusMaxPixels: 8,
+    radiusMinPixels: 8, // Bigger dots for better visibility
+    radiusMaxPixels: 12, // Much larger maximum for visibility across zoom levels
     lineWidthMinPixels: 2,
     getPosition: (d: Business) => [d.position.lng, d.position.lat],
-    getRadius: (_d: Business) => 8,
+    getRadius: (_d: Business) => 15, // Bigger base radius
     getFillColor: (_d: Business) => [250, 204, 21, 255],
     getLineColor: (_d: Business) => [255, 255, 255, 255],
     onClick: onBusinessClick ? (info) => info.object && onBusinessClick(info.object as Business) : undefined,
@@ -105,14 +105,14 @@ export const createBusinessClusterLayer = (
     filled: true,
     opacity: 1.0,
     radiusScale: 1,
-    radiusMinPixels: 10,
-    radiusMaxPixels: 15,
+    radiusMinPixels: 8,
+    radiusMaxPixels: 12,
     lineWidthMinPixels: 2,
     getPosition: (d: any) => [d.position.lng, d.position.lat],
     getRadius: (d: any) =>
       d.type === 'cluster'
-        ? Math.min(Math.max(Math.sqrt(d.count) * 4, 12), 50)
-        : 6,
+        ? Math.min(Math.max(Math.sqrt(d.count) * 4, 15), 60)
+        : 12,
     getFillColor: (d: any) =>
       d.type === 'cluster'
         ? [250, 204, 21, 200 + Math.min(d.count / 20, 1) * 55]

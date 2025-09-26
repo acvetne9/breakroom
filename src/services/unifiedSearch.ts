@@ -1,21 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Business } from '@/types/business';
+import { applyBusinessFilters, SearchFilters } from './businessFiltering';
 
 // Search results cache to prevent repeated queries
 const searchCache = new Map<string, { results: Business[]; timestamp: number }>();
 const CACHE_DURATION = 30000; // 30 seconds
 const MAX_CACHE_SIZE = 100;
 
-export interface UnifiedSearchFilters {
-  textTerms: string[];
-  roleFilter?: string;
-  businessTypeFilter?: string;
-  salaryQuery?: {
-    min?: number;
-    max?: number;
-    isRange: boolean;
-  };
-}
+export interface UnifiedSearchFilters extends SearchFilters {}
 
 // Parse salary strings to hourly rate
 const parseSalaryToHourly = (salary: string): number | null => {
@@ -136,6 +128,8 @@ export const searchBusinessesUnified = async (
   }
   
   try {
+    // Load basic businesses from database with minimal filtering
+    // (we'll apply the full filtering logic later using applyBusinessFilters)
     let baseQuery = supabase.from('businesses').select(`
       id, name, lat, lng, atmosphere, business_type, website, salary
     `);
@@ -149,72 +143,15 @@ export const searchBusinessesUnified = async (
         .lte('lng', bounds.east);
     }
     
-   // Apply text search on business name/type (filtering out role terms)
-   const nonRoleTerms = filters.textTerms.filter(term => term !== filters.roleFilter);
-   if (nonRoleTerms.length > 0) {
-     for (const term of nonRoleTerms) {
-       baseQuery = baseQuery.or(`name.ilike.%${term}%,business_type.ilike.%${term}%`);
-     }
-   }
+    // For keyword search, we'll load more businesses and filter them with applyBusinessFilters
+    // This ensures consistent filtering logic across the app
+    baseQuery = baseQuery.limit(Math.min(limit * 3, 10000)); // Load more for filtering
     
-    // Apply business type filter
-    if (filters.businessTypeFilter) {
-      baseQuery = baseQuery.ilike('business_type', `%${filters.businessTypeFilter}%`);
+    const { data: businesses, error: businessError } = await baseQuery;
+    if (businessError) {
+      console.error('❌ Business search error:', businessError);
+      return [];
     }
-    
-    baseQuery = baseQuery.limit(limit);
-    
-    const { data: nameMatches, error: nameError } = await baseQuery;
-    if (nameError) {
-      console.error('❌ Business search error:', nameError);
-    }
-    
-    // Find businesses by matching roles
-    let roleMatchedBusinesses: any[] = [];
-    if (filters.roleFilter) {
-      const { data: roleRows, error: roleSearchError } = await supabase
-        .from('business_roles')
-        .select('business_id')
-        .ilike('role', `%${filters.roleFilter}%`)
-        .limit(5000);
-      
-      if (!roleSearchError && roleRows?.length) {
-        const roleBusinessIds = Array.from(new Set(roleRows.map(r => r.business_id)));
-        
-        if (roleBusinessIds.length > 0) {
-          let roleBizQuery = supabase.from('businesses')
-            .select('id, name, lat, lng, atmosphere, business_type, website, salary')
-            .in('id', roleBusinessIds);
-            
-          if (bounds) {
-            roleBizQuery = roleBizQuery
-              .gte('lat', bounds.south)
-              .lte('lat', bounds.north)
-              .gte('lng', bounds.west)
-              .lte('lng', bounds.east);
-          }
-          
-          // Apply non-role text terms to role-matched businesses
-          const nonRoleTerms = filters.textTerms.filter(term => term !== filters.roleFilter);
-          if (nonRoleTerms.length > 0) {
-            for (const term of nonRoleTerms) {
-              roleBizQuery = roleBizQuery.or(`name.ilike.%${term}%,business_type.ilike.%${term}%`);
-            }
-          }
-          
-          const { data: roleBizData, error: roleBizError } = await roleBizQuery.limit(limit);
-          if (!roleBizError) {
-            roleMatchedBusinesses = roleBizData || [];
-          }
-        }
-      }
-    }
-    
-    // Combine and dedupe business matches from name/type and role-based searches
-    const combinedMap = new Map<string, any>();
-    (nameMatches || []).forEach(b => combinedMap.set(b.id, b));
-    (roleMatchedBusinesses || []).forEach(b => combinedMap.set(b.id, b));
-    const businesses = Array.from(combinedMap.values());
     
     if (!businesses || businesses.length === 0) {
       return [];
@@ -299,54 +236,12 @@ export const searchBusinessesUnified = async (
         }))
     }));
     
-    // Apply filters efficiently - minimal logging
-    const roleMatchedBusinessIds = new Set(roleMatchedBusinesses.map(b => b.id));
-    let filteredCount = 0;
-    let roleFilteredCount = 0;
-    let salaryFilteredCount = 0;
+    // Apply enhanced business filtering using the centralized logic
+    console.log(`🔍 Applying enhanced filters to ${businessesWithRoles.length} businesses...`);
+    const filteredBusinesses = applyBusinessFilters(businessesWithRoles, filters as SearchFilters);
     
-    const filteredBusinesses = businessesWithRoles.filter(business => {
-      // Role filter - businesses from role search automatically pass
-      if (filters.roleFilter) {
-        if (roleMatchedBusinessIds.has(business.id)) {
-          // Auto-pass: found via role search
-        } else {
-          // Check if name/type-matched business has the role
-          const hasMatchingRole = business.roles?.some(role => 
-            role.role.toLowerCase().includes(filters.roleFilter!)
-          );
-          if (!hasMatchingRole) {
-            roleFilteredCount++;
-            return false;
-          }
-        }
-      }
-      
-      // Salary filter - must match if specified
-      if (filters.salaryQuery) {
-        const { min, max, isRange } = filters.salaryQuery;
-        
-        const hasMatchingSalary = business.roles?.some(role => {
-          const hourlyRate = parseSalaryToHourly(role.salary);
-          if (hourlyRate === null) return false;
-          
-          if (isRange) {
-            return hourlyRate >= min! && hourlyRate <= max!;
-          } else {
-            // Allow +/- $2 tolerance for single value
-            return Math.abs(hourlyRate - min!) <= 2;
-          }
-        });
-        
-        if (!hasMatchingSalary) {
-          salaryFilteredCount++;
-          return false;
-        }
-      }
-      
-      filteredCount++;
-      return true;
-    });
+    // Limit to requested amount
+    const finalResults = filteredBusinesses.slice(0, limit);
     
     // Cache results
     if (searchCache.size >= MAX_CACHE_SIZE) {
@@ -354,13 +249,13 @@ export const searchBusinessesUnified = async (
       searchCache.delete(oldestKey);
     }
     searchCache.set(cacheKey, {
-      results: filteredBusinesses,
+      results: finalResults,
       timestamp: Date.now()
     });
     
     // Single summary log instead of spam
-    console.log(`✅ Search completed: ${businesses.length} businesses -> ${filteredBusinesses.length} results (filtered out: ${roleFilteredCount} by role, ${salaryFilteredCount} by salary)`);
-    return filteredBusinesses;
+    console.log(`✅ Search completed: ${businesses.length} businesses -> ${finalResults.length} results`);
+    return finalResults;
     
   } catch (error) {
     console.error('❌ Unified search error:', error);

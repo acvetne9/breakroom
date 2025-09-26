@@ -227,6 +227,49 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   })();
 
+  const debugTileData = useCallback((map: maplibregl.Map) => {
+    const handleDebugClick = (e: maplibregl.MapMouseEvent) => {
+      console.log('🔍 DEBUG: Clicked at', e.lngLat);
+      
+      // Query all features at click point
+      const features = map.queryRenderedFeatures(e.point);
+      console.log('🔍 All features found:', features.length, features);
+      
+      // Look specifically at road features
+      const roadFeatures = features.filter(f => 
+        f.source === 'nyc-tiles' && 
+        f.sourceLayer === 'examplepoints' &&
+        f.geometry?.type === 'LineString'
+      );
+      console.log('🔍 Road features from examplepoints:', roadFeatures);
+      
+      // Check for highway/road properties
+      const roadsWithHighway = roadFeatures.filter(f => f.properties?.highway);
+      console.log('🔍 Roads with highway property:', roadsWithHighway);
+      
+      // Check for names
+      const namedRoads = roadsWithHighway.filter(f => 
+        f.properties?.name && f.properties.name !== ''
+      );
+      console.log('🔍 Named roads:', namedRoads);
+      
+      if (namedRoads.length > 0) {
+        console.log('✅ Found named roads! Sample properties:', namedRoads[0].properties);
+      } else if (roadsWithHighway.length > 0) {
+        console.log('❌ Found roads but no names. Sample properties:', roadsWithHighway[0].properties);
+      } else {
+        console.log('❌ No road features found');
+        // Log ALL feature properties to see what's available
+        features.forEach((f, i) => {
+          console.log(`Feature ${i}:`, f.properties);
+        });
+      }
+    };
+    
+    map.on('click', handleDebugClick);
+    return () => map.off('click', handleDebugClick);
+  }, []);
+
   // vector layers (styling restored exactly as requested)
   const addVectorLayers = useCallback((map: maplibregl.Map) => {
     try {
@@ -287,36 +330,26 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
         },
         {
-          id: 'nyc-road-labels',
-          type: 'symbol',
+          id: 'nyc-road-labels-simple',
+          type: 'symbol' as const,
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           layout: {
-            'text-field': [
-              'case',
-              ['has', 'name'],
-              ['get', 'name'],
-              ''
-            ],
-            'text-font': ["Open Sans Regular", "Arial Unicode MS Regular"],
-            'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 12],
-            'text-max-width': 8,
-            'text-line-height': 1.2,
+            'text-field': ['get', 'name'],
+            'text-size': 14,
             'symbol-placement': 'line',
-            'text-rotation-alignment': 'map',
-            'text-allow-overlap': false,
-            'text-ignore-placement': false
+            'text-rotation-alignment': 'map'
           },
           paint: {
-            'text-color': '#333333',
+            'text-color': '#000000',
             'text-halo-color': '#FFFFFF',
-            'text-halo-width': 1.5,
-            'text-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 1]
+            'text-halo-width': 2
           },
           filter: [
             'all',
             ['==', ['geometry-type'], 'LineString'],
-            ['has', 'highway']
+            ['has', 'highway'],
+            ['has', 'name']
           ],
           minzoom: 12
         }
@@ -353,13 +386,21 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, []);
 
   const getBusinessLimitForViewport = useCallback((zoom: number) => {
+    // For search results, show more businesses across all zoom levels
+    if (searchFilters) {
+      if (zoom < 10) return 20000;
+      if (zoom < 12) return 35000;
+      if (zoom < 14) return 50000;
+      return 80000;
+    }
+    // Regular browsing limits
     if (zoom < 10) return 5000;
     if (zoom < 12) return 15000;
     if (zoom < 14) return 40000;
     if (zoom < 16) return 80000;
     if (zoom < 18) return 150000;
     return 200000;
-  }, []);
+  }, [searchFilters]);
 
   // Updated handleBusinessClick with fly-to behavior
   const handleBusinessClick = useCallback(async (business: any) => {
@@ -461,10 +502,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   const handleViewportChange = useCallback(async () => {
     if (!mapRef.current || !mapLoaded) return;
-    if (loading) {
-      console.log("⏸️ Skipping viewport change while loading...");
-      return;
-    }
   
     const map = mapRef.current;
     const zoom = map.getZoom();
@@ -478,9 +515,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   
     const boundsKey = `${viewportBounds.north.toFixed(4)}-${viewportBounds.south.toFixed(4)}-${viewportBounds.east.toFixed(4)}-${viewportBounds.west.toFixed(4)}`;
   
-    // Prevent duplicate calls for same viewport within 2s
+    // Prevent duplicate calls for same viewport within 1s (reduced from 2s)
     const now = Date.now();
-    if (lastBoundsRef.current === boundsKey && now - lastLoadTimeRef.current < 2000) {
+    if (lastBoundsRef.current === boundsKey && now - lastLoadTimeRef.current < 1000) {
       return;
     }
   
@@ -488,12 +525,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     lastLoadTimeRef.current = now;
   
     try {
+      console.log(`🗺️ Loading businesses for viewport: ${boundsKey}`);
       const limit = getBusinessLimitForViewport(zoom);
-      await loadBusinessesInViewport?.(viewportBounds, limit);
+      await loadBusinessesInViewport?.(viewportBounds, limit, true); // Pass isMoving=true
     } catch (err) {
       console.error("❌ Error loading businesses:", err);
     }
-  }, [mapLoaded, loading, loadBusinessesInViewport, getBusinessLimitForViewport]);
+  }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport]);
 
   // initialize map once
   useEffect(() => {
@@ -597,6 +635,72 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           console.error('❌ Error adding layers:', err);
         }
         
+        // ADD THIS LINE - Call the debug function
+        debugTileData(mapInstance);
+        console.log('🔍 Debug click handler added - click anywhere on the map to see tile data');
+        
+        // Add more debugging for source and layers
+        setTimeout(() => {
+          console.log('🔍 Checking map sources and layers...');
+          
+          // Check if source exists and is loaded
+          const source = mapInstance.getSource('nyc-tiles');
+          console.log('🔍 NYC tiles source:', source);
+          
+          // Check all layers in the map
+          const style = mapInstance.getStyle();
+          console.log('🔍 Map style layers:', style.layers.map(l => ({ 
+            id: l.id, 
+            type: l.type, 
+            source: 'source' in l ? l.source : 'no-source' 
+          })));
+          
+          // Check specifically for your layers
+          const roadLayer = mapInstance.getLayer('nyc-roads');
+          const labelLayer = mapInstance.getLayer('nyc-road-labels');
+          console.log('🔍 Road layer exists:', !!roadLayer, roadLayer);
+          console.log('🔍 Label layer exists:', !!labelLayer, labelLayer);
+          
+          // Try to query a larger area to see if ANY features exist
+          const bounds = mapInstance.getBounds();
+          const bbox = [
+            [bounds.getWest(), bounds.getSouth()],
+            [bounds.getEast(), bounds.getNorth()]
+          ];
+          
+          try {
+            const allFeatures = mapInstance.queryRenderedFeatures(undefined, { layers: ['nyc-roads'] });
+            console.log('🔍 All road features in viewport:', allFeatures.length, allFeatures);
+          } catch (e) {
+            console.log('❌ Could not query road features:', e);
+          }
+          
+          // Test tile URL directly
+          const zoom = Math.floor(mapInstance.getZoom());
+          const center = mapInstance.getCenter();
+          const tileZ = zoom;
+          const tileX = Math.floor((center.lng + 180) / 360 * Math.pow(2, tileZ));
+          const tileY = Math.floor((1 - Math.log(Math.tan(center.lat * Math.PI / 180) + 1 / Math.cos(center.lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, tileZ));
+          
+          const testTileUrl = `${window.location.origin}/data/tiles/${tileZ}/${tileX}/${tileY}.pbf`;
+          console.log('🔍 Testing tile URL:', testTileUrl);
+          
+          // Test if the tile URL is accessible
+          fetch(testTileUrl)
+            .then(response => {
+              console.log('🔍 Tile fetch response:', response.status, response);
+              if (!response.ok) {
+                console.error('❌ Tile not found at:', testTileUrl);
+              } else {
+                console.log('✅ Tile exists and is accessible');
+              }
+            })
+            .catch(error => {
+              console.error('❌ Tile fetch error:', error);
+            });
+            
+        }, 2000);
+        
         // Load businesses for the initial viewport
         setTimeout(() => {
           if (mapRef.current && !loading) {
@@ -617,12 +721,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         }
       });
 
-      const debounceViewportChange = debounce(() => {
-        handleViewportChange();
-      }, 800);
-      
-      mapInstance.on('moveend', debounceViewportChange);
-      mapInstance.on('zoomend', debounceViewportChange);
+      // Initial event listeners will be set up in separate useEffect
 
       // Handle deck.gl overlay initialization
       try {
@@ -665,13 +764,32 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [businesses, deckOverlay, overlayReady, deckGLLayers]);
 
+  // Set up move/zoom event listeners - updates when handleViewportChange changes
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded) return;
+
+    const debounceViewportChange = debounce(() => {
+      handleViewportChange();
+    }, 800);
+    
+    mapRef.current.on('moveend', debounceViewportChange);
+    mapRef.current.on('zoomend', debounceViewportChange);
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.off('moveend', debounceViewportChange);
+        mapRef.current.off('zoomend', debounceViewportChange);
+      }
+    };
+  }, [mapLoaded, handleViewportChange]);
+
   // Initial load when map is ready - SINGLE TRIGGER
   useEffect(() => {
     if (mapLoaded && !businesses?.length && !loading) {
       const timeout = setTimeout(() => handleViewportChange(), 2000);
       return () => clearTimeout(timeout);
     }
-  }, [mapLoaded, handleViewportChange]); // Removed businesses and loading from deps to prevent loops
+  }, [mapLoaded, handleViewportChange]);
 
   // center/load neighborhood center
   const isUserInteractingRef = useRef(false);

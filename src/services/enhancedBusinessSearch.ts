@@ -91,17 +91,14 @@ function parseSearchQuery(query: string): SearchFilters {
       }
     }
     
-    // Add all remaining terms as both potential roles and text terms
-    // This allows flexible matching - the database will find matches in both business names and roles
+    // Add all non-salary terms as keywords for searching
     filters.textTerms?.push(word);
   }
   
-  // Use all text terms as potential place search (for business names)
+  // For keyword search, use the full query to search business names, types, and roles
   if (filters.textTerms && filters.textTerms.length > 0) {
-    filters.place = filters.textTerms.join(' ');
-    // Use individual terms for role search, not the joined string
-    // This prevents searching for non-existent roles like "cashier pizza"
-    filters.role = filters.textTerms[0]; // Use first term as primary role filter
+    filters.place = query.trim(); // Use full query for comprehensive keyword search
+    filters.role = query.trim(); // Use full query for role search too
   }
   
   return filters;
@@ -113,9 +110,9 @@ export async function searchBusinessesEnhanced(query: string, limit: number = 50
   const filters = parseSearchQuery(query);
   
   try {
-    // Search for businesses that match either name OR roles  
-    // First, get businesses that match the name
-    const nameResults = filters.place ? await supabase
+    // Search for businesses that match name, business type, or roles as keywords
+    // First, get businesses that match the name or business type
+    const nameAndTypeResults = filters.place ? await supabase
       .from('businesses')
       .select(`
         id,
@@ -134,7 +131,7 @@ export async function searchBusinessesEnhanced(query: string, limit: number = 50
           downvotes
         )
       `)
-      .ilike('name', `%${filters.place}%`)
+      .or(`name.ilike.%${filters.place}%,business_type.ilike.%${filters.place}%`)
       .limit(limit) : { data: [] };
 
     // Then, get businesses that match roles (without join to avoid PostgREST relationship requirement)
@@ -168,35 +165,12 @@ export async function searchBusinessesEnhanced(query: string, limit: number = 50
       }
     }
 
-    // If we have multiple text terms, also search for business type matches
-    const businessTypeResults = filters.textTerms && filters.textTerms.length > 1 ? await supabase
-      .from('businesses')
-      .select(`
-        id,
-        name,
-        lat,
-        lng,
-        address,
-        atmosphere,
-        business_type,
-        website,
-        business_roles (
-          id,
-          role,
-          salary,
-          upvotes,
-          downvotes
-        )
-      `)
-      .ilike('business_type', `%${filters.textTerms.slice(1).join(' ')}%`)
-      .limit(limit) : { data: [] };
-
     // Combine and deduplicate results
     const allBusinesses = new Map();
     
-    // Add name matches
-    if (nameResults.data) {
-      nameResults.data.forEach(business => {
+    // Add name and business type matches
+    if (nameAndTypeResults.data) {
+      nameAndTypeResults.data.forEach(business => {
         allBusinesses.set(business.id, business);
       });
     }
@@ -204,13 +178,6 @@ export async function searchBusinessesEnhanced(query: string, limit: number = 50
     // Add role matches
     if (roleResults.data) {
       roleResults.data.forEach(business => {
-        allBusinesses.set(business.id, business);
-      });
-    }
-
-    // Add business type matches
-    if (businessTypeResults.data) {
-      businessTypeResults.data.forEach(business => {
         allBusinesses.set(business.id, business);
       });
     }
