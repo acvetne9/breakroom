@@ -323,21 +323,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'line-opacity': 0.8
           },
           filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
-        },
-        {
-          id: 'nyc-road-labels-safer',
-          type: 'symbol',
-          source: 'nyc-tiles',
-          'source-layer': 'examplepoints', // or whatever your source layer is
-          layout: {
-            'text-field': ['get', 'name'],   // replace 'name' with the label property
-            'text-font': ['OpenSansArialUnicode'], // <- this must match your font stack
-            'text-size': 12
-          },
-          paint: {
-            'text-color': '#333'
-          }
         }
+        
       ];
   
       console.log('🗺️ Adding vector layers...');
