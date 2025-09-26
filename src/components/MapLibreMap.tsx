@@ -14,6 +14,7 @@ import type { GeoJSONFeature } from 'maplibre-gl';
 import type { Business } from '@/types/business';
 import * as turf from '@turf/turf';
 import type { Feature, Point } from 'geojson';
+import type { MapGeoJSONFeature } from "maplibre-gl";
 
 interface MapLibreMapProps {
   onBusinessClick?: (business: any) => void;
@@ -274,7 +275,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (!mapRef.current) return;
     const map = mapRef.current;
   
-    const features = map.querySourceFeatures("nyc-tiles");
+    const features = map.querySourceFeatures("nyc-tiles") as MapGeoJSONFeature[];
     const layers = [...new Set(features.map(f => f.sourceLayer))];
     console.log("🔍 source-layers in nyc-tiles:", layers);
   
