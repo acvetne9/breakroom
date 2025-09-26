@@ -736,26 +736,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     initializeMap();
   }, []);
 
-  mapInstance.on("load", () => {
-  // Roads already exist — now add road labels
-    mapInstance.addLayer({
-      id: "nyc-road-labels",
-      type: "symbol",
-      source: "nyc-tiles",
-      "source-layer": "examplepoints", // 🔑 must match your actual vector-tile layer name
-      layout: {
-        "text-field": ["get", "name"],
-        "text-font": ["OpenSansArialUnicode"], // must match your font folder
-        "text-size": 12,
-      },
-      paint: {
-        "text-color": "#333",
-        "text-halo-color": "#fff",
-        "text-halo-width": 2
-      }
-    });
-  });
-
   // update deck layers
   useEffect(() => {
     if (!deckOverlay || !overlayReady) return;
@@ -817,6 +797,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       map.off("dragend", onDragEnd);
       map.off("zoomstart", onZoomStart);
       map.off("zoomend", onZoomEnd);
+      map.on("load", () => {
+      // Roads already exist — now add road labels
+        map.addLayer({
+          id: "nyc-road-labels",
+          type: "symbol",
+          source: "nyc-tiles",
+          "source-layer": "examplepoints", // 🔑 must match your actual vector-tile layer name
+          layout: {
+            "text-field": ["get", "name"],
+            "text-font": ["OpenSansArialUnicode"], // must match your font folder
+            "text-size": 12,
+          },
+          paint: {
+            "text-color": "#333",
+            "text-halo-color": "#fff",
+            "text-halo-width": 2
+          }
+        });
+      });
     };
   }, [mapLoaded]);
   
