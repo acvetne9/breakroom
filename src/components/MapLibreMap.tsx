@@ -417,7 +417,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'text-pitch-alignment': 'viewport',
             'text-max-angle': 45,
             'symbol-spacing': 250,
-            'text-font': ['Open Sans Regular', 'Arial Regular'] // Fallback fonts
+            'text-font': ['Open Sans Regular', 'Arial Regular'] 
           },
           paint: {
             'text-color': '#2C2C2C',
@@ -425,7 +425,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'text-halo-width': 2,
             'text-opacity': 1
           },
-          // Ultra-simplified filter - if you can click it, it should have a label
           filter: [
             'all',
             ['has', 'name'],
