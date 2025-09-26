@@ -330,29 +330,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
         },
         {
-          id: 'nyc-road-labels-simple',
+          id: 'nyc-road-labels-ultra-safe',
           type: 'symbol' as const,
           source: 'nyc-tiles',
           'source-layer': 'examplepoints',
           layout: {
             'text-field': ['get', 'name'],
-            'text-size': 14,
-            'symbol-placement': 'line',
-            'text-rotation-alignment': 'map'
+            'text-size': 20, // Big text
+            'text-allow-overlap': true, // Force visibility
+            'text-ignore-placement': true // Ignore collisions
           },
           paint: {
-            'text-color': '#000000',
-            'text-halo-color': '#FFFFFF',
-            'text-halo-width': 2
+            'text-color': '#FF0000', // Red
+            'text-opacity': 1 // Full opacity
           },
-          filter: [
-            'all',
-            ['==', ['geometry-type'], 'LineString'],
-            ['has', 'highway'],
-            ['has', 'name']
-          ],
-          minzoom: 12
-        }
+          filter: ['has', 'name']
+        };
       ];
   
       console.log('🗺️ Adding vector layers...');
