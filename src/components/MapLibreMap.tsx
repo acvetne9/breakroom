@@ -275,13 +275,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (!mapRef.current) return;
     const map = mapRef.current;
   
-    const features = map.querySourceFeatures("nyc-tiles") as MapGeoJSONFeature[];
-    const layers = [...new Set(features.map(f => f.sourceLayer))];
-    console.log("🔍 source-layers in nyc-tiles:", layers);
+    const allLayers = map.getStyle().layers || [];
+    console.log("🔍 Style layers:", allLayers.map(l => l.id));
   
-    if (features.length) {
-      console.log("🔍 sample feature properties:", features[0].properties);
-    }
+    allLayers.forEach(layer => {
+      if (layer.source === "nyc-tiles") {
+        const feats = map.queryRenderedFeatures({ layers: [layer.id] });
+        if (feats.length) {
+          console.log("✅ Features in layer:", layer.id, feats[0]);
+        } else {
+          console.log("❌ No features in layer:", layer.id);
+        }
+      }
+    });
   }, [mapRef.current]);
 
   // vector layers (styling restored exactly as requested)
