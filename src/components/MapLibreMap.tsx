@@ -275,20 +275,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     if (!mapRef.current) return;
     const map = mapRef.current;
   
-    const allLayers = map.getStyle().layers || [];
-    console.log("🔍 Style layers:", allLayers.map(l => l.id));
+    // Loop through each visible style layer
+    const styleLayers = map.getStyle().layers || [];
+    console.log("🔍 Style layers:", styleLayers.map(l => l.id));
   
-    allLayers.forEach(layer => {
+    styleLayers.forEach(layer => {
       if (layer.source === "nyc-tiles") {
-        const feats = map.queryRenderedFeatures({ layers: [layer.id] });
-        if (feats.length) {
-          console.log("✅ Features in layer:", layer.id, feats[0]);
+        const features = map.queryRenderedFeatures({ layers: [layer.id] });
+        if (features.length > 0) {
+          console.log(`✅ Features in layer: ${layer.id}`, features[0]);
+          const sourceLayer = (features[0] as any).layer["source-layer"];
+          console.log(`   🔍 source-layer for ${layer.id}:`, sourceLayer);
         } else {
-          console.log("❌ No features in layer:", layer.id);
+          console.log(`❌ No features in layer: ${layer.id}`);
         }
       }
     });
-  }, [mapRef.current]);
+  }, []);
 
   // vector layers (styling restored exactly as requested)
   const addVectorLayers = useCallback((map: maplibregl.Map) => {
