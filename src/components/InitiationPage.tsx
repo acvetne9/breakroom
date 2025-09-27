@@ -251,7 +251,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
             <h1 className="text-app-black mb-6 font-normal text-lg">
               {/* Full text for larger screens, condensed for smaller screens */}
               <span>
-                Make A Difference! ❤️
+                Share your job!
               </span>
             </h1>
           </div>
@@ -274,7 +274,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
             <p className="text-app-black mb-4 text-lg">
               {/* Full text for larger screens, condensed for smaller screens */}
               <span >
-                3 Easy Questions
+                Make A Difference! ❤️
               </span>
             </p>
           </div>
@@ -294,7 +294,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
             <p className="text-app-black mb-4 text-lg font-normal">
               {/* Full text for larger screens, condensed for smaller screens */}
               <span >
-                Kept Anonymous 🤐
+                Answers Kept Anonymous 🤐
               </span>
             </p>
           </div>
