@@ -1,20 +1,73 @@
 import { supabase } from "@/integrations/supabase/client";
 
-// Get authenticated user ID or temporary user ID for backwards compatibility
-const getUserId = async (): Promise<string> => {
+// Get or create user profile in profiles table
+export const getUserProfile = async (): Promise<string> => {
   const { data: { user } } = await supabase.auth.getUser();
   
-  if (user?.id) {
-    return user.id;
+  if (user) {
+    // Authenticated user - find or create their profile
+    let { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    
+    if (!profile) {
+      // Create profile for authenticated user
+      const { data: newProfile, error } = await supabase
+        .from('profiles')
+        .insert({
+          user_id: user.id,
+          display_name: user.email?.split('@')[0] || 'User',
+          is_authenticated: true
+        })
+        .select('id')
+        .single();
+      
+      if (error) throw error;
+      return newProfile.id;
+    }
+    
+    return profile.id;
+  } else {
+    // Unauthenticated user - use temp profile
+    let tempUserId = localStorage.getItem('tempUserId');
+    if (!tempUserId) {
+      tempUserId = crypto.randomUUID();
+      localStorage.setItem('tempUserId', tempUserId);
+    }
+    
+    // Find or create temp profile
+    let { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('temp_user_id', tempUserId)
+      .maybeSingle();
+    
+    if (!profile) {
+      // Create profile for unauthenticated user
+      const { data: newProfile, error } = await supabase
+        .from('profiles')
+        .insert({
+          user_id: null,
+          temp_user_id: tempUserId,
+          display_name: 'Anonymous User',
+          is_authenticated: false
+        })
+        .select('id')
+        .single();
+      
+      if (error) throw error;
+      return newProfile.id;
+    }
+    
+    return profile.id;
   }
-  
-  // Fallback to temp user ID for backwards compatibility
-  let tempUserId = localStorage.getItem('tempUserId');
-  if (!tempUserId) {
-    tempUserId = crypto.randomUUID();
-    localStorage.setItem('tempUserId', tempUserId);
-  }
-  return tempUserId;
+};
+
+// Retrieve authenticated user ID or temporary ID for backwards compatibility
+const getUserId = async (): Promise<string> => {
+  return getUserProfile();
 };
 
 export interface PostData {
@@ -193,31 +246,31 @@ export const getUserVotes = async (postIds: string[]): Promise<{ [postId: string
 
 // Delete a post
 export const deletePost = async (postId: string): Promise<{ success: boolean; error?: any }> => {
-  // Get authenticated user ID (required for delete)
-  const { data: { user } } = await supabase.auth.getUser();
+  // Get current user's profile ID
+  const currentProfileId = await getUserProfile();
   
-  if (!user?.id) {
-    return { success: false, error: 'Not authenticated - cannot delete post' };
-  }
-
   // Get the post to check ownership
   const { data: post, error: fetchError } = await supabase
     .from('posts')
     .select('user_id')
     .eq('id', postId)
-    .single();
+    .maybeSingle();
 
   if (fetchError) {
     return { success: false, error: fetchError };
   }
 
-  // Prevent deletion of default posts
+  if (!post) {
+    return { success: false, error: 'Post not found' };
+  }
+
+  // Prevent deletion of default posts (system posts)
   if (post.user_id === '00000000-0000-0000-0000-000000000000') {
     return { success: false, error: 'Default posts cannot be deleted' };
   }
 
-  // Check if user owns the post
-  if (post.user_id !== user.id) {
+  // Check if user owns the post by comparing profile IDs
+  if (post.user_id !== currentProfileId) {
     return { success: false, error: 'Not authorized to delete this post' };
   }
 

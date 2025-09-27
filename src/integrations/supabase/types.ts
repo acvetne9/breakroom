@@ -168,11 +168,12 @@ export type Database = {
       }
       posts: {
         Row: {
-          bussiness_id: string | null
+          business_id: string | null
           content: string
           created_at: string | null
           downvotes: number | null
           id: string
+          is_comment: string | null
           job_role: string | null
           post_type: string
           salary: number | null
@@ -182,11 +183,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          bussiness_id?: string | null
+          business_id?: string | null
           content: string
           created_at?: string | null
           downvotes?: number | null
           id?: string
+          is_comment?: string | null
           job_role?: string | null
           post_type: string
           salary?: number | null
@@ -196,11 +198,12 @@ export type Database = {
           user_id: string
         }
         Update: {
-          bussiness_id?: string | null
+          business_id?: string | null
           content?: string
           created_at?: string | null
           downvotes?: number | null
           id?: string
+          is_comment?: string | null
           job_role?: string | null
           post_type?: string
           salary?: number | null
@@ -209,29 +212,43 @@ export type Database = {
           upvotes?: number | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "posts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
           created_at: string | null
           display_name: string | null
           id: string
+          is_authenticated: boolean
+          temp_user_id: string | null
           updated_at: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string | null
           display_name?: string | null
           id?: string
+          is_authenticated?: boolean
+          temp_user_id?: string | null
           updated_at?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string | null
           display_name?: string | null
           id?: string
+          is_authenticated?: boolean
+          temp_user_id?: string | null
           updated_at?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -319,6 +336,13 @@ export type Database = {
             columns: ["post_id"]
             isOneToOne: false
             referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "votes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
