@@ -262,71 +262,74 @@ const HomePage: React.FC<HomePageProps> = ({
         </div>
       )}
 
-      <div>
-        {/* MapLibre with OpenStreetMap base layer */}
-        <MapLibreMap
-          onBusinessClick={handleBusinessClick}
-          selectedBusiness={selectedBusiness}
-          landmarks={LANDMARKS}
-          searchFilters={searchFilters}
-          neighborhoodCenter={neighborhoodCenter}
-        />
-      
-        {/* Business Preview Popup */}
-        {selectedBusiness && !showBusinessDetails && (
-          <BusinessPreview 
-            business={selectedBusiness}
-            posts={posts}
-            onClose={handleClosePreview}
-            onShowDetails={handleShowBusinessDetails}
-            onStoriesClick={handleBusinessStoriesClick}
+      {/* Only show map content after loading completes */}
+      {!showLoading && (
+        <div>
+          {/* MapLibre with OpenStreetMap base layer */}
+          <MapLibreMap
+            onBusinessClick={handleBusinessClick}
+            selectedBusiness={selectedBusiness}
+            landmarks={LANDMARKS}
+            searchFilters={searchFilters}
+            neighborhoodCenter={neighborhoodCenter}
           />
-        )}
-  
-        {/* Business Details Card */}
-        {selectedBusiness && showBusinessDetails && (
-          <BusinessDetails 
-            business={selectedBusiness}
-            posts={posts}
-            onClose={handleClosePreview}
-            onBackToPreview={handleBackToPreview}
-            onStoriesClick={() => onBusinessStoriesClick?.(selectedBusiness.id)}
-            onPostClick={onPostClick}
-            onRoleVote={onRoleVote}
-          />
-        )}
+        
+          {/* Business Preview Popup */}
+          {selectedBusiness && !showBusinessDetails && (
+            <BusinessPreview 
+              business={selectedBusiness}
+              posts={posts}
+              onClose={handleClosePreview}
+              onShowDetails={handleShowBusinessDetails}
+              onStoriesClick={handleBusinessStoriesClick}
+            />
+          )}
+    
+          {/* Business Details Card */}
+          {selectedBusiness && showBusinessDetails && (
+            <BusinessDetails 
+              business={selectedBusiness}
+              posts={posts}
+              onClose={handleClosePreview}
+              onBackToPreview={handleBackToPreview}
+              onStoriesClick={() => onBusinessStoriesClick?.(selectedBusiness.id)}
+              onPostClick={onPostClick}
+              onRoleVote={onRoleVote}
+            />
+          )}
 
-        {/* Search input bar at bottom */}
-        {currentSlide === 1 && currentView === 'main' && (
-          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
-            <div className="relative">
-              <UnifiedBusinessSearch
-                value={searchValue}
-                onChange={handleSearchChange}
-                onBusinessSelect={handleSearchBusinessSelect}
-                placeholder="Find that next gig!"
-                variant="search-bar"
-                showIcon={!showClearButton} // Hide search icon when clear button should show
-                onLocationSave={onLocationSave}
-              />
-              
-              {/* Clear search button (X) that replaces the search icon */}
-              {showClearButton && (
-                <button
-                  onClick={handleClearSearch}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
-                  aria-label="Clear search"
-                >
-                  <div className="relative w-3 h-3">
-                    <div className="absolute top-1/2 left-0 w-full h-0.5 bg-gray-600 transform -translate-y-1/2 rotate-45"></div>
-                    <div className="absolute top-1/2 left-0 w-full h-0.5 bg-gray-600 transform -translate-y-1/2 -rotate-45"></div>
-                  </div>
-                </button>
-              )}
+          {/* Search input bar at bottom */}
+          {currentSlide === 1 && currentView === 'main' && (
+            <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
+              <div className="relative">
+                <UnifiedBusinessSearch
+                  value={searchValue}
+                  onChange={handleSearchChange}
+                  onBusinessSelect={handleSearchBusinessSelect}
+                  placeholder="Find that next gig!"
+                  variant="search-bar"
+                  showIcon={!showClearButton} // Hide search icon when clear button should show
+                  onLocationSave={onLocationSave}
+                />
+                
+                {/* Clear search button (X) that replaces the search icon */}
+                {showClearButton && (
+                  <button
+                    onClick={handleClearSearch}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                    aria-label="Clear search"
+                  >
+                    <div className="relative w-3 h-3">
+                      <div className="absolute top-1/2 left-0 w-full h-0.5 bg-gray-600 transform -translate-y-1/2 rotate-45"></div>
+                      <div className="absolute top-1/2 left-0 w-full h-0.5 bg-gray-600 transform -translate-y-1/2 -rotate-45"></div>
+                    </div>
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
