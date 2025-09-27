@@ -478,10 +478,17 @@ const MobileApp: React.FC = () => {
         <div 
           className="absolute left-0 top-0 w-12 h-full pointer-events-auto"
           onTouchStart={(e) => {
-            if (currentSlide > 0) {
+            // Prevent swipe if multi-touch (zoom gesture)
+            if (currentSlide > 0 && e.touches.length === 1) {
               const touch = e.touches[0];
               const startX = touch.clientX;
               const handleTouchMove = (moveEvent: TouchEvent) => {
+                // Check if still single touch
+                if (moveEvent.touches.length !== 1) {
+                  document.removeEventListener('touchmove', handleTouchMove);
+                  document.removeEventListener('touchend', handleTouchEnd);
+                  return;
+                }
                 const moveTouch = moveEvent.touches[0];
                 const deltaX = moveTouch.clientX - startX;
                 if (deltaX > 100) {
@@ -504,10 +511,17 @@ const MobileApp: React.FC = () => {
         <div 
           className="absolute right-0 top-0 w-12 h-full pointer-events-auto"
           onTouchStart={(e) => {
-             if (currentSlide < 2) {
+             // Prevent swipe if multi-touch (zoom gesture)
+             if (currentSlide < 2 && e.touches.length === 1) {
               const touch = e.touches[0];
               const startX = touch.clientX;
               const handleTouchMove = (moveEvent: TouchEvent) => {
+                // Check if still single touch
+                if (moveEvent.touches.length !== 1) {
+                  document.removeEventListener('touchmove', handleTouchMove);
+                  document.removeEventListener('touchend', handleTouchEnd);
+                  return;
+                }
                 const moveTouch = moveEvent.touches[0];
                 const deltaX = startX - moveTouch.clientX;
                 if (deltaX > 100) {
