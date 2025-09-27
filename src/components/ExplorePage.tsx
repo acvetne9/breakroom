@@ -252,25 +252,28 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     return posts.filter(post => post.isComment === postId);
   };
 
-  // Drop-in infinite scroll for batching 1000 posts
-  const usePaginatedPosts = (posts: Post[], batchSize = 1000) => {
-    const [visibleCount, setVisibleCount] = useState(batchSize);
+  // Proper pagination hook at top level
+  const [visibleCount, setVisibleCount] = useState(1000);
   
-    useEffect(() => {
-      const handleScroll = () => {
-        const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
-        // If close to bottom, load more
-        if (scrollTop + clientHeight >= scrollHeight - 50) {
-          setVisibleCount(prev => Math.min(prev + batchSize, posts.length));
-        }
-      };
-  
-      window.addEventListener("scroll", handleScroll);
-      return () => window.removeEventListener("scroll", handleScroll);
-    }, [posts.length, batchSize]);
-  
-    return posts.slice(0, visibleCount);
-  };
+  useEffect(() => {
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+      // If close to bottom, load more
+      if (scrollTop + clientHeight >= scrollHeight - 50) {
+        setVisibleCount(prev => Math.min(prev + 1000, displayPosts.length));
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [displayPosts.length]);
+
+  // Reset visible count when posts change
+  useEffect(() => {
+    setVisibleCount(1000);
+  }, [displayPosts]);
+
+  const paginatedPosts = displayPosts.slice(0, visibleCount);
 
   if (loading) {
     return (
@@ -288,7 +291,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
       {/* Posts list */}
       <div className={`h-full overflow-y-auto pb-20 ${filteredBusinessId || filteredUserStories ? 'pt-20' : 'pt-20'}`}>
         <div className="space-y-4 px-4">
-          {usePaginatedPosts(displayPosts).map(post => (
+          {paginatedPosts.map(post => (
             <div key={post.id} className="relative">
               {/* Post with background collage if business has 5+ photos */}
               <div

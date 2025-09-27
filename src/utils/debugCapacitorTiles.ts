@@ -9,17 +9,18 @@ export function addTileDebugLogs() {
   const originalFetch = window.fetch;
   let fetchCallCount = 0;
   
-  window.fetch = async function(input: RequestInfo | URL, init?: RequestInit) {
-    const url = typeof input === 'string' ? input : input.toString();
+window.fetch = async function(input: RequestInfo | URL, init?: RequestInit) {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     
     if (url.includes('.pbf')) {
       fetchCallCount++;
       console.log(`🔍 Fetch call #${fetchCallCount} for tile:`, url);
-      console.log('🔍 Request details:', { input, init });
+      console.log('🔍 Request details:', { url, init });
     }
     
     try {
-      const result = await originalFetch(input, init);
+      // Use URL string for tile requests to avoid Request object cloning issues
+      const result = await originalFetch(url.includes('.pbf') ? url : input, init);
       if (url.includes('.pbf')) {
         console.log(`🔍 Fetch result for ${url}:`, {
           ok: result.ok,

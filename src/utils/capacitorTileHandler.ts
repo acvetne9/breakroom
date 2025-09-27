@@ -9,16 +9,20 @@ let isPatched = false;
  */
 export function patchTileLoading() {
   const originalFetch = window.fetch;
-  window.fetch = async (input: RequestInfo, init?: RequestInit): Promise<Response> => {
-    const url = typeof input === 'string' ? input : input.url;
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
 
-    // 🔍 Log every tile request
-    if (url.includes("/data/tiles/")) {
-      console.log("🟦 Tile request:", url);
+    // Only handle tile requests to minimize telemetry interference
+    if (!url.includes("/data/tiles/")) {
+      return originalFetch(input, init);
     }
 
+    // 🔍 Log every tile request
+    console.log("🟦 Tile request:", url);
+
     try {
-      const response = await originalFetch(input, init);
+      // Use URL string to avoid Request object cloning issues
+      const response = await originalFetch(url, init);
       const buf = await response.arrayBuffer();
       const u8 = new Uint8Array(buf);
 

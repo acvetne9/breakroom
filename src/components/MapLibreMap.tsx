@@ -14,6 +14,7 @@ import type { GeoJSONFeature } from 'maplibre-gl';
 import type { Business } from '@/types/business';
 import * as turf from '@turf/turf';
 import type { Feature, Point } from 'geojson';
+import type { MapGeoJSONFeature } from "maplibre-gl";
 
 interface MapLibreMapProps {
   onBusinessClick?: (business: any) => void;
@@ -227,47 +228,41 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   })();
 
-  const debugTileData = useCallback((map: maplibregl.Map) => {
-    const handleDebugClick = (e: maplibregl.MapMouseEvent) => {
-      console.log('🔍 DEBUG: Clicked at', e.lngLat);
-      
-      // Query all features at click point
-      const features = map.queryRenderedFeatures(e.point);
-      console.log('🔍 All features found:', features.length, features);
-      
-      // Look specifically at road features
-      const roadFeatures = features.filter(f => 
-        f.source === 'nyc-tiles' && 
-        f.sourceLayer === 'examplepoints' &&
-        f.geometry?.type === 'LineString'
-      );
-      console.log('🔍 Road features from examplepoints:', roadFeatures);
-      
-      // Check for highway/road properties
-      const roadsWithHighway = roadFeatures.filter(f => f.properties?.highway);
-      console.log('🔍 Roads with highway property:', roadsWithHighway);
-      
-      // Check for names
-      const namedRoads = roadsWithHighway.filter(f => 
-        f.properties?.name && f.properties.name !== ''
-      );
-      console.log('🔍 Named roads:', namedRoads);
-      
-      if (namedRoads.length > 0) {
-        console.log('✅ Found named roads! Sample properties:', namedRoads[0].properties);
-      } else if (roadsWithHighway.length > 0) {
-        console.log('❌ Found roads but no names. Sample properties:', roadsWithHighway[0].properties);
-      } else {
-        console.log('❌ No road features found');
-        // Log ALL feature properties to see what's available
-        features.forEach((f, i) => {
-          console.log(`Feature ${i}:`, f.properties);
-        });
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+  
+    const handleLoad = () => {
+      const style = map.getStyle();
+      if (!style) {
+        console.warn("⚠️ No style yet, skipping");
+        return;
       }
+  
+      const styleLayers = style.layers || [];
+      console.log("🔍 Style layers:", styleLayers.map(l => l.id));
+  
+      styleLayers.forEach(layer => {
+        if ("source" in layer && layer.source === "nyc-tiles") {
+          const features = map.queryRenderedFeatures({ layers: [layer.id] });
+          if (features.length > 0) {
+            const f = features[0] as any;
+            console.log(`✅ Features in layer: ${layer.id}`, f);
+            console.log(
+              `   🔍 source-layer for ${layer.id}:`,
+              f.layer["source-layer"]
+            );
+          } else {
+            console.log(`❌ No features in layer: ${layer.id}`);
+          }
+        }
+      });
     };
-    
-    map.on('click', handleDebugClick);
-    return () => map.off('click', handleDebugClick);
+  
+    map.on("load", handleLoad);
+    return () => {
+      map.off("load", handleLoad);
+    };
   }, []);
 
   // vector layers (styling restored exactly as requested)
@@ -328,30 +323,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             'line-opacity': 0.8
           },
           filter: ['all', ['==', ['geometry-type'], 'LineString'], ['has', 'highway']]
-        },
-        {
-          id: 'nyc-road-labels-simple',
-          type: 'symbol' as const,
-          source: 'nyc-tiles',
-          'source-layer': 'examplepoints',
-          layout: {
-            'text-field': ['get', 'name'],
-            'text-size': 14,
-            'symbol-placement': 'line',
-            'text-rotation-alignment': 'map'
-          },
-          paint: {
-            'text-color': '#000000',
-            'text-halo-color': '#FFFFFF',
-            'text-halo-width': 2
-          },
-          filter: [
-            'all',
-            ['==', ['geometry-type'], 'LineString'],
-            ['has', 'highway'],
-            ['has', 'name']
-          ],
-          minzoom: 12
         }
       ];
   
@@ -517,7 +488,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   
     // Prevent duplicate calls for same viewport within 1s (reduced from 2s)
     const now = Date.now();
-    if (lastBoundsRef.current === boundsKey && now - lastLoadTimeRef.current < 1000) {
+    if (lastBoundsRef.current === boundsKey && now - lastLoadTimeRef.current < 250) {
       return;
     }
   
@@ -559,7 +530,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       const style = {
         version: 8 as const,
-        glyphs: `${window.location.origin}/assets/fonts/{fontstack}/{range}.pbf`,
+        glyphs: `${window.location.origin}/data/{fontstack}/{range}.pbf`, // ✅ matches your existing path
         sources: { 'nyc-tiles': vectorSource },
         layers: [
           { id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } }
@@ -634,10 +605,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         } catch (err) {
           console.error('❌ Error adding layers:', err);
         }
-        
-        // ADD THIS LINE - Call the debug function
-        debugTileData(mapInstance);
-        console.log('🔍 Debug click handler added - click anywhere on the map to see tile data');
         
         // Add more debugging for source and layers
         setTimeout(() => {
@@ -720,8 +687,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           });
         }
       });
-
-      // Initial event listeners will be set up in separate useEffect
 
       // Handle deck.gl overlay initialization
       try {
@@ -812,6 +777,49 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       map.off("dragend", onDragEnd);
       map.off("zoomstart", onZoomStart);
       map.off("zoomend", onZoomEnd);
+      map.on("load", () => {
+      // Roads already exist — now add road labels
+        map.addLayer({
+          id: "nyc-road-labels",
+          type: "symbol",
+          source: "nyc-tiles",
+          "source-layer": "examplepoints", // <-- change to your real road source-layer name if different
+          minzoom: 13, // show labels only when zoomed in (tune to taste)
+          filter: [
+            "all",
+            ["has", "name"],
+            // keep only major roads; adjust types to match your tile property (could be 'highway', 'class', 'fclass' etc)
+            ["match", ["get", "highway"],
+              ["motorway", "trunk", "primary", "secondary", "tertiary"], true, false
+            ]
+          ],
+          layout: {
+            "text-field": ["coalesce", ["get", "name"], ""],
+            "text-font": ["OpenSansArialUnicode"],      // must match your fontstack (see glyphs config)
+            "text-size": [
+              "interpolate", ["linear"], ["zoom"],
+              13, 10,   // at zoom 13 -> 10px
+              16, 12    // at zoom 16 -> 12px
+            ],
+            "symbol-placement": "line",                 // <-- makes labels follow the line geometry (curved)
+            "text-rotation-alignment": "map",           // align label direction to the map (and the line)
+            "text-pitch-alignment": "map",
+            "text-keep-upright": true,                  // avoid upside-down text on steep curves
+            "symbol-spacing": 900,                      // larger = fewer repeats along a single line (tune 600–1500)
+            "text-max-angle": 18,                       // limit how curvy the text can be
+            "text-allow-overlap": false,
+            "text-ignore-placement": false,
+            "text-optional": true,
+            "text-padding": 2,
+            "text-justify": "center"
+          },
+          paint: {
+            "text-color": "#222",
+            "text-halo-color": "#fff",
+            "text-halo-width": 1.2
+          }
+        } as any);
+      });
     };
   }, [mapLoaded]);
   
