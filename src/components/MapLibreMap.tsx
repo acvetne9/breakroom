@@ -516,7 +516,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       const vectorSource = {
         type: 'vector' as const,
-        tiles: ["./data/tiles/{z}/{x}/{y}.pbf"],
+        tiles: [`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`],
         minzoom: 10,
         maxzoom: 16,
         scheme: 'xyz' as const
@@ -524,7 +524,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       const style = {
         version: 8 as const,
-        glyphs: "./data/{fontstack}/{range}.pbf",
+        glyphs: `${window.location.origin}/data/{fontstack}/{range}.pbf`, // ✅ matches your existing path
         sources: { 'nyc-tiles': vectorSource },
         layers: [
           { id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } }
@@ -532,7 +532,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       } as any;
 
       const mapInstance = new maplibregl.Map({
-        failIfMajorPerformanceCaveat: false,
         container: mapContainerRef.current!,
         style,
         center: [-73.986104, 40.715245],
@@ -541,7 +540,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         minZoom: 9,
         renderWorldCopies: false,
         attributionControl: false
-      });
+      } as any );
 
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
 
