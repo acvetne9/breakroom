@@ -514,8 +514,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         await new Promise(resolve => setTimeout(resolve, 200));
       }
 
-      const tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-      const glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
+      let tiles = "/data/tiles/{z}/{x}/{y}.pbf";
+      let glyphs = "/data/{fontstack}/{range}.pbf";
+
+      if (!window.Capacitor) {
+        tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+        glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
+      }
       
       const vectorSource = {
         type: 'vector' as const,
