@@ -49,15 +49,20 @@ export interface Post {
   createdAt: Date;
   timestamp?: string;
   isComment?: string;
+  userId?: string;
 }
 
 // Transform database post to frontend post format
-export const transformPost = (dbPost: PostData, businesses: any[] = []): Post => {
+export const transformPost = async (dbPost: PostData, businesses: any[] = []): Promise<Post> => {
   const business = businesses.find(b => b.id === dbPost.bussiness_id);
+  
+  // Determine if current user owns this post
+  const currentUserId = await getUserId();
+  const isOwnPost = dbPost.user_id === currentUserId;
   
   return {
     id: dbPost.id,
-    author: 'You', // For now, all posts are from current user
+    author: isOwnPost ? 'You' : 'Other',
     text: dbPost.content,
     businessId: dbPost.bussiness_id,
     businessName: business?.name,
@@ -70,6 +75,7 @@ export const transformPost = (dbPost: PostData, businesses: any[] = []): Post =>
     createdAt: new Date(dbPost.created_at),
     timestamp: dbPost.created_at,
     isComment: dbPost.is_comment,
+    userId: dbPost.user_id, // Add user_id to Post interface
   };
 };
 

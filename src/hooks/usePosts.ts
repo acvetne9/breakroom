@@ -22,8 +22,10 @@ export const usePosts = () => {
       }
 
       if (postsData) {
-        // Transform posts without businesses data for now
-        const transformedPosts = postsData.map(post => transformPost(post, []));
+        // Transform posts asynchronously
+        const transformedPosts = await Promise.all(
+          postsData.map(post => transformPost(post, []))
+        );
         const postIds = transformedPosts.map(p => p.id);
         const userVotes = await getUserVotes(postIds);
         
@@ -73,8 +75,8 @@ export const usePosts = () => {
       }
 
       if (data) {
-        // Add the new post to the local state (without businesses data for now)
-        const newPost = transformPost(data, []);
+        // Add the new post to the local state (transform asynchronously)
+        const newPost = await transformPost(data, []);
         setPosts(prevPosts => [newPost, ...prevPosts]);
         return true;
       }
