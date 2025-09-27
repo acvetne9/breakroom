@@ -805,7 +805,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         } as any);
       });
     };
-  }, 'business-scatter');
+  }, [overlayReady]);
   
   useEffect(() => {
     if (!mapRef.current || !mapLoaded || !searchFilters?.neighborhoodFilter || !neighborhoodCenter) return;
