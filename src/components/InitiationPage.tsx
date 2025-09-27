@@ -273,11 +273,8 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
           <div className="text-center">
             <p className="text-app-black mb-4 text-lg">
               {/* Full text for larger screens, condensed for smaller screens */}
-              <span className="hidden sm:inline">
-                Find Work That Works For You 👷‍♀️
-              </span>
-              <span className="sm:hidden">
-                Work That Works For You 👷‍♀️
+              <span >
+                3 Easy Questions
               </span>
             </p>
           </div>
@@ -288,7 +285,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
               value={role}
               onChange={handleRoleChange}
               onBlur={checkForCompletion}
-              placeholder="Share your job..."
+              placeholder="Share your job!..."
               className="app-input"
             />
           </div>
@@ -296,12 +293,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
           <div className="text-center">
             <p className="text-app-black mb-4 text-lg font-normal">
               {/* Full text for larger screens, condensed for smaller screens */}
-              <span className="hidden sm:inline">
-                3 Easy Questions. Kept Anonymous 🤐
-              </span>
-              <span className="sm:hidden">
-                3 Easy Questions.
-                <br />
+              <span >
                 Kept Anonymous 🤐
               </span>
             </p>
@@ -317,7 +309,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                 value={salary}
                 onChange={handleSalaryChange}
                 onBlur={checkForCompletion}
-                placeholder="Earnings Est."
+                placeholder="Pay Est. $"
                 className="app-input text-center text-lg flex-1 !py-0 h-12"
               />
               <select
