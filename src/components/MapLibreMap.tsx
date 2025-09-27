@@ -768,7 +768,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: "symbol",
           source: "nyc-tiles",
           "source-layer": "examplepoints",
-          minzoom: 8, 
           filter: [
             "all",
             ["has", "name"],
