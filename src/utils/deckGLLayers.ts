@@ -68,7 +68,7 @@ export const createBusinessScatterplotLayer = ({
     pickable: true,
     parameters: {
       depthTest: false // ensures labels/symbols aren't hidden
-    }
+    },
     stroked: true,
     filled: true,
     opacity: 1.0,
@@ -106,7 +106,7 @@ export const createBusinessClusterLayer = (
     pickable: true,
     parameters: {
       depthTest: false // ensures labels/symbols aren't hidden
-    }
+    },
     stroked: true,
     filled: true,
     opacity: 1.0,
