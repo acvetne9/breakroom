@@ -1,4 +1,4 @@
-import { ScatterplotLayer } from '@deck.gl/layers';
+import { ScatterplotLayer, TextLayer } from '@deck.gl/layers';
 import * as turf from '@turf/turf';
 import type { Business } from '@/types/business';
 
@@ -9,6 +9,10 @@ export interface DeckGLBusinessLayerProps {
   getTooltip?: (info: any) => string;
   map?: any;
   neighborhoodBoundary?: { lat: number; lon: number }[];
+}
+
+export interface LandmarkEmojiLayerProps {
+  landmarks: { lat: number; lng: number; emoji: string }[];
 }
 
 /**
@@ -84,6 +88,32 @@ export const createBusinessScatterplotLayer = ({
       getPosition: [filteredBusinesses],
       getRadius: [filteredBusinesses],
       getFillColor: [filteredBusinesses],
+    },
+  });
+};
+
+/**
+ * Emoji layer for landmarks - renders behind business scatterplot
+ */
+export const createEmojiLandmarkLayer = ({
+  landmarks
+}: LandmarkEmojiLayerProps) => {
+  return new TextLayer({
+    id: 'emoji-landmarks',
+    data: landmarks,
+    pickable: false,
+    getPosition: (d: { lat: number; lng: number; emoji: string }) => [d.lng, d.lat],
+    getText: (d: { lat: number; lng: number; emoji: string }) => d.emoji,
+    getSize: 32,
+    getAngle: 0,
+    getTextAnchor: 'middle',
+    getAlignmentBaseline: 'center',
+    parameters: {
+      depthTest: false
+    },
+    updateTriggers: {
+      getPosition: [landmarks],
+      getText: [landmarks],
     },
   });
 };

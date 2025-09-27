@@ -3,7 +3,7 @@ import maplibregl from 'maplibre-gl';
 import type { LayerSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { MapboxOverlay } from '@deck.gl/mapbox'; // use this package
-import { createBusinessScatterplotLayer } from '@/utils/deckGLLayers';
+import { createBusinessScatterplotLayer, createEmojiLandmarkLayer } from '@/utils/deckGLLayers';
 import { useViewportMapData } from '../hooks/useViewportMapData';
 import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
 import { createTileBlobUrl, isCapacitor } from '@/utils/tileDecompression';
@@ -410,48 +410,58 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [searchFilters, mapLoaded, loadBusinessesInViewport]);
 
   const deckGLLayers = useMemo(() => {
-    if (!businesses || !businesses.length) {
-      return [];
-    }
-  
-    // Ensure each business has valid lat/lng
-    let validBusinesses = businesses.filter(
-      b => b?.position?.lat != null && b?.position?.lng != null
-    );
-    
-    if (!validBusinesses.length) {
-      return [];
-    }
-  
-    // Handle neighborhood filter if present
-    if (searchFilters?.neighborhoodFilter?.boundary?.length) {
-      const neighborhoodCoords = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
-      if (neighborhoodCoords.length) {
-        const turfPolygon = turf.polygon([neighborhoodCoords.map(p => [p.lon, p.lat])]);
-        validBusinesses = validBusinesses.filter(b => {
-          const point = turf.point([b.position.lng, b.position.lat]);
-          return turf.booleanPointInPolygon(point, turfPolygon);
-        });
+    const layers: any[] = [];
+
+    // Add emoji landmarks layer first (renders behind businesses)
+    if (landmarks && landmarks.length > 0) {
+      try {
+        const emojiLayer = createEmojiLandmarkLayer({ landmarks });
+        layers.push(emojiLayer);
+        console.log("✅ Created emoji landmarks layer");
+      } catch (err) {
+        console.error("❌ Failed to create emoji layer", err);
       }
     }
-  
-    if (!validBusinesses.length) return [];
-  
-    let safeLayer: any = null;
-    try {
-      safeLayer = createBusinessScatterplotLayer({
-        businesses: validBusinesses,
-        selectedBusinessId: selectedBusiness?.id,
-        onBusinessClick: handleBusinessClick,
-        neighborhoodBoundary: searchFilters?.neighborhoodFilter?.boundary || null
-      });
-      console.log("✅ Created scatterplot layer:", safeLayer);
-    } catch (err) {
-      console.error("❌ Failed to create scatterplot layer", err);
+
+    // Add business scatterplot layer on top
+    if (businesses && businesses.length > 0) {
+      // Ensure each business has valid lat/lng
+      let validBusinesses = businesses.filter(
+        b => b?.position?.lat != null && b?.position?.lng != null
+      );
+      
+      if (validBusinesses.length > 0) {
+        // Handle neighborhood filter if present
+        if (searchFilters?.neighborhoodFilter?.boundary?.length) {
+          const neighborhoodCoords = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
+          if (neighborhoodCoords.length) {
+            const turfPolygon = turf.polygon([neighborhoodCoords.map(p => [p.lon, p.lat])]);
+            validBusinesses = validBusinesses.filter(b => {
+              const point = turf.point([b.position.lng, b.position.lat]);
+              return turf.booleanPointInPolygon(point, turfPolygon);
+            });
+          }
+        }
+
+        if (validBusinesses.length > 0) {
+          try {
+            const businessLayer = createBusinessScatterplotLayer({
+              businesses: validBusinesses,
+              selectedBusinessId: selectedBusiness?.id,
+              onBusinessClick: handleBusinessClick,
+              neighborhoodBoundary: searchFilters?.neighborhoodFilter?.boundary || null
+            });
+            layers.push(businessLayer);
+            console.log("✅ Created scatterplot layer:", businessLayer);
+          } catch (err) {
+            console.error("❌ Failed to create scatterplot layer", err);
+          }
+        }
+      }
     }
     
-    return safeLayer ? [safeLayer] : [];
-  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, businesses]);
+    return layers;
+  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, businesses, landmarks]);
   
   const lastLoadTimeRef = useRef(0);
 
