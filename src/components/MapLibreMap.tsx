@@ -743,7 +743,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // center/load neighborhood center
   const isUserInteractingRef = useRef(false);
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || !mapLoaded) return;
     const map = mapRef.current;
   
     const onDragStart = () => { isUserInteractingRef.current = true; };
@@ -755,63 +755,72 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     map.on("dragend", onDragEnd);
     map.on("zoomstart", onZoomStart);
     map.on("zoomend", onZoomEnd);
+
+    // Add road labels layer after map is loaded and only if it doesn't exist
+    if (mapLoaded && !map.getLayer("nyc-road-labels")) {
+      try {
+        map.addLayer({
+          id: "nyc-road-labels",
+          type: "symbol",
+          source: "nyc-tiles",
+          "source-layer": "examplepoints",
+          filter: [
+            "all",
+            ["has", "name"],
+            [
+              "match",
+              ["get", "highway"],
+              // Always show these (major roads)
+              ["motorway", "trunk", "primary", "secondary", "tertiary"],
+              true,
+              // Show local roads only when zoom >= 14
+              ["step",
+                ["zoom"],
+                false,                // below 14 → don't show
+                14, ["in", ["get", "highway"], ["literal", ["residential", "unclassified", "living_street"]]]
+              ]
+            ]
+          ],
+          layout: {
+            "text-field": ["coalesce", ["get", "name"], ""],
+            "text-font": ["OpenSansArialUnicode"],
+            "text-size": [
+              "interpolate", ["linear"], ["zoom"],
+              12, 9,   // smaller zoom
+              15, 11,
+              17, 13   // bigger zoom
+            ],
+            "symbol-placement": "line",
+            "text-rotation-alignment": "map",
+            "text-pitch-alignment": "map",
+            "text-keep-upright": true,
+            "symbol-spacing": 700,
+            "text-max-angle": 25,
+            "text-allow-overlap": false,
+            "text-ignore-placement": false,
+            "text-optional": true,
+            "text-padding": 2,
+            "text-justify": "center"
+          },
+          paint: {
+            "text-color": "#222",
+            "text-halo-color": "#fff",
+            "text-halo-width": 1.2
+          }
+        } as any);
+        console.log("✅ Added road labels layer");
+      } catch (err) {
+        console.error("❌ Failed to add road labels layer:", err);
+      }
+    }
   
     return () => {
       map.off("dragstart", onDragStart);
       map.off("dragend", onDragEnd);
       map.off("zoomstart", onZoomStart);
       map.off("zoomend", onZoomEnd);
-      map.addLayer({
-        id: "nyc-road-labels",
-        type: "symbol",
-        source: "nyc-tiles",
-        "source-layer": "examplepoints",
-        filter: [
-          "all",
-          ["has", "name"],
-          [
-            "match",
-            ["get", "highway"],
-            // Always show these (major roads)
-            ["motorway", "trunk", "primary", "secondary", "tertiary"],
-            true,
-            // Show local roads only when zoom >= 14
-            ["step",
-              ["zoom"],
-              false,                // below 14 → don't show
-              14, ["in", ["get", "highway"], ["literal", ["residential", "unclassified", "living_street"]]]
-            ]
-          ]
-        ],
-        layout: {
-          "text-field": ["coalesce", ["get", "name"], ""],
-          "text-font": ["OpenSansArialUnicode"],
-          "text-size": [
-            "interpolate", ["linear"], ["zoom"],
-            12, 9,   // smaller zoom
-            15, 11,
-            17, 13   // bigger zoom
-          ],
-          "symbol-placement": "line",
-          "text-rotation-alignment": "map",
-          "text-pitch-alignment": "map",
-          "text-keep-upright": true,
-          "symbol-spacing": 700,
-          "text-max-angle": 25,
-          "text-allow-overlap": false,
-          "text-ignore-placement": false,
-          "text-optional": true,
-          "text-padding": 2,
-          "text-justify": "center"
-        },
-        paint: {
-          "text-color": "#222",
-          "text-halo-color": "#fff",
-          "text-halo-width": 1.2
-        }
-      } as any);
     };
-  }, [overlayReady]);
+  }, [mapLoaded]);
   
   useEffect(() => {
     if (!mapRef.current || !mapLoaded || !searchFilters?.neighborhoodFilter || !neighborhoodCenter) return;
