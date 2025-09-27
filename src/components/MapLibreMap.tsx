@@ -15,6 +15,7 @@ import type { Business } from '@/types/business';
 import * as turf from '@turf/turf';
 import type { Feature, Point } from 'geojson';
 import type { MapGeoJSONFeature } from "maplibre-gl";
+import { Capacitor } from '@capacitor/core';
 
 interface MapLibreMapProps {
   onBusinessClick?: (business: any) => void;
