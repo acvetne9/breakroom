@@ -205,6 +205,11 @@ export const deletePost = async (postId: string): Promise<{ success: boolean; er
     return { success: false, error: fetchError };
   }
 
+  // Prevent deletion of default posts
+  if (post.user_id === '00000000-0000-0000-0000-000000000000') {
+    return { success: false, error: 'Default posts cannot be deleted' };
+  }
+
   // Check if user owns the post
   if (post.user_id !== user.id) {
     return { success: false, error: 'Not authorized to delete this post' };
