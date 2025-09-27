@@ -66,6 +66,9 @@ export const createBusinessScatterplotLayer = ({
     id: 'businesses-scatter',
     data: filteredBusinesses,
     pickable: true,
+    parameters: {
+      depthTest: false // ensures labels/symbols aren't hidden
+    }
     stroked: true,
     filled: true,
     opacity: 1.0,
@@ -101,6 +104,9 @@ export const createBusinessClusterLayer = (
     id: 'businesses-cluster',
     data: filteredData,
     pickable: true,
+    parameters: {
+      depthTest: false // ensures labels/symbols aren't hidden
+    }
     stroked: true,
     filled: true,
     opacity: 1.0,
