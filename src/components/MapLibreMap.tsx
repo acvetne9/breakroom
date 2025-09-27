@@ -768,7 +768,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: "symbol",
           source: "nyc-tiles",
           "source-layer": "examplepoints", // <-- change to your real road source-layer name if different
-          minzoom: 13, // show labels only when zoomed in (tune to taste)
+          minzoom: 15, // show labels only when zoomed in (tune to taste)
           filter: [
             "all",
             ["has", "name"],
