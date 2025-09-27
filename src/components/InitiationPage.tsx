@@ -251,7 +251,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
             <h1 className="text-app-black mb-6 font-normal text-lg">
               {/* Full text for larger screens, condensed for smaller screens */}
               <span>
-                Share your job!
+                Join the Community! 
               </span>
             </h1>
           </div>
