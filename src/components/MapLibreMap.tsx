@@ -767,8 +767,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           id: "nyc-road-labels",
           type: "symbol",
           source: "nyc-tiles",
-          "source-layer": "examplepoints", // <-- change to your real road source-layer name if different
-          minzoom: 15, // show labels only when zoomed in (tune to taste)
+          "source-layer": "examplepoints",
+          minzoom: 8, 
           filter: [
             "all",
             ["has", "name"],
@@ -778,7 +778,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             ]
           ],
           layout: {
-            "text-field": ["coalesce", ["get", "name"], ""],
+            'text-field': ['coalesce', ['get', 'name'], ''],
             "text-font": ["OpenSansArialUnicode"],      // must match your fontstack (see glyphs config)
             "text-size": [
               "interpolate", ["linear"], ["zoom"],
