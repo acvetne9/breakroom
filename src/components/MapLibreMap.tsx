@@ -517,7 +517,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       let tiles = "/data/tiles/{z}/{x}/{y}.pbf";
       let glyphs = "/data/{fontstack}/{range}.pbf";
 
-      if (!window.Capacitor) {
+      if (!!(window as any).Capacitor) {
         tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
         glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
       }
