@@ -514,8 +514,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         await new Promise(resolve => setTimeout(resolve, 200));
       }
 
-      const tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`
-      const glyphs = ${window.location.origin}/data/{fontstack}/{range}.pbf
+      const tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+      const glyphs = ${window.location.origin}/data/{fontstack}/{range}.pbf;
       
       if ((window as any).Capacitor) {
         tiles = `capacitor://localhost/data/tiles/{z}/{x}/{y}.pbf`;
