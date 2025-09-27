@@ -761,52 +761,55 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       map.off("dragend", onDragEnd);
       map.off("zoomstart", onZoomStart);
       map.off("zoomend", onZoomEnd);
-      map.on("load", () => {
-      if (!map.getLayer("nyc-road-labels")) {
-        map.addLayer({
-          id: "nyc-road-labels",
-          type: "symbol",
-          source: "nyc-tiles",
-          "source-layer": "examplepoints", // replace with actual road source-layer
-          filter: [
-            "all",
-            ["has", "name"],
-            ["match", ["get", "highway"],
-              [
-                "motorway", "trunk", "primary", "secondary", "tertiary", 
-                "residential", "living_street", "unclassified", "service"
-              ],
-              true, false
+      map.addLayer({
+        id: "nyc-road-labels",
+        type: "symbol",
+        source: "nyc-tiles",
+        "source-layer": "examplepoints",
+        filter: [
+          "all",
+          ["has", "name"],
+          [
+            "match",
+            ["get", "highway"],
+            // Always show these (major roads)
+            ["motorway", "trunk", "primary", "secondary", "tertiary"],
+            true,
+            // Show local roads only when zoom >= 14
+            ["step",
+              ["zoom"],
+              false,                // below 14 → don't show
+              14, ["in", ["get", "highway"], ["literal", ["residential", "unclassified", "living_street"]]]
             ]
+          ]
+        ],
+        layout: {
+          "text-field": ["coalesce", ["get", "name"], ""],
+          "text-font": ["OpenSansArialUnicode"],
+          "text-size": [
+            "interpolate", ["linear"], ["zoom"],
+            12, 9,   // smaller zoom
+            15, 11,
+            17, 13   // bigger zoom
           ],
-          minzoom: 11,   // ✅ start showing at zoom 11
-          maxzoom: 24,
-          layout: {
-            "text-field": ["get", "name"],
-            "text-font": ["OpenSansArialUnicode"],
-            "text-size": [
-              "interpolate", ["linear"], ["zoom"],
-              11, 8,    // smaller text at zoom 11
-              13, 10,
-              15, 12,
-              18, 16
-            ],
-            "symbol-placement": "line",
-            "symbol-spacing": 1000,    // high spacing → fewer repeats per road
-            "text-max-angle": 18,
-            "text-rotation-alignment": "map",
-            "text-pitch-alignment": "map",
-            "text-keep-upright": true,
-            "text-optional": true
-          },
-          paint: {
-            "text-color": "#222",
-            "text-halo-color": "#fff",
-            "text-halo-width": 1.2
-          }
-        } as any, "business-scatterplot"); // ensure it sits above your scatterplot
-      }
-    });
+          "symbol-placement": "line",
+          "text-rotation-alignment": "map",
+          "text-pitch-alignment": "map",
+          "text-keep-upright": true,
+          "symbol-spacing": 700,
+          "text-max-angle": 25,
+          "text-allow-overlap": false,
+          "text-ignore-placement": false,
+          "text-optional": true,
+          "text-padding": 2,
+          "text-justify": "center"
+        },
+        paint: {
+          "text-color": "#222",
+          "text-halo-color": "#fff",
+          "text-halo-width": 1.2
+        }
+      } as any);
     };
   }, [overlayReady]);
   
