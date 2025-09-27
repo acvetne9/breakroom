@@ -782,8 +782,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             "text-font": ["OpenSansArialUnicode"],      // must match your fontstack (see glyphs config)
             "text-size": [
               "interpolate", ["linear"], ["zoom"],
-              13, 10,   // at zoom 13 -> 10px
-              16, 12    // at zoom 16 -> 12px
+              15, 10,   // at zoom 13 -> 10px
+              17, 12    // at zoom 16 -> 12px
             ],
             "symbol-placement": "line",                 // <-- makes labels follow the line geometry (curved)
             "text-rotation-alignment": "map",           // align label direction to the map (and the line)
