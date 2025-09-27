@@ -15,7 +15,6 @@ import type { Business } from '@/types/business';
 import * as turf from '@turf/turf';
 import type { Feature, Point } from 'geojson';
 import type { MapGeoJSONFeature } from "maplibre-gl";
-import { Capacitor } from '@capacitor/core';
 
 interface MapLibreMapProps {
   onBusinessClick?: (business: any) => void;
@@ -515,11 +514,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         await new Promise(resolve => setTimeout(resolve, 200));
       }
 
-      const baseUrl = Capacitor.getPlatform() === 'web' ? '' : 'capacitor://localhost';
-
       const vectorSource = {
         type: 'vector' as const,
-        tiles: [`${baseUrl}/data/tiles/{z}/{x}/{y}.pbf`],
+        tiles: [`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`],
         minzoom: 10,
         maxzoom: 16,
         scheme: 'xyz' as const
@@ -527,7 +524,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       const style = {
         version: 8 as const,
-        glyphs: `${baseUrl}/data/{fontstack}/{range}.pbf`, // ✅ matches your existing path
+        glyphs: `${window.location.origin}/data/{fontstack}/{range}.pbf`, // ✅ matches your existing path
         sources: { 'nyc-tiles': vectorSource },
         layers: [
           { id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } }
