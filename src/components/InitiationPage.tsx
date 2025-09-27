@@ -252,13 +252,6 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
               {/* Full text for larger screens, condensed for smaller screens */}
               <span className="hidden sm:inline">
                 Make A Difference! ❤️
-                <br />
-                Share A Past Or Current Job
-              </span>
-              <span className="sm:hidden">
-                Make A Difference! ❤️
-                <br />
-                Share A Past Or Current Job
               </span>
             </h1>
           </div>
@@ -295,7 +288,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
               value={role}
               onChange={handleRoleChange}
               onBlur={checkForCompletion}
-              placeholder="Search or select a job role..."
+              placeholder="Share your job..."
               className="app-input"
             />
           </div>
