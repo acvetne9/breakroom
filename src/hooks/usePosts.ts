@@ -9,6 +9,7 @@ export const usePosts = () => {
 
   // Fetch posts from backend
   const fetchPosts = async () => {
+    console.log('🔍 usePosts - fetchPosts started');
     setLoading(true);
     setError(null);
     
@@ -17,15 +18,22 @@ export const usePosts = () => {
       
       if (postsError) {
         setError('Failed to fetch posts');
-        console.error('Posts fetch error:', postsError);
+        console.error('❌ Posts fetch error:', postsError);
         return;
       }
 
       if (postsData) {
+        console.log('🔍 usePosts - transforming posts, count:', postsData.length);
         // Transform posts asynchronously
         const transformedPosts = await Promise.all(
           postsData.map(post => transformPost(post, []))
         );
+        console.log('🔍 usePosts - transformed posts:', transformedPosts.map(p => ({ 
+          id: p.id, 
+          author: p.author, 
+          content: p.text.substring(0, 50) + '...' 
+        })));
+        
         const postIds = transformedPosts.map(p => p.id);
         const userVotes = await getUserVotes(postIds);
         
@@ -35,11 +43,12 @@ export const usePosts = () => {
           userVote: userVotes[post.id] || null
         }));
         
+        console.log('🔍 usePosts - final posts with votes, count:', postsWithVotes.length);
         setPosts(postsWithVotes);
       }
     } catch (err) {
       setError('Failed to load posts');
-      console.error('Posts loading error:', err);
+      console.error('❌ Posts loading error:', err);
     } finally {
       setLoading(false);
     }

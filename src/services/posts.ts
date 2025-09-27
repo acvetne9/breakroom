@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 // Get or create user profile in profiles table
 export const getUserProfile = async (): Promise<string> => {
   const { data: { user } } = await supabase.auth.getUser();
+  console.log('🔍 getUserProfile - auth user:', user ? 'authenticated' : 'unauthenticated');
   
   if (user) {
     // Authenticated user - find or create their profile
@@ -11,6 +12,8 @@ export const getUserProfile = async (): Promise<string> => {
       .select('id')
       .eq('user_id', user.id)
       .maybeSingle();
+    
+    console.log('🔍 Found existing profile for auth user:', profile);
     
     if (!profile) {
       // Create profile for authenticated user
@@ -24,7 +27,11 @@ export const getUserProfile = async (): Promise<string> => {
         .select('id')
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error creating auth user profile:', error);
+        throw error;
+      }
+      console.log('✅ Created new profile for auth user:', newProfile);
       return newProfile.id;
     }
     
@@ -37,12 +44,16 @@ export const getUserProfile = async (): Promise<string> => {
       localStorage.setItem('tempUserId', tempUserId);
     }
     
+    console.log('🔍 Using temp user ID:', tempUserId);
+    
     // Find or create temp profile
     let { data: profile } = await supabase
       .from('profiles')
       .select('id')
       .eq('temp_user_id', tempUserId)
       .maybeSingle();
+    
+    console.log('🔍 Found existing temp profile:', profile);
     
     if (!profile) {
       // Create profile for unauthenticated user
@@ -57,7 +68,11 @@ export const getUserProfile = async (): Promise<string> => {
         .select('id')
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error creating temp user profile:', error);
+        throw error;
+      }
+      console.log('✅ Created new temp profile:', newProfile);
       return newProfile.id;
     }
     
@@ -113,6 +128,14 @@ export const transformPost = async (dbPost: PostData, businesses: any[] = []): P
   const currentUserId = await getUserId();
   const isOwnPost = dbPost.user_id === currentUserId;
   
+  console.log('🔍 transformPost:', {
+    postId: dbPost.id,
+    postUserId: dbPost.user_id,
+    currentUserId,
+    isOwnPost,
+    content: dbPost.content.substring(0, 50) + '...'
+  });
+  
   return {
     id: dbPost.id,
     author: isOwnPost ? 'You' : 'Other',
@@ -134,10 +157,22 @@ export const transformPost = async (dbPost: PostData, businesses: any[] = []): P
 
 // Get all posts
 export const getPosts = async (): Promise<{ data: PostData[] | null; error: any }> => {
+  console.log('🔍 getPosts - fetching posts from database...');
+  
   const { data, error } = await supabase
     .from('posts')
     .select('*')
     .order('created_at', { ascending: false });
+
+  console.log('🔍 getPosts result:', {
+    postCount: data?.length || 0,
+    error: error?.message || 'none',
+    firstPost: data?.[0] ? {
+      id: data[0].id,
+      content: data[0].content.substring(0, 50) + '...',
+      user_id: data[0].user_id
+    } : 'none'
+  });
 
   return { data, error };
 };
