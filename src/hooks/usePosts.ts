@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getPosts, createPost, voteOnPost, deletePost, getUserVotes, transformPost, Post, PostData } from '@/services/posts';
+import { getPosts, createPost, voteOnPost, deletePost, getUserVotes, transformPost, getUserProfile, Post, PostData } from '@/services/posts';
 import { supabase } from '@/integrations/supabase/client';
 
 export const usePosts = () => {
@@ -9,7 +9,6 @@ export const usePosts = () => {
 
   // Fetch posts from backend
   const fetchPosts = async () => {
-    console.log('🔍 usePosts - fetchPosts started');
     setLoading(true);
     setError(null);
     
@@ -23,16 +22,18 @@ export const usePosts = () => {
       }
 
       if (postsData) {
-        console.log('🔍 usePosts - transforming posts, count:', postsData.length);
-        // Transform posts asynchronously
+        // Get businesses
+        const { data: businesses } = await supabase
+          .from('businesses')
+          .select('*');
+
+        // Get current user ID once to avoid race conditions
+        const currentUserId = await getUserProfile();
+
+        // Transform posts with cached user ID
         const transformedPosts = await Promise.all(
-          postsData.map(post => transformPost(post, []))
+          postsData.map(post => transformPost(post, businesses || [], currentUserId))
         );
-        console.log('🔍 usePosts - transformed posts:', transformedPosts.map(p => ({ 
-          id: p.id, 
-          author: p.author, 
-          content: p.text.substring(0, 50) + '...' 
-        })));
         
         const postIds = transformedPosts.map(p => p.id);
         const userVotes = await getUserVotes(postIds);
@@ -43,7 +44,6 @@ export const usePosts = () => {
           userVote: userVotes[post.id] || null
         }));
         
-        console.log('🔍 usePosts - final posts with votes, count:', postsWithVotes.length);
         setPosts(postsWithVotes);
       }
     } catch (err) {
@@ -84,8 +84,9 @@ export const usePosts = () => {
       }
 
       if (data) {
-        // Add the new post to the local state (transform asynchronously)
-        const newPost = await transformPost(data, []);
+        // Get current user ID and transform the new post
+        const currentUserId = await getUserProfile();
+        const newPost = await transformPost(data, [], currentUserId);
         setPosts(prevPosts => [newPost, ...prevPosts]);
         return true;
       }

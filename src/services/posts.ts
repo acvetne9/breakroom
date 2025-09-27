@@ -1,82 +1,117 @@
 import { supabase } from "@/integrations/supabase/client";
 
+// Cache for user profile to avoid race conditions
+let cachedProfileId: string | null = null;
+let profilePromise: Promise<string> | null = null;
+
 // Get or create user profile in profiles table
 export const getUserProfile = async (): Promise<string> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  console.log('🔍 getUserProfile - auth user:', user ? 'authenticated' : 'unauthenticated');
+  // Return cached profile if available
+  if (cachedProfileId) {
+    return cachedProfileId;
+  }
   
-  if (user) {
-    // Authenticated user - find or create their profile
-    let { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .maybeSingle();
+  // Return existing promise if one is in progress
+  if (profilePromise) {
+    return profilePromise;
+  }
+  
+  // Create new promise for profile creation
+  profilePromise = (async () => {
+    const { data: { user } } = await supabase.auth.getUser();
     
-    console.log('🔍 Found existing profile for auth user:', profile);
-    
-    if (!profile) {
-      // Create profile for authenticated user
-      const { data: newProfile, error } = await supabase
+    if (user) {
+      // Authenticated user - find or create their profile
+      let { data: profile } = await supabase
         .from('profiles')
-        .insert({
-          user_id: user.id,
-          display_name: user.email?.split('@')[0] || 'User',
-          is_authenticated: true
-        })
         .select('id')
-        .single();
+        .eq('user_id', user.id)
+        .maybeSingle();
       
-      if (error) {
-        console.error('❌ Error creating auth user profile:', error);
-        throw error;
+      if (!profile) {
+        // Try to create profile, handle conflicts gracefully
+        const { data: newProfile, error } = await supabase
+          .from('profiles')
+          .insert({
+            user_id: user.id,
+            display_name: user.email?.split('@')[0] || 'User',
+            is_authenticated: true
+          })
+          .select('id')
+          .single();
+        
+        if (error && error.code === '23505') {
+          // Profile already exists due to race condition, fetch it
+          const { data: existingProfile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', user.id)
+            .single();
+          profile = existingProfile;
+        } else if (error) {
+          throw error;
+        } else {
+          profile = newProfile;
+        }
       }
-      console.log('✅ Created new profile for auth user:', newProfile);
-      return newProfile.id;
-    }
-    
-    return profile.id;
-  } else {
-    // Unauthenticated user - use temp profile
-    let tempUserId = localStorage.getItem('tempUserId');
-    if (!tempUserId) {
-      tempUserId = crypto.randomUUID();
-      localStorage.setItem('tempUserId', tempUserId);
-    }
-    
-    console.log('🔍 Using temp user ID:', tempUserId);
-    
-    // Find or create temp profile
-    let { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('temp_user_id', tempUserId)
-      .maybeSingle();
-    
-    console.log('🔍 Found existing temp profile:', profile);
-    
-    if (!profile) {
-      // Create profile for unauthenticated user
-      const { data: newProfile, error } = await supabase
+      
+      cachedProfileId = profile!.id;
+      return profile!.id;
+    } else {
+      // Unauthenticated user - use temp profile
+      let tempUserId = localStorage.getItem('tempUserId');
+      if (!tempUserId) {
+        tempUserId = crypto.randomUUID();
+        localStorage.setItem('tempUserId', tempUserId);
+      }
+      
+      // Find existing temp profile
+      let { data: profile } = await supabase
         .from('profiles')
-        .insert({
-          user_id: null,
-          temp_user_id: tempUserId,
-          display_name: 'Anonymous User',
-          is_authenticated: false
-        })
         .select('id')
-        .single();
+        .eq('temp_user_id', tempUserId)
+        .maybeSingle();
       
-      if (error) {
-        console.error('❌ Error creating temp user profile:', error);
-        throw error;
+      if (!profile) {
+        // Try to create profile, handle conflicts gracefully
+        const { data: newProfile, error } = await supabase
+          .from('profiles')
+          .insert({
+            user_id: null,
+            temp_user_id: tempUserId,
+            display_name: 'Anonymous User',
+            is_authenticated: false
+          })
+          .select('id')
+          .single();
+        
+        if (error && error.code === '23505') {
+          // Profile already exists due to race condition, fetch it
+          const { data: existingProfile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('temp_user_id', tempUserId)
+            .single();
+          profile = existingProfile;
+        } else if (error) {
+          throw error;
+        } else {
+          profile = newProfile;
+        }
       }
-      console.log('✅ Created new temp profile:', newProfile);
-      return newProfile.id;
+      
+      cachedProfileId = profile!.id;
+      return profile!.id;
     }
-    
-    return profile.id;
+  })();
+  
+  try {
+    const result = await profilePromise;
+    profilePromise = null; // Clear promise after completion
+    return result;
+  } catch (error) {
+    profilePromise = null; // Clear promise on error
+    throw error;
   }
 };
 
@@ -121,20 +156,12 @@ export interface Post {
 }
 
 // Transform database post to frontend post format
-export const transformPost = async (dbPost: PostData, businesses: any[] = []): Promise<Post> => {
+export const transformPost = async (dbPost: PostData, businesses: any[] = [], currentUserId?: string): Promise<Post> => {
   const business = businesses.find(b => b.id === dbPost.bussiness_id);
   
-  // Determine if current user owns this post
-  const currentUserId = await getUserId();
-  const isOwnPost = dbPost.user_id === currentUserId;
-  
-  console.log('🔍 transformPost:', {
-    postId: dbPost.id,
-    postUserId: dbPost.user_id,
-    currentUserId,
-    isOwnPost,
-    content: dbPost.content.substring(0, 50) + '...'
-  });
+  // Use provided currentUserId or get it once
+  const userId = currentUserId || await getUserId();
+  const isOwnPost = dbPost.user_id === userId;
   
   return {
     id: dbPost.id,
@@ -151,7 +178,7 @@ export const transformPost = async (dbPost: PostData, businesses: any[] = []): P
     createdAt: new Date(dbPost.created_at),
     timestamp: dbPost.created_at,
     isComment: dbPost.is_comment,
-    userId: dbPost.user_id, // Add user_id to Post interface
+    userId: dbPost.user_id,
   };
 };
 
