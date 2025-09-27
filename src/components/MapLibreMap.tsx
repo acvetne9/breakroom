@@ -514,29 +514,28 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         await new Promise(resolve => setTimeout(resolve, 200));
       }
 
-      let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-      let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
+      const tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+      const glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
       
-      if ((window as any).Capacitor) {
-        tiles = `capacitor://localhost/data/tiles/{z}/{x}/{y}.pbf`;
-        glyphs = `capacitor://localhost/data/{fontstack}/{range}.pbf`;
-      }
-
       const vectorSource = {
         type: 'vector' as const,
         tiles: [tiles],
         minzoom: 10,
         maxzoom: 16,
-        scheme: 'xyz' as const
+        scheme: 'xyz' as const,
       };
-
+      
       const style = {
         version: 8 as const,
-        glyphs: glyphs, // ✅ matches your existing path
+        glyphs: glyphs,
         sources: { 'nyc-tiles': vectorSource },
         layers: [
-          { id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } }
-        ]
+          {
+            id: 'background',
+            type: 'background',
+            paint: { 'background-color': '#F5F5DC' },
+          },
+        ],
       } as any;
 
       const mapInstance = new maplibregl.Map({
