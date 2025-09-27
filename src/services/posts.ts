@@ -1,7 +1,14 @@
 import { supabase } from "@/integrations/supabase/client";
 
-// Get or create a consistent temporary user ID
-const getTempUserId = (): string => {
+// Get authenticated user ID or temporary user ID for backwards compatibility
+const getUserId = async (): Promise<string> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (user?.id) {
+    return user.id;
+  }
+  
+  // Fallback to temp user ID for backwards compatibility
   let tempUserId = localStorage.getItem('tempUserId');
   if (!tempUserId) {
     tempUserId = crypto.randomUUID();
@@ -86,15 +93,15 @@ export const createPost = async (
   salary?: number,
   isComment?: string
 ): Promise<{ data: PostData | null; error: any }> => {
-  // Get consistent temp user ID
-  const tempUserId = getTempUserId();
+  // Get authenticated or temp user ID
+  const userId = await getUserId();
   
   const { data, error } = await supabase
     .from('posts')
     .insert({
       content,
       post_type: postType,
-      user_id: tempUserId,
+      user_id: userId,
       bussiness_id: businessId,
       job_role: jobRole,
       time_period: timePeriod,
@@ -112,15 +119,15 @@ export const voteOnPost = async (
   postId: string,
   voteType: 'upvote' | 'downvote'
 ): Promise<{ success: boolean; error?: any }> => {
-  // Get consistent temp user ID
-  const tempUserId = getTempUserId();
+  // Get authenticated or temp user ID
+  const userId = await getUserId();
   
   // Check if user already voted
   const { data: existingVote } = await supabase
     .from('votes')
     .select('*')
     .eq('post_id', postId)
-    .eq('user_id', tempUserId)
+    .eq('user_id', userId)
     .single();
 
   if (existingVote) {
@@ -147,7 +154,7 @@ export const voteOnPost = async (
       .from('votes')
       .insert({
         post_id: postId,
-        user_id: tempUserId,
+        user_id: userId,
         vote_type: voteType
       });
     
@@ -161,13 +168,13 @@ export const getUserVotes = async (postIds: string[]): Promise<{ [postId: string
     return {};
   }
 
-  // Get consistent temp user ID
-  const tempUserId = getTempUserId();
+  // Get authenticated or temp user ID
+  const userId = await getUserId();
   
   const { data: votes } = await supabase
     .from('votes')
     .select('post_id, vote_type')
-    .eq('user_id', tempUserId)
+    .eq('user_id', userId)
     .in('post_id', postIds);
 
   const userVotes: { [postId: string]: 'up' | 'down' } = {};
@@ -180,8 +187,12 @@ export const getUserVotes = async (postIds: string[]): Promise<{ [postId: string
 
 // Delete a post
 export const deletePost = async (postId: string): Promise<{ success: boolean; error?: any }> => {
-  // Get consistent temp user ID
-  const tempUserId = getTempUserId();
+  // Get authenticated user ID (required for delete)
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user?.id) {
+    return { success: false, error: 'Not authenticated - cannot delete post' };
+  }
 
   // Get the post to check ownership
   const { data: post, error: fetchError } = await supabase
@@ -195,11 +206,11 @@ export const deletePost = async (postId: string): Promise<{ success: boolean; er
   }
 
   // Check if user owns the post
-  if (post.user_id !== tempUserId) {
+  if (post.user_id !== user.id) {
     return { success: false, error: 'Not authorized to delete this post' };
   }
 
-  // Delete the post
+  // Delete the post (RLS will also enforce this)
   const { error } = await supabase
     .from('posts')
     .delete()
