@@ -517,9 +517,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
       let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
 
-      if ((window as any).Capacitor) {
-        tiles = "https://localhost/data/tiles/{z}/{x}/{y}.pbf";
-        glyphs = "https://localhost/data/{fontstack}/{range}.pbf";
+      if (typeof (window as any).Capacitor !== "undefined") {
+        tiles = "/data/tiles/{z}/{x}/{y}.pbf";
+        glyphs = "/data/{fontstack}/{range}.pbf";
       }
       
       const vectorSource = {
@@ -551,8 +551,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         maxZoom: 18,
         minZoom: 9,
         renderWorldCopies: false,
-        attributionControl: false
-      } as any );
+        attributionControl: false,
+        antialias: false
+      });
 
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
 
