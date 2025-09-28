@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getPosts, createPost, voteOnPost, deletePost, getUserVotes, transformPost, Post, PostData } from '@/services/posts';
+import { getPosts, createPost, voteOnPost, deletePost, getUserVotes, transformPost, getUserProfile, Post, PostData } from '@/services/posts';
 import { supabase } from '@/integrations/supabase/client';
 
 export const usePosts = () => {
@@ -17,13 +17,24 @@ export const usePosts = () => {
       
       if (postsError) {
         setError('Failed to fetch posts');
-        console.error('Posts fetch error:', postsError);
+        console.error('❌ Posts fetch error:', postsError);
         return;
       }
 
       if (postsData) {
-        // Transform posts without businesses data for now
-        const transformedPosts = postsData.map(post => transformPost(post, []));
+        // Get businesses
+        const { data: businesses } = await supabase
+          .from('businesses')
+          .select('*');
+
+        // Get current user ID once to avoid race conditions
+        const currentUserId = await getUserProfile();
+
+        // Transform posts with cached user ID
+        const transformedPosts = await Promise.all(
+          postsData.map(post => transformPost(post, businesses || [], currentUserId))
+        );
+        
         const postIds = transformedPosts.map(p => p.id);
         const userVotes = await getUserVotes(postIds);
         
@@ -37,7 +48,7 @@ export const usePosts = () => {
       }
     } catch (err) {
       setError('Failed to load posts');
-      console.error('Posts loading error:', err);
+      console.error('❌ Posts loading error:', err);
     } finally {
       setLoading(false);
     }
@@ -73,8 +84,9 @@ export const usePosts = () => {
       }
 
       if (data) {
-        // Add the new post to the local state (without businesses data for now)
-        const newPost = transformPost(data, []);
+        // Get current user ID and transform the new post
+        const currentUserId = await getUserProfile();
+        const newPost = await transformPost(data, [], currentUserId);
         setPosts(prevPosts => [newPost, ...prevPosts]);
         return true;
       }

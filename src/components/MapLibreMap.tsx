@@ -3,7 +3,7 @@ import maplibregl from 'maplibre-gl';
 import type { LayerSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { MapboxOverlay } from '@deck.gl/mapbox'; // use this package
-import { createBusinessScatterplotLayer } from '@/utils/deckGLLayers';
+import { createBusinessScatterplotLayer, createEmojiLandmarkLayer } from '@/utils/deckGLLayers';
 import { useViewportMapData } from '../hooks/useViewportMapData';
 import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
 import { createTileBlobUrl, isCapacitor } from '@/utils/tileDecompression';
@@ -212,22 +212,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [businesses]);
 
-  // Debug glyph requests
-  (function debugGlyphs() {
-    const origFetch = window.fetch;
-    window.fetch = async (input: RequestInfo, init?: RequestInit) => {
-      const url = typeof input === "string" ? input : input.url;
-      if (url.includes("/assets/fonts/")) {
-        console.log("🔡 Glyph request:", url);
-      }
-      const res = await origFetch(input, init);
-      if (!res.ok) {
-        console.error("⚠️ Glyph request failed:", url, res.status);
-      }
-      return res;
-    };
-  })();
-
   useEffect(() => {
     if (!mapRef.current) return;
     const map = mapRef.current;
@@ -426,48 +410,58 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [searchFilters, mapLoaded, loadBusinessesInViewport]);
 
   const deckGLLayers = useMemo(() => {
-    if (!businesses || !businesses.length) {
-      return [];
-    }
-  
-    // Ensure each business has valid lat/lng
-    let validBusinesses = businesses.filter(
-      b => b?.position?.lat != null && b?.position?.lng != null
-    );
-    
-    if (!validBusinesses.length) {
-      return [];
-    }
-  
-    // Handle neighborhood filter if present
-    if (searchFilters?.neighborhoodFilter?.boundary?.length) {
-      const neighborhoodCoords = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
-      if (neighborhoodCoords.length) {
-        const turfPolygon = turf.polygon([neighborhoodCoords.map(p => [p.lon, p.lat])]);
-        validBusinesses = validBusinesses.filter(b => {
-          const point = turf.point([b.position.lng, b.position.lat]);
-          return turf.booleanPointInPolygon(point, turfPolygon);
-        });
+    const layers: any[] = [];
+
+    // Add emoji landmarks layer first (renders behind businesses)
+    if (landmarks && landmarks.length > 0) {
+      try {
+        const emojiLayer = createEmojiLandmarkLayer({ landmarks });
+        layers.push(emojiLayer);
+        console.log("✅ Created emoji landmarks layer");
+      } catch (err) {
+        console.error("❌ Failed to create emoji layer", err);
       }
     }
-  
-    if (!validBusinesses.length) return [];
-  
-    let safeLayer: any = null;
-    try {
-      safeLayer = createBusinessScatterplotLayer({
-        businesses: validBusinesses,
-        selectedBusinessId: selectedBusiness?.id,
-        onBusinessClick: handleBusinessClick,
-        neighborhoodBoundary: searchFilters?.neighborhoodFilter?.boundary || null
-      });
-      console.log("✅ Created scatterplot layer:", safeLayer);
-    } catch (err) {
-      console.error("❌ Failed to create scatterplot layer", err);
+
+    // Add business scatterplot layer on top
+    if (businesses && businesses.length > 0) {
+      // Ensure each business has valid lat/lng
+      let validBusinesses = businesses.filter(
+        b => b?.position?.lat != null && b?.position?.lng != null
+      );
+      
+      if (validBusinesses.length > 0) {
+        // Handle neighborhood filter if present
+        if (searchFilters?.neighborhoodFilter?.boundary?.length) {
+          const neighborhoodCoords = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
+          if (neighborhoodCoords.length) {
+            const turfPolygon = turf.polygon([neighborhoodCoords.map(p => [p.lon, p.lat])]);
+            validBusinesses = validBusinesses.filter(b => {
+              const point = turf.point([b.position.lng, b.position.lat]);
+              return turf.booleanPointInPolygon(point, turfPolygon);
+            });
+          }
+        }
+
+        if (validBusinesses.length > 0) {
+          try {
+            const businessLayer = createBusinessScatterplotLayer({
+              businesses: validBusinesses,
+              selectedBusinessId: selectedBusiness?.id,
+              onBusinessClick: handleBusinessClick,
+              neighborhoodBoundary: searchFilters?.neighborhoodFilter?.boundary || null
+            });
+            layers.push(businessLayer);
+            console.log("✅ Created scatterplot layer:", businessLayer);
+          } catch (err) {
+            console.error("❌ Failed to create scatterplot layer", err);
+          }
+        }
+      }
     }
     
-    return safeLayer ? [safeLayer] : [];
-  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, businesses]);
+    return layers;
+  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, businesses, landmarks]);
   
   const lastLoadTimeRef = useRef(0);
 
@@ -520,21 +514,33 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         await new Promise(resolve => setTimeout(resolve, 200));
       }
 
+      let tiles = "/data/tiles/{z}/{x}/{y}.pbf";
+      let glyphs = "/data/{fontstack}/{range}.pbf";
+
+      if (!!(window as any).Capacitor) {
+        tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+        glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
+      }
+      
       const vectorSource = {
         type: 'vector' as const,
-        tiles: [`${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`],
+        tiles: [tiles],
         minzoom: 10,
         maxzoom: 16,
-        scheme: 'xyz' as const
+        scheme: 'xyz' as const,
       };
-
+      
       const style = {
         version: 8 as const,
-        glyphs: `${window.location.origin}/data/{fontstack}/{range}.pbf`, // ✅ matches your existing path
+        glyphs: glyphs,
         sources: { 'nyc-tiles': vectorSource },
         layers: [
-          { id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } }
-        ]
+          {
+            id: 'background',
+            type: 'background',
+            paint: { 'background-color': '#F5F5DC' },
+          },
+        ],
       } as any;
 
       const mapInstance = new maplibregl.Map({
@@ -546,7 +552,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         minZoom: 9,
         renderWorldCopies: false,
         attributionControl: false
-      });
+      } as any );
 
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
 
@@ -759,7 +765,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // center/load neighborhood center
   const isUserInteractingRef = useRef(false);
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || !mapLoaded) return;
     const map = mapRef.current;
   
     const onDragStart = () => { isUserInteractingRef.current = true; };
@@ -771,42 +777,47 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     map.on("dragend", onDragEnd);
     map.on("zoomstart", onZoomStart);
     map.on("zoomend", onZoomEnd);
-  
-    return () => {
-      map.off("dragstart", onDragStart);
-      map.off("dragend", onDragEnd);
-      map.off("zoomstart", onZoomStart);
-      map.off("zoomend", onZoomEnd);
-      map.on("load", () => {
-      // Roads already exist — now add road labels
+
+    // Add road labels layer after map is loaded and only if it doesn't exist
+    if (mapLoaded && !map.getLayer("nyc-road-labels")) {
+      try {
         map.addLayer({
           id: "nyc-road-labels",
           type: "symbol",
           source: "nyc-tiles",
-          "source-layer": "examplepoints", // <-- change to your real road source-layer name if different
-          minzoom: 13, // show labels only when zoomed in (tune to taste)
+          "source-layer": "examplepoints",
           filter: [
             "all",
             ["has", "name"],
-            // keep only major roads; adjust types to match your tile property (could be 'highway', 'class', 'fclass' etc)
-            ["match", ["get", "highway"],
-              ["motorway", "trunk", "primary", "secondary", "tertiary"], true, false
+            [
+              "match",
+              ["get", "highway"],
+              // Always show these (major roads)
+              ["motorway", "trunk", "primary", "secondary", "tertiary"],
+              true,
+              // Show local roads only when zoom >= 14
+              ["step",
+                ["zoom"],
+                false,                // below 14 → don't show
+                14, ["in", ["get", "highway"], ["literal", ["residential", "unclassified", "living_street"]]]
+              ]
             ]
           ],
           layout: {
             "text-field": ["coalesce", ["get", "name"], ""],
-            "text-font": ["OpenSansArialUnicode"],      // must match your fontstack (see glyphs config)
+            "text-font": ["OpenSansArialUnicode"],
             "text-size": [
               "interpolate", ["linear"], ["zoom"],
-              13, 10,   // at zoom 13 -> 10px
-              16, 12    // at zoom 16 -> 12px
+              12, 9,   // smaller zoom
+              15, 11,
+              17, 13   // bigger zoom
             ],
-            "symbol-placement": "line",                 // <-- makes labels follow the line geometry (curved)
-            "text-rotation-alignment": "map",           // align label direction to the map (and the line)
+            "symbol-placement": "line",
+            "text-rotation-alignment": "map",
             "text-pitch-alignment": "map",
-            "text-keep-upright": true,                  // avoid upside-down text on steep curves
-            "symbol-spacing": 900,                      // larger = fewer repeats along a single line (tune 600–1500)
-            "text-max-angle": 18,                       // limit how curvy the text can be
+            "text-keep-upright": true,
+            "symbol-spacing": 700,
+            "text-max-angle": 25,
             "text-allow-overlap": false,
             "text-ignore-placement": false,
             "text-optional": true,
@@ -819,7 +830,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             "text-halo-width": 1.2
           }
         } as any);
-      });
+        console.log("✅ Added road labels layer");
+      } catch (err) {
+        console.error("❌ Failed to add road labels layer:", err);
+      }
+    }
+  
+    return () => {
+      map.off("dragstart", onDragStart);
+      map.off("dragend", onDragEnd);
+      map.off("zoomstart", onZoomStart);
+      map.off("zoomend", onZoomEnd);
     };
   }, [mapLoaded]);
   

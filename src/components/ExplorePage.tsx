@@ -23,6 +23,7 @@ interface Post {
   createdAt: Date;
   timestamp?: string;
   isComment?: string;
+  userId?: string;
 }
 
 interface ExplorePageProps {
@@ -190,15 +191,17 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     const success = await removePost(postId);
   
     if (!success) {
-      setPostText('');
-      setPostPlaceholder('Failed to create post. Please try again.');
+      toast({
+        title: "Error",
+        description: "Failed to delete post. Please try again.",
+        variant: "destructive"
+      });
       return;
     }
   
     if (expandedPost === postId) {
       setExpandedPost(null);
       setCommentText('');
-      setPostPlaceholder(filteredBusinessId ? "Thoughts about this business?" : "How's work?");
     }
   };
 
@@ -356,12 +359,12 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                   {/* Voting component in bottom right */}
                   {post.author !== 'System' && (
                     <div className="absolute bottom-1 right-1">
-                      <VotingComponent 
+                       <VotingComponent 
                         upvotes={post.upvotes} 
                         downvotes={post.downvotes} 
                         userVote={post.userVote} 
                         onVote={voteType => handlePostVote(post.id, voteType)}
-                        isOwner={post.author === 'You'}
+                        isOwner={post.userId === '00000000-0000-0000-0000-000000000000' ? false : post.author === 'You'}
                         onDelete={() => handlePostDelete(post.id)}
                       />
                     </div>
