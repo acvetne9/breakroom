@@ -553,7 +553,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         renderWorldCopies: false,
         attributionControl: false,
         antialias: false
-      });
+      } as any);
 
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
 
