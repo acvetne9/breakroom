@@ -517,9 +517,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
       let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
 
-      if (!!(window as any).Capacitor) {
-        tiles = "/data/tiles/{z}/{x}/{y}.pbf";
-        glyphs = "/data/{fontstack}/{range}.pbf";
+      if ((window as any).Capacitor) {
+        tiles = "https://localhost/data/tiles/{z}/{x}/{y}.pbf";
+        glyphs = "https://localhost/data/{fontstack}/{range}.pbf";
       }
       
       const vectorSource = {
