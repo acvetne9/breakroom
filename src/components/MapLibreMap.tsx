@@ -519,12 +519,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       // let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
 
       function getAssetUrl(path: string) {
-        if (Capacitor.isNativePlatform()) {
-          return Capacitor.convertFileSrc(path);
+        const platform = Capacitor.getPlatform();
+      
+        if (platform === "android") {
+          // Only Android needs the capacitor:// scheme
+          return `capacitor://localhost/${path.replace(/^\//, "")}`;
         }
-        return path;
+      
+        // Web + iOS use normal origin
+        return `${window.location.origin}${path}`;
       }
       
+      // usage:
       const tiles = getAssetUrl("/data/tiles/{z}/{x}/{y}.pbf");
       const glyphs = getAssetUrl("/data/{fontstack}/{range}.pbf");
       
