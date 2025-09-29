@@ -515,12 +515,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         await new Promise(resolve => setTimeout(resolve, 200));
       }
       
+      // Helper function to detect Android native platform specifically
+      const isAndroidNative = (): boolean => {
+        return !!Capacitor?.isNativePlatform?.() && /Android/i.test(navigator.userAgent);
+      };
+
       let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
       let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
 
       // Android-specific URL handling to fix ERR_CONNECTION_REFUSED
-      if (Capacitor.getPlatform() === 'android') {
-        console.log('🤖 Android detected - using relative paths for tiles');
+      // Only apply relative paths for Android native, preserve web and iOS functionality
+      if (isAndroidNative()) {
+        console.log('🤖 Android native detected - using relative paths for tiles');
         tiles = "/data/tiles/{z}/{x}/{y}.pbf";
         glyphs = "/data/{fontstack}/{range}.pbf";
       }
