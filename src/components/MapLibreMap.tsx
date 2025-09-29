@@ -515,21 +515,44 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         await new Promise(resolve => setTimeout(resolve, 200));
       }
       
-      let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-      let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
-
-      // if (Capacitor.getPlatform() === 'android') {
-      //   tiles = "/data/tiles/{z}/{x}/{y}.pbf";
-      //   glyphs = "/data/{fontstack}/{range}.pbf";
-      // }
+      function isAndroidNative(): boolean {
+        try {
+          // Capacitor.isNativePlatform() returns true for native apps (iOS/Android).
+          // Combine that with a UA check for Android so we don't accidentally treat
+          // hosted previews (where Capacitor may be present) as Android native.
+          const isNative = typeof Capacitor !== 'undefined'
+            && typeof (Capacitor as any).isNativePlatform === 'function'
+            && (Capacitor as any).isNativePlatform();
       
-      const vectorSource = { 
-        type: 'vector' as const, 
-        tiles: [tiles], 
-        minzoom: 10, 
-        maxzoom: 16, 
-        scheme: 'xyz' as const, 
-      }; 
+          const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+          const isAndroidUA = /Android/i.test(ua);
+      
+          return !!(isNative && isAndroidUA);
+        } catch (e) {
+          return false;
+        }
+      }
+      
+      const origin = (typeof window !== 'undefined' && window.location?.origin) ? window.location.origin : '';
+      const androidNative = isAndroidNative();
+      
+      // Choose base URL: Android native -> https://localhost so WebViewAssetLoader can intercept,
+      // Web and iOS -> window.location.origin (unchanged behavior).
+      const base = androidNative ? 'https://localhost' : origin;
+      
+      // build the exact tile/glyph urls MapLibre expects
+      const tiles = `${base}/data/tiles/{z}/{x}/{y}.pbf`;
+      const glyphs = `${base}/data/{fontstack}/{range}.pbf`;
+      
+      // Debug logs — leave these while testing
+      console.log('ENV: androidNative=', androidNative, 'Capacitor.getPlatform=', Capacitor.getPlatform?.());
+      console.log('Map tile URL:', tiles);
+      console.log('Map glyphs URL:', glyphs);
+      
+      // sanity checks
+      if (!glyphs.includes('{fontstack}') || !glyphs.includes('{range}')) {
+        console.error('Glyphs URL must contain {fontstack} and {range} tokens. Current glyphs:', glyphs);
+      }
       
       const style = { 
         version: 8 as const, 
