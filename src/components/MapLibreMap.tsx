@@ -515,37 +515,28 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         await new Promise(resolve => setTimeout(resolve, 200));
       }
       
-      // 1. Compute Android/native condition
       function isAndroidNative(): boolean {
-        try {
-          const isNative = typeof Capacitor !== 'undefined'
-            && typeof (Capacitor as any).isNativePlatform === 'function'
-            && (Capacitor as any).isNativePlatform();
-      
-          const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
-          const isAndroidUA = /Android/i.test(ua);
-      
-          return !!(isNative && isAndroidUA);
-        } catch {
-          return false;
-        }
+        if (typeof Capacitor === 'undefined') return false;
+        if (!(Capacitor as any).isNativePlatform?.()) return false; // must be native
+        const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+        return /Android/i.test(ua); // only Android UA
       }
       
-      const origin = (typeof window !== 'undefined' && window.location?.origin) ? window.location.origin : '';
-      const androidNative = isAndroidNative();
+      // Default URLs for web + iOS (unchanged)
+      let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+      let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
       
-      // 2. Pick base
-      const base = androidNative ? 'https://localhost' : origin;
+      // ONLY change URLs for Android native
+      if (isAndroidNative()) {
+        tiles = '/data/tiles/{z}/{x}/{y}.pbf';
+        glyphs = '/data/{fontstack}/{range}.pbf';
+      }
       
-      // 3. Build URLs
-      const tiles = `${base}/data/tiles/{z}/{x}/{y}.pbf`;
-      const glyphs = `${base}/data/{fontstack}/{range}.pbf`;
+      console.log('Android native?', isAndroidNative());
+      console.log('Tiles URL:', tiles);
+      console.log('Glyphs URL:', glyphs);
       
-      console.log('ENV: androidNative=', androidNative, 'platform=', Capacitor.getPlatform?.());
-      console.log('Map tile URL:', tiles);
-      console.log('Map glyphs URL:', glyphs);
-      
-      // 4. Define vectorSource before using it in style
+      // Then use tiles/glyphs normally in MapLibre
       const vectorSource = {
         type: 'vector' as const,
         tiles: [tiles],
@@ -554,18 +545,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         scheme: 'xyz' as const,
       };
       
-      // 5. Style uses vectorSource
       const style = {
         version: 8 as const,
         glyphs,
         sources: { 'nyc-tiles': vectorSource },
         layers: [
-          { id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } },
-          // ... your other layers here ...
+          {
+            id: 'background',
+            type: 'background',
+            paint: { 'background-color': '#F5F5DC' },
+          },
+          // other layers here
         ],
       } as any;
       
-      // 6. Pass style to maplibre
       const mapInstance = new maplibregl.Map({
         container: mapContainerRef.current!,
         style,
@@ -575,7 +568,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         minZoom: 9,
         renderWorldCopies: false,
         attributionControl: false,
-      });
+      } as any);
       
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
 
