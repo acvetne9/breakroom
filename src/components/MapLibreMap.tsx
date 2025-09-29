@@ -515,53 +515,67 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         await new Promise(resolve => setTimeout(resolve, 200));
       }
       
+      // 1. Compute Android/native condition
       function isAndroidNative(): boolean {
-        return !!Capacitor?.isNativePlatform?.() && /Android/i.test(navigator.userAgent);
+        try {
+          const isNative = typeof Capacitor !== 'undefined'
+            && typeof (Capacitor as any).isNativePlatform === 'function'
+            && (Capacitor as any).isNativePlatform();
+      
+          const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+          const isAndroidUA = /Android/i.test(ua);
+      
+          return !!(isNative && isAndroidUA);
+        } catch {
+          return false;
+        }
       }
       
-      // Default for web + iOS
-      let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-      let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
+      const origin = (typeof window !== 'undefined' && window.location?.origin) ? window.location.origin : '';
+      const androidNative = isAndroidNative();
       
-      // Override ONLY for Android native
-      if (isAndroidNative()) {
-        tiles = '/data/tiles/{z}/{x}/{y}.pbf';
-        glyphs = '/data/{fontstack}/{range}.pbf';
-      }
+      // 2. Pick base
+      const base = androidNative ? 'https://localhost' : origin;
       
-      console.log('Android native?', isAndroidNative());
-      console.log('Tiles URL:', tiles);
-      console.log('Glyphs URL:', glyphs);
+      // 3. Build URLs
+      const tiles = `${base}/data/tiles/{z}/{x}/{y}.pbf`;
+      const glyphs = `${base}/data/{fontstack}/{range}.pbf`;
       
-      const vectorSource = { 
-        type: 'vector' as const, 
-        tiles: [tiles], 
-        minzoom: 10, 
-        maxzoom: 16, 
-        scheme: 'xyz' as const, 
-      }; 
+      console.log('ENV: androidNative=', androidNative, 'platform=', Capacitor.getPlatform?.());
+      console.log('Map tile URL:', tiles);
+      console.log('Map glyphs URL:', glyphs);
       
-      const style = { 
-        version: 8 as const, 
-        glyphs: glyphs, 
-        sources: { 'nyc-tiles': vectorSource }, 
-        layers: [ { 
-          id: 'background', 
-          type: 'background', 
-          paint: { 'background-color': '#F5F5DC' }, 
-        }, ], 
+      // 4. Define vectorSource before using it in style
+      const vectorSource = {
+        type: 'vector' as const,
+        tiles: [tiles],
+        minzoom: 10,
+        maxzoom: 16,
+        scheme: 'xyz' as const,
+      };
+      
+      // 5. Style uses vectorSource
+      const style = {
+        version: 8 as const,
+        glyphs,
+        sources: { 'nyc-tiles': vectorSource },
+        layers: [
+          { id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } },
+          // ... your other layers here ...
+        ],
       } as any;
       
-      const mapInstance = new maplibregl.Map({ 
-        container: mapContainerRef.current!, 
-        style, 
-        center: [-73.986104, 40.715245], 
-        zoom: 12.77, 
-        maxZoom: 18, 
-        minZoom: 9, 
-        renderWorldCopies: false, 
-        attributionControl: false 
-      } as any );
+      // 6. Pass style to maplibre
+      const mapInstance = new maplibregl.Map({
+        container: mapContainerRef.current!,
+        style,
+        center: [-73.986104, 40.715245],
+        zoom: 12.77,
+        maxZoom: 18,
+        minZoom: 9,
+        renderWorldCopies: false,
+        attributionControl: false,
+      });
       
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
 
