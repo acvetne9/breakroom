@@ -515,13 +515,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         await new Promise(resolve => setTimeout(resolve, 200));
       }
       
+      function isAndroidNative(): boolean {
+        return !!Capacitor?.isNativePlatform?.() && /Android/i.test(navigator.userAgent);
+      }
+      
+      // Default for web + iOS
       let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
       let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
-
-      // if (Capacitor.getPlatform() === 'android') {
-      //   tiles = "/data/tiles/{z}/{x}/{y}.pbf";
-      //   glyphs = "/data/{fontstack}/{range}.pbf";
-      // }
+      
+      // Override ONLY for Android native
+      if (isAndroidNative()) {
+        tiles = '/data/tiles/{z}/{x}/{y}.pbf';
+        glyphs = '/data/{fontstack}/{range}.pbf';
+      }
+      
+      console.log('Android native?', isAndroidNative());
+      console.log('Tiles URL:', tiles);
+      console.log('Glyphs URL:', glyphs);
       
       const vectorSource = { 
         type: 'vector' as const, 
