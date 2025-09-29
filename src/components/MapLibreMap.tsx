@@ -518,10 +518,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
       let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
 
-      if (Capacitor.getPlatform() === 'android') {
-        tiles = "/data/tiles/{z}/{x}/{y}.pbf";
-        glyphs = "/data/{fontstack}/{range}.pbf";
-      }
+      // if (Capacitor.getPlatform() === 'android') {
+      //   tiles = "/data/tiles/{z}/{x}/{y}.pbf";
+      //   glyphs = "/data/{fontstack}/{range}.pbf";
+      // }
       
       const vectorSource = { 
         type: 'vector' as const, 
@@ -530,6 +530,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         maxzoom: 16, 
         scheme: 'xyz' as const, 
       }; 
+      
       const style = { 
         version: 8 as const, 
         glyphs: glyphs, 
@@ -539,7 +540,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: 'background', 
           paint: { 'background-color': '#F5F5DC' }, 
         }, ], 
-      } as any; 
+      } as any;
+      
       const mapInstance = new maplibregl.Map({ 
         container: mapContainerRef.current!, 
         style, 
