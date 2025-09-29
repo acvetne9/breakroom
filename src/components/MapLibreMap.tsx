@@ -15,6 +15,7 @@ import type { Business } from '@/types/business';
 import * as turf from '@turf/turf';
 import type { Feature, Point } from 'geojson';
 import type { MapGeoJSONFeature } from "maplibre-gl";
+import { Capacitor } from '@capacitor/core';
 
 interface MapLibreMapProps {
   onBusinessClick?: (business: any) => void;
@@ -517,8 +518,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       // let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
       // let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
 
-      const tiles = './data/tiles/{z}/{x}/{y}.pbf';
-      const glyphs = './data/{fontstack}/{range}.pbf';
+      let tiles: string;
+      let glyphs: string;
+      
+      if (Capacitor.isNativePlatform()) {
+        tiles = 'data/tiles/{z}/{x}/{y}.pbf';
+        glyphs = 'data/{fontstack}/{range}.pbf';
+      } else {
+        tiles = '/data/tiles/{z}/{x}/{y}.pbf';
+        glyphs = '/data/{fontstack}/{range}.pbf';
+      }
       
       const vectorSource = {
         type: 'vector' as const,
