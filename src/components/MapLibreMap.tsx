@@ -518,34 +518,33 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       // let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
       // let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
 
-      let tiles: string;
-      let glyphs: string;
-      
-      if (Capacitor.isNativePlatform()) {
-        tiles = 'data/tiles/{z}/{x}/{y}.pbf';
-        glyphs = 'data/{fontstack}/{range}.pbf';
-      } else {
-        tiles = '/data/tiles/{z}/{x}/{y}.pbf';
-        glyphs = '/data/{fontstack}/{range}.pbf';
+      function getAssetUrl(path: string) {
+        if (Capacitor.isNativePlatform()) {
+          return Capacitor.convertFileSrc(path);
+        }
+        return path;
       }
       
+      const tiles = getAssetUrl("/data/tiles/{z}/{x}/{y}.pbf");
+      const glyphs = getAssetUrl("/data/OpenSansArialUnicode/{range}.pbf");
+      
       const vectorSource = {
-        type: 'vector' as const,
+        type: "vector" as const,
         tiles: [tiles],
         minzoom: 10,
         maxzoom: 16,
-        scheme: 'xyz' as const,
+        scheme: "xyz" as const,
       };
       
       const style = {
         version: 8 as const,
         glyphs,
-        sources: { 'nyc-tiles': vectorSource },
+        sources: { "nyc-tiles": vectorSource },
         layers: [
           {
-            id: 'background',
-            type: 'background',
-            paint: { 'background-color': '#F5F5DC' },
+            id: "background",
+            type: "background",
+            paint: { "background-color": "#F5F5DC" },
           },
         ],
       } as any;
@@ -560,6 +559,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         renderWorldCopies: false,
         attributionControl: false,
       });
+      
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
 
       mapRef.current = mapInstance;
