@@ -526,7 +526,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
       
       const tiles = getAssetUrl("/data/tiles/{z}/{x}/{y}.pbf");
-      const glyphs = getAssetUrl("/data/OpenSansArialUnicode/{range}.pbf");
+      const glyphs = getAssetUrl("/data/{fontstack}/{range}.pbf");
       
       const vectorSource = {
         type: "vector" as const,
