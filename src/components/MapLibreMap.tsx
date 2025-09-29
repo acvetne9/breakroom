@@ -514,23 +514,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         // Add a small delay to ensure patching is complete
         await new Promise(resolve => setTimeout(resolve, 200));
       }
-      
-      // 1. Compute Android/native condition
-      function isAndroidNative(): boolean {
-        try {
-          const isNative = typeof Capacitor !== 'undefined'
-            && typeof (Capacitor as any).isNativePlatform === 'function'
-            && (Capacitor as any).isNativePlatform();
-      
-          const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
-          const isAndroidUA = /Android/i.test(ua);
-      
-          return !!(isNative && isAndroidUA);
-        } catch {
-          return false;
-        }
-      }
-    
+
       // Helper: detect ONLY Android native app
       function isAndroidNative(): boolean {
         if (typeof Capacitor === 'undefined') return false;
