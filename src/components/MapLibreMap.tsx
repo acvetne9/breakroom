@@ -514,13 +514,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         await new Promise(resolve => setTimeout(resolve, 200));
       }
 
-      let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-      let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
+      // let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+      // let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
 
-      if (typeof (window as any).Capacitor !== "undefined") {
+      // if (typeof (window as any).Capacitor !== "undefined") {
         tiles = './data/tiles/{z}/{x}/{y}.pbf';
         glyphs = './data/{fontstack}/{range}.pbf';
-      }
+      // }
       
       const vectorSource = {
         type: 'vector' as const,
