@@ -253,7 +253,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
           {/* Salary + Time Period */}
           <div>
             <div className="flex items-center space-x-3">
-              <input type="text" inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*" value={salary} onChange={handleSalaryChange} onBlur={checkForCompletion} placeholder="Pay Est. $" className="app-input text-left text-lg flex-1 !py-0 h-12" />
+              <input type="text" inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*" value={salary} onChange={handleSalaryChange} onBlur={checkForCompletion} placeholder="Pay Est. ($)" className="app-input text-left text-lg flex-1 !py-0 h-12" />
               <select value={timePeriod} onChange={e => setTimePeriod(e.target.value)} className="app-input text-lg w-auto !py-0 h-12">
                 <option value="HR">HR</option>
                 <option value="MO">MO</option>
