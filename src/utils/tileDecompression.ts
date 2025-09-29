@@ -5,9 +5,13 @@ import * as pako from 'pako';
  * where service workers don't work
  */
 
-// Check if we're running in Capacitor
+// Check if we're running in Capacitor native (not web)
 export const isCapacitor = () => {
-  return !!(window as any).Capacitor || window.location.protocol === 'capacitor:';
+  try {
+    return (window as any).Capacitor?.isNativePlatform?.() || window.location.protocol === 'capacitor:';
+  } catch {
+    return false;
+  }
 };
 
 /**
