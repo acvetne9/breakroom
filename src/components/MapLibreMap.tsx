@@ -518,10 +518,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
       let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
 
-      // if (Capacitor.getPlatform() === 'android') {
-      //   tiles = "/data/tiles/{z}/{x}/{y}.pbf";
-      //   glyphs = "/data/{fontstack}/{range}.pbf";
-      // }
+      // Android-specific URL handling to fix ERR_CONNECTION_REFUSED
+      if (Capacitor.getPlatform() === 'android') {
+        console.log('🤖 Android detected - using relative paths for tiles');
+        tiles = "/data/tiles/{z}/{x}/{y}.pbf";
+        glyphs = "/data/{fontstack}/{range}.pbf";
+      }
       
       const vectorSource = { 
         type: 'vector' as const, 
