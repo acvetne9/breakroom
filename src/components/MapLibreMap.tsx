@@ -515,48 +515,41 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         await new Promise(resolve => setTimeout(resolve, 200));
       }
       
-      const platform = Capacitor.getPlatform(); // "android" | "ios" | "web"
-      const origin = window.location.origin;
-      
-      // Web & iOS: keep current, use origin (works in browser + iOS simulator)
-      let tiles = `${origin}/data/tiles/{z}/{x}/{y}.pbf`;
-      let glyphs = `${origin}/data/{fontstack}/{range}.pbf`;
-      
-      // Android: force absolute https://localhost so WebViewAssetLoader in MainActivity will intercept it.
-      // (Do NOT use 'capacitor://' for fetch requests — it is not fetchable.)
-      if (platform === 'android') {
-        tiles = `https://localhost/data/tiles/{z}/{x}/{y}.pbf`;
-        glyphs = `https://localhost/data/{fontstack}/{range}.pbf`;
+      let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+      let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
+
+      if (Capacitor.getPlatform() === 'android') {
+        tiles = "/data/tiles/{z}/{x}/{y}.pbf";
+        glyphs = "/data/{fontstack}/{range}.pbf";
       }
       
-      const vectorSource = {
-        type: 'vector' as const,
-        tiles: [tiles],
-        minzoom: 10,
-        maxzoom: 16,
-        scheme: 'xyz' as const,
-      };
-      
-      const style = {
-        version: 8 as const,
-        glyphs,
-        sources: { 'nyc-tiles': vectorSource },
-        layers: [
-          { id: 'background', type: 'background', paint: { 'background-color': '#F5F5DC' } },
-          // add your other layers (nyc-roads/labels) here, matching the source-layer names in your tiles
-        ],
-      } as any;
-      
-      const mapInstance = new maplibregl.Map({
-        container: mapContainerRef.current!,
-        style,
-        center: [-73.986104, 40.715245],
-        zoom: 12.77,
-        maxZoom: 18,
-        minZoom: 9,
-        renderWorldCopies: false,
-        attributionControl: false,
-      } as any);
+      const vectorSource = { 
+        type: 'vector' as const, 
+        tiles: [tiles], 
+        minzoom: 10, 
+        maxzoom: 16, 
+        scheme: 'xyz' as const, 
+      }; 
+      const style = { 
+        version: 8 as const, 
+        glyphs: glyphs, 
+        sources: { 'nyc-tiles': vectorSource }, 
+        layers: [ { 
+          id: 'background', 
+          type: 'background', 
+          paint: { 'background-color': '#F5F5DC' }, 
+        }, ], 
+      } as any; 
+      const mapInstance = new maplibregl.Map({ 
+        container: mapContainerRef.current!, 
+        style, 
+        center: [-73.986104, 40.715245], 
+        zoom: 12.77, 
+        maxZoom: 18, 
+        minZoom: 9, 
+        renderWorldCopies: false, 
+        attributionControl: false 
+      } as any );
       
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
 
