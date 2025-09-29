@@ -520,17 +520,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         return !!Capacitor?.isNativePlatform?.() && /Android/i.test(navigator.userAgent);
       };
 
-      // Default URLs for web and iOS - use full origin path
+      // Default URLs work for web, iOS, and Android
+      // Android uses https://localhost, iOS uses capacitor://localhost, web uses normal origin
       let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
       let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
 
-      // Android-specific URL handling to fix ERR_CONNECTION_REFUSED
-      // Android Capacitor needs capacitor:// protocol or relative paths
+      // Log the platform and URLs for debugging
       if (isAndroidNative()) {
-        console.log('🤖 Android native detected - using capacitor:// protocol for tiles');
-        const baseUrl = 'capacitor://localhost';
-        tiles = `${baseUrl}/data/tiles/{z}/{x}/{y}.pbf`;
-        glyphs = `${baseUrl}/data/{fontstack}/{range}.pbf`;
+        console.log('🤖 Android native detected - origin:', window.location.origin);
+        console.log('🗺️ Tiles URL:', tiles);
       }
       
       const vectorSource = { 
