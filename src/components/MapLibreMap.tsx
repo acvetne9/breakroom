@@ -518,8 +518,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       // let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
 
       // if (typeof (window as any).Capacitor !== "undefined") {
-        tiles = './data/tiles/{z}/{x}/{y}.pbf';
-        glyphs = './data/{fontstack}/{range}.pbf';
+      let tiles = './data/tiles/{z}/{x}/{y}.pbf';
+      let glyphs = './data/{fontstack}/{range}.pbf';
       // }
       
       const vectorSource = {
