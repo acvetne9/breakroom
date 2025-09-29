@@ -515,18 +515,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         await new Promise(resolve => setTimeout(resolve, 200));
       }
       
+      // Detect Android native ONLY
       function isAndroidNative(): boolean {
-        if (typeof Capacitor === 'undefined') return false;
-        if (!(Capacitor as any).isNativePlatform?.()) return false; // must be native
-        const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
-        return /Android/i.test(ua); // only Android UA
+        return !!Capacitor?.isNativePlatform?.() && /Android/i.test(navigator.userAgent);
       }
       
-      // Default URLs for web + iOS (unchanged)
+      // Default for web + iOS
       let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
       let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
       
-      // ONLY change URLs for Android native
+      // Override ONLY for Android native
       if (isAndroidNative()) {
         tiles = '/data/tiles/{z}/{x}/{y}.pbf';
         glyphs = '/data/{fontstack}/{range}.pbf';
@@ -536,39 +534,28 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       console.log('Tiles URL:', tiles);
       console.log('Glyphs URL:', glyphs);
       
-      // Then use tiles/glyphs normally in MapLibre
-      const vectorSource = {
-        type: 'vector' as const,
-        tiles: [tiles],
-        minzoom: 10,
-        maxzoom: 16,
-        scheme: 'xyz' as const,
-      };
-      
+      // Use tiles/glyphs normally in the style
       const style = {
         version: 8 as const,
         glyphs,
-        sources: { 'nyc-tiles': vectorSource },
+        sources: {
+          'nyc-tiles': {
+            type: 'vector' as const,
+            tiles: [tiles],
+            minzoom: 10,
+            maxzoom: 16,
+            scheme: 'xyz' as const,
+          },
+        },
         layers: [
           {
             id: 'background',
             type: 'background',
             paint: { 'background-color': '#F5F5DC' },
           },
-          // other layers here
+          // add other layers
         ],
       } as any;
-      
-      const mapInstance = new maplibregl.Map({
-        container: mapContainerRef.current!,
-        style,
-        center: [-73.986104, 40.715245],
-        zoom: 12.77,
-        maxZoom: 18,
-        minZoom: 9,
-        renderWorldCopies: false,
-        attributionControl: false,
-      } as any);
       
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
 
