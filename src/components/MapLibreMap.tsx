@@ -15,6 +15,7 @@ import type { Business } from '@/types/business';
 import * as turf from '@turf/turf';
 import type { Feature, Point } from 'geojson';
 import type { MapGeoJSONFeature } from "maplibre-gl";
+import { Capacitor } from '@capacitor/core';
 
 interface MapLibreMapProps {
   onBusinessClick?: (business: any) => void;
@@ -513,47 +514,53 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         // Add a small delay to ensure patching is complete
         await new Promise(resolve => setTimeout(resolve, 200));
       }
+      
+      // Helper function to detect Android native platform specifically
+      const isAndroidNative = (): boolean => {
+        return !!Capacitor?.isNativePlatform?.() && /Android/i.test(navigator.userAgent);
+      };
 
-      let tiles = "/data/tiles/{z}/{x}/{y}.pbf";
-      let glyphs = "/data/{fontstack}/{range}.pbf";
+      // Default URLs work for web, iOS, and Android
+      // Android uses https://localhost, iOS uses capacitor://localhost, web uses normal origin
+      let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+      let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
 
-      if (!!(window as any).Capacitor) {
-        tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-        glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
+      // Log the platform and URLs for debugging
+      if (isAndroidNative()) {
+        console.log('🤖 Android native detected - origin:', window.location.origin);
+        console.log('🗺️ Tiles URL:', tiles);
       }
       
-      const vectorSource = {
-        type: 'vector' as const,
-        tiles: [tiles],
-        minzoom: 10,
-        maxzoom: 16,
-        scheme: 'xyz' as const,
-      };
+      const vectorSource = { 
+        type: 'vector' as const, 
+        tiles: [tiles], 
+        minzoom: 10, 
+        maxzoom: 16, 
+        scheme: 'xyz' as const, 
+      }; 
       
-      const style = {
-        version: 8 as const,
-        glyphs: glyphs,
-        sources: { 'nyc-tiles': vectorSource },
-        layers: [
-          {
-            id: 'background',
-            type: 'background',
-            paint: { 'background-color': '#F5F5DC' },
-          },
-        ],
+      const style = { 
+        version: 8 as const, 
+        glyphs: glyphs, 
+        sources: { 'nyc-tiles': vectorSource }, 
+        layers: [ { 
+          id: 'background', 
+          type: 'background', 
+          paint: { 'background-color': '#F5F5DC' }, 
+        }, ], 
       } as any;
-
-      const mapInstance = new maplibregl.Map({
-        container: mapContainerRef.current!,
-        style,
-        center: [-73.986104, 40.715245],
-        zoom: 12.77,
-        maxZoom: 18,
-        minZoom: 9,
-        renderWorldCopies: false,
-        attributionControl: false
+      
+      const mapInstance = new maplibregl.Map({ 
+        container: mapContainerRef.current!, 
+        style, 
+        center: [-73.986104, 40.715245], 
+        zoom: 12.77, 
+        maxZoom: 18, 
+        minZoom: 9, 
+        renderWorldCopies: false, 
+        attributionControl: false 
       } as any );
-
+      
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
 
       mapRef.current = mapInstance;
