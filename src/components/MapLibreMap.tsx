@@ -504,31 +504,34 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const initializeMap = async () => {
       if (!mapContainerRef.current || mapRef.current) return;
       
-      // Enhanced Capacitor setup with debugging
-      if (isCapacitor()) {
-        console.log('🔧 Setting up Capacitor tile handling');
+      // Helper function to detect Android native platform specifically
+      const isAndroidNative = (): boolean => {
+        return !!Capacitor?.isNativePlatform?.() && /Android/i.test(navigator.userAgent);
+      };
+
+      // Android-specific tile handling setup (does not affect web/iOS)
+      if (isAndroidNative()) {
+        console.log('🤖 Android native detected - setting up tile handling');
+        console.log('🤖 Origin:', window.location.origin);
+        console.log('🤖 Protocol:', window.location.protocol);
+        console.log('🤖 Capacitor available:', !!Capacitor);
         logCapacitorEnvironment();
         addTileDebugLogs();
         patchTileLoading();
         
         // Add a small delay to ensure patching is complete
         await new Promise(resolve => setTimeout(resolve, 200));
+        console.log('🤖 Android tile patching complete');
       }
-      
-      // Helper function to detect Android native platform specifically
-      const isAndroidNative = (): boolean => {
-        return !!Capacitor?.isNativePlatform?.() && /Android/i.test(navigator.userAgent);
-      };
 
-      // Default URLs work for web, iOS, and Android
-      // Android uses https://localhost, iOS uses capacitor://localhost, web uses normal origin
+      // Default URLs work for web and iOS
       let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
       let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
 
-      // Log the platform and URLs for debugging
+      // Log tile URLs for Android debugging
       if (isAndroidNative()) {
-        console.log('🤖 Android native detected - origin:', window.location.origin);
-        console.log('🗺️ Tiles URL:', tiles);
+        console.log('🗺️ Tiles URL template:', tiles);
+        console.log('🗺️ Glyphs URL template:', glyphs);
       }
       
       const vectorSource = { 
