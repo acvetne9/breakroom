@@ -515,20 +515,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         await new Promise(resolve => setTimeout(resolve, 200));
       }
       
-      // Helper function to detect Android native platform specifically
-      const isAndroidNative = (): boolean => {
-        return !!Capacitor?.isNativePlatform?.() && /Android/i.test(navigator.userAgent);
-      };
-
-      // Default URLs work for web, iOS, and Android
-      // Android uses https://localhost, iOS uses capacitor://localhost, web uses normal origin
+      const isAndroidNative = (): boolean =>
+        !!Capacitor.isNativePlatform && /Android/i.test(navigator.userAgent);
+      
       let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
       let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
-
-      // Log the platform and URLs for debugging
+      
       if (isAndroidNative()) {
-        console.log('🤖 Android native detected - origin:', window.location.origin);
-        console.log('🗺️ Tiles URL:', tiles);
+        // Capacitor Android uses https://localhost instead of normal origin
+        tiles = 'https://localhost/data/tiles/{z}/{x}/{y}.pbf';
+        glyphs = 'https://localhost/data/{fontstack}/{range}.pbf';
+        console.log('🤖 Android native tile URL:', tiles);
       }
       
       const vectorSource = { 
@@ -558,8 +555,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         maxZoom: 18, 
         minZoom: 9, 
         renderWorldCopies: false, 
-        attributionControl: false,
-        failIfMajorPerformanceCaveat: false
+        attributionControl: false 
       } as any );
       
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
@@ -583,11 +579,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       window.addEventListener('flyToBusiness', handleFlyToBusiness as EventListener);
 
       mapInstance.on('error', (e) => {
-        // Enhanced error logging for Android debugging
-        console.error('🗺️ Map error type:', e.type);
-        console.error('🗺️ Map error message:', e.error?.message || 'No message');
-        console.error('🗺️ Map error stack:', e.error?.stack || 'No stack');
-        console.error('🗺️ Full error object:', JSON.stringify(e, null, 2));
+        console.error('🗺️ Map error:', e.error || e);
         
         // Handle tile loading errors more gracefully in Capacitor
         if (isCapacitor() && e.error?.message?.includes('Unable to parse the tile')) {
