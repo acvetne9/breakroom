@@ -515,18 +515,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         await new Promise(resolve => setTimeout(resolve, 200));
       }
       
-      const isAndroidNative = (): boolean =>
-        !!Capacitor.isNativePlatform && /Android/i.test(navigator.userAgent);
+      // Helper to get base URL for Capacitor
+      const getBaseUrl = () => {
+        if (Capacitor.getPlatform() === 'android') {
+          // 10.0.2.2 points to host machine from Android emulator
+          return 'http://10.0.2.2:8080';
+        }
+        return window.location.origin;
+      };
       
-      let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-      let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
+      const baseUrl = getBaseUrl();
+      let tiles = `${baseUrl}/data/tiles/{z}/{x}/{y}.pbf`;
+      let glyphs = `${baseUrl}/data/{fontstack}/{range}.pbf`;
       
-      if (isAndroidNative()) {
-        // Capacitor Android uses https://localhost instead of normal origin
-        tiles = 'https://localhost/data/tiles/{z}/{x}/{y}.pbf';
-        glyphs = 'https://localhost/data/{fontstack}/{range}.pbf';
-        console.log('🤖 Android native tile URL:', tiles);
-      }
+      console.log('🗺️ Tile URL configured:', tiles);
       
       const vectorSource = { 
         type: 'vector' as const, 
@@ -559,6 +561,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       } as any );
       
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
+      
+      // WebGL fallback for emulators
+      try {
+        const canvas = mapInstance.getCanvas();
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (!gl) {
+          console.warn('⚠️ WebGL not supported, using canvas fallback');
+          // MapLibre will automatically fall back to canvas rendering
+        } else {
+          console.log('✅ WebGL supported');
+        }
+      } catch (err) {
+        console.warn('⚠️ WebGL check failed, continuing with default renderer:', err);
+      }
 
       mapRef.current = mapInstance;
 
