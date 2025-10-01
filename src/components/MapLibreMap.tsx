@@ -583,7 +583,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       window.addEventListener('flyToBusiness', handleFlyToBusiness as EventListener);
 
       mapInstance.on('error', (e) => {
-        console.error('🗺️ Map error:', e.error || e);
+        // Enhanced error logging for Android debugging
+        console.error('🗺️ Map error type:', e.type);
+        console.error('🗺️ Map error message:', e.error?.message || 'No message');
+        console.error('🗺️ Map error stack:', e.error?.stack || 'No stack');
+        console.error('🗺️ Full error object:', JSON.stringify(e, null, 2));
         
         // Handle tile loading errors more gracefully in Capacitor
         if (isCapacitor() && e.error?.message?.includes('Unable to parse the tile')) {
