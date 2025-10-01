@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/android": "^7.4.3",
     "@capacitor/cli": "^7.4.3",
     "@capacitor/core": "^7.4.3",
     "@googlemaps/js-api-loader": "^1.16.10",
@@ -51,7 +52,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
-    "date-fns": "^4.1.0",
+    "date-fns": "^3.6.0",
     "deck.gl": "^9.1.14",
     "embla-carousel-react": "^8.3.0",
     "framer-motion": "^12.23.6",

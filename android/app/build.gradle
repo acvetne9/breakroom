@@ -1,0 +1,51 @@
+// Apply necessary plugins
+plugins {
+    id 'com.android.application' // NOT 'com.android.library'
+    id 'org.jetbrains.kotlin.android'
+}
+
+// Android configuration
+android {
+    namespace "com.acvetne.breakroom"
+    compileSdk 35 // or 35 if your Gradle plugin supports it
+
+    defaultConfig {
+        applicationId 'com.acvetne.breakroom'
+        minSdkVersion 23
+        targetSdkVersion 35
+        versionCode 1
+        versionName "1.0"
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+        freeCompilerArgs += ["-Xjvm-default=all"]
+    }
+}
+
+dependencies {
+    implementation project(':capacitor-android')
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'com.google.android.material:material:1.12.0'
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.webkit:webkit:1.8.0'
+}
+
+// Optional: Google Services plugin if google-services.json exists
+def servicesJSON = file('google-services.json')
+if (servicesJSON.exists() && servicesJSON.text.trim()) {
+    apply plugin: 'com.google.gms.google-services'
+} else {
+    logger.info("google-services.json not found, Google services plugin not applied.")
+}
+
+// No need to include flatDir or external Maven for Capacitor 5
+
+// To suppress compileSdk warnings for newer SDKs
+// Add this to gradle.properties instead:
+// android.suppressUnsupportedCompileSdk=33
