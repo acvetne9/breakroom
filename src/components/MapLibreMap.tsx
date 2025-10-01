@@ -558,7 +558,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         maxZoom: 18, 
         minZoom: 9, 
         renderWorldCopies: false, 
-        attributionControl: false 
+        attributionControl: false,
         failIfMajorPerformanceCaveat: false
       } as any );
       
