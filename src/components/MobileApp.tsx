@@ -4,7 +4,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import InitiationPage from './InitiationPage';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 
 const HomePage = React.lazy(() => import('./HomePage'));
 const SettingsPage = React.lazy(() => import('./SettingsPage'));
@@ -39,7 +38,6 @@ interface Post {
 
 const MobileApp: React.FC = () => {
   const isMobile = useIsMobile();
-  const { user } = useAuth();
   const [currentView, setCurrentView] = useState<'initiation' | 'main'>('main'); // Default to main, will check on mount
   const [checkingJob, setCheckingJob] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
@@ -57,14 +55,16 @@ const MobileApp: React.FC = () => {
   // Check if user has a current job on mount
   useEffect(() => {
     const checkCurrentJob = async () => {
-      if (!user) {
-        // If no user, skip initiation
-        setCurrentView('main');
-        setCheckingJob(false);
-        return;
-      }
-
       try {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          // If no user, skip initiation
+          setCurrentView('main');
+          setCheckingJob(false);
+          return;
+        }
+
         const { data, error } = await supabase
           .from('current_jobs')
           .select('*')
@@ -90,7 +90,7 @@ const MobileApp: React.FC = () => {
     };
 
     checkCurrentJob();
-  }, [user]);
+  }, []);
 
   // Remove local posts state - now handled by backend
 
