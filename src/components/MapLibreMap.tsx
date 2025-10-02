@@ -514,19 +514,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         // Add a small delay to ensure patching is complete
         await new Promise(resolve => setTimeout(resolve, 200));
       }
-      
-      // Helper to get base URL for Capacitor
-      const getBaseUrl = () => {
-        if (Capacitor.getPlatform() === 'android') {
-          // 10.0.2.2 points to host machine from Android emulator
-          return 'http://10.0.2.2:8080';
-        }
-        return window.location.origin;
-      };
-      
-      const baseUrl = getBaseUrl();
-      let tiles = `${baseUrl}/data/tiles/{z}/{x}/{y}.pbf`;
-      let glyphs = `${baseUrl}/data/{fontstack}/{range}.pbf`;
+
+      let tiles = `./data/tiles/{z}/{x}/{y}.pbf`;
+      let glyphs = `./data/{fontstack}/{range}.pbf`;
       
       console.log('🗺️ Tile URL configured:', tiles);
       
