@@ -531,8 +531,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       //   }
       // }
 
-      const tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`,
-      const glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`,
+      const tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`
+      const glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`
       
       // const { tiles, glyphs } = getTileAndGlyphURLs();
       
