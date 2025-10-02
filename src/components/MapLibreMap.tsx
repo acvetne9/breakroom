@@ -514,25 +514,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         // Add a small delay to ensure patching is complete
         await new Promise(resolve => setTimeout(resolve, 200));
       }
-
-      function getTileAndGlyphURLs() {
-        const platform = Capacitor.getPlatform();
       
-        if (platform === "android" && !!window.cordova == false) {
-          // Android app build (not web browser pretending to be android)
+      function getTileAndGlyphURLs() {
+        if (Capacitor.getPlatform() === "android") {
+          // 👇 Map to android/app/src/main/assets/public/
           return {
-            tiles: "file:///android_asset/tiles/{z}/{x}/{y}.pbf",
-            glyphs: "file:///android_asset/fonts/{fontstack}/{range}.pbf",
+            tiles: "https://localhost/data/tiles/{z}/{x}/{y}.pbf",
+            glyphs: "https://localhost/data/fonts/{fontstack}/{range}.pbf",
+          };
+        } else {
+          // 👇 Web + iOS load from /public/data
+          return {
+            tiles: `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`,
+            glyphs: `${window.location.origin}/data/fonts/{fontstack}/{range}.pbf`,
           };
         }
-      
-        // Default → Web + iOS
-        return {
-          tiles: `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`,
-          glyphs: `${window.location.origin}/data/fonts/{fontstack}/{range}.pbf`,
-        };
       }
-
       
       const { tiles, glyphs } = getTileAndGlyphURLs();
       
