@@ -514,17 +514,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         // Add a small delay to ensure patching is complete
         await new Promise(resolve => setTimeout(resolve, 200));
       }
-
+      
       function getTileAndGlyphURLs() {
         if (Capacitor.getPlatform() === "android") {
+          // 👇 Map to android/app/src/main/assets/public/
           return {
-            tiles: "file:///android_asset/tiles/{z}/{x}/{y}.pbf",
-            glyphs: "file:///android_asset/fonts/{fontstack}/{range}.pbf",
+            tiles: "https://localhost/data/tiles/{z}/{x}/{y}.pbf",
+            glyphs: "https://localhost/data/fonts/{fontstack}/{range}.pbf",
           };
         } else {
+          // 👇 Web + iOS load from /public/data
           return {
             tiles: `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`,
-            glyphs: `${window.location.origin}/data/{fontstack}/{range}.pbf`,
+            glyphs: `${window.location.origin}/data/fonts/{fontstack}/{range}.pbf`,
           };
         }
       }
@@ -533,37 +535,37 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       
       console.log("🗺️ Tile URL configured:", tiles);
       
-      const vectorSource = { 
-        type: "vector" as const, 
-        tiles: [tiles], 
-        minzoom: 10, 
-        maxzoom: 16, 
-        scheme: "xyz" as const, 
+      const vectorSource = {
+        type: "vector" as const,
+        tiles: [tiles],
+        minzoom: 10,
+        maxzoom: 16,
+        scheme: "xyz" as const,
       };
       
-      const style = { 
-        version: 8 as const, 
-        glyphs: glyphs, 
-        sources: { "nyc-tiles": vectorSource }, 
-        layers: [ 
-          { 
-            id: "background", 
-            type: "background", 
-            paint: { "background-color": "#F5F5DC" }, 
-          }, 
-        ], 
-      };
+      const style = {
+        version: 8 as const,
+        glyphs: glyphs,
+        sources: { "nyc-tiles": vectorSource },
+        layers: [
+          {
+            id: "background",
+            type: "background",
+            paint: { "background-color": "#F5F5DC" },
+          },
+        ],
+      } as any;
       
-      const mapInstance = new maplibregl.Map({ 
-        container: mapContainerRef.current!, 
-        style, 
-        center: [-73.986104, 40.715245], 
-        zoom: 12.77, 
-        maxZoom: 18, 
-        minZoom: 9, 
-        renderWorldCopies: false, 
-        attributionControl: false, 
-      } as any);
+      const mapInstance = new maplibregl.Map({
+        container: mapContainerRef.current!,
+        style,
+        center: [-73.986104, 40.715245],
+        zoom: 12.77,
+        maxZoom: 18,
+        minZoom: 9,
+        renderWorldCopies: false,
+        attributionControl: false,
+      });
       
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
       
