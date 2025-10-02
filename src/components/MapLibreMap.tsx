@@ -516,20 +516,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
 
       function getTileAndGlyphURLs() {
-        const platform = Capacitor.getPlatform();    
-        if (platform === "android") {
+        const platform = Capacitor.getPlatform();
+      
+        if (platform === "android" && !!window.cordova == false) {
+          // Android app build (not web browser pretending to be android)
           return {
-            tiles: "/data/tiles/{z}/{x}/{y}.pbf",
-            glyphs: "/data/fonts/{fontstack}/{range}.pbf",
-          };
-        } else {
-          // Web uses absolute URLs
-          return {
-            tiles: `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`,
-            glyphs: `${window.location.origin}/data/fonts/{fontstack}/{range}.pbf`,
+            tiles: "data/tiles/{z}/{x}/{y}.pbf",
+            glyphs: "data/fonts/{fontstack}/{range}.pbf",
           };
         }
+      
+        // Default → Web + iOS
+        return {
+          tiles: `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`,
+          glyphs: `${window.location.origin}/data/fonts/{fontstack}/{range}.pbf`,
+        };
       }
+
       
       const { tiles, glyphs } = getTileAndGlyphURLs();
       
