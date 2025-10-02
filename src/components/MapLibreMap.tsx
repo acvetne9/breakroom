@@ -200,6 +200,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // Add loading state ref to prevent multiple calls
   const lastBoundsRef = useRef<string>('');
 
+  useEffect(() => {
+    const canvas = document.createElement("canvas");
+    const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    if (!gl) {
+      console.error("❌ WebGL is NOT supported in this WebView");
+    } else {
+      console.log("✅ WebGL is supported in this WebView");
+    }
+  }, []);
+
   const callbackRefs = useRef({ onBusinessClick, onMapLoaded, onBusinessesLoaded });
   useEffect(() => { callbackRefs.current = { onBusinessClick, onMapLoaded, onBusinessesLoaded }; }, [onBusinessClick, onMapLoaded, onBusinessesLoaded]);
 
@@ -517,20 +527,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       function getTileAndGlyphURLs() {
         if (Capacitor.getPlatform() === "android") {
-          // Android → tiles/fonts bundled in app/src/main/assets/public/data
           return {
-            tiles: "file:///android_asset/public/data/tiles/{z}/{x}/{y}.pbf",
-            glyphs: "file:///android_asset/public/data/fonts/{fontstack}/{range}.pbf",
+            tiles: `assets/tiles/{z}/{x}/{y}.pbf`,
+            glyphs: `assets/fonts/{fontstack}/{range}.pbf`,
           };
         } else {
-          // iOS + Web → use public folder from web build
           return {
             tiles: `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`,
-            glyphs: `${window.location.origin}/data/fonts/{fontstack}/{range}.pbf`,
+            glyphs: `${window.location.origin}/data/{fontstack}/{range}.pbf`,
           };
         }
       }
-
+      
       const { tiles, glyphs } = getTileAndGlyphURLs();
       
       console.log("🗺️ Tile URL configured:", tiles);
