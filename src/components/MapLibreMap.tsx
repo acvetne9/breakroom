@@ -504,6 +504,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const initializeMap = async () => {
       if (!mapContainerRef.current || mapRef.current) return;
       
+      // Wait for service worker to be ready (web only)
+      if (!isCapacitor() && (window as any).__serviceWorkerReady) {
+        console.log('🗺️ Waiting for service worker to be ready...');
+        await (window as any).__serviceWorkerReady;
+        console.log('🗺️ Service worker ready, initializing map');
+      }
+      
       // Enhanced Capacitor setup with debugging
       if (isCapacitor()) {
         console.log('🔧 Setting up Capacitor tile handling');
