@@ -514,16 +514,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         // Add a small delay to ensure patching is complete
         await new Promise(resolve => setTimeout(resolve, 200));
       }
-      
+
       function getTileAndGlyphURLs() {
-        if (Capacitor.getPlatform() === "android") {
-          // 👇 Map to android/app/src/main/assets/public/
+        const platform = Capacitor.getPlatform();    
+        if (platform === "android") {
           return {
-            tiles: "https://localhost/data/tiles/{z}/{x}/{y}.pbf",
-            glyphs: "https://localhost/data/fonts/{fontstack}/{range}.pbf",
+            tiles: "/data/tiles/{z}/{x}/{y}.pbf",
+            glyphs: "/data/fonts/{fontstack}/{range}.pbf",
           };
         } else {
-          // 👇 Web + iOS load from /public/data
+          // Web uses absolute URLs
           return {
             tiles: `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`,
             glyphs: `${window.location.origin}/data/fonts/{fontstack}/{range}.pbf`,
