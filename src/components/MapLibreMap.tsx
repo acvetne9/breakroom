@@ -519,8 +519,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         if (Capacitor.getPlatform() === "android") {
           // 👇 Map to android/app/src/main/assets/public/
           return {
-            tiles: "file:///android_asset/data/tiles/{z}/{x}/{y}.pbf",
-            glyphs: "file:///android_asset/data/fonts/{fontstack}/{range}.pbf",
+            tiles: "/data/tiles/{z}/{x}/{y}.pbf",
+            glyphs: "/data/fonts/{fontstack}/{range}.pbf",
           };
         } else {
           // 👇 Web + iOS load from /public/data
