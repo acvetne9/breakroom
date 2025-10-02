@@ -518,8 +518,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       function getTileAndGlyphURLs() {
         if (Capacitor.getPlatform() === "android") {
           return {
-            tiles: `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`,
-            glyphs: `${window.location.origin}/data/{fontstack}/{range}.pbf`,
+            tiles: `assets/tiles/{z}/{x}/{y}.pbf`,
+            glyphs: `assets/{fontstack}/{range}.pbf`,
           };
         } else {
           return {
