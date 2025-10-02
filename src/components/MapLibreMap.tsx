@@ -518,7 +518,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       function getTileAndGlyphURLs() {
         const platform = Capacitor.getPlatform();
       
-        if (platform === "android" && !!window.cordova == false) {
+        if (platform === "android") {
           // Android app build (not web browser pretending to be android)
           return {
             tiles: "data/tiles/{z}/{x}/{y}.pbf",
