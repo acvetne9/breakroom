@@ -518,40 +518,38 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       function getTileAndGlyphURLs() {
         if (Capacitor.getPlatform() === "android") {
           return {
-            tiles: "file:///android_asset/tiles/{z}/{x}/{y}.pbf",
-            glyphs: "file:///android_asset/fonts/{fontstack}/{range}.pbf",
+            tiles: "https://localhost/assets/tiles/{z}/{x}/{y}.pbf",
+            glyphs: "https://localhost/assets/fonts/{fontstack}/{range}.pbf",
           };
         } else {
           return {
             tiles: `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`,
-            glyphs: `${window.location.origin}/data/{fontstack}/{range}.pbf`,
+            glyphs: `${window.location.origin}/data/fonts/{fontstack}/{range}.pbf`,
           };
         }
       }
       
       const { tiles, glyphs } = getTileAndGlyphURLs();
       
-      console.log("🗺️ Tile URL configured:", tiles);
-      
-      const vectorSource = { 
-        type: "vector" as const, 
-        tiles: [tiles], 
-        minzoom: 10, 
-        maxzoom: 16, 
-        scheme: "xyz" as const, 
+      const vectorSource = {
+        type: "vector" as const,
+        tiles: [tiles],
+        minzoom: 10,
+        maxzoom: 16,
+        scheme: "xyz" as const,
       };
       
-      const style = { 
-        version: 8 as const, 
-        glyphs: glyphs, 
-        sources: { "nyc-tiles": vectorSource }, 
-        layers: [ 
-          { 
-            id: "background", 
-            type: "background", 
-            paint: { "background-color": "#F5F5DC" }, 
-          }, 
-        ], 
+      const style = {
+        version: 8 as const,
+        glyphs: glyphs,
+        sources: { "nyc-tiles": vectorSource },
+        layers: [
+          {
+            id: "background",
+            type: "background",
+            paint: { "background-color": "#F5F5DC" },
+          },
+        ],
       };
       
       const mapInstance = new maplibregl.Map({ 
