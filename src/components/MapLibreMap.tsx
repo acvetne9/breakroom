@@ -514,30 +514,47 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         // Add a small delay to ensure patching is complete
         await new Promise(resolve => setTimeout(resolve, 200));
       }
+
+      function getTileAndGlyphURLs() {
+        if (Capacitor.getPlatform() === "android") {
+          // Android → use bundled assets
+          return {
+            tiles: "asset://tiles/{z}/{x}/{y}.pbf",
+            glyphs: "asset://tiles/{fontstack}/{range}.pbf",
+          };
+        } else {
+          // Web + iOS → serve from /public/data
+          return {
+            tiles: `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`,
+            glyphs: `${window.location.origin}/data/{fontstack}/{range}.pbf`,
+          };
+        }
+      }
       
-      let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
-      let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
+      const { tiles, glyphs } = getTileAndGlyphURLs();
       
-      console.log('🗺️ Tile URL configured:', tiles);
+      console.log("🗺️ Tile URL configured:", tiles);
       
       const vectorSource = { 
-        type: 'vector' as const, 
+        type: "vector" as const, 
         tiles: [tiles], 
         minzoom: 10, 
         maxzoom: 16, 
-        scheme: 'xyz' as const, 
-      }; 
+        scheme: "xyz" as const, 
+      };
       
       const style = { 
         version: 8 as const, 
         glyphs: glyphs, 
-        sources: { 'nyc-tiles': vectorSource }, 
-        layers: [ { 
-          id: 'background', 
-          type: 'background', 
-          paint: { 'background-color': '#F5F5DC' }, 
-        }, ], 
-      } as any;
+        sources: { "nyc-tiles": vectorSource }, 
+        layers: [ 
+          { 
+            id: "background", 
+            type: "background", 
+            paint: { "background-color": "#F5F5DC" }, 
+          }, 
+        ], 
+      };
       
       const mapInstance = new maplibregl.Map({ 
         container: mapContainerRef.current!, 
@@ -547,8 +564,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         maxZoom: 18, 
         minZoom: 9, 
         renderWorldCopies: false, 
-        attributionControl: false 
-      } as any );
+        attributionControl: false, 
+      } as any);
       
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
       
