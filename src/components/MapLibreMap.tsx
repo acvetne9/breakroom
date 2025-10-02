@@ -514,9 +514,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         // Add a small delay to ensure patching is complete
         await new Promise(resolve => setTimeout(resolve, 200));
       }
-
-      let tiles = `./data/tiles/{z}/{x}/{y}.pbf`;
-      let glyphs = `./data/{fontstack}/{range}.pbf`;
+      
+      let tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+      let glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`;
       
       console.log('🗺️ Tile URL configured:', tiles);
       
