@@ -515,26 +515,21 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         await new Promise(resolve => setTimeout(resolve, 200));
       }
 
-      // function getTileAndGlyphURLs() {
-      //   if (Capacitor.getPlatform() === "android") {
-      //     // Android → use bundled assets
-      //     return {
-      //       tiles: "asset://tiles/{z}/{x}/{y}.pbf",
-      //       glyphs: "asset://tiles/{fontstack}/{range}.pbf",
-      //     };
-      //   } else {
-      //     // Web + iOS → serve from /public/data
-      //     return {
-      //       tiles: `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`,
-      //       glyphs: `${window.location.origin}/data/{fontstack}/{range}.pbf`,
-      //     };
-      //   }
-      // }
-
-      const tiles = `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`
-      const glyphs = `${window.location.origin}/data/{fontstack}/{range}.pbf`
+      function getTileAndGlyphURLs() {
+        if (Capacitor.getPlatform() === "android") {
+          return {
+            tiles: "file:///android_asset/tiles/{z}/{x}/{y}.pbf",
+            glyphs: "file:///android_asset/fonts/{fontstack}/{range}.pbf",
+          };
+        } else {
+          return {
+            tiles: `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`,
+            glyphs: `${window.location.origin}/data/{fontstack}/{range}.pbf`,
+          };
+        }
+      }
       
-      // const { tiles, glyphs } = getTileAndGlyphURLs();
+      const { tiles, glyphs } = getTileAndGlyphURLs();
       
       console.log("🗺️ Tile URL configured:", tiles);
       
