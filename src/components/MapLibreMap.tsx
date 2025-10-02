@@ -517,18 +517,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       function getTileAndGlyphURLs() {
         if (Capacitor.getPlatform() === "android") {
+          // Android → tiles/fonts bundled in app/src/main/assets/public/data
           return {
             tiles: "file:///android_asset/public/data/tiles/{z}/{x}/{y}.pbf",
             glyphs: "file:///android_asset/public/data/fonts/{fontstack}/{range}.pbf",
           };
         } else {
+          // iOS + Web → use public folder from web build
           return {
             tiles: `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`,
-            glyphs: `${window.location.origin}/data/{fontstack}/{range}.pbf`,
+            glyphs: `${window.location.origin}/data/fonts/{fontstack}/{range}.pbf`,
           };
         }
       }
-      
+
       const { tiles, glyphs } = getTileAndGlyphURLs();
       
       console.log("🗺️ Tile URL configured:", tiles);
