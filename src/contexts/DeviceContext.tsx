@@ -4,45 +4,35 @@ import { supabase } from "@/integrations/supabase/client";
 interface DeviceContextType {
   deviceId: string;
   loading: boolean;
-  skipInitiationThisSession: boolean;
-}
-
-const DeviceContext = createContext<DeviceContextType | undefined>(undefined);
-
-interface DeviceProviderProps {
-  children: ReactNode;
-}
-
-function generateDeviceId(): string {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  ctx?.fillText('device-fingerprint', 2, 2);
-  const canvasFingerprint = canvas.toDataURL();
-  
-  const screen = `${window.screen.width}x${window.screen.height}`;
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const language = navigator.language;
-  const userAgent = navigator.userAgent;
-  
-  const fingerprint = btoa(`${canvasFingerprint}-${screen}-${timezone}-${language}-${userAgent}`);
-  
-  return `device_${fingerprint.substring(0, 40)}`;
+  isFirstSession: boolean;
 }
 
 export function DeviceProvider({ children }: DeviceProviderProps) {
   const [deviceId, setDeviceId] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [skipInitiationThisSession, setSkipInitiationThisSession] = useState(false);
+  const [isFirstSession, setIsFirstSession] = useState(false);
 
   useEffect(() => {
     const initializeDevice = async () => {
       try {
-        const sessionKey = 'skip_initiation_this_session';
-        const shouldSkip = sessionStorage.getItem(sessionKey) === 'true';
+        // Use sessionStorage to detect if this is the same browser session
+        const currentSessionId = sessionStorage.getItem('current_session_id');
+        const profileCreatedInSession = localStorage.getItem('profile_created_in_session');
         
-        if (shouldSkip) {
-          console.log('Skipping initiation this session');
-          setSkipInitiationThisSession(true);
+        let thisSessionId = currentSessionId;
+        if (!thisSessionId) {
+          // New session - generate unique session ID
+          thisSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          sessionStorage.setItem('current_session_id', thisSessionId);
+        }
+        
+        // Check if profile was created in THIS session
+        if (profileCreatedInSession === thisSessionId) {
+          setIsFirstSession(true);
+          console.log('Profile was created in this session');
+        } else {
+          setIsFirstSession(false);
+          console.log('Profile was created in a different session (or not at all)');
         }
         
         let storedDeviceId = localStorage.getItem('device_id');
@@ -70,7 +60,7 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
           
           if (selectError) {
             console.error('Error checking profile:', selectError);
-          } else if (!profile && !shouldSkip) {
+          } else if (!profile) {
             const { error: insertError } = await supabase
               .from('profiles')
               .insert({
@@ -79,15 +69,12 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
                 is_authenticated: true
               });
             
-            if (insertError) {
-              if (insertError.code === '23505') {
-                console.log('Profile already exists (concurrent creation)');
-              } else {
-                console.error('Error creating profile:', insertError);
-              }
-            } else {
-              sessionStorage.setItem(sessionKey, 'true');
-              setSkipInitiationThisSession(true);
+            if (insertError && insertError.code !== '23505') {
+              console.error('Error creating profile:', insertError);
+            } else if (!insertError) {
+              // Store that profile was created in THIS session
+              localStorage.setItem('profile_created_in_session', thisSessionId);
+              setIsFirstSession(true);
               console.log('Created new profile for authenticated user');
             }
           } else if (profile) {
@@ -102,7 +89,7 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
           
           if (selectError) {
             console.error('Error checking temp profile:', selectError);
-          } else if (!profile && !shouldSkip) {
+          } else if (!profile) {
             const { error: insertError } = await supabase
               .from('profiles')
               .insert({
@@ -112,15 +99,12 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
                 is_authenticated: false
               });
             
-            if (insertError) {
-              if (insertError.code === '23505') {
-                console.log('Temp profile already exists (concurrent creation)');
-              } else {
-                console.error('Error creating temp profile:', insertError);
-              }
-            } else {
-              sessionStorage.setItem(sessionKey, 'true');
-              setSkipInitiationThisSession(true);
+            if (insertError && insertError.code !== '23505') {
+              console.error('Error creating temp profile:', insertError);
+            } else if (!insertError) {
+              // Store that profile was created in THIS session
+              localStorage.setItem('profile_created_in_session', thisSessionId);
+              setIsFirstSession(true);
               console.log('Created new profile for temp user');
             }
           } else if (profile) {
@@ -142,7 +126,7 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
   const value = {
     deviceId,
     loading,
-    skipInitiationThisSession,
+    isFirstSession,
   };
 
   return <DeviceContext.Provider value={value}>{children}</DeviceContext.Provider>;
