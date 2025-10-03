@@ -58,18 +58,32 @@ export const getUserProfile = async (): Promise<string> => {
       cachedProfileId = profile!.id;
       return profile!.id;
     } else {
-      // Unauthenticated user - use temp profile
-      let tempUserId = localStorage.getItem('tempUserId');
-      if (!tempUserId) {
-        tempUserId = crypto.randomUUID();
-        localStorage.setItem('tempUserId', tempUserId);
+      // Unauthenticated user - use device_id for consistency
+      let deviceId = localStorage.getItem('device_id');
+      if (!deviceId) {
+        // Generate device ID if not exists (same logic as DeviceContext)
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        ctx?.fillText('device-fingerprint', 2, 2);
+        const canvasFingerprint = canvas.toDataURL();
+        
+        const screen = `${window.screen.width}x${window.screen.height}`;
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const language = navigator.language;
+        const userAgent = navigator.userAgent;
+        
+        const fingerprint = btoa(`${canvasFingerprint}-${screen}-${timezone}-${language}-${userAgent}`);
+        const randomSuffix = Math.random().toString(36).substring(2, 15);
+        
+        deviceId = `device_${fingerprint.substring(0, 20)}_${randomSuffix}`;
+        localStorage.setItem('device_id', deviceId);
       }
       
-      // Find existing temp profile
+      // Find existing temp profile using device_id
       let { data: profile } = await supabase
         .from('profiles')
         .select('id')
-        .eq('temp_user_id', tempUserId)
+        .eq('temp_user_id', deviceId)
         .maybeSingle();
       
       if (!profile) {
@@ -78,7 +92,7 @@ export const getUserProfile = async (): Promise<string> => {
           .from('profiles')
           .insert({
             user_id: null,
-            temp_user_id: tempUserId,
+            temp_user_id: deviceId,
             display_name: 'Anonymous User',
             is_authenticated: false
           })
@@ -90,7 +104,7 @@ export const getUserProfile = async (): Promise<string> => {
           const { data: existingProfile } = await supabase
             .from('profiles')
             .select('id')
-            .eq('temp_user_id', tempUserId)
+            .eq('temp_user_id', deviceId)
             .single();
           profile = existingProfile;
         } else if (error) {
