@@ -27,8 +27,6 @@ interface MapLibreMapProps {
   neighborhoodCenter?: { lat: number; lon: number } | null;
   enableClustering?: boolean;
   isClusteredData?: boolean;
-  userProfile?: { id: string; current_job?: any } | null;
-  onShowInitiationCard?: () => void;
 }
 
 interface Bounds {
@@ -68,46 +66,7 @@ const featureToLatLon = (feature: Feature<Point> | { lat: number; lon: number })
   throw new Error('Invalid feature for conversion to lat/lon');
 };
 
-// Profile management functions
-const getDeviceId = (): string => {
-  let deviceId = sessionStorage.getItem('deviceId');
-  if (!deviceId) {
-    deviceId = `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    sessionStorage.setItem('deviceId', deviceId);
-  }
-  return deviceId;
-};
-
-const getProfile = (deviceId: string) => {
-  const profiles = sessionStorage.getItem('userProfiles');
-  if (!profiles) return null;
-  
-  try {
-    const profilesMap = JSON.parse(profiles);
-    return profilesMap[deviceId] || null;
-  } catch {
-    return null;
-  }
-};
-
-const createProfile = (deviceId: string) => {
-  const newProfile = {
-    id: `profile_${Date.now()}`,
-    deviceId,
-    createdAt: Date.now(),
-    current_job: null
-  };
-  
-  const profiles = sessionStorage.getItem('userProfiles');
-  const profilesMap = profiles ? JSON.parse(profiles) : {};
-  profilesMap[deviceId] = newProfile;
-  sessionStorage.setItem('userProfiles', JSON.stringify(profilesMap));
-  
-  // Mark that we just created a profile this session
-  sessionStorage.setItem('profileCreatedThisSession', 'true');
-  
-  return newProfile;
-};
+// Profile management is now handled by DeviceContext
 
 const createOptimizedGridSampling = (bounds: Bounds, businesses: Business[], maxBusinesses: number = 1000000, prioritizeVisible: boolean = false): Business[] => {
   if (!businesses || businesses.length <= maxBusinesses) return businesses;
@@ -226,9 +185,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   searchFilters,
   neighborhoodCenter,
   enableClustering = true,
-  isClusteredData = false,
-  userProfile,
-  onShowInitiationCard
+  isClusteredData = false
 }) => {
   const [mapLoaded, setMapLoaded] = useState(false);
   const [deckOverlay, setDeckOverlay] = useState<MapboxOverlay | null>(null);
@@ -240,36 +197,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const layersAddedRef = useRef(false);
   const lastBoundsRef = useRef<string>('');
 
-  // Handle profile logic on mount
-  useEffect(() => {
-    console.log('🔍 Profile useEffect running...');
-    const deviceId = getDeviceId();
-    console.log('🔍 Device ID:', deviceId);
-    let profile = getProfile(deviceId);
-    console.log('🔍 Existing profile:', profile);
-    
-    // Check if we just created a profile in this session
-    const justCreated = sessionStorage.getItem('profileCreatedThisSession') === 'true';
-    console.log('🔍 Profile created this session?', justCreated);
-    
-    if (!profile) {
-      // Create profile if it doesn't exist - DO NOT show initiation card
-      profile = createProfile(deviceId);
-      console.log('✅ Created new profile for device:', deviceId);
-    } else if (!justCreated) {
-      // Profile exists from a previous session (not just created)
-      // Check if user has a current_job
-      if (!profile.current_job) {
-        // Show initiation card
-        console.log('📋 Showing initiation card for existing profile without job');
-        onShowInitiationCard?.();
-      } else {
-        console.log('✅ Profile has current_job, not showing initiation card');
-      }
-    } else {
-      console.log('⏭️ Profile exists but was created this session, skipping initiation card');
-    }
-  }, [onShowInitiationCard]);
+  // Profile logic now handled by DeviceContext and MobileApp
 
   useEffect(() => {
     const canvas = document.createElement("canvas");

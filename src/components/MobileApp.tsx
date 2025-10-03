@@ -111,7 +111,7 @@ const MobileApp: React.FC = () => {
     };
     
     initializeApp();
-  }, []);
+  }, [profileWasCreated]);
 
   // Remove local posts state - now handled by backend
 
