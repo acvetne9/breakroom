@@ -38,6 +38,7 @@ interface Post {
 }
 
 const MobileApp: React.FC = () => {
+  console.log('🚀 MobileApp component rendering');
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const [currentView, setCurrentView] = useState<'initiation' | 'main'>('initiation');
@@ -55,15 +56,19 @@ const MobileApp: React.FC = () => {
   
   // Sequential flow: 1) Ensure profile exists, 2) Check current job, 3) Show initiation if needed
   useEffect(() => {
+    console.log('🎬 useEffect for initialization starting');
+    
     const initializeApp = async () => {
+      console.log('🔧 initializeApp function called');
       try {
         console.log('Step 1: Ensuring profile exists for device...');
         
         // Step 1: Get or create profile for this device
         const { getUserProfile } = await import('../services/posts');
-        const profileId = await getUserProfile();
+        console.log('✅ getUserProfile imported');
         
-        console.log('Profile confirmed:', profileId);
+        const profileId = await getUserProfile();
+        console.log('✅ Profile confirmed:', profileId);
         
         // Step 2: Check if profile has a current job
         console.log('Step 2: Checking for current job...');
@@ -81,7 +86,7 @@ const MobileApp: React.FC = () => {
           setCurrentView('initiation');
         }
       } catch (error) {
-        console.error('Error during app initialization:', error);
+        console.error('❌ Error during app initialization:', error);
         // On error, show main view to avoid blocking user
         setCurrentView('main');
       }
