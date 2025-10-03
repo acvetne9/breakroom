@@ -84,18 +84,29 @@ const MobileApp: React.FC = () => {
         }
         
         // Step 3: Profile already existed - check for current job
-        const { hasCurrentJob } = await import('../services/currentJobs');
+        const { hasCurrentJob, getCurrentJob } = await import('../services/currentJobs');
         const hasJob = await hasCurrentJob();
         
         console.log('💼 Current job check:', hasJob);
         
-        // Step 4: Show initiation only if no job exists
-        if (!hasJob) {
-          console.log('📝 No job found - showing initiation');
-          setCurrentView('initiation');
-        } else {
+        // Step 4: Load current job data if it exists
+        if (hasJob) {
+          const currentJob = await getCurrentJob();
+          if (currentJob) {
+            setUserData({
+              salary: `$${currentJob.salary}`,
+              role: currentJob.role,
+              location: currentJob.location,
+              fullLocation: currentJob.location,
+              timePeriod: currentJob.time_period || 'HR'
+            });
+            console.log('📊 Loaded user data:', currentJob);
+          }
           console.log('✅ Job found - going to main view');
           setCurrentView('main');
+        } else {
+          console.log('📝 No job found - showing initiation');
+          setCurrentView('initiation');
         }
       } catch (error) {
         console.error('❌ Error during app initialization:', error);

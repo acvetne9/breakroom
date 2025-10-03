@@ -34,6 +34,31 @@ export const hasCurrentJob = async (): Promise<boolean> => {
 };
 
 /**
+ * Get the current job for the current user
+ */
+export const getCurrentJob = async (): Promise<CurrentJobData | null> => {
+  try {
+    const { profileId } = await getUserProfile();
+    
+    const { data, error } = await supabase
+      .from('current_jobs')
+      .select('role, salary, location, time_period')
+      .eq('profile_id', profileId)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('Error fetching current job:', error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error in getCurrentJob:', error);
+    return null;
+  }
+};
+
+/**
  * Create or update the current job for the current user
  */
 export const saveCurrentJob = async (jobData: CurrentJobData): Promise<void> => {
