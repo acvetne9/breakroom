@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 interface DeviceContextType {
   deviceId: string;
   loading: boolean;
+  profileWasCreated: boolean;
 }
 
 const DeviceContext = createContext<DeviceContextType | undefined>(undefined);
@@ -34,6 +35,7 @@ function generateDeviceId(): string {
 export function DeviceProvider({ children }: DeviceProviderProps) {
   const [deviceId, setDeviceId] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [profileWasCreated, setProfileWasCreated] = useState(false);
 
   useEffect(() => {
     const initializeDevice = async () => {
@@ -73,6 +75,8 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
               display_name: user.email?.split('@')[0] || 'User',
               is_authenticated: true
             });
+          setProfileWasCreated(true);
+          console.log('✨ Created new profile for authenticated user');
         }
       } else {
         // Temp user - ensure profile exists
@@ -91,6 +95,8 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
               display_name: 'Anonymous User',
               is_authenticated: false
             });
+          setProfileWasCreated(true);
+          console.log('✨ Created new profile for temp user');
         }
       }
       
@@ -104,6 +110,7 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
   const value = {
     deviceId,
     loading,
+    profileWasCreated,
   };
 
   return <DeviceContext.Provider value={value}>{children}</DeviceContext.Provider>;

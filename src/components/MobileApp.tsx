@@ -5,6 +5,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import InitiationPage from './InitiationPage';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDevice } from '@/contexts/DeviceContext';
 
 const HomePage = React.lazy(() => import('./HomePage'));
 const SettingsPage = React.lazy(() => import('./SettingsPage'));
@@ -41,6 +42,7 @@ const MobileApp: React.FC = () => {
   console.log('🚀 MobileApp component rendering');
   const isMobile = useIsMobile();
   const { user } = useAuth();
+  const { profileWasCreated } = useDevice();
   const [currentView, setCurrentView] = useState<'initiation' | 'main'>('main');
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -70,26 +72,20 @@ const MobileApp: React.FC = () => {
     
     const initializeApp = async () => {
       try {
-        // Step 1: Get or create profile
-        const { getUserProfile } = await import('../services/posts');
-        const { profileId, wasCreated } = await getUserProfile();
-        
-        console.log('📋 Profile check complete:', { profileId, wasCreated });
-        
-        // Step 2: If profile was just created, don't show initiation
-        if (wasCreated) {
-          console.log('✨ New profile created - going to main view');
+        // Step 1: If profile was just created on this load, don't show initiation
+        if (profileWasCreated) {
+          console.log('✨ Profile was just created - going to main view');
           setCurrentView('main');
           return;
         }
         
-        // Step 3: Profile already existed - check for current job
+        // Step 2: Check for current job
         const { hasCurrentJob, getCurrentJob } = await import('../services/currentJobs');
         const hasJob = await hasCurrentJob();
         
         console.log('💼 Current job check:', hasJob);
         
-        // Step 4: Load current job data if it exists
+        // Step 3: Load current job data if it exists
         if (hasJob) {
           const currentJob = await getCurrentJob();
           if (currentJob) {
