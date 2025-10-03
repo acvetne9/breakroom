@@ -526,15 +526,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
 
       function getTileAndGlyphURLs() {
-        if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android") {
-          let platform = Capacitor.isNativePlatform()
-          console.log("Caught on web: ")
+        console.log("getTileAndGlyphURLs called, platform =", Capacitor.getPlatform());
+        if (Capacitor.getPlatform() === "android") {
+          console.log("Android branch taken");
           return {
             tiles: "file:///android_asset/public/data/tiles/{z}/{x}/{y}.pbf",
             glyphs: "file:///android_asset/public/data/fonts/{fontstack}/{range}.pbf",
           };
         } else {
-          // iOS + Web → use public folder from web build
+          console.log("Web/iOS branch taken");
           return {
             tiles: `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`,
             glyphs: `${window.location.origin}/data/fonts/{fontstack}/{range}.pbf`,
