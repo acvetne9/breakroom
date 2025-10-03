@@ -12,6 +12,7 @@ const ExplorePage = React.lazy(() => import('./ExplorePage'));
 
 import { useBusinessesData } from '../hooks/useBusinessesData';
 import { handleRoleVote as handleRoleVoteService } from '@/services/roleVoting';
+import { useProfileInit } from '@/hooks/useProfileInit';
 
 interface UserData {
   salary: string;
@@ -52,18 +53,15 @@ const MobileApp: React.FC = () => {
   
   const constraintsRef = useRef(null);
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
+  
+  // Initialize profile immediately on app mount
+  useProfileInit();
 
-  // Create profile on first visit and check if current job exists
+  // Check if current job exists and show initiation card if needed
   useEffect(() => {
     const checkInitiationStatus = async () => {
       try {
-        // Import getUserProfile to ensure profile is created on first visit
-        const { getUserProfile } = await import('../services/posts');
-        
-        // This will create the profile if it doesn't exist
-        await getUserProfile();
-        
-        // Now check if they have a current job
+        // Check if they have a current job
         const { hasCurrentJob } = await import('../services/currentJobs');
         const hasJob = await hasCurrentJob();
         
@@ -72,7 +70,7 @@ const MobileApp: React.FC = () => {
         if (hasJob) {
           setCurrentView('main');
         } else {
-          // Profile exists but no job - show initiation
+          // No job - show initiation card
           setCurrentView('initiation');
         }
       } catch (error) {
@@ -82,7 +80,8 @@ const MobileApp: React.FC = () => {
       }
     };
 
-    checkInitiationStatus();
+    // Small delay to ensure profile init completes first
+    setTimeout(checkInitiationStatus, 100);
   }, []);
 
   // Remove local posts state - now handled by backend
