@@ -4,24 +4,43 @@ import { supabase } from "@/integrations/supabase/client";
 let cachedProfileId: string | null = null;
 let profilePromise: Promise<{ profileId: string; wasCreated: boolean }> | null = null;
 
+// Global flag to ensure single initialization across the app
+let isInitializing = false;
+
 // Get or create user profile in profiles table
 export const getUserProfile = async (): Promise<{ profileId: string; wasCreated: boolean }> => {
+  console.log('🔐 getUserProfile called - cached:', !!cachedProfileId, 'promise:', !!profilePromise, 'initializing:', isInitializing);
+  
   // Return cached profile if available (always wasCreated: false for cached)
   if (cachedProfileId) {
+    console.log('✅ Returning cached profile:', cachedProfileId);
     return { profileId: cachedProfileId, wasCreated: false };
   }
   
   // Return existing promise if one is in progress
   if (profilePromise) {
+    console.log('⏳ Returning existing profile promise');
     return profilePromise;
   }
   
+  // Check global initialization flag
+  if (isInitializing) {
+    console.log('⚠️ Another initialization in progress, waiting...');
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return getUserProfile(); // Retry
+  }
+  
+  // Set flag to prevent concurrent initializations
+  isInitializing = true;
+  
   // Create new promise for profile creation
   profilePromise = (async () => {
+    console.log('🚀 Starting profile creation/fetch');
     const { data: { user } } = await supabase.auth.getUser();
     let wasCreated = false;
     
     if (user) {
+      console.log('👤 Authenticated user detected:', user.id);
       // Authenticated user - find or create their profile
       let { data: profile } = await supabase
         .from('profiles')
@@ -30,6 +49,7 @@ export const getUserProfile = async (): Promise<{ profileId: string; wasCreated:
         .maybeSingle();
       
       if (!profile) {
+        console.log('📝 Creating new authenticated profile');
         wasCreated = true;
         // Try to create profile, handle conflicts gracefully
         const { data: newProfile, error } = await supabase
@@ -43,6 +63,7 @@ export const getUserProfile = async (): Promise<{ profileId: string; wasCreated:
           .single();
         
         if (error && error.code === '23505') {
+          console.log('🔄 Profile conflict detected, fetching existing');
           // Profile already exists due to race condition, fetch it
           const { data: existingProfile } = await supabase
             .from('profiles')
@@ -50,19 +71,26 @@ export const getUserProfile = async (): Promise<{ profileId: string; wasCreated:
             .eq('user_id', user.id)
             .single();
           profile = existingProfile;
+          wasCreated = false; // Not created by this call
         } else if (error) {
           throw error;
         } else {
           profile = newProfile;
         }
+      } else {
+        console.log('✅ Found existing authenticated profile:', profile.id);
       }
       
+      // Set cache IMMEDIATELY to prevent race conditions
       cachedProfileId = profile!.id;
+      console.log('💾 Cached profile ID:', cachedProfileId);
       return { profileId: profile!.id, wasCreated };
     } else {
+      console.log('👻 Unauthenticated user - using device ID');
       // Unauthenticated user - use device_id for consistency
       let deviceId = localStorage.getItem('device_id');
       if (!deviceId) {
+        console.log('🆔 Generating new device ID');
         // Generate device ID if not exists (same logic as DeviceContext)
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
@@ -79,6 +107,9 @@ export const getUserProfile = async (): Promise<{ profileId: string; wasCreated:
         
         deviceId = `device_${fingerprint.substring(0, 20)}_${randomSuffix}`;
         localStorage.setItem('device_id', deviceId);
+        console.log('🆔 Created device ID:', deviceId);
+      } else {
+        console.log('🆔 Using existing device ID:', deviceId);
       }
       
       // Find existing temp profile using device_id
@@ -89,6 +120,7 @@ export const getUserProfile = async (): Promise<{ profileId: string; wasCreated:
         .maybeSingle();
       
       if (!profile) {
+        console.log('📝 Creating new temp profile');
         wasCreated = true;
         // Try to create profile, handle conflicts gracefully
         const { data: newProfile, error } = await supabase
@@ -103,6 +135,7 @@ export const getUserProfile = async (): Promise<{ profileId: string; wasCreated:
           .single();
         
         if (error && error.code === '23505') {
+          console.log('🔄 Temp profile conflict detected, fetching existing');
           // Profile already exists due to race condition, fetch it
           const { data: existingProfile } = await supabase
             .from('profiles')
@@ -110,14 +143,19 @@ export const getUserProfile = async (): Promise<{ profileId: string; wasCreated:
             .eq('temp_user_id', deviceId)
             .single();
           profile = existingProfile;
+          wasCreated = false; // Not created by this call
         } else if (error) {
           throw error;
         } else {
           profile = newProfile;
         }
+      } else {
+        console.log('✅ Found existing temp profile:', profile.id);
       }
       
+      // Set cache IMMEDIATELY to prevent race conditions
       cachedProfileId = profile!.id;
+      console.log('💾 Cached profile ID:', cachedProfileId);
       return { profileId: profile!.id, wasCreated };
     }
   })();
@@ -125,9 +163,14 @@ export const getUserProfile = async (): Promise<{ profileId: string; wasCreated:
   try {
     const result = await profilePromise;
     profilePromise = null; // Clear promise after completion
+    isInitializing = false; // Clear flag
+    console.log('✅ getUserProfile completed:', result);
     return result;
   } catch (error) {
     profilePromise = null; // Clear promise on error
+    isInitializing = false; // Clear flag on error
+    cachedProfileId = null; // Clear cache on error
+    console.error('❌ getUserProfile failed:', error);
     throw error;
   }
 };

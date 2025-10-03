@@ -54,16 +54,31 @@ const MobileApp: React.FC = () => {
   const constraintsRef = useRef(null);
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
   
+  // Ref to prevent double initialization in React 18 StrictMode
+  const hasInitialized = useRef(false);
+  
   // On page load: create profile if needed, or show initiation if profile exists without job
   useEffect(() => {
+    // Prevent double initialization in StrictMode
+    if (hasInitialized.current) {
+      console.log('⏭️ Skipping duplicate initialization (StrictMode)');
+      return;
+    }
+    
+    hasInitialized.current = true;
+    console.log('🎬 MobileApp initialization starting');
+    
     const initializeApp = async () => {
       try {
         // Step 1: Get or create profile
         const { getUserProfile } = await import('../services/posts');
         const { profileId, wasCreated } = await getUserProfile();
         
+        console.log('📋 Profile check complete:', { profileId, wasCreated });
+        
         // Step 2: If profile was just created, don't show initiation
         if (wasCreated) {
+          console.log('✨ New profile created - going to main view');
           setCurrentView('main');
           return;
         }
@@ -72,14 +87,18 @@ const MobileApp: React.FC = () => {
         const { hasCurrentJob } = await import('../services/currentJobs');
         const hasJob = await hasCurrentJob();
         
+        console.log('💼 Current job check:', hasJob);
+        
         // Step 4: Show initiation only if no job exists
         if (!hasJob) {
+          console.log('📝 No job found - showing initiation');
           setCurrentView('initiation');
         } else {
+          console.log('✅ Job found - going to main view');
           setCurrentView('main');
         }
       } catch (error) {
-        console.error('Error during app initialization:', error);
+        console.error('❌ Error during app initialization:', error);
         setCurrentView('main');
       }
     };
