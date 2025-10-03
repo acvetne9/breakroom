@@ -3,6 +3,8 @@ import { motion, PanInfo } from 'framer-motion';
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import InitiationPage from './InitiationPage';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 const HomePage = React.lazy(() => import('./HomePage'));
 const SettingsPage = React.lazy(() => import('./SettingsPage'));
@@ -37,6 +39,7 @@ interface Post {
 
 const MobileApp: React.FC = () => {
   const isMobile = useIsMobile();
+  const { user } = useAuth();
   const [currentView, setCurrentView] = useState<'initiation' | 'main'>('initiation');
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -49,6 +52,42 @@ const MobileApp: React.FC = () => {
   
   const constraintsRef = useRef(null);
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
+
+  // Check if user has a current job
+  useEffect(() => {
+    const checkCurrentJob = async () => {
+      if (!user) {
+        // If not authenticated, check after a brief delay to allow for auth setup
+        setTimeout(() => {
+          if (!user) setCurrentView('initiation');
+        }, 500);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('current_jobs')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        // If user has a current job, skip initiation
+        if (data) {
+          setCurrentView('main');
+        } else {
+          setCurrentView('initiation');
+        }
+      } catch (error) {
+        console.error('Error checking current job:', error);
+        // On error, show initiation to be safe
+        setCurrentView('initiation');
+      }
+    };
+
+    checkCurrentJob();
+  }, [user]);
 
   // Remove local posts state - now handled by backend
 
