@@ -200,15 +200,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // Add loading state ref to prevent multiple calls
   const lastBoundsRef = useRef<string>('');
 
-  useEffect(() => {
-    const canvas = document.createElement("canvas");
-    const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
-    if (!gl) {
-      console.error("❌ WebGL is NOT supported in this WebView");
-    } else {
-      console.log("✅ WebGL is supported in this WebView");
-    }
-  }, []);
+  // useEffect(() => {
+  //   const canvas = document.createElement("canvas");
+  //   const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+  //   if (!gl) {
+  //     console.error("❌ WebGL is NOT supported in this WebView");
+  //   } else {
+  //     console.log("✅ WebGL is supported in this WebView");
+  //   }
+  // }, []);
 
   const callbackRefs = useRef({ onBusinessClick, onMapLoaded, onBusinessesLoaded });
   useEffect(() => { callbackRefs.current = { onBusinessClick, onMapLoaded, onBusinessesLoaded }; }, [onBusinessClick, onMapLoaded, onBusinessesLoaded]);
