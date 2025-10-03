@@ -7,6 +7,28 @@ interface DeviceContextType {
   isFirstSession: boolean;
 }
 
+const DeviceContext = createContext<DeviceContextType | undefined>(undefined);
+
+interface DeviceProviderProps {
+  children: ReactNode;
+}
+
+function generateDeviceId(): string {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  ctx?.fillText('device-fingerprint', 2, 2);
+  const canvasFingerprint = canvas.toDataURL();
+  
+  const screen = `${window.screen.width}x${window.screen.height}`;
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const language = navigator.language;
+  const userAgent = navigator.userAgent;
+  
+  const fingerprint = btoa(`${canvasFingerprint}-${screen}-${timezone}-${language}-${userAgent}`);
+  
+  return `device_${fingerprint.substring(0, 40)}`;
+}
+
 export function DeviceProvider({ children }: DeviceProviderProps) {
   const [deviceId, setDeviceId] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -15,18 +37,15 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
   useEffect(() => {
     const initializeDevice = async () => {
       try {
-        // Use sessionStorage to detect if this is the same browser session
         const currentSessionId = sessionStorage.getItem('current_session_id');
         const profileCreatedInSession = localStorage.getItem('profile_created_in_session');
         
         let thisSessionId = currentSessionId;
         if (!thisSessionId) {
-          // New session - generate unique session ID
           thisSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
           sessionStorage.setItem('current_session_id', thisSessionId);
         }
         
-        // Check if profile was created in THIS session
         if (profileCreatedInSession === thisSessionId) {
           setIsFirstSession(true);
           console.log('Profile was created in this session');
@@ -72,7 +91,6 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
             if (insertError && insertError.code !== '23505') {
               console.error('Error creating profile:', insertError);
             } else if (!insertError) {
-              // Store that profile was created in THIS session
               localStorage.setItem('profile_created_in_session', thisSessionId);
               setIsFirstSession(true);
               console.log('Created new profile for authenticated user');
@@ -102,7 +120,6 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
             if (insertError && insertError.code !== '23505') {
               console.error('Error creating temp profile:', insertError);
             } else if (!insertError) {
-              // Store that profile was created in THIS session
               localStorage.setItem('profile_created_in_session', thisSessionId);
               setIsFirstSession(true);
               console.log('Created new profile for temp user');
