@@ -3,7 +3,6 @@ import { motion, PanInfo } from 'framer-motion';
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import InitiationPage from './InitiationPage';
-import { supabase } from '@/integrations/supabase/client';
 
 const HomePage = React.lazy(() => import('./HomePage'));
 const SettingsPage = React.lazy(() => import('./SettingsPage'));
@@ -38,8 +37,7 @@ interface Post {
 
 const MobileApp: React.FC = () => {
   const isMobile = useIsMobile();
-  const [currentView, setCurrentView] = useState<'initiation' | 'main'>('main'); // Default to main, will check on mount
-  const [checkingJob, setCheckingJob] = useState(true);
+  const [currentView, setCurrentView] = useState<'initiation' | 'main'>('initiation');
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
   const [userData, setUserData] = useState<UserData | null>(null);
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
@@ -51,46 +49,6 @@ const MobileApp: React.FC = () => {
   
   const constraintsRef = useRef(null);
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
-
-  // Check if user has a current job on mount
-  useEffect(() => {
-    const checkCurrentJob = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
-          // If no user, skip initiation
-          setCurrentView('main');
-          setCheckingJob(false);
-          return;
-        }
-
-        const { data, error } = await supabase
-          .from('current_jobs')
-          .select('*')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (error) {
-          console.error('Error checking current job:', error);
-          setCurrentView('main');
-        } else if (data) {
-          // User has a current job, skip initiation
-          setCurrentView('main');
-        } else {
-          // User has no current job, show initiation
-          setCurrentView('initiation');
-        }
-      } catch (err) {
-        console.error('Error checking current job:', err);
-        setCurrentView('main');
-      } finally {
-        setCheckingJob(false);
-      }
-    };
-
-    checkCurrentJob();
-  }, []);
 
   // Remove local posts state - now handled by backend
 
@@ -397,15 +355,6 @@ const MobileApp: React.FC = () => {
       }
     }
   };
-
-  // Show loading while checking job
-  if (checkingJob) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center">
-        <Skeleton className="w-full h-full" />
-      </div>
-    );
-  }
 
   return (
     <div className="fixed inset-0 overflow-hidden">
