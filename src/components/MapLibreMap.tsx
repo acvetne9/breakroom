@@ -95,14 +95,16 @@ const createProfile = (deviceId: string) => {
     id: `profile_${Date.now()}`,
     deviceId,
     createdAt: Date.now(),
-    current_job: null,
-    createdThisSession: true
+    current_job: null
   };
   
   const profiles = sessionStorage.getItem('userProfiles');
   const profilesMap = profiles ? JSON.parse(profiles) : {};
   profilesMap[deviceId] = newProfile;
   sessionStorage.setItem('userProfiles', JSON.stringify(profilesMap));
+  
+  // Mark that we just created a profile this session
+  sessionStorage.setItem('profileCreatedThisSession', 'true');
   
   return newProfile;
 };
@@ -243,26 +245,20 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const deviceId = getDeviceId();
     let profile = getProfile(deviceId);
     
+    // Check if we just created a profile in this session
+    const justCreated = sessionStorage.getItem('profileCreatedThisSession') === 'true';
+    
     if (!profile) {
       // Create profile if it doesn't exist - DO NOT show initiation card
       profile = createProfile(deviceId);
       console.log('✅ Created new profile for device:', deviceId);
-    } else {
-      // Profile exists from a previous session
-      if (!profile.createdThisSession) {
-        // Check if user has a current_job
-        if (!profile.current_job) {
-          // Show initiation card
-          onShowInitiationCard?.();
-          console.log('📋 Showing initiation card for existing profile without job');
-        }
-      } else {
-        // Profile was created in a previous load (has createdThisSession flag from before)
-        // Now mark it as not created this session for future loads
-        profile.createdThisSession = false;
-        const profiles = JSON.parse(sessionStorage.getItem('userProfiles') || '{}');
-        profiles[deviceId] = profile;
-        sessionStorage.setItem('userProfiles', JSON.stringify(profiles));
+    } else if (!justCreated) {
+      // Profile exists from a previous session (not just created)
+      // Check if user has a current_job
+      if (!profile.current_job) {
+        // Show initiation card
+        onShowInitiationCard?.();
+        console.log('📋 Showing initiation card for existing profile without job');
       }
     }
   }, [onShowInitiationCard]);
