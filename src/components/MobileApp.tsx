@@ -41,7 +41,7 @@ const MobileApp: React.FC = () => {
   console.log('🚀 MobileApp component rendering');
   const isMobile = useIsMobile();
   const { user } = useAuth();
-  const [currentView, setCurrentView] = useState<'initiation' | 'main'>('initiation');
+  const [currentView, setCurrentView] = useState<'initiation' | 'main'>('main');
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
   const [userData, setUserData] = useState<UserData | null>(null);
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
@@ -54,41 +54,25 @@ const MobileApp: React.FC = () => {
   const constraintsRef = useRef(null);
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
   
-  // Sequential flow: 1) Ensure profile exists, 2) Check current job, 3) Show initiation if needed
+  // Check once on mount: if profile exists but no current job, show initiation once
   useEffect(() => {
-    console.log('🎬 useEffect for initialization starting');
-    
     const initializeApp = async () => {
-      console.log('🔧 initializeApp function called');
       try {
-        console.log('Step 1: Ensuring profile exists for device...');
-        
-        // Step 1: Get or create profile for this device
+        // Step 1: Ensure profile exists for this device
         const { getUserProfile } = await import('../services/posts');
-        console.log('✅ getUserProfile imported');
-        
         const profileId = await getUserProfile();
-        console.log('✅ Profile confirmed:', profileId);
         
-        // Step 2: Check if profile has a current job
-        console.log('Step 2: Checking for current job...');
+        // Step 2: Check if current job exists
         const { hasCurrentJob } = await import('../services/currentJobs');
         const hasJob = await hasCurrentJob();
         
-        console.log('Has current job:', hasJob);
-        
-        // Step 3: Determine view based on current job existence
-        if (hasJob) {
-          console.log('Step 3: Current job exists - showing main view');
-          setCurrentView('main');
-        } else {
-          console.log('Step 3: No current job - showing initiation card');
+        // Step 3: Only show initiation if profile exists but no current job
+        // Once user completes initiation (creates current_jobs entry), they'll never see it again
+        if (!hasJob) {
           setCurrentView('initiation');
         }
       } catch (error) {
-        console.error('❌ Error during app initialization:', error);
-        // On error, show main view to avoid blocking user
-        setCurrentView('main');
+        console.error('Error during app initialization:', error);
       }
     };
 
