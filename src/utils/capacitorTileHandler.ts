@@ -6,9 +6,20 @@ let isPatched = false;
 
 /**
  * Patch fetch to handle tile decompression in Capacitor environments
+ * ONLY runs on Capacitor/Android - web uses service worker instead
  */
 export function patchTileLoading() {
-  const originalFetch = window.fetch;
+  // CRITICAL: Only patch fetch on Capacitor, not on web
+  if (!isCapacitor()) {
+    console.log('🌐 Running on web - skipping fetch patch, using service worker instead');
+    isPatched = false;
+    return;
+  }
+
+  console.log('📱 Running on Capacitor - patching fetch for tile decompression');
+  originalFetch = window.fetch;
+  isPatched = true;
+  
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
 

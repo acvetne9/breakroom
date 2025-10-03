@@ -514,15 +514,30 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const initializeMap = async () => {
       if (!mapContainerRef.current || mapRef.current) return;
       
-      // Enhanced Capacitor setup with debugging
+      // Platform-specific tile handling setup
       if (isCapacitor()) {
-        console.log('🔧 Setting up Capacitor tile handling');
+        // Capacitor: Use fetch patching for tile decompression
+        console.log('📱 Capacitor detected - setting up fetch patch');
         logCapacitorEnvironment();
         addTileDebugLogs();
         patchTileLoading();
-        
-        // Add a small delay to ensure patching is complete
         await new Promise(resolve => setTimeout(resolve, 200));
+      } else {
+        // Web: Wait for service worker to be ready
+        console.log('🌐 Web detected - waiting for service worker...');
+        let attempts = 0;
+        const maxAttempts = 50; // 5 seconds max wait
+        
+        while (!(window as any).__SW_READY__ && attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
+        }
+        
+        if ((window as any).__SW_READY__) {
+          console.log('✅ Service worker ready - initializing map');
+        } else {
+          console.log('⚠️ Service worker not ready after 5s - proceeding anyway');
+        }
       }
 
       function getTileAndGlyphURLs() {
