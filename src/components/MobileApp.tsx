@@ -53,37 +53,67 @@ const MobileApp: React.FC = () => {
   const constraintsRef = useRef(null);
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
 
-  // Check if user has a current job - show initiation only on second load
+  // Check if user profile exists and has a current job
   useEffect(() => {
-    const checkCurrentJob = async () => {
+    const checkInitiationStatus = async () => {
       try {
-        // Check if this is the first load
-        const hasLoadedBefore = localStorage.getItem('has_loaded_before');
+        // First, check if profile already exists in database (before it gets auto-created)
+        const { data: { user } } = await supabase.auth.getUser();
         
-        if (!hasLoadedBefore) {
-          // First load - mark it and skip to main view
-          localStorage.setItem('has_loaded_before', 'true');
+        let profileExists = false;
+        
+        if (user) {
+          // Authenticated user - check if their profile exists
+          const { data: existingProfile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          
+          profileExists = !!existingProfile;
+        } else {
+          // Unauthenticated user - check if temp profile exists
+          const deviceId = localStorage.getItem('device_id');
+          if (deviceId) {
+            const { data: existingProfile } = await supabase
+              .from('profiles')
+              .select('id')
+              .eq('temp_user_id', deviceId)
+              .maybeSingle();
+            
+            profileExists = !!existingProfile;
+          }
+        }
+        
+        console.log('Profile exists:', profileExists);
+        
+        // If profile doesn't exist yet, it will be created on first interaction
+        // Let user explore first (show main view)
+        if (!profileExists) {
           setCurrentView('main');
           return;
         }
         
-        // Second+ load - check for current job
+        // Profile exists - now check if they have a current job
         const { hasCurrentJob } = await import('../services/currentJobs');
         const hasJob = await hasCurrentJob();
+        
+        console.log('Has current job:', hasJob);
         
         if (hasJob) {
           setCurrentView('main');
         } else {
+          // Profile exists but no job - show initiation
           setCurrentView('initiation');
         }
       } catch (error) {
-        console.error('Error checking current job:', error);
+        console.error('Error checking initiation status:', error);
         // On error, show main view to avoid blocking user
         setCurrentView('main');
       }
     };
 
-    checkCurrentJob();
+    checkInitiationStatus();
   }, []);
 
   // Remove local posts state - now handled by backend
