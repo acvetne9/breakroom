@@ -39,69 +39,117 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
 
   useEffect(() => {
     const initializeDevice = async () => {
-      // Check if device ID exists in localStorage
-      let storedDeviceId = localStorage.getItem('device_id');
-      
-      // Clear old device IDs that have random suffixes (old format)
-      if (storedDeviceId && storedDeviceId.split('_').length > 2) {
-        console.log('🧹 Clearing old device ID format:', storedDeviceId);
-        localStorage.removeItem('device_id');
-        storedDeviceId = null;
-      }
-      
-      if (!storedDeviceId) {
-        // Generate new device ID if none exists
-        storedDeviceId = generateDeviceId();
-        localStorage.setItem('device_id', storedDeviceId);
-        console.log('🆔 Generated new device ID:', storedDeviceId);
-      }
-      
-      // Create profile on initial load if authenticated or temp user doesn't have one
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (user) {
-        // Authenticated user - ensure profile exists
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
+      try {
+        // Check session storage first for this session's profile creation status
+        const sessionKey = 'profile_created_this_session';
+        const createdThisSession = sessionStorage.getItem(sessionKey) === 'true';
         
-        if (!profile) {
-          await supabase
-            .from('profiles')
-            .insert({
-              user_id: user.id,
-              display_name: user.email?.split('@')[0] || 'User',
-              is_authenticated: true
-            });
+        if (createdThisSession) {
+          console.log('✅ Profile was already created in this session');
           setProfileWasCreated(true);
-          console.log('✨ Created new profile for authenticated user');
         }
-      } else {
-        // Temp user - ensure profile exists
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('temp_user_id', storedDeviceId)
-          .maybeSingle();
         
-        if (!profile) {
-          await supabase
-            .from('profiles')
-            .insert({
-              user_id: null,
-              temp_user_id: storedDeviceId,
-              display_name: 'Anonymous User',
-              is_authenticated: false
-            });
-          setProfileWasCreated(true);
-          console.log('✨ Created new profile for temp user');
+        // Check if device ID exists in localStorage
+        let storedDeviceId = localStorage.getItem('device_id');
+        
+        // Clear old device IDs that have random suffixes (old format)
+        if (storedDeviceId && storedDeviceId.split('_').length > 2) {
+          console.log('🧹 Clearing old device ID format:', storedDeviceId);
+          localStorage.removeItem('device_id');
+          storedDeviceId = null;
         }
+        
+        if (!storedDeviceId) {
+          // Generate new device ID if none exists
+          storedDeviceId = generateDeviceId();
+          localStorage.setItem('device_id', storedDeviceId);
+          console.log('🆔 Generated new device ID:', storedDeviceId);
+        }
+        
+        // Check for authenticated user
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user) {
+          // Authenticated user - ensure profile exists
+          const { data: profile, error: selectError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          
+          if (selectError) {
+            console.error('❌ Error checking profile:', selectError);
+          } else if (!profile && !createdThisSession) {
+            // Profile doesn't exist and we haven't created one this session
+            const { error: insertError } = await supabase
+              .from('profiles')
+              .insert({
+                user_id: user.id,
+                display_name: user.email?.split('@')[0] || 'User',
+                is_authenticated: true
+              });
+            
+            if (insertError) {
+              // Check if it's a duplicate key error (profile already exists)
+              if (insertError.code === '23505') {
+                console.log('ℹ️ Profile already exists (concurrent creation)');
+              } else {
+                console.error('❌ Error creating profile:', insertError);
+              }
+            } else {
+              // Successfully created profile
+              sessionStorage.setItem(sessionKey, 'true');
+              setProfileWasCreated(true);
+              console.log('✨ Created new profile for authenticated user');
+            }
+          } else if (profile) {
+            console.log('ℹ️ Profile already exists for authenticated user');
+          }
+        } else {
+          // Temp user - ensure profile exists
+          const { data: profile, error: selectError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('temp_user_id', storedDeviceId)
+            .maybeSingle();
+          
+          if (selectError) {
+            console.error('❌ Error checking temp profile:', selectError);
+          } else if (!profile && !createdThisSession) {
+            // Profile doesn't exist and we haven't created one this session
+            const { error: insertError } = await supabase
+              .from('profiles')
+              .insert({
+                user_id: null,
+                temp_user_id: storedDeviceId,
+                display_name: 'Anonymous User',
+                is_authenticated: false
+              });
+            
+            if (insertError) {
+              // Check if it's a duplicate key error (profile already exists)
+              if (insertError.code === '23505') {
+                console.log('ℹ️ Temp profile already exists (concurrent creation)');
+              } else {
+                console.error('❌ Error creating temp profile:', insertError);
+              }
+            } else {
+              // Successfully created profile
+              sessionStorage.setItem(sessionKey, 'true');
+              setProfileWasCreated(true);
+              console.log('✨ Created new profile for temp user');
+            }
+          } else if (profile) {
+            console.log('ℹ️ Temp profile already exists');
+          }
+        }
+        
+        setDeviceId(storedDeviceId);
+      } catch (error) {
+        console.error('❌ Fatal error in device initialization:', error);
+      } finally {
+        setLoading(false);
       }
-      
-      setDeviceId(storedDeviceId);
-      setLoading(false);
     };
     
     initializeDevice();
