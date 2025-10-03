@@ -528,7 +528,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       function getTileAndGlyphURLs() {
         if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android") {
           let platform = Capacitor.isNativePlatform()
-          console.log("Caught on web: ", platform)
+          console.log("Caught on web: ")
           return {
             tiles: "file:///android_asset/public/data/tiles/{z}/{x}/{y}.pbf",
             glyphs: "file:///android_asset/public/data/fonts/{fontstack}/{range}.pbf",
