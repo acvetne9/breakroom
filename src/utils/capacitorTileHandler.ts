@@ -8,6 +8,12 @@ let isPatched = false;
  * Patch fetch to handle tile decompression in Capacitor environments
  */
 export function patchTileLoading() {
+  // Only patch on Capacitor native platforms, not on web
+  if (!isCapacitor()) {
+    console.log('🌐 Skipping fetch patch on web platform');
+    return;
+  }
+  
   const originalFetch = window.fetch;
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
