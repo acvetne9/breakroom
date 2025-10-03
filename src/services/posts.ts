@@ -2,13 +2,13 @@ import { supabase } from "@/integrations/supabase/client";
 
 // Cache for user profile to avoid race conditions
 let cachedProfileId: string | null = null;
-let profilePromise: Promise<string> | null = null;
+let profilePromise: Promise<{ profileId: string; wasCreated: boolean }> | null = null;
 
 // Get or create user profile in profiles table
-export const getUserProfile = async (): Promise<string> => {
-  // Return cached profile if available
+export const getUserProfile = async (): Promise<{ profileId: string; wasCreated: boolean }> => {
+  // Return cached profile if available (always wasCreated: false for cached)
   if (cachedProfileId) {
-    return cachedProfileId;
+    return { profileId: cachedProfileId, wasCreated: false };
   }
   
   // Return existing promise if one is in progress
@@ -19,6 +19,7 @@ export const getUserProfile = async (): Promise<string> => {
   // Create new promise for profile creation
   profilePromise = (async () => {
     const { data: { user } } = await supabase.auth.getUser();
+    let wasCreated = false;
     
     if (user) {
       // Authenticated user - find or create their profile
@@ -29,6 +30,7 @@ export const getUserProfile = async (): Promise<string> => {
         .maybeSingle();
       
       if (!profile) {
+        wasCreated = true;
         // Try to create profile, handle conflicts gracefully
         const { data: newProfile, error } = await supabase
           .from('profiles')
@@ -56,7 +58,7 @@ export const getUserProfile = async (): Promise<string> => {
       }
       
       cachedProfileId = profile!.id;
-      return profile!.id;
+      return { profileId: profile!.id, wasCreated };
     } else {
       // Unauthenticated user - use device_id for consistency
       let deviceId = localStorage.getItem('device_id');
@@ -87,6 +89,7 @@ export const getUserProfile = async (): Promise<string> => {
         .maybeSingle();
       
       if (!profile) {
+        wasCreated = true;
         // Try to create profile, handle conflicts gracefully
         const { data: newProfile, error } = await supabase
           .from('profiles')
@@ -115,7 +118,7 @@ export const getUserProfile = async (): Promise<string> => {
       }
       
       cachedProfileId = profile!.id;
-      return profile!.id;
+      return { profileId: profile!.id, wasCreated };
     }
   })();
   
@@ -131,7 +134,8 @@ export const getUserProfile = async (): Promise<string> => {
 
 // Retrieve authenticated user ID or temporary ID for backwards compatibility
 const getUserId = async (): Promise<string> => {
-  return getUserProfile();
+  const { profileId } = await getUserProfile();
+  return profileId;
 };
 
 export interface PostData {
@@ -323,7 +327,7 @@ export const getUserVotes = async (postIds: string[]): Promise<{ [postId: string
 // Delete a post
 export const deletePost = async (postId: string): Promise<{ success: boolean; error?: any }> => {
   // Get current user's profile ID
-  const currentProfileId = await getUserProfile();
+  const { profileId: currentProfileId } = await getUserProfile();
   
   // Get the post to check ownership
   const { data: post, error: fetchError } = await supabase

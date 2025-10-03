@@ -13,7 +13,7 @@ export interface CurrentJobData {
  */
 export const hasCurrentJob = async (): Promise<boolean> => {
   try {
-    const profileId = await getUserProfile();
+    const { profileId } = await getUserProfile();
     
     const { data, error } = await supabase
       .from('current_jobs')
@@ -38,7 +38,7 @@ export const hasCurrentJob = async (): Promise<boolean> => {
  */
 export const saveCurrentJob = async (jobData: CurrentJobData): Promise<void> => {
   try {
-    const profileId = await getUserProfile();
+    const { profileId } = await getUserProfile();
     
     // Check if a current job already exists
     const { data: existing } = await supabase
@@ -86,7 +86,7 @@ export const saveCurrentJob = async (jobData: CurrentJobData): Promise<void> => 
  */
 export const deleteCurrentJob = async (): Promise<void> => {
   try {
-    const profileId = await getUserProfile();
+    const { profileId } = await getUserProfile();
     
     const { error } = await supabase
       .from('current_jobs')

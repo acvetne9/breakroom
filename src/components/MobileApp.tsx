@@ -54,28 +54,36 @@ const MobileApp: React.FC = () => {
   const constraintsRef = useRef(null);
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
   
-  // Check once on mount: if profile exists but no current job, show initiation once
+  // On page load: create profile if needed, or show initiation if profile exists without job
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        // Step 1: Ensure profile exists for this device
+        // Step 1: Get or create profile
         const { getUserProfile } = await import('../services/posts');
-        const profileId = await getUserProfile();
+        const { profileId, wasCreated } = await getUserProfile();
         
-        // Step 2: Check if current job exists
+        // Step 2: If profile was just created, don't show initiation
+        if (wasCreated) {
+          setCurrentView('main');
+          return;
+        }
+        
+        // Step 3: Profile already existed - check for current job
         const { hasCurrentJob } = await import('../services/currentJobs');
         const hasJob = await hasCurrentJob();
         
-        // Step 3: Only show initiation if profile exists but no current job
-        // Once user completes initiation (creates current_jobs entry), they'll never see it again
+        // Step 4: Show initiation only if no job exists
         if (!hasJob) {
           setCurrentView('initiation');
+        } else {
+          setCurrentView('main');
         }
       } catch (error) {
         console.error('Error during app initialization:', error);
+        setCurrentView('main');
       }
     };
-
+    
     initializeApp();
   }, []);
 
