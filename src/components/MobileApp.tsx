@@ -61,55 +61,83 @@ const MobileApp: React.FC = () => {
   const { isFirstSession, loading: deviceLoading } = useDevice();
 
   useEffect(() => {
-    if (hasInitialized.current) {
-      console.log('Skipping duplicate initialization (StrictMode)');
-      return;
-    }
-    
-    if (deviceLoading) {
-      console.log('Waiting for device initialization...');
-      return;
-    }
-    
-    hasInitialized.current = true;
-    console.log('MobileApp initialization starting');
-    
-    const initializeApp = async () => {
-      try {
-        const { hasCurrentJob, getCurrentJob } = await import('../services/currentJobs');
-        const hasJob = await hasCurrentJob();
-        
-        console.log('Current job check:', hasJob);
-        
-        if (hasJob) {
-          const currentJob = await getCurrentJob();
-          if (currentJob) {
-            setUserData({
-              salary: `$${currentJob.salary}`,
-              role: currentJob.role,
-              location: currentJob.location,
-              fullLocation: currentJob.location,
-              timePeriod: currentJob.time_period || 'HR'
-            });
-            console.log('Loaded user data:', currentJob);
-          }
-          console.log('Job found - going to main view');
-          setCurrentView('main');
-        } else if (isFirstSession) {
-          console.log('Profile just created - skipping initiation until next session');
-          setCurrentView('main');
-        } else {
-          console.log('No job found - showing initiation');
-          setCurrentView('initiation');
+  if (hasInitialized.current) {
+    console.log('Skipping duplicate initialization (StrictMode)');
+    return;
+  }
+  
+  if (deviceLoading) {
+    console.log('Waiting for device initialization...');
+    return;
+  }
+  
+  hasInitialized.current = true;
+  console.log('MobileApp initialization starting');
+  
+  const initializeApp = async () => {
+    try {
+      // Check if profile exists in database
+      const { data: { user } } = await supabase.auth.getUser();
+      let profileExists = false;
+      
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        profileExists = !!profile;
+      } else {
+        const storedDeviceId = localStorage.getItem('device_id');
+        if (storedDeviceId) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('temp_user_id', storedDeviceId)
+            .maybeSingle();
+          profileExists = !!profile;
         }
-      } catch (error) {
-        console.error('Error during app initialization:', error);
-        setCurrentView('main');
       }
-    };
-    
-    initializeApp();
-  }, [isFirstSession, deviceLoading]);
+      
+      console.log('Profile exists:', profileExists);
+      
+      // Check for current job
+      const { hasCurrentJob, getCurrentJob } = await import('../services/currentJobs');
+      const hasJob = await hasCurrentJob();
+      
+      console.log('Current job check:', hasJob);
+      
+      if (hasJob) {
+        const currentJob = await getCurrentJob();
+        if (currentJob) {
+          setUserData({
+            salary: `$${currentJob.salary}`,
+            role: currentJob.role,
+            location: currentJob.location,
+            fullLocation: currentJob.location,
+            timePeriod: currentJob.time_period || 'HR'
+          });
+          console.log('Loaded user data:', currentJob);
+        }
+        console.log('Job found - going to main view');
+        setCurrentView('main');
+      } else if (!profileExists || isFirstSession) {
+        // No profile yet OR profile just created - skip initiation
+        console.log('Profile just created or does not exist - going to main');
+        setCurrentView('main');
+      } else {
+        // Profile exists, no job, and not first session - show initiation
+        console.log('No job found - showing initiation');
+        setCurrentView('initiation');
+      }
+    } catch (error) {
+      console.error('Error during app initialization:', error);
+      setCurrentView('main');
+    }
+  };
+  
+  initializeApp();
+}, [isFirstSession, deviceLoading]);
 
   const handleInitiationComplete = async (data: UserData) => {
     setUserData(data);
