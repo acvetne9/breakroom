@@ -103,9 +103,9 @@ export const getUserProfile = async (): Promise<{ profileId: string; wasCreated:
         const userAgent = navigator.userAgent;
         
         const fingerprint = btoa(`${canvasFingerprint}-${screen}-${timezone}-${language}-${userAgent}`);
-        const randomSuffix = Math.random().toString(36).substring(2, 15);
         
-        deviceId = `device_${fingerprint.substring(0, 20)}_${randomSuffix}`;
+        // No random suffix - same device = same ID
+        deviceId = `device_${fingerprint.substring(0, 40)}`;
         localStorage.setItem('device_id', deviceId);
         console.log('🆔 Created device ID:', deviceId);
       } else {

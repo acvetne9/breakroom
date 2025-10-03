@@ -23,11 +23,11 @@ function generateDeviceId(): string {
   const language = navigator.language;
   const userAgent = navigator.userAgent;
   
-  // Combine characteristics and add random component
+  // Combine characteristics - same device = same ID
   const fingerprint = btoa(`${canvasFingerprint}-${screen}-${timezone}-${language}-${userAgent}`);
-  const randomSuffix = Math.random().toString(36).substring(2, 15);
   
-  return `device_${fingerprint.substring(0, 20)}_${randomSuffix}`;
+  // No random suffix - ensures consistent device identification
+  return `device_${fingerprint.substring(0, 40)}`;
 }
 
 export function DeviceProvider({ children }: DeviceProviderProps) {
