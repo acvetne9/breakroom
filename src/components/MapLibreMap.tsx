@@ -244,11 +244,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     let profile = getProfile(deviceId);
     
     if (!profile) {
-      // Create profile if it doesn't exist
+      // Create profile if it doesn't exist - DO NOT show initiation card
       profile = createProfile(deviceId);
       console.log('✅ Created new profile for device:', deviceId);
     } else {
-      // Profile exists and wasn't created this session
+      // Profile exists from a previous session
       if (!profile.createdThisSession) {
         // Check if user has a current_job
         if (!profile.current_job) {
@@ -256,12 +256,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           onShowInitiationCard?.();
           console.log('📋 Showing initiation card for existing profile without job');
         }
+      } else {
+        // Profile was created in a previous load (has createdThisSession flag from before)
+        // Now mark it as not created this session for future loads
+        profile.createdThisSession = false;
+        const profiles = JSON.parse(sessionStorage.getItem('userProfiles') || '{}');
+        profiles[deviceId] = profile;
+        sessionStorage.setItem('userProfiles', JSON.stringify(profiles));
       }
-      // Mark that this profile was not created this session
-      profile.createdThisSession = false;
-      const profiles = JSON.parse(sessionStorage.getItem('userProfiles') || '{}');
-      profiles[deviceId] = profile;
-      sessionStorage.setItem('userProfiles', JSON.stringify(profiles));
     }
   }, [onShowInitiationCard]);
 
