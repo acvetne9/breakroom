@@ -12,7 +12,6 @@ const ExplorePage = React.lazy(() => import('./ExplorePage'));
 
 import { useBusinessesData } from '../hooks/useBusinessesData';
 import { handleRoleVote as handleRoleVoteService } from '@/services/roleVoting';
-import { useProfileInit } from '@/hooks/useProfileInit';
 
 interface UserData {
   salary: string;
@@ -54,34 +53,41 @@ const MobileApp: React.FC = () => {
   const constraintsRef = useRef(null);
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
   
-  // Initialize profile immediately on app mount
-  useProfileInit();
-
-  // Check if current job exists and show initiation card if needed
+  // Sequential flow: 1) Ensure profile exists, 2) Check current job, 3) Show initiation if needed
   useEffect(() => {
-    const checkInitiationStatus = async () => {
+    const initializeApp = async () => {
       try {
-        // Check if they have a current job
+        console.log('Step 1: Ensuring profile exists for device...');
+        
+        // Step 1: Get or create profile for this device
+        const { getUserProfile } = await import('../services/posts');
+        const profileId = await getUserProfile();
+        
+        console.log('Profile confirmed:', profileId);
+        
+        // Step 2: Check if profile has a current job
+        console.log('Step 2: Checking for current job...');
         const { hasCurrentJob } = await import('../services/currentJobs');
         const hasJob = await hasCurrentJob();
         
         console.log('Has current job:', hasJob);
         
+        // Step 3: Determine view based on current job existence
         if (hasJob) {
+          console.log('Step 3: Current job exists - showing main view');
           setCurrentView('main');
         } else {
-          // No job - show initiation card
+          console.log('Step 3: No current job - showing initiation card');
           setCurrentView('initiation');
         }
       } catch (error) {
-        console.error('Error checking initiation status:', error);
+        console.error('Error during app initialization:', error);
         // On error, show main view to avoid blocking user
         setCurrentView('main');
       }
     };
 
-    // Small delay to ensure profile init completes first
-    setTimeout(checkInitiationStatus, 100);
+    initializeApp();
   }, []);
 
   // Remove local posts state - now handled by backend
