@@ -58,29 +58,28 @@ const MobileApp: React.FC = () => {
   // Ref to prevent double initialization in React 18 StrictMode
   const hasInitialized = useRef(false);
 
-  const { skipInitiationThisSession, loading: deviceLoading } = useDevice();
+  const { isFirstSession, loading: deviceLoading } = useDevice();
 
   useEffect(() => {
     if (hasInitialized.current) {
-      console.log('⏭️ Skipping duplicate initialization (StrictMode)');
+      console.log('Skipping duplicate initialization (StrictMode)');
       return;
     }
     
-    // Wait for DeviceContext to finish initializing
     if (deviceLoading) {
-      console.log('⏳ Waiting for device initialization...');
+      console.log('Waiting for device initialization...');
       return;
     }
     
     hasInitialized.current = true;
-    console.log('🎬 MobileApp initialization starting');
+    console.log('MobileApp initialization starting');
     
     const initializeApp = async () => {
       try {
         const { hasCurrentJob, getCurrentJob } = await import('../services/currentJobs');
         const hasJob = await hasCurrentJob();
         
-        console.log('💼 Current job check:', hasJob);
+        console.log('Current job check:', hasJob);
         
         if (hasJob) {
           const currentJob = await getCurrentJob();
@@ -92,27 +91,25 @@ const MobileApp: React.FC = () => {
               fullLocation: currentJob.location,
               timePeriod: currentJob.time_period || 'HR'
             });
-            console.log('📊 Loaded user data:', currentJob);
+            console.log('Loaded user data:', currentJob);
           }
-          console.log('✅ Job found - going to main view');
+          console.log('Job found - going to main view');
           setCurrentView('main');
-        } else if (skipInitiationThisSession) {
-          console.log('✨ Profile just created - skipping initiation until next session');
+        } else if (isFirstSession) {
+          console.log('Profile just created - skipping initiation until next session');
           setCurrentView('main');
         } else {
-          console.log('📝 No job found - showing initiation');
+          console.log('No job found - showing initiation');
           setCurrentView('initiation');
         }
       } catch (error) {
-        console.error('❌ Error during app initialization:', error);
+        console.error('Error during app initialization:', error);
         setCurrentView('main');
       }
     };
     
     initializeApp();
-  }, [skipInitiationThisSession, deviceLoading]);
-
-  // Remove local posts state - now handled by backend
+  }, [isFirstSession, deviceLoading]);
 
   const handleInitiationComplete = async (data: UserData) => {
     setUserData(data);
