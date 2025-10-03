@@ -242,11 +242,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   // Handle profile logic on mount
   useEffect(() => {
+    console.log('🔍 Profile useEffect running...');
     const deviceId = getDeviceId();
+    console.log('🔍 Device ID:', deviceId);
     let profile = getProfile(deviceId);
+    console.log('🔍 Existing profile:', profile);
     
     // Check if we just created a profile in this session
     const justCreated = sessionStorage.getItem('profileCreatedThisSession') === 'true';
+    console.log('🔍 Profile created this session?', justCreated);
     
     if (!profile) {
       // Create profile if it doesn't exist - DO NOT show initiation card
@@ -257,9 +261,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       // Check if user has a current_job
       if (!profile.current_job) {
         // Show initiation card
-        onShowInitiationCard?.();
         console.log('📋 Showing initiation card for existing profile without job');
+        onShowInitiationCard?.();
+      } else {
+        console.log('✅ Profile has current_job, not showing initiation card');
       }
+    } else {
+      console.log('⏭️ Profile exists but was created this session, skipping initiation card');
     }
   }, [onShowInitiationCard]);
 
