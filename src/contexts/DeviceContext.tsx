@@ -38,10 +38,19 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
     // Check if device ID exists in localStorage
     let storedDeviceId = localStorage.getItem('device_id');
     
+    // Clear old device IDs that have random suffixes (old format)
+    // Old format: device_XXX_randomsuffix, New format: device_XXX (no underscore after hash)
+    if (storedDeviceId && storedDeviceId.split('_').length > 2) {
+      console.log('🧹 Clearing old device ID format:', storedDeviceId);
+      localStorage.removeItem('device_id');
+      storedDeviceId = null;
+    }
+    
     if (!storedDeviceId) {
       // Generate new device ID if none exists
       storedDeviceId = generateDeviceId();
       localStorage.setItem('device_id', storedDeviceId);
+      console.log('🆔 Generated new device ID:', storedDeviceId);
     }
     
     setDeviceId(storedDeviceId);

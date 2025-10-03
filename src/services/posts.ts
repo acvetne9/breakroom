@@ -89,6 +89,15 @@ export const getUserProfile = async (): Promise<{ profileId: string; wasCreated:
       console.log('👻 Unauthenticated user - using device ID');
       // Unauthenticated user - use device_id for consistency
       let deviceId = localStorage.getItem('device_id');
+      
+      // Clear old device IDs that have random suffixes (old format)
+      // Old format: device_XXX_randomsuffix, New format: device_XXX (no underscore after hash)
+      if (deviceId && deviceId.split('_').length > 2) {
+        console.log('🧹 Clearing old device ID format:', deviceId);
+        localStorage.removeItem('device_id');
+        deviceId = null;
+      }
+      
       if (!deviceId) {
         console.log('🆔 Generating new device ID');
         // Generate device ID if not exists (same logic as DeviceContext)
