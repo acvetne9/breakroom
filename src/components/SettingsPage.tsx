@@ -680,9 +680,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         {showHelpPopup && <div className="mt-4 w-full bg-white border-2 border-app-yellow rounded-xl p-4 shadow-lg" onClick={e => e.stopPropagation()}>
             <p className="text-sm text-app-gray-dark">
               <strong>Disclaimer:</strong> The information presented in this app is based on surveys, user input, and publicly available sources. We do not independently verify all information, and it should not be taken as factual statements about any individual or organization.
+              <a href="https://breakroom-privacy-policy.lovable.app/privacy-policy" target="_blank" rel="noopener noreferrer">
+                Privacy Policy
+              </a>
             </p>
-            <span href="https://breakroom-privacy-policy.lovable.app/privacy-policy">Privacy Policy</span>
-          </div>}
+        </div>}
 
       </div>
     </div>;
