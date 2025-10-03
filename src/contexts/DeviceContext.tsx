@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { supabase } from "@/integrations/supabase/client";
 
 interface DeviceContextType {
   deviceId: string;
@@ -35,26 +36,69 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if device ID exists in localStorage
-    let storedDeviceId = localStorage.getItem('device_id');
+    const initializeDevice = async () => {
+      // Check if device ID exists in localStorage
+      let storedDeviceId = localStorage.getItem('device_id');
+      
+      // Clear old device IDs that have random suffixes (old format)
+      if (storedDeviceId && storedDeviceId.split('_').length > 2) {
+        console.log('🧹 Clearing old device ID format:', storedDeviceId);
+        localStorage.removeItem('device_id');
+        storedDeviceId = null;
+      }
+      
+      if (!storedDeviceId) {
+        // Generate new device ID if none exists
+        storedDeviceId = generateDeviceId();
+        localStorage.setItem('device_id', storedDeviceId);
+        console.log('🆔 Generated new device ID:', storedDeviceId);
+      }
+      
+      // Create profile on initial load if authenticated or temp user doesn't have one
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // Authenticated user - ensure profile exists
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (!profile) {
+          await supabase
+            .from('profiles')
+            .insert({
+              user_id: user.id,
+              display_name: user.email?.split('@')[0] || 'User',
+              is_authenticated: true
+            });
+        }
+      } else {
+        // Temp user - ensure profile exists
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('temp_user_id', storedDeviceId)
+          .maybeSingle();
+        
+        if (!profile) {
+          await supabase
+            .from('profiles')
+            .insert({
+              user_id: null,
+              temp_user_id: storedDeviceId,
+              display_name: 'Anonymous User',
+              is_authenticated: false
+            });
+        }
+      }
+      
+      setDeviceId(storedDeviceId);
+      setLoading(false);
+    };
     
-    // Clear old device IDs that have random suffixes (old format)
-    // Old format: device_XXX_randomsuffix, New format: device_XXX (no underscore after hash)
-    if (storedDeviceId && storedDeviceId.split('_').length > 2) {
-      console.log('🧹 Clearing old device ID format:', storedDeviceId);
-      localStorage.removeItem('device_id');
-      storedDeviceId = null;
-    }
-    
-    if (!storedDeviceId) {
-      // Generate new device ID if none exists
-      storedDeviceId = generateDeviceId();
-      localStorage.setItem('device_id', storedDeviceId);
-      console.log('🆔 Generated new device ID:', storedDeviceId);
-    }
-    
-    setDeviceId(storedDeviceId);
-    setLoading(false);
+    initializeDevice();
   }, []);
 
   const value = {
