@@ -582,53 +582,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         maxZoom: 18, 
         minZoom: 9, 
         renderWorldCopies: false, 
-        attributionControl: false,
-        transformRequest: Capacitor.getPlatform() === "web" ? (url: string, resourceType: string) => {
-          // For web platform, intercept tile requests and handle decompression
-          if (resourceType === 'Tile' && url.includes('/data/tiles/')) {
-            console.log('🔧 Intercepting tile request for web:', url);
-            return {
-              url,
-              headers: {},
-              credentials: 'same-origin'
-            };
-          }
-          return { url };
-        } : undefined
+        attributionControl: false
       } as any);
       
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
-      
-      // For web platform, add custom tile loading with decompression
-      if (Capacitor.getPlatform() === "web") {
-        const originalFetch = window.fetch;
-        window.fetch = async function(input: RequestInfo | URL, init?: RequestInit) {
-          const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-          
-          if (url.includes('/data/tiles/') && url.endsWith('.pbf')) {
-            console.log('🔧 Fetching and decompressing tile:', url);
-            try {
-              const response = await originalFetch(input, init);
-              const arrayBuffer = await response.arrayBuffer();
-              const decompressed = await import('@/utils/tileDecompression').then(m => m.decompressTile(arrayBuffer, url));
-              
-              return new Response(decompressed, {
-                status: response.status,
-                statusText: response.statusText,
-                headers: {
-                  'Content-Type': 'application/x-protobuf',
-                  'Content-Encoding': 'identity'
-                }
-              });
-            } catch (error) {
-              console.error('🔧 Error decompressing tile:', error);
-              return originalFetch(input, init);
-            }
-          }
-          
-          return originalFetch(input, init);
-        };
-      }
       
       // WebGL fallback for emulators
       try {
