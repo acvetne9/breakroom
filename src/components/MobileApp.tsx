@@ -53,48 +53,17 @@ const MobileApp: React.FC = () => {
   const constraintsRef = useRef(null);
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
 
-  // Check if user profile exists and has a current job
+  // Create profile on first visit and check if current job exists
   useEffect(() => {
     const checkInitiationStatus = async () => {
       try {
-        // First, check if profile already exists in database (before it gets auto-created)
-        const { data: { user } } = await supabase.auth.getUser();
+        // Import getUserProfile to ensure profile is created on first visit
+        const { getUserProfile } = await import('../services/posts');
         
-        let profileExists = false;
+        // This will create the profile if it doesn't exist
+        await getUserProfile();
         
-        if (user) {
-          // Authenticated user - check if their profile exists
-          const { data: existingProfile } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('user_id', user.id)
-            .maybeSingle();
-          
-          profileExists = !!existingProfile;
-        } else {
-          // Unauthenticated user - check if temp profile exists
-          const deviceId = localStorage.getItem('device_id');
-          if (deviceId) {
-            const { data: existingProfile } = await supabase
-              .from('profiles')
-              .select('id')
-              .eq('temp_user_id', deviceId)
-              .maybeSingle();
-            
-            profileExists = !!existingProfile;
-          }
-        }
-        
-        console.log('Profile exists:', profileExists);
-        
-        // If profile doesn't exist yet, it will be created on first interaction
-        // Let user explore first (show main view)
-        if (!profileExists) {
-          setCurrentView('main');
-          return;
-        }
-        
-        // Profile exists - now check if they have a current job
+        // Now check if they have a current job
         const { hasCurrentJob } = await import('../services/currentJobs');
         const hasJob = await hasCurrentJob();
         
