@@ -53,10 +53,21 @@ const MobileApp: React.FC = () => {
   const constraintsRef = useRef(null);
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
 
-  // Check if user has a current job
+  // Check if user has a current job - show initiation only on second load
   useEffect(() => {
     const checkCurrentJob = async () => {
       try {
+        // Check if this is the first load
+        const hasLoadedBefore = localStorage.getItem('has_loaded_before');
+        
+        if (!hasLoadedBefore) {
+          // First load - mark it and skip to main view
+          localStorage.setItem('has_loaded_before', 'true');
+          setCurrentView('main');
+          return;
+        }
+        
+        // Second+ load - check for current job
         const { hasCurrentJob } = await import('../services/currentJobs');
         const hasJob = await hasCurrentJob();
         
@@ -67,8 +78,8 @@ const MobileApp: React.FC = () => {
         }
       } catch (error) {
         console.error('Error checking current job:', error);
-        // On error, show initiation to be safe
-        setCurrentView('initiation');
+        // On error, show main view to avoid blocking user
+        setCurrentView('main');
       }
     };
 
