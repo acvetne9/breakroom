@@ -108,33 +108,41 @@ export type Database = {
           created_at: string | null
           id: string
           location: string | null
+          profile_id: string
           role: string | null
           salary: number | null
           time_period: string | null
           updated_at: string | null
-          user_id: string
         }
         Insert: {
           created_at?: string | null
           id?: string
           location?: string | null
+          profile_id: string
           role?: string | null
           salary?: number | null
           time_period?: string | null
           updated_at?: string | null
-          user_id: string
         }
         Update: {
           created_at?: string | null
           id?: string
           location?: string | null
+          profile_id?: string
           role?: string | null
           salary?: number | null
           time_period?: string | null
           updated_at?: string | null
-          user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "current_jobs_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       past_jobs: {
         Row: {

@@ -56,25 +56,11 @@ const MobileApp: React.FC = () => {
   // Check if user has a current job
   useEffect(() => {
     const checkCurrentJob = async () => {
-      if (!user) {
-        // If not authenticated, check after a brief delay to allow for auth setup
-        setTimeout(() => {
-          if (!user) setCurrentView('initiation');
-        }, 500);
-        return;
-      }
-
       try {
-        const { data, error } = await supabase
-          .from('current_jobs')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (error) throw error;
-
-        // If user has a current job, skip initiation
-        if (data) {
+        const { hasCurrentJob } = await import('../services/currentJobs');
+        const hasJob = await hasCurrentJob();
+        
+        if (hasJob) {
           setCurrentView('main');
         } else {
           setCurrentView('initiation');
@@ -87,7 +73,7 @@ const MobileApp: React.FC = () => {
     };
 
     checkCurrentJob();
-  }, [user]);
+  }, []);
 
   // Remove local posts state - now handled by backend
 
@@ -95,15 +81,25 @@ const MobileApp: React.FC = () => {
     setUserData(data);
     setCurrentView('main');
     
-    // Save job data to database (only if authenticated)
+    // Save job data to database
     try {
+      // Save current job
+      const { saveCurrentJob } = await import('../services/currentJobs');
+      const salary = parseInt(data.salary.replace(/[^0-9]/g, '')) || 0;
+      await saveCurrentJob({
+        role: data.role,
+        salary: salary,
+        location: data.location,
+        time_period: data.timePeriod || 'HR'
+      });
+      
+      // Save business role
       const { createOrUpdateBusinessRole } = await import('../services/businesses');
       await createOrUpdateBusinessRole(data.location, data.role, data.salary);
-      console.log('Job role saved to database:', { location: data.location, role: data.role, salary: data.salary });
+      console.log('Job saved to database:', { location: data.location, role: data.role, salary: data.salary });
       
-      // Create job update post in backend
+      // Create job update post
       const { createPost } = await import('../services/posts');
-      const salary = parseInt(data.salary.replace(/[^0-9]/g, '')) || 0;
       await createPost(
         `New Job Update! ${data.salary}/${data.timePeriod || 'HR'} for ${data.role} 😳`,
         'job_update',
@@ -113,8 +109,8 @@ const MobileApp: React.FC = () => {
         salary
       );
     } catch (error) {
-      console.warn('Could not save job data to database (user not authenticated):', error);
-      // Continue without showing error to user since this is optional functionality
+      console.error('Error saving job data:', error);
+      // Continue to main view even if save fails
     }
   };
 
