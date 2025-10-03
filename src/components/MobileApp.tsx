@@ -54,15 +54,16 @@ const MobileApp: React.FC = () => {
   
   const constraintsRef = useRef(null);
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
-  
-  // Ref to prevent double initialization in React 18 StrictMode
-  const { skipInitiationThisSession } = useDevice();
 
   // Ref to prevent double initialization in React 18 StrictMode
   const hasInitialized = useRef(false);
 
   useEffect(() => {
-    if (hasInitialized.current) return;
+    if (hasInitialized.current) {
+      console.log('⏭️ Skipping duplicate initialization (StrictMode)');
+      return;
+    }
+    
     hasInitialized.current = true;
     
     const initializeApp = async () => {
