@@ -398,6 +398,15 @@ const MobileApp: React.FC = () => {
     }
   };
 
+  // Show loading while checking job
+  if (checkingJob) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center">
+        <Skeleton className="w-full h-full" />
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 overflow-hidden">
       {/* Map is always the background */}
