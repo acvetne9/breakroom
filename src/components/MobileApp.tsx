@@ -57,35 +57,17 @@ const MobileApp: React.FC = () => {
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
   
   // Ref to prevent double initialization in React 18 StrictMode
-  const hasInitialized = useRef(false);
-  
-  // On page load: create profile if needed, or show initiation if profile exists without job
+  const { skipInitiationThisSession } = useDevice();
+
   useEffect(() => {
-    // Prevent double initialization in StrictMode
-    if (hasInitialized.current) {
-      console.log('⏭️ Skipping duplicate initialization (StrictMode)');
-      return;
-    }
-    
+    if (hasInitialized.current) return;
     hasInitialized.current = true;
-    console.log('🎬 MobileApp initialization starting');
     
     const initializeApp = async () => {
       try {
-        // Step 1: If profile was just created on this load, don't show initiation
-        if (profileWasCreated) {
-          console.log('✨ Profile was just created - going to main view');
-          setCurrentView('main');
-          return;
-        }
-        
-        // Step 2: Check for current job
         const { hasCurrentJob, getCurrentJob } = await import('../services/currentJobs');
         const hasJob = await hasCurrentJob();
         
-        console.log('💼 Current job check:', hasJob);
-        
-        // Step 3: Load current job data if it exists
         if (hasJob) {
           const currentJob = await getCurrentJob();
           if (currentJob) {
@@ -96,22 +78,23 @@ const MobileApp: React.FC = () => {
               fullLocation: currentJob.location,
               timePeriod: currentJob.time_period || 'HR'
             });
-            console.log('📊 Loaded user data:', currentJob);
           }
-          console.log('✅ Job found - going to main view');
+          setCurrentView('main');
+        } else if (skipInitiationThisSession) {
+          // Profile just created - skip initiation until next session
           setCurrentView('main');
         } else {
-          console.log('📝 No job found - showing initiation');
+          // No job and profile exists from previous session - show initiation
           setCurrentView('initiation');
         }
       } catch (error) {
-        console.error('❌ Error during app initialization:', error);
+        console.error('Error during app initialization:', error);
         setCurrentView('main');
       }
     };
     
     initializeApp();
-  }, [profileWasCreated]);
+  }, [skipInitiationThisSession]);
 
   // Remove local posts state - now handled by backend
 
