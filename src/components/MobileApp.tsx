@@ -42,7 +42,6 @@ const MobileApp: React.FC = () => {
   console.log('🚀 MobileApp component rendering');
   const isMobile = useIsMobile();
   const { user } = useAuth();
-  const { profileWasCreated } = useDevice();
   const [currentView, setCurrentView] = useState<'initiation' | 'main'>('main');
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -58,6 +57,9 @@ const MobileApp: React.FC = () => {
   
   // Ref to prevent double initialization in React 18 StrictMode
   const { skipInitiationThisSession } = useDevice();
+
+  // Ref to prevent double initialization in React 18 StrictMode
+  const hasInitialized = useRef(false);
 
   useEffect(() => {
     if (hasInitialized.current) return;
