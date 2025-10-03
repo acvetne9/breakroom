@@ -200,6 +200,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   // Add loading state ref to prevent multiple calls
   const lastBoundsRef = useRef<string>('');
 
+  useEffect(() => {
+    const canvas = document.createElement("canvas");
+    const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    if (!gl) {
+      console.error("❌ WebGL is NOT supported in this WebView");
+    } else {
+      console.log("✅ WebGL is supported in this WebView");
+    }
+  }, []);
+
   const callbackRefs = useRef({ onBusinessClick, onMapLoaded, onBusinessesLoaded });
   useEffect(() => { callbackRefs.current = { onBusinessClick, onMapLoaded, onBusinessesLoaded }; }, [onBusinessClick, onMapLoaded, onBusinessesLoaded]);
 
@@ -514,40 +524,47 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         // Add a small delay to ensure patching is complete
         await new Promise(resolve => setTimeout(resolve, 200));
       }
-      
-      // Helper to get base URL for Capacitor
-      const getBaseUrl = () => {
-        if (Capacitor.getPlatform() === 'android') {
-          // 10.0.2.2 points to host machine from Android emulator
-          return 'http://10.0.2.2:8080';
+
+      function getTileAndGlyphURLs() {
+        if (Capacitor.getPlatform() === "android") {
+          // Android → tiles/fonts bundled in app/src/main/assets/public/data
+          return {
+            tiles: "file:///android_asset/public/data/tiles/{z}/{x}/{y}.pbf",
+            glyphs: "file:///android_asset/public/data/fonts/{fontstack}/{range}.pbf",
+          };
+        } else {
+          // iOS + Web → use public folder from web build
+          return {
+            tiles: `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`,
+            glyphs: `${window.location.origin}/data/fonts/{fontstack}/{range}.pbf`,
+          };
         }
-        return window.location.origin;
-      };
+      }
       
-      const baseUrl = getBaseUrl();
-      let tiles = `${baseUrl}/data/tiles/{z}/{x}/{y}.pbf`;
-      let glyphs = `${baseUrl}/data/{fontstack}/{range}.pbf`;
+      const { tiles, glyphs } = getTileAndGlyphURLs();
       
-      console.log('🗺️ Tile URL configured:', tiles);
+      console.log("🗺️ Tile URL configured:", tiles);
       
       const vectorSource = { 
-        type: 'vector' as const, 
+        type: "vector" as const, 
         tiles: [tiles], 
         minzoom: 10, 
         maxzoom: 16, 
-        scheme: 'xyz' as const, 
-      }; 
+        scheme: "xyz" as const, 
+      };
       
       const style = { 
         version: 8 as const, 
         glyphs: glyphs, 
-        sources: { 'nyc-tiles': vectorSource }, 
-        layers: [ { 
-          id: 'background', 
-          type: 'background', 
-          paint: { 'background-color': '#F5F5DC' }, 
-        }, ], 
-      } as any;
+        sources: { "nyc-tiles": vectorSource }, 
+        layers: [ 
+          { 
+            id: "background", 
+            type: "background", 
+            paint: { "background-color": "#F5F5DC" }, 
+          }, 
+        ], 
+      };
       
       const mapInstance = new maplibregl.Map({ 
         container: mapContainerRef.current!, 
@@ -557,8 +574,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         maxZoom: 18, 
         minZoom: 9, 
         renderWorldCopies: false, 
-        attributionControl: false 
-      } as any );
+        attributionControl: false, 
+      } as any);
       
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
       
