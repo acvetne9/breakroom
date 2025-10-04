@@ -61,55 +61,58 @@ const MobileApp: React.FC = () => {
   const { isFirstSession, loading: deviceLoading } = useDevice();
 
   useEffect(() => {
-  if (hasInitialized.current) {
-    console.log('Skipping duplicate initialization (StrictMode)');
-    return;
-  }
-  
-  if (deviceLoading) {
-    console.log('Waiting for device initialization...');
-    return;
-  }
-  
-  hasInitialized.current = true;
-  console.log('MobileApp initialization starting');
-  
-  const initializeApp = async () => {
-    try {
-      console.log('Debug - isFirstSession:', isFirstSession);
-      
-      const { hasCurrentJob, getCurrentJob } = await import('../services/currentJobs');
-      const hasJob = await hasCurrentJob();
-      
-      console.log('Current job check:', hasJob);
-      
-      if (hasJob) {
-        const currentJob = await getCurrentJob();
-        if (currentJob) {
-          setUserData({
-            salary: `$${currentJob.salary}`,
-            role: currentJob.role,
-            location: currentJob.location,
-            fullLocation: currentJob.location,
-            timePeriod: currentJob.time_period || 'HR'
-          });
-          console.log('Loaded user data:', currentJob);
-        }
-        console.log('Job found - going to main view');
-        setCurrentView('main');
-      } else if (isFirstSession) {
-        console.log('First session - going to main');
-        setCurrentView('main');
-      } else {
-        console.log('Not first session, no job - showing initiation');
-        setCurrentView('initiation');
-      }
-    } catch (error) {
-      console.error('Error during app initialization:', error);
-      setCurrentView('main');
+    if (hasInitialized.current) {
+      console.log('Skipping duplicate initialization (StrictMode)');
+      return;
     }
-  };
     
+    if (deviceLoading) {
+      console.log('Waiting for device initialization...');
+      return;
+    }
+    
+    hasInitialized.current = true;
+    console.log('MobileApp initialization starting');
+    
+    const initializeApp = async () => {
+      try {
+        console.log('Debug - isFirstSession:', isFirstSession);
+        
+        const { hasCurrentJob, getCurrentJob } = await import('../services/currentJobs');
+        const hasJob = await hasCurrentJob();
+        
+        console.log('Current job check:', hasJob);
+        
+        if (hasJob) {
+          const currentJob = await getCurrentJob();
+          if (currentJob) {
+            setUserData({
+              salary: `$${currentJob.salary}`,
+              role: currentJob.role,
+              location: currentJob.location,
+              fullLocation: currentJob.location,
+              timePeriod: currentJob.time_period || 'HR'
+            });
+            console.log('Loaded user data:', currentJob);
+          }
+          console.log('Job found - going to main view');
+          setCurrentView('main');
+        } else if (isFirstSession) {
+          console.log('First session - going to main');
+          setCurrentView('main');
+        } else {
+          console.log('Not first session, no job - showing initiation');
+          setCurrentView('initiation');
+        }
+      } catch (error) {
+        console.error('Error during app initialization:', error);
+        setCurrentView('main');
+      }
+    };
+  
+    initializeApp();
+  }, [isFirstSession, deviceLoading]);
+
   const handleInitiationComplete = async (data: UserData) => {
     setUserData(data);
     setCurrentView('main');
