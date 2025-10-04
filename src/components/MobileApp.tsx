@@ -76,32 +76,8 @@ const MobileApp: React.FC = () => {
   
   const initializeApp = async () => {
     try {
-      // Check if profile exists in database
-      const { data: { user } } = await supabase.auth.getUser();
-      let profileExists = false;
+      console.log('Debug - isFirstSession:', isFirstSession);
       
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        profileExists = !!profile;
-      } else {
-        const storedDeviceId = localStorage.getItem('device_id');
-        if (storedDeviceId) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('temp_user_id', storedDeviceId)
-            .maybeSingle();
-          profileExists = !!profile;
-        }
-      }
-      
-      console.log('Profile exists:', profileExists);
-      
-      // Check for current job
       const { hasCurrentJob, getCurrentJob } = await import('../services/currentJobs');
       const hasJob = await hasCurrentJob();
       
@@ -121,13 +97,11 @@ const MobileApp: React.FC = () => {
         }
         console.log('Job found - going to main view');
         setCurrentView('main');
-      } else if (!profileExists || isFirstSession) {
-        // No profile yet OR profile just created - skip initiation
-        console.log('Profile just created or does not exist - going to main');
+      } else if (isFirstSession) {
+        console.log('First session - going to main');
         setCurrentView('main');
       } else {
-        // Profile exists, no job, and not first session - show initiation
-        console.log('No job found - showing initiation');
+        console.log('Not first session, no job - showing initiation');
         setCurrentView('initiation');
       }
     } catch (error) {
@@ -135,10 +109,7 @@ const MobileApp: React.FC = () => {
       setCurrentView('main');
     }
   };
-  
-  initializeApp();
-}, [isFirstSession, deviceLoading]);
-
+    
   const handleInitiationComplete = async (data: UserData) => {
     setUserData(data);
     setCurrentView('main');
