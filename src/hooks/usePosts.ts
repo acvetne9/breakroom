@@ -28,7 +28,7 @@ export const usePosts = () => {
           .select('*');
 
         // Get current user ID once to avoid race conditions
-        const currentUserId = await getUserProfile();
+        const { profileId: currentUserId } = await getUserProfile();
 
         // Transform posts with cached user ID
         const transformedPosts = await Promise.all(
@@ -85,7 +85,7 @@ export const usePosts = () => {
 
       if (data) {
         // Get current user ID and transform the new post
-        const currentUserId = await getUserProfile();
+        const { profileId: currentUserId } = await getUserProfile();
         const newPost = await transformPost(data, [], currentUserId);
         setPosts(prevPosts => [newPost, ...prevPosts]);
         return true;

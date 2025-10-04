@@ -4,6 +4,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import InitiationPage from './InitiationPage';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useDevice } from '@/contexts/DeviceContext';
 
 const HomePage = React.lazy(() => import('./HomePage'));
 const SettingsPage = React.lazy(() => import('./SettingsPage'));
@@ -37,9 +39,10 @@ interface Post {
 }
 
 const MobileApp: React.FC = () => {
+  console.log('🚀 MobileApp component rendering');
   const isMobile = useIsMobile();
-  const [currentView, setCurrentView] = useState<'initiation' | 'main'>('main'); // Default to main, will check on mount
-  const [checkingJob, setCheckingJob] = useState(true);
+  const { user } = useAuth();
+  const [currentView, setCurrentView] = useState<'initiation' | 'main'>('main');
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
   const [userData, setUserData] = useState<UserData | null>(null);
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
@@ -52,61 +55,113 @@ const MobileApp: React.FC = () => {
   const constraintsRef = useRef(null);
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
 
-  // Check if user has a current job on mount
-  useEffect(() => {
-    const checkCurrentJob = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
-          // If no user, skip initiation
-          setCurrentView('main');
-          setCheckingJob(false);
-          return;
-        }
+  // Ref to prevent double initialization in React 18 StrictMode
+  const hasInitialized = useRef(false);
 
-        const { data, error } = await supabase
-          .from('current_jobs')
-          .select('*')
+  const { isFirstSession, loading: deviceLoading } = useDevice();
+
+  useEffect(() => {
+  if (hasInitialized.current) {
+    console.log('Skipping duplicate initialization (StrictMode)');
+    return;
+  }
+  
+  if (deviceLoading) {
+    console.log('Waiting for device initialization...');
+    return;
+  }
+  
+  hasInitialized.current = true;
+  console.log('MobileApp initialization starting');
+  
+  const initializeApp = async () => {
+    try {
+      // Check if profile exists in database
+      const { data: { user } } = await supabase.auth.getUser();
+      let profileExists = false;
+      
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
           .eq('user_id', user.id)
           .maybeSingle();
-
-        if (error) {
-          console.error('Error checking current job:', error);
-          setCurrentView('main');
-        } else if (data) {
-          // User has a current job, skip initiation
-          setCurrentView('main');
-        } else {
-          // User has no current job, show initiation
-          setCurrentView('initiation');
+        profileExists = !!profile;
+      } else {
+        const storedDeviceId = localStorage.getItem('device_id');
+        if (storedDeviceId) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('temp_user_id', storedDeviceId)
+            .maybeSingle();
+          profileExists = !!profile;
         }
-      } catch (err) {
-        console.error('Error checking current job:', err);
-        setCurrentView('main');
-      } finally {
-        setCheckingJob(false);
       }
-    };
-
-    checkCurrentJob();
-  }, []);
-
-  // Remove local posts state - now handled by backend
+      
+      console.log('Profile exists:', profileExists);
+      
+      // Check for current job
+      const { hasCurrentJob, getCurrentJob } = await import('../services/currentJobs');
+      const hasJob = await hasCurrentJob();
+      
+      console.log('Current job check:', hasJob);
+      
+      if (hasJob) {
+        const currentJob = await getCurrentJob();
+        if (currentJob) {
+          setUserData({
+            salary: `$${currentJob.salary}`,
+            role: currentJob.role,
+            location: currentJob.location,
+            fullLocation: currentJob.location,
+            timePeriod: currentJob.time_period || 'HR'
+          });
+          console.log('Loaded user data:', currentJob);
+        }
+        console.log('Job found - going to main view');
+        setCurrentView('main');
+      } else if (!profileExists || isFirstSession) {
+        // No profile yet OR profile just created - skip initiation
+        console.log('Profile just created or does not exist - going to main');
+        setCurrentView('main');
+      } else {
+        // Profile exists, no job, and not first session - show initiation
+        console.log('No job found - showing initiation');
+        setCurrentView('initiation');
+      }
+    } catch (error) {
+      console.error('Error during app initialization:', error);
+      setCurrentView('main');
+    }
+  };
+  
+  initializeApp();
+}, [isFirstSession, deviceLoading]);
 
   const handleInitiationComplete = async (data: UserData) => {
     setUserData(data);
     setCurrentView('main');
     
-    // Save job data to database (only if authenticated)
+    // Save job data to database
     try {
+      // Save current job
+      const { saveCurrentJob } = await import('../services/currentJobs');
+      const salary = parseInt(data.salary.replace(/[^0-9]/g, '')) || 0;
+      await saveCurrentJob({
+        role: data.role,
+        salary: salary,
+        location: data.location,
+        time_period: data.timePeriod || 'HR'
+      });
+      
+      // Save business role
       const { createOrUpdateBusinessRole } = await import('../services/businesses');
       await createOrUpdateBusinessRole(data.location, data.role, data.salary);
-      console.log('Job role saved to database:', { location: data.location, role: data.role, salary: data.salary });
+      console.log('Job saved to database:', { location: data.location, role: data.role, salary: data.salary });
       
-      // Create job update post in backend
+      // Create job update post
       const { createPost } = await import('../services/posts');
-      const salary = parseInt(data.salary.replace(/[^0-9]/g, '')) || 0;
       await createPost(
         `New Job Update! ${data.salary}/${data.timePeriod || 'HR'} for ${data.role} 😳`,
         'job_update',
@@ -116,8 +171,8 @@ const MobileApp: React.FC = () => {
         salary
       );
     } catch (error) {
-      console.warn('Could not save job data to database (user not authenticated):', error);
-      // Continue without showing error to user since this is optional functionality
+      console.error('Error saving job data:', error);
+      // Continue to main view even if save fails
     }
   };
 

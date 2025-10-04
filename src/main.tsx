@@ -8,33 +8,50 @@ const isCapacitor = () => {
   return !!(window as any).Capacitor || window.location.protocol === 'capacitor:';
 };
 
-// Register service worker to normalize .pbf headers on the fly (web only)
+// Register service worker to handle tile decompression on web
+// On Capacitor, we use fetch patching instead (see capacitorTileHandler.ts)
 if ('serviceWorker' in navigator && !isCapacitor()) {
+  console.log('🌐 Web environment detected - registering service worker for tiles');
+  
   window.addEventListener('load', async () => {
     try {
-      // Unregister any existing service workers first
+      // Unregister any old service workers first
       const registrations = await navigator.serviceWorker.getRegistrations();
       for (const registration of registrations) {
         await registration.unregister();
-        console.log('🧩 Unregistered old service worker');
+        console.log('🧹 Unregistered old service worker');
       }
       
       // Register new service worker
-      const reg = await navigator.serviceWorker.register('/tiles-sw.js', { 
+      const registration = await navigator.serviceWorker.register('/tiles-sw.js', { 
         scope: '/' 
       });
-      console.log('🧩 Service worker registered for tiles:', reg.scope);
+      console.log('✅ Service worker registered:', registration.scope);
       
-      // Force activation
-      if (reg.waiting) {
-        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      // Force immediate activation if waiting
+      if (registration.waiting) {
+        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
       }
+      
+      // Wait for the service worker to be active and controlling
+      await navigator.serviceWorker.ready;
+      console.log('✅ Service worker is ready and active');
+      
+      // Store SW ready state globally for map initialization
+      (window as any).__SW_READY__ = true;
+      
     } catch (err) {
-      console.log('🧩 Service worker registration failed:', err);
+      console.error('❌ Service worker registration failed:', err);
+      // Mark as ready anyway so app doesn't hang
+      (window as any).__SW_READY__ = true;
     }
   });
 } else if (isCapacitor()) {
-  console.log('🔧 Running in Capacitor - service worker disabled, using tile patching');
+  console.log('📱 Capacitor environment detected - service worker disabled (using fetch patching)');
+  (window as any).__SW_READY__ = true; // No SW needed on Capacitor
+} else {
+  console.log('⚠️ Service workers not supported in this environment');
+  (window as any).__SW_READY__ = true;
 }
 
 createRoot(document.getElementById("root")!).render(

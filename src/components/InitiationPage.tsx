@@ -97,7 +97,13 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   const checkForCompletion = () => {
     const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
     const isValidRole = JOB_OPTIONS.includes(role.trim()) || role.trim() === 'Other';
-    if (allFilled && isValidRole && !isComplete) {
+    
+    // Business validation: either selected from dropdown OR new business with valid address
+    const businessValidFromDropdown = fullLocation && fullLocation !== location;
+    const businessValidNewBusiness = showNewBusinessForm && newBusinessAddress.trim() !== '' && isValidAddress(newBusinessAddress);
+    const businessValid = businessValidFromDropdown || businessValidNewBusiness;
+    
+    if (allFilled && isValidRole && businessValid && !isComplete) {
       setIsComplete(true);
 
       // Delay to allow for UI animations if needed

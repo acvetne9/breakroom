@@ -2,122 +2,88 @@ import { supabase } from "@/integrations/supabase/client";
 
 // Cache for user profile to avoid race conditions
 let cachedProfileId: string | null = null;
-let profilePromise: Promise<string> | null = null;
+let profilePromise: Promise<{ profileId: string; wasCreated: boolean }> | null = null;
 
-// Get or create user profile in profiles table
-export const getUserProfile = async (): Promise<string> => {
+// Global flag to ensure single initialization across the app
+let isInitializing = false;
+
+// Get user profile (fetch only, doesn't create)
+export const getUserProfile = async (): Promise<{ profileId: string; wasCreated: boolean }> => {
+  console.log('🔐 getUserProfile called - cached:', !!cachedProfileId);
+  
   // Return cached profile if available
   if (cachedProfileId) {
-    return cachedProfileId;
+    console.log('✅ Returning cached profile:', cachedProfileId);
+    return { profileId: cachedProfileId, wasCreated: false };
   }
   
   // Return existing promise if one is in progress
   if (profilePromise) {
+    console.log('⏳ Returning existing profile promise');
     return profilePromise;
   }
   
-  // Create new promise for profile creation
+  // Create new promise for profile fetch
   profilePromise = (async () => {
+    console.log('🚀 Fetching user profile');
     const { data: { user } } = await supabase.auth.getUser();
     
     if (user) {
-      // Authenticated user - find or create their profile
-      let { data: profile } = await supabase
+      console.log('👤 Authenticated user detected:', user.id);
+      const { data: profile } = await supabase
         .from('profiles')
         .select('id')
         .eq('user_id', user.id)
         .maybeSingle();
       
       if (!profile) {
-        // Try to create profile, handle conflicts gracefully
-        const { data: newProfile, error } = await supabase
-          .from('profiles')
-          .insert({
-            user_id: user.id,
-            display_name: user.email?.split('@')[0] || 'User',
-            is_authenticated: true
-          })
-          .select('id')
-          .single();
-        
-        if (error && error.code === '23505') {
-          // Profile already exists due to race condition, fetch it
-          const { data: existingProfile } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('user_id', user.id)
-            .single();
-          profile = existingProfile;
-        } else if (error) {
-          throw error;
-        } else {
-          profile = newProfile;
-        }
+        throw new Error('Profile not found for authenticated user');
       }
       
-      cachedProfileId = profile!.id;
-      return profile!.id;
+      cachedProfileId = profile.id;
+      console.log('💾 Cached profile ID:', cachedProfileId);
+      return { profileId: profile.id, wasCreated: false };
     } else {
-      // Unauthenticated user - use temp profile
-      let tempUserId = localStorage.getItem('tempUserId');
-      if (!tempUserId) {
-        tempUserId = crypto.randomUUID();
-        localStorage.setItem('tempUserId', tempUserId);
+      console.log('👻 Unauthenticated user - using device ID');
+      let deviceId = localStorage.getItem('device_id');
+      
+      if (!deviceId) {
+        throw new Error('Device ID not found');
       }
       
-      // Find existing temp profile
-      let { data: profile } = await supabase
+      const { data: profile } = await supabase
         .from('profiles')
         .select('id')
-        .eq('temp_user_id', tempUserId)
+        .eq('temp_user_id', deviceId)
         .maybeSingle();
       
       if (!profile) {
-        // Try to create profile, handle conflicts gracefully
-        const { data: newProfile, error } = await supabase
-          .from('profiles')
-          .insert({
-            user_id: null,
-            temp_user_id: tempUserId,
-            display_name: 'Anonymous User',
-            is_authenticated: false
-          })
-          .select('id')
-          .single();
-        
-        if (error && error.code === '23505') {
-          // Profile already exists due to race condition, fetch it
-          const { data: existingProfile } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('temp_user_id', tempUserId)
-            .single();
-          profile = existingProfile;
-        } else if (error) {
-          throw error;
-        } else {
-          profile = newProfile;
-        }
+        throw new Error('Profile not found for device');
       }
       
-      cachedProfileId = profile!.id;
-      return profile!.id;
+      cachedProfileId = profile.id;
+      console.log('💾 Cached profile ID:', cachedProfileId);
+      return { profileId: profile.id, wasCreated: false };
     }
   })();
   
   try {
     const result = await profilePromise;
-    profilePromise = null; // Clear promise after completion
+    profilePromise = null;
+    console.log('✅ getUserProfile completed:', result);
     return result;
   } catch (error) {
-    profilePromise = null; // Clear promise on error
+    profilePromise = null;
+    cachedProfileId = null;
+    console.error('❌ getUserProfile failed:', error);
     throw error;
   }
 };
 
 // Retrieve authenticated user ID or temporary ID for backwards compatibility
 const getUserId = async (): Promise<string> => {
-  return getUserProfile();
+  const { profileId } = await getUserProfile();
+  return profileId;
 };
 
 export interface PostData {
@@ -309,7 +275,7 @@ export const getUserVotes = async (postIds: string[]): Promise<{ [postId: string
 // Delete a post
 export const deletePost = async (postId: string): Promise<{ success: boolean; error?: any }> => {
   // Get current user's profile ID
-  const currentProfileId = await getUserProfile();
+  const { profileId: currentProfileId } = await getUserProfile();
   
   // Get the post to check ownership
   const { data: post, error: fetchError } = await supabase

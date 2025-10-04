@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import maplibregl from 'maplibre-gl';
 import type { LayerSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { MapboxOverlay } from '@deck.gl/mapbox'; // use this package
+import { MapboxOverlay } from '@deck.gl/mapbox';
 import { createBusinessScatterplotLayer, createEmojiLandmarkLayer } from '@/utils/deckGLLayers';
 import { useViewportMapData } from '../hooks/useViewportMapData';
 import { useViewportBusinesses } from '../hooks/useViewportBusinesses';
@@ -66,6 +66,8 @@ const featureToLatLon = (feature: Feature<Point> | { lat: number; lon: number })
   throw new Error('Invalid feature for conversion to lat/lon');
 };
 
+// Profile management is now handled by DeviceContext
+
 const createOptimizedGridSampling = (bounds: Bounds, businesses: Business[], maxBusinesses: number = 1000000, prioritizeVisible: boolean = false): Business[] => {
   if (!businesses || businesses.length <= maxBusinesses) return businesses;
 
@@ -123,7 +125,7 @@ class BusinessCache {
   private persist() {
     try {
       const data = Array.from(this.cache.values());
-      localStorage.setItem(this.storageKey, JSON.stringify(data));
+      sessionStorage.setItem(this.storageKey, JSON.stringify(data));
     } catch (err) {
       console.warn('⚠️ Failed to persist business cache', err);
     }
@@ -131,13 +133,13 @@ class BusinessCache {
 
   private loadFromStorage() {
     try {
-      const stored = localStorage.getItem(this.storageKey);
+      const stored = sessionStorage.getItem(this.storageKey);
       if (stored) {
         const arr: (Business & { detailsLoaded?: boolean })[] = JSON.parse(stored);
         arr.forEach(b => {
           if (b?.id) this.cache.set(b.id, b);
         });
-        console.log(`✅ Restored ${this.cache.size} businesses from localStorage`);
+        console.log(`✅ Restored ${this.cache.size} businesses from sessionStorage`);
       }
     } catch (err) {
       console.warn('⚠️ Failed to restore business cache', err);
@@ -162,9 +164,7 @@ class BusinessCache {
     if (!Array.isArray(businesses)) return;
   
     if (replace) {
-      // build a set of incoming IDs
       const incomingIds = new Set(businesses.map(b => b.id));
-      // remove anything not in incoming
       for (const id of this.cache.keys()) {
         if (!incomingIds.has(id)) this.cache.delete(id);
       }
@@ -187,18 +187,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   enableClustering = true,
   isClusteredData = false
 }) => {
-  // state & refs
   const [mapLoaded, setMapLoaded] = useState(false);
   const [deckOverlay, setDeckOverlay] = useState<MapboxOverlay | null>(null);
   const [overlayReady, setOverlayReady] = useState(false);
 
-  // refs - simplified
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
   const layersAddedRef = useRef(false);
-  // Add loading state ref to prevent multiple calls
   const lastBoundsRef = useRef<string>('');
+
+  // Profile logic now handled by DeviceContext and MobileApp
 
   useEffect(() => {
     const canvas = document.createElement("canvas");
@@ -213,10 +212,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const callbackRefs = useRef({ onBusinessClick, onMapLoaded, onBusinessesLoaded });
   useEffect(() => { callbackRefs.current = { onBusinessClick, onMapLoaded, onBusinessesLoaded }; }, [onBusinessClick, onMapLoaded, onBusinessesLoaded]);
 
-  // hooks - simplified to single source of truth
   const { businesses, loading, loadBusinessesInViewport, fetchFullBusinessDetails, isSearching } = useViewportBusinesses(searchFilters);
 
-  // Simplified: Just trigger callback when businesses are loaded
   useEffect(() => {
     if (businesses && businesses.length > 0) {
       callbackRefs.current.onBusinessesLoaded?.();
@@ -260,7 +257,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, []);
 
-  // vector layers (styling restored exactly as requested)
   const addVectorLayers = useCallback((map: maplibregl.Map) => {
     try {
       const layers: LayerSpecification[] = [
@@ -325,13 +321,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       
       layers.forEach(layer => {
         try {
-          // Debug: log the layer before adding
           console.log("🔍 Validating layer:", layer.id, layer);
       
-          // Ensure layout object exists for symbol layers
           if (layer.type === "symbol" && !("layout" in layer)) {
             console.warn(`⚠️ Missing layout for symbol layer: ${layer.id}`);
-            (layer as any).layout = { "text-field": "" }; // minimal fallback
+            (layer as any).layout = { "text-field": "" };
           }
       
           if (!map.getLayer(layer.id)) {
@@ -352,14 +346,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, []);
 
   const getBusinessLimitForViewport = useCallback((zoom: number) => {
-    // For search results, show more businesses across all zoom levels
     if (searchFilters) {
       if (zoom < 10) return 20000;
       if (zoom < 12) return 35000;
       if (zoom < 14) return 50000;
       return 80000;
     }
-    // Regular browsing limits
     if (zoom < 10) return 5000;
     if (zoom < 12) return 15000;
     if (zoom < 14) return 40000;
@@ -368,14 +360,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return 200000;
   }, [searchFilters]);
 
-  // Updated handleBusinessClick with fly-to behavior
   const handleBusinessClick = useCallback(async (business: any) => {
     if (!business || !callbackRefs.current.onBusinessClick) return;
   
     try {
       let businessToReturn = business;
   
-      // Fly to the business on map
       if (mapRef.current && business?.position?.lat && business?.position?.lng) {
         mapRef.current.flyTo({
           center: [business.position.lng, business.position.lat],
@@ -386,7 +376,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         });
       }
   
-      // Load full details if needed  
       if (business.id && !business.id.startsWith('vector_') && fetchFullBusinessDetails) {
         const full = await fetchFullBusinessDetails(business.id);
         if (full) {
@@ -402,7 +391,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [fetchFullBusinessDetails]);
 
-  // Trigger load ONLY on search filter changes - prevent multiple calls
   useEffect(() => {
     if (mapLoaded && mapRef.current && searchFilters) {
       const timeout = setTimeout(() => {
@@ -423,7 +411,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const deckGLLayers = useMemo(() => {
     const layers: any[] = [];
 
-    // Add emoji landmarks layer first (renders behind businesses)
     if (landmarks && landmarks.length > 0) {
       try {
         const emojiLayer = createEmojiLandmarkLayer({ landmarks });
@@ -434,15 +421,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     }
 
-    // Add business scatterplot layer on top
     if (businesses && businesses.length > 0) {
-      // Ensure each business has valid lat/lng
       let validBusinesses = businesses.filter(
         b => b?.position?.lat != null && b?.position?.lng != null
       );
       
       if (validBusinesses.length > 0) {
-        // Handle neighborhood filter if present
         if (searchFilters?.neighborhoodFilter?.boundary?.length) {
           const neighborhoodCoords = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
           if (neighborhoodCoords.length) {
@@ -491,7 +475,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   
     const boundsKey = `${viewportBounds.north.toFixed(4)}-${viewportBounds.south.toFixed(4)}-${viewportBounds.east.toFixed(4)}-${viewportBounds.west.toFixed(4)}`;
   
-    // Prevent duplicate calls for same viewport within 1s (reduced from 2s)
     const now = Date.now();
     if (lastBoundsRef.current === boundsKey && now - lastLoadTimeRef.current < 250) {
       return;
@@ -503,40 +486,49 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     try {
       console.log(`🗺️ Loading businesses for viewport: ${boundsKey}`);
       const limit = getBusinessLimitForViewport(zoom);
-      await loadBusinessesInViewport?.(viewportBounds, limit, true); // Pass isMoving=true
+      await loadBusinessesInViewport?.(viewportBounds, limit, true);
     } catch (err) {
       console.error("❌ Error loading businesses:", err);
     }
   }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport]);
 
-  // initialize map once
   useEffect(() => {
     const initializeMap = async () => {
       if (!mapContainerRef.current || mapRef.current) return;
       
-      // Enhanced Capacitor setup with debugging
       if (isCapacitor()) {
-        console.log('🔧 Setting up Capacitor tile handling');
+        console.log('📱 Capacitor detected - setting up fetch patch');
         logCapacitorEnvironment();
         addTileDebugLogs();
         patchTileLoading();
-        
-        // Add a small delay to ensure patching is complete
         await new Promise(resolve => setTimeout(resolve, 200));
+      } else {
+        console.log('🌐 Web detected - waiting for service worker...');
+        let attempts = 0;
+        const maxAttempts = 50;
+        
+        while (!(window as any).__SW_READY__ && attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
+        }
+        
+        if ((window as any).__SW_READY__) {
+          console.log('✅ Service worker ready - initializing map');
+        } else {
+          console.log('⚠️ Service worker not ready after 5s - proceeding anyway');
+        }
       }
 
       function getTileAndGlyphURLs() {
         if (Capacitor.getPlatform() === "android") {
-          // Android → tiles/fonts bundled in app/src/main/assets/public/data
           return {
-            tiles: "file:///android_asset/public/data/tiles/{z}/{x}/{y}.pbf",
-            glyphs: "file:///android_asset/public/data/fonts/{fontstack}/{range}.pbf",
+            tiles: `assets/tiles/{z}/{x}/{y}.pbf`,
+            glyphs: `assets/fonts/{fontstack}/{range}.pbf`,
           };
         } else {
-          // iOS + Web → use public folder from web build
           return {
             tiles: `${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`,
-            glyphs: `${window.location.origin}/data/fonts/{fontstack}/{range}.pbf`,
+            glyphs: `${window.location.origin}/data/{fontstack}/{range}.pbf`,
           };
         }
       }
@@ -579,13 +571,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       
       mapInstance.setMaxBounds([[-74.25909, 40.494399], [-73.700272, 40.917]]);
       
-      // WebGL fallback for emulators
       try {
         const canvas = mapInstance.getCanvas();
         const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
         if (!gl) {
           console.warn('⚠️ WebGL not supported, using canvas fallback');
-          // MapLibre will automatically fall back to canvas rendering
         } else {
           console.log('✅ WebGL supported');
         }
@@ -595,7 +585,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       mapRef.current = mapInstance;
 
-      // Add event listener for flyToBusiness custom event
       const handleFlyToBusiness = (event: CustomEvent) => {
         const { lat, lng } = event.detail;
         if (mapRef.current && lat != null && lng != null) {
@@ -614,11 +603,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       mapInstance.on('error', (e) => {
         console.error('🗺️ Map error:', e.error || e);
         
-        // Handle tile loading errors more gracefully in Capacitor
         if (isCapacitor() && e.error?.message?.includes('Unable to parse the tile')) {
           console.log('🔧 Tile parsing error in Capacitor - attempting recovery');
           
-          // Don't mark as loaded immediately, give tiles another chance
           setTimeout(() => {
             if (!mapLoaded && mapRef.current) {
               console.log('🗺️ Setting map as loaded after tile error recovery attempt');
@@ -627,7 +614,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             }
           }, 2000);
         } else {
-          // For other errors, continue as before
           if (!mapLoaded) {
             console.log('🗺️ Setting map as loaded despite error');
             setMapLoaded(true);
@@ -649,69 +635,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           console.error('❌ Error adding layers:', err);
         }
         
-        // Add more debugging for source and layers
-        setTimeout(() => {
-          console.log('🔍 Checking map sources and layers...');
-          
-          // Check if source exists and is loaded
-          const source = mapInstance.getSource('nyc-tiles');
-          console.log('🔍 NYC tiles source:', source);
-          
-          // Check all layers in the map
-          const style = mapInstance.getStyle();
-          console.log('🔍 Map style layers:', style.layers.map(l => ({ 
-            id: l.id, 
-            type: l.type, 
-            source: 'source' in l ? l.source : 'no-source' 
-          })));
-          
-          // Check specifically for your layers
-          const roadLayer = mapInstance.getLayer('nyc-roads');
-          const labelLayer = mapInstance.getLayer('nyc-road-labels');
-          console.log('🔍 Road layer exists:', !!roadLayer, roadLayer);
-          console.log('🔍 Label layer exists:', !!labelLayer, labelLayer);
-          
-          // Try to query a larger area to see if ANY features exist
-          const bounds = mapInstance.getBounds();
-          const bbox = [
-            [bounds.getWest(), bounds.getSouth()],
-            [bounds.getEast(), bounds.getNorth()]
-          ];
-          
-          try {
-            const allFeatures = mapInstance.queryRenderedFeatures(undefined, { layers: ['nyc-roads'] });
-            console.log('🔍 All road features in viewport:', allFeatures.length, allFeatures);
-          } catch (e) {
-            console.log('❌ Could not query road features:', e);
-          }
-          
-          // Test tile URL directly
-          const zoom = Math.floor(mapInstance.getZoom());
-          const center = mapInstance.getCenter();
-          const tileZ = zoom;
-          const tileX = Math.floor((center.lng + 180) / 360 * Math.pow(2, tileZ));
-          const tileY = Math.floor((1 - Math.log(Math.tan(center.lat * Math.PI / 180) + 1 / Math.cos(center.lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, tileZ));
-          
-          const testTileUrl = `${window.location.origin}/data/tiles/${tileZ}/${tileX}/${tileY}.pbf`;
-          console.log('🔍 Testing tile URL:', testTileUrl);
-          
-          // Test if the tile URL is accessible
-          fetch(testTileUrl)
-            .then(response => {
-              console.log('🔍 Tile fetch response:', response.status, response);
-              if (!response.ok) {
-                console.error('❌ Tile not found at:', testTileUrl);
-              } else {
-                console.log('✅ Tile exists and is accessible');
-              }
-            })
-            .catch(error => {
-              console.error('❌ Tile fetch error:', error);
-            });
-            
-        }, 2000);
-        
-        // Load businesses for the initial viewport
         setTimeout(() => {
           if (mapRef.current && !loading) {
             handleViewportChange();
@@ -719,7 +642,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         }, 1000);
       });
 
-      // Add interaction event listeners
       mapInstance.on('click', (e) => {
         const features = mapInstance.queryRenderedFeatures(e.point);
         if (features && features.length > 0) {
@@ -731,7 +653,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         }
       });
 
-      // Handle deck.gl overlay initialization
       try {
         const overlay = new MapboxOverlay({
           interleaved: true,
@@ -746,7 +667,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         console.error('❌ Failed to initialize Deck.GL overlay:', overlayError);
       }
 
-      // Cleanup function
       return () => {
         window.removeEventListener('flyToBusiness', handleFlyToBusiness as EventListener);
         if (mapRef.current) {
@@ -759,7 +679,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     initializeMap();
   }, []);
 
-  // update deck layers
   useEffect(() => {
     if (!deckOverlay || !overlayReady) return;
     deckOverlay.setProps({ layers: deckGLLayers });
@@ -772,7 +691,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [businesses, deckOverlay, overlayReady, deckGLLayers]);
 
-  // Set up move/zoom event listeners - updates when handleViewportChange changes
   useEffect(() => {
     if (!mapRef.current || !mapLoaded) return;
 
@@ -791,7 +709,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, [mapLoaded, handleViewportChange]);
 
-  // Initial load when map is ready - SINGLE TRIGGER
   useEffect(() => {
     if (mapLoaded && !businesses?.length && !loading) {
       const timeout = setTimeout(() => handleViewportChange(), 2000);
@@ -799,7 +716,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded, handleViewportChange]);
 
-  // center/load neighborhood center
   const isUserInteractingRef = useRef(false);
   useEffect(() => {
     if (!mapRef.current || !mapLoaded) return;
@@ -815,7 +731,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     map.on("zoomstart", onZoomStart);
     map.on("zoomend", onZoomEnd);
 
-    // Add road labels layer after map is loaded and only if it doesn't exist
     if (mapLoaded && !map.getLayer("nyc-road-labels")) {
       try {
         map.addLayer({
@@ -829,13 +744,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             [
               "match",
               ["get", "highway"],
-              // Always show these (major roads)
               ["motorway", "trunk", "primary", "secondary", "tertiary"],
               true,
-              // Show local roads only when zoom >= 14
               ["step",
                 ["zoom"],
-                false,                // below 14 → don't show
+                false,
                 14, ["in", ["get", "highway"], ["literal", ["residential", "unclassified", "living_street"]]]
               ]
             ]
@@ -845,9 +758,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             "text-font": ["OpenSansArialUnicode"],
             "text-size": [
               "interpolate", ["linear"], ["zoom"],
-              12, 9,   // smaller zoom
+              12, 9,
               15, 11,
-              17, 13   // bigger zoom
+              17, 13
             ],
             "symbol-placement": "line",
             "text-rotation-alignment": "map",
@@ -884,13 +797,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (!mapRef.current || !mapLoaded || !searchFilters?.neighborhoodFilter || !neighborhoodCenter) return;
   
-    // cancel if user is scrolling
     if (isUserInteractingRef.current) {
       console.log("⏸️ User interacting with map, skipping auto-fly");
       return;
     }
   
-    // debounce until search input idle (e.g., 800ms after last change)
     const timeout = setTimeout(() => {
       if (!isUserInteractingRef.current && mapRef.current) {
         console.log("✈️ Flying to neighborhood center");
@@ -906,7 +817,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return () => clearTimeout(timeout);
   }, [searchFilters?.neighborhoodFilter, neighborhoodCenter, mapLoaded]);
 
-  // Load businesses ONLY when search filters change
   useEffect(() => {
     if (mapLoaded && searchFilters?.neighborhoodFilter) {
       const timeout = setTimeout(() => handleViewportChange(), 500);
@@ -914,11 +824,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded, searchFilters?.neighborhoodFilter, handleViewportChange]);
 
-  // landmarks handling (unchanged)
   useEffect(() => {
     if (!mapLoaded || !Array.isArray(landmarks) || landmarks.length === 0 || !mapRef.current) return;
 
-    // remove old markers
     landmarkMarkersRef.current.forEach(marker => { try { marker.remove(); } catch {} });
     landmarkMarkersRef.current = [];
 

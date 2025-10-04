@@ -249,11 +249,6 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
 
       setBusinesses(prev => [...prev, newBusiness]);
 
-      toast({
-        title: "Business created!",
-        description: "New business has been added to the map",
-      });
-
       setInternalShowAddForm(false);
       setInternalAddress('');
     } catch (error) {

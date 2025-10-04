@@ -681,7 +681,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             <p className="text-sm text-app-gray-dark">
               <strong>Disclaimer:</strong> The information presented in this app is based on surveys, user input, and publicly available sources. We do not independently verify all information, and it should not be taken as factual statements about any individual or organization.
             </p>
-          </div>}
+            <a href="https://breakroom-privacy-policy.lovable.app/privacy-policy" target="_blank" rel="noopener noreferrer">
+                Privacy Policy
+            </a>
+        </div>}
 
       </div>
     </div>;
