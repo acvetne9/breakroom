@@ -203,9 +203,13 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 500));
 
+      // Set the full address as both location and fullLocation
+      setLocation(address);
+      setFullLocation(address);
       setShowNewBusinessForm(false);
       setNewBusinessAddress('');
       setAddressError('');
+      
       setTimeout(() => checkForCompletion(), 100);
     } catch {
       toast({
