@@ -22,8 +22,18 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
+    signingConfigs {
+        release {
+            storeFile file("${rootDir}/../my-upload-key.jks")
+            storePassword "wofwallen"
+            keyAlias "my-key-alias"
+            keyPassword "wofwallen"
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
             minifyEnabled false
             shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
