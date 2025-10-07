@@ -14,19 +14,17 @@ interface DeviceProviderProps {
 }
 
 function generateDeviceId(): string {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  ctx?.fillText('device-fingerprint', 2, 2);
-  const canvasFingerprint = canvas.toDataURL();
+  // Generate a truly unique ID with timestamp and random components
+  const timestamp = Date.now();
+  const random1 = Math.random().toString(36).substring(2, 15);
+  const random2 = Math.random().toString(36).substring(2, 15);
+  const random3 = Math.random().toString(36).substring(2, 15);
   
+  // Add some browser fingerprint for consistency (but not as the primary uniqueness)
   const screen = `${window.screen.width}x${window.screen.height}`;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const language = navigator.language;
-  const userAgent = navigator.userAgent;
   
-  const fingerprint = btoa(`${canvasFingerprint}-${screen}-${timezone}-${language}-${userAgent}`);
-  
-  return `device_${fingerprint.substring(0, 40)}`;
+  return `device_${timestamp}_${random1}${random2}${random3}_${btoa(screen + timezone).substring(0, 10)}`;
 }
 
 export function DeviceProvider({ children }: DeviceProviderProps) {

@@ -202,13 +202,14 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 500));
-      toast({
-        title: 'Business created!',
-        description: 'New business has been added to the map'
-      });
+
+      // Set the full address as both location and fullLocation
+      setLocation(address);
+      setFullLocation(address);
       setShowNewBusinessForm(false);
       setNewBusinessAddress('');
       setAddressError('');
+      
       setTimeout(() => checkForCompletion(), 100);
     } catch {
       toast({
