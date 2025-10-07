@@ -15,6 +15,9 @@ const config: CapacitorConfig = {
         },
       }
     : {}),
+  "ios": {
+    "path": "ios/breakroom"
+  },
 };
 
 export default config;
