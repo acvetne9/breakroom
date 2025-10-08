@@ -543,19 +543,17 @@ const MobileApp: React.FC = () => {
 
       {/* Swipe detection overlay - only at screen edges */}
       <div 
-        className="absolute inset-0 z-30 pointer-events-none"
+        className="absolute inset-0 z-10 pointer-events-none"
       >
         {/* Left edge swipe area */}
         <div 
-          className="absolute left-0 top-0 w-20 h-full pointer-events-auto"
+          className="absolute left-0 top-0 w-12 h-full pointer-events-auto"
           onTouchStart={(e) => {
             // Prevent swipe if multi-touch (zoom gesture)
             if (currentSlide > 0 && e.touches.length === 1) {
-              e.preventDefault(); // Prevent scroll interference
               const touch = e.touches[0];
               const startX = touch.clientX;
               const handleTouchMove = (moveEvent: TouchEvent) => {
-                moveEvent.preventDefault(); // Prevent scroll during swipe
                 // Check if still single touch
                 if (moveEvent.touches.length !== 1) {
                   document.removeEventListener('touchmove', handleTouchMove);
@@ -582,15 +580,13 @@ const MobileApp: React.FC = () => {
         
         {/* Right edge swipe area */}
         <div 
-          className="absolute right-0 top-0 w-20 h-full pointer-events-auto"
+          className="absolute right-0 top-0 w-12 h-full pointer-events-auto"
           onTouchStart={(e) => {
              // Prevent swipe if multi-touch (zoom gesture)
              if (currentSlide < 2 && e.touches.length === 1) {
-              e.preventDefault(); // Prevent scroll interference
               const touch = e.touches[0];
               const startX = touch.clientX;
               const handleTouchMove = (moveEvent: TouchEvent) => {
-                moveEvent.preventDefault(); // Prevent scroll during swipe
                 // Check if still single touch
                 if (moveEvent.touches.length !== 1) {
                   document.removeEventListener('touchmove', handleTouchMove);
