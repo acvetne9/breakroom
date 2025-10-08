@@ -1,0 +1,10 @@
+{
+	"appId": "com.acvetne.breakroom",
+	"appName": "breakroom",
+	"webDir": "dist",
+	"bundledWebRuntime": false,
+	"ios": {
+		"path": "ios/breakroom/App"
+	},
+	"packageClassList": []
+}

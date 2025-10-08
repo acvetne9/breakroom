@@ -16,7 +16,7 @@ const config: CapacitorConfig = {
       }
     : {}),
   "ios": {
-    "path": "ios/breakroom"
+    "path": "ios"
   },
 };
 
