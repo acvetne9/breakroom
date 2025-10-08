@@ -547,7 +547,7 @@ const MobileApp: React.FC = () => {
       >
         {/* Left edge swipe area */}
         <div 
-          className="absolute left-0 top-0 w-24 h-full pointer-events-auto"
+          className="absolute left-0 top-0 w-12 h-full pointer-events-auto"
           onTouchStart={(e) => {
             // Prevent swipe if multi-touch (zoom gesture)
             if (currentSlide > 0 && e.touches.length === 1) {
@@ -580,7 +580,7 @@ const MobileApp: React.FC = () => {
         
         {/* Right edge swipe area */}
         <div 
-          className="absolute right-0 top-0 w-24 h-full pointer-events-auto"
+          className="absolute right-0 top-0 w-12 h-full pointer-events-auto"
           onTouchStart={(e) => {
              // Prevent swipe if multi-touch (zoom gesture)
              if (currentSlide < 2 && e.touches.length === 1) {

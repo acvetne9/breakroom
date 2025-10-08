@@ -45,7 +45,7 @@ export function patchTileLoading() {
         try {
           const decompressed = pako.inflate(u8);
           console.log(`✅ Decompressed tile: ${url} | new size=${decompressed.length}`);
-          return new Response(decompressed.buffer as ArrayBuffer, {
+          return new Response(decompressed, {
             status: response.status,
             statusText: response.statusText,
             headers: {
