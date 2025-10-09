@@ -20,7 +20,6 @@ interface BusinessDetailsProps {
     id: string;
     name: string;
     atmosphere: string[];
-    salary?: string;
     address?: string;
     stories?: Array<{
       id: string;
@@ -173,7 +172,7 @@ return (
 
                 <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
                   <span className="font-medium text-app-black">
-                    {typeof role.salary === 'string' ? role.salary : (business.salary || '$13.6')}
+                    {typeof role.salary === 'string' ? role.salary : '$13.6'}
                     {!(typeof role.salary === 'string' && role.salary.includes('/')) && (
                       <span className="text-xs text-app-gray-medium ml-1">/hr</span>
                     )}
@@ -191,7 +190,7 @@ return (
               <div className="flex justify-between items-center py-1">
                 <span className="text-app-black">Barista</span>
                 <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
-                  <span className="font-medium text-app-black">{business.salary || '$13.6'}</span>
+                  <span className="font-medium text-app-black">$13.6</span>
                   <VotingComponent
                     upvotes={0}
                     downvotes={0}

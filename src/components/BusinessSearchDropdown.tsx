@@ -237,7 +237,6 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
         name: value,
         position: coordinates,
         atmosphere: [],
-        salary: salary,
         roles: [{
           role: role,
           salary: salary,
@@ -306,7 +305,6 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
             >
               <div className="flex justify-between items-center">
                 <span className="font-medium">{business.name}</span>
-                <span className="text-sm text-muted-foreground">{business.salary}</span>
               </div>
               <div className="flex gap-2 mt-1">
                 <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">

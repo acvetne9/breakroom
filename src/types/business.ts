@@ -12,7 +12,6 @@ export interface Business {
   name: string;
   position: { lat: number; lng: number };
   atmosphere: string[];
-  salary?: string;
   roles?: BusinessRole[];
   detailsLoaded?: boolean;
   businessType?: string;

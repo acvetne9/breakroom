@@ -131,7 +131,7 @@ export const searchBusinessesUnified = async (
     // Load basic businesses from database with minimal filtering
     // (we'll apply the full filtering logic later using applyBusinessFilters)
     let baseQuery = supabase.from('businesses').select(`
-      id, name, lat, lng, atmosphere, business_type, website, salary
+      id, name, lat, lng, atmosphere, business_type, website
     `);
     
     // Apply geographic bounds if specified
@@ -221,7 +221,6 @@ export const searchBusinessesUnified = async (
       name: business.name,
       position: { lat: business.lat, lng: business.lng },
       atmosphere: business.atmosphere || [],
-      salary: business.salary,
       businessType: business.business_type,
       website: business.website,
       roles: allRoles

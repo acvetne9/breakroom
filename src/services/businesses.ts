@@ -172,7 +172,6 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
     businessType: businessData.business_type,
     position: { lat: businessData.lat, lng: businessData.lng },
     atmosphere: businessData.atmosphere || [],
-    salary: businessData.salary,
     roles: businessRoles,
     website: businessData.website,
   };

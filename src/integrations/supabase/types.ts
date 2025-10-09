@@ -69,7 +69,6 @@ export type Database = {
           lat: number
           lng: number
           name: string
-          salary: string | null
           updated_at: string
           website: string | null
         }
@@ -83,7 +82,6 @@ export type Database = {
           lat: number
           lng: number
           name: string
-          salary?: string | null
           updated_at?: string
           website?: string | null
         }
@@ -97,7 +95,6 @@ export type Database = {
           lat?: number
           lng?: number
           name?: string
-          salary?: string | null
           updated_at?: string
           website?: string | null
         }
