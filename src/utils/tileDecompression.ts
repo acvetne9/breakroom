@@ -27,7 +27,7 @@ export async function decompressTile(data: ArrayBuffer, url?: string): Promise<A
     if (url) console.log('🔧 Decompressing gzipped tile:', url);
     try {
       const decompressed = pako.ungzip(bytes);
-      return decompressed.buffer;
+      return decompressed.buffer as ArrayBuffer;
     } catch (e) {
       console.warn('Decompression failed, returning original bytes:', e);
       return data;

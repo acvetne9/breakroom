@@ -545,8 +545,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       }
     }, 100);
   };
-  return <div className="relative w-full h-full flex items-center justify-center">
-      <div ref={scrollContainerRef} className="app-card p-6 overflow-y-auto relative">
+  return <div className="w-full h-full flex items-center justify-center bg-transparent">
+      <div ref={scrollContainerRef} className="app-card p-6 overflow-y-auto w-full h-full max-w-2xl">
         <h1 className="text-xl font-medium text-app-black mb-2">Your Page! 😊</h1>
 
         {/* Neighborhoods
