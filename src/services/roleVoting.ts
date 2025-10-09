@@ -38,19 +38,6 @@ export const handleRoleVote = async (
             .eq('id', existingVote.id);
 
           if (deleteError) throw deleteError;
-
-          // Update business_roles vote counts
-          const { error: updateError } = await supabase
-            .from('business_roles')
-            .update({
-              [voteType === 'up' ? 'upvotes' : 'downvotes']: 
-                Math.max(0, (existingVote.vote_type === 'upvote' ? 
-                  (await getCurrentVoteCount(roleId, 'upvotes')) - 1 :
-                  (await getCurrentVoteCount(roleId, 'downvotes')) - 1))
-            })
-            .eq('id', roleId);
-
-          if (updateError) throw updateError;
         } else {
           // Different vote - update it
           const { error: updateError } = await supabase
@@ -59,20 +46,6 @@ export const handleRoleVote = async (
             .eq('id', existingVote.id);
 
           if (updateError) throw updateError;
-
-          // Update business_roles vote counts (subtract old, add new)
-          const currentUpvotes = await getCurrentVoteCount(roleId, 'upvotes');
-          const currentDownvotes = await getCurrentVoteCount(roleId, 'downvotes');
-
-          const { error: updateRoleError } = await supabase
-            .from('business_roles')
-            .update({
-              upvotes: voteType === 'up' ? currentUpvotes + 1 : Math.max(0, currentUpvotes - 1),
-              downvotes: voteType === 'down' ? currentDownvotes + 1 : Math.max(0, currentDownvotes - 1)
-            })
-            .eq('id', roleId);
-
-          if (updateRoleError) throw updateRoleError;
         }
       } else {
         // New authenticated vote - create it
@@ -85,29 +58,14 @@ export const handleRoleVote = async (
           });
 
         if (insertError) throw insertError;
-
-        // Update business_roles vote counts
-        const currentCount = await getCurrentVoteCount(roleId, voteType === 'up' ? 'upvotes' : 'downvotes');
-        const { error: updateError } = await supabase
-          .from('business_roles')
-          .update({
-            [voteType === 'up' ? 'upvotes' : 'downvotes']: currentCount + 1
-          })
-          .eq('id', roleId);
-
-        if (updateError) throw updateError;
       }
     } else {
-      // Anonymous voting - just update the vote counts directly
-      const currentCount = await getCurrentVoteCount(roleId, voteType === 'up' ? 'upvotes' : 'downvotes');
-      const { error: updateError } = await supabase
-        .from('business_roles')
-        .update({
-          [voteType === 'up' ? 'upvotes' : 'downvotes']: currentCount + 1
-        })
-        .eq('id', roleId);
-
-      if (updateError) throw updateError;
+      // Anonymous voting not supported for database persistence
+      // The trigger will automatically calculate votes_total from role_votes table
+      return { 
+        success: false, 
+        error: 'Anonymous voting requires authentication' 
+      };
     }
 
     return { success: true };
@@ -119,14 +77,3 @@ export const handleRoleVote = async (
     };
   }
 };
-
-async function getCurrentVoteCount(roleId: string, field: 'upvotes' | 'downvotes'): Promise<number> {
-  const { data, error } = await supabase
-    .from('business_roles')
-    .select(field)
-    .eq('id', roleId)
-    .single();
-
-  if (error) throw error;
-  return data?.[field] || 0;
-}

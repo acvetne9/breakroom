@@ -174,7 +174,7 @@ export const searchBusinessesUnified = async (
       const executeBatch = async (ids: string[]) => {
         const { data, error } = await supabase
           .from('business_roles')
-          .select('business_id, id, role, salary, upvotes, downvotes')
+          .select('business_id, id, role, salary, votes_total')
           .in('business_id', ids);
         if (error) {
           console.error('❌ Roles batch error:', error);
@@ -229,8 +229,7 @@ export const searchBusinessesUnified = async (
           id: role.id,
           role: role.role,
           salary: role.salary,
-          upvotes: role.upvotes || 0,
-          downvotes: role.downvotes || 0,
+          votesTotal: role.votes_total || 0,
           userVote: null
         }))
     }));

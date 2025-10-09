@@ -29,8 +29,7 @@ interface BusinessDetailsProps {
     roles?: Array<{
       role: string;
       salary: string;
-      upvotes?: number;
-      downvotes?: number;
+      votesTotal?: number;
       userVote?: 'up' | 'down' | null;
     }>;
     website?: string;
@@ -179,8 +178,7 @@ return (
                   </span>
 
                   <VotingComponent
-                    upvotes={role.upvotes || 0}
-                    downvotes={role.downvotes || 0}
+                    votesTotal={role.votesTotal || 0}
                     userVote={role.userVote}
                     onVote={(voteType) => handleRoleVote(index, voteType)}
                   />
@@ -192,8 +190,7 @@ return (
                 <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
                   <span className="font-medium text-app-black">$13.6</span>
                   <VotingComponent
-                    upvotes={0}
-                    downvotes={0}
+                    votesTotal={0}
                     userVote={null}
                     onVote={() => {}}
                   />

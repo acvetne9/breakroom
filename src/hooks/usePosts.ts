@@ -111,46 +111,42 @@ export const usePosts = () => {
       setPosts(prevPosts => 
         prevPosts.map(post => {
           if (post.id === postId) {
-            let newUpvotes = post.upvotes;
-            let newDownvotes = post.downvotes;
+            let newVotesTotal = post.votesTotal;
             let newUserVote: 'up' | 'down' | null = post.userVote;
 
             if (voteType === 'up') {
               if (post.userVote === 'up') {
                 // Remove upvote
-                newUpvotes--;
+                newVotesTotal--;
                 newUserVote = null;
               } else if (post.userVote === 'down') {
                 // Switch from downvote to upvote
-                newDownvotes--;
-                newUpvotes++;
+                newVotesTotal += 2;
                 newUserVote = 'up';
               } else {
                 // Add upvote
-                newUpvotes++;
+                newVotesTotal++;
                 newUserVote = 'up';
               }
             } else {
               if (post.userVote === 'down') {
                 // Remove downvote
-                newDownvotes--;
+                newVotesTotal++;
                 newUserVote = null;
               } else if (post.userVote === 'up') {
                 // Switch from upvote to downvote
-                newUpvotes--;
-                newDownvotes++;
+                newVotesTotal -= 2;
                 newUserVote = 'down';
               } else {
                 // Add downvote
-                newDownvotes++;
+                newVotesTotal--;
                 newUserVote = 'down';
               }
             }
 
             return {
               ...post,
-              upvotes: newUpvotes,
-              downvotes: newDownvotes,
+              votesTotal: newVotesTotal,
               userVote: newUserVote
             };
           }

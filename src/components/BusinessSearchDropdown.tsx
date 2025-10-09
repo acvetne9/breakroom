@@ -240,8 +240,7 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
         roles: [{
           role: role,
           salary: salary,
-          upvotes: 0,
-          downvotes: 0,
+          votesTotal: 0,
           userVote: null
         }]
       };

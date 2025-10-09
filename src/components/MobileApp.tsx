@@ -266,40 +266,36 @@ const MobileApp: React.FC = () => {
         if (business.id === businessId && business.roles) {
           const updatedRoles = business.roles.map((role, index) => {
             if (index === roleIndex) {
-              let newUpvotes = role.upvotes;
-              let newDownvotes = role.downvotes;
+              let newVotesTotal = role.votesTotal;
               let newUserVote: 'up' | 'down' | null = role.userVote;
 
               if (voteType === 'up') {
                 if (role.userVote === 'up') {
-                  newUpvotes--;
+                  newVotesTotal--;
                   newUserVote = null;
                 } else if (role.userVote === 'down') {
-                  newDownvotes--;
-                  newUpvotes++;
+                  newVotesTotal += 2;
                   newUserVote = 'up';
                 } else {
-                  newUpvotes++;
+                  newVotesTotal++;
                   newUserVote = 'up';
                 }
               } else {
                 if (role.userVote === 'down') {
-                  newDownvotes--;
+                  newVotesTotal++;
                   newUserVote = null;
                 } else if (role.userVote === 'up') {
-                  newUpvotes--;
-                  newDownvotes++;
+                  newVotesTotal -= 2;
                   newUserVote = 'down';
                 } else {
-                  newDownvotes++;
+                  newVotesTotal--;
                   newUserVote = 'down';
                 }
               }
 
               return {
                 ...role,
-                upvotes: newUpvotes,
-                downvotes: newDownvotes,
+                votesTotal: newVotesTotal,
                 userVote: newUserVote
               };
             }
@@ -327,29 +323,26 @@ const MobileApp: React.FC = () => {
           if (business.id === businessId && business.roles) {
             const updatedRoles = business.roles.map((role, index) => {
               if (index === roleIndex) {
-                let revertUpvotes = role.upvotes;
-                let revertDownvotes = role.downvotes;
+                let revertVotesTotal = role.votesTotal;
                 let revertUserVote: 'up' | 'down' | null = role.userVote;
 
                 // Revert the optimistic update
                 if (voteType === 'up') {
                   if (role.userVote === null) {
-                    revertUpvotes--;
+                    revertVotesTotal--;
                     revertUserVote = 'up';
                   } else if (role.userVote === 'up') {
-                    revertDownvotes++;
-                    revertUpvotes--;
+                    revertVotesTotal -= 2;
                     revertUserVote = 'down';
                   } else {
                     revertUserVote = null;
                   }
                 } else {
                   if (role.userVote === null) {
-                    revertDownvotes--;
+                    revertVotesTotal++;
                     revertUserVote = 'down';  
                   } else if (role.userVote === 'down') {
-                    revertUpvotes++;
-                    revertDownvotes--;
+                    revertVotesTotal += 2;
                     revertUserVote = 'up';
                   } else {
                     revertUserVote = null;
@@ -358,8 +351,7 @@ const MobileApp: React.FC = () => {
 
                 return {
                   ...role,
-                  upvotes: revertUpvotes,
-                  downvotes: revertDownvotes,
+                  votesTotal: revertVotesTotal,
                   userVote: revertUserVote
                 };
               }

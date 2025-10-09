@@ -2,8 +2,7 @@ export interface BusinessRole {
   id?: string;
   role: string;
   salary: string;
-  upvotes: number;
-  downvotes: number;
+  votesTotal: number;
   userVote?: 'up' | 'down' | null;
 }
 
