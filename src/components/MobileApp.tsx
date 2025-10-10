@@ -447,7 +447,7 @@ const MobileApp: React.FC = () => {
           animate={{ x: 0 }}
           exit={{ x: "-100%" }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="absolute inset-0 z-20"
+          className="absolute inset-0 z-50 bg-white"
           drag="x"
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.1}
@@ -459,17 +459,15 @@ const MobileApp: React.FC = () => {
         >
           <Suspense fallback={<Skeleton className="w-full h-full" />}>
             <SettingsPage
-              initialData={userData}
+              initialData={userData || { salary: "", role: "", location: "", timePeriod: "HR" }}
               onStoriesClick={handleUserStoriesClick}
               onPostClick={(post) => {
                 setExpandedPost(post.id);
-                setCurrentSlide(2); // Navigate to explore page
+                setCurrentSlide(2);
               }}
               onJobUpdate={handleJobUpdate}
               onSearchTrigger={(searchTerm) => {
-                // Navigate to home page and trigger search
                 setCurrentSlide(1);
-                // Set search state that will be picked up by HomePage
                 setTimeout(() => {
                   const searchEvent = new CustomEvent("triggerSearch", { detail: searchTerm });
                   window.dispatchEvent(searchEvent);

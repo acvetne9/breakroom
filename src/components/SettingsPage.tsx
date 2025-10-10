@@ -639,14 +639,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     }, 100);
   };
   return (
-    <div
-      className="w-full h-full flex items-center justify-center overflow-hidden"
-      style={{ backgroundColor: "rgba(255, 0, 0, 0.5)" }}
-    >
-      <div
-        className="app-card p-6 animate-fade-in flex flex-col w-full"
-        style={{ maxHeight: "80vh", height: "auto", backgroundColor: "white" }}
-      >
+    <div className="w-full h-full flex items-center justify-center bg-transparent overflow-hidden">
+      <div className="app-card p-6 animate-fade-in flex flex-col w-full" style={{ maxHeight: "80vh", height: "auto" }}>
         {/* Scrollable content area */}
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pr-2">
           <h1 className="text-xl font-medium text-app-black mb-2">Your Page! 😊</h1>
