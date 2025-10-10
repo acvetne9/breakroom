@@ -132,10 +132,12 @@
 @layer components {
   /* App Card - large UI box matching mockups exactly */
   .app-card {
-    @apply w-[90vw] h-[85vh] bg-white/100 backdrop-blur-sm rounded-2xl relative mx-auto;
+    @apply w-[90vw] h-[85vh] bg-white rounded-2xl relative mx-auto;
     border: 2px solid hsl(var(--app-yellow));
     box-shadow: var(--app-shadow);
     max-width: 400px;
+    -webkit-transform: translateZ(0); /* Force hardware acceleration on iOS */
+    transform: translateZ(0);
   }
   
   /* App Popup - smaller version of card */
