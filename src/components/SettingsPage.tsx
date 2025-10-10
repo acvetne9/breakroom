@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useDevice } from '@/contexts/DeviceContext';
 import { nycNeighborhoods } from '../utils/nyc_neighborhoods';
 import { usePosts } from '@/hooks/usePosts';
+import { getCurrentJob } from '@/services/currentJobs';
 interface UserInfo {
   salary: string;
   role: string;
@@ -147,6 +148,26 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   useEffect(() => {
     currentJobChangedRef.current = currentJobChanged;
   }, [currentJobChanged]);
+
+  // Load current job from Supabase on mount
+  useEffect(() => {
+    const loadCurrentJob = async () => {
+      const jobData = await getCurrentJob();
+      if (jobData) {
+        setCurrentJob({
+          salary: jobData.salary ? `$${jobData.salary}` : '',
+          role: jobData.role || '',
+          location: jobData.location || '',
+          isHiring: false
+        });
+        setCurrentJobFullLocation(jobData.location || '');
+        setCurrentTimePeriod(jobData.time_period || 'HR');
+        setCurrentJobBusinessInput(jobData.location || '');
+        setCurrentJobBusinessSelected(!!jobData.location);
+      }
+    };
+    loadCurrentJob();
+  }, []);
 
   // Initialize past job states
   useEffect(() => {
