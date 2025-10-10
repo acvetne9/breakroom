@@ -441,7 +441,7 @@ const MobileApp: React.FC = () => {
       {currentView === "initiation" && <InitiationPage onComplete={handleInitiationComplete} />}
 
       {/* Settings Card - slides from left */}
-      {currentSlide === 0 && userData && (
+      {currentSlide === 0 && (
         <motion.div
           initial={{ x: "-100%" }}
           animate={{ x: 0 }}
