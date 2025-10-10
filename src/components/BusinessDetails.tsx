@@ -119,7 +119,7 @@ return (
     onClick={handleBackgroundClick}
   >
     <div
-      className="app-card p-6 animate-fade-in flex flex-col max-h-[80vh] w-full md:w-[600px] relative"
+      className="app-card p-6 animate-fade-in flex flex-col max-h-[80vh] relative"
       onClick={handleCardClick}
     >
       {/* Scrollable content area */}
