@@ -1,5 +1,4 @@
-
-@import 'maplibre-gl/dist/maplibre-gl.css';
+@import "maplibre-gl/dist/maplibre-gl.css";
 
 @tailwind base;
 @tailwind components;
@@ -17,38 +16,38 @@
     --app-black: 0 0% 0%;
     --app-white: 0 0% 100%;
     --app-shadow: 0 0% 0%;
-    
+
     /* Background and surfaces */
     --background: 0 0% 100%;
     --foreground: 0 0% 0%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 0%;
-    
+
     /* Interactive elements */
     --primary: 45 100% 55%;
     --primary-foreground: 0 0% 0%;
     --secondary: 210 11% 71%;
     --secondary-foreground: 0 0% 0%;
-    
+
     /* Borders and inputs */
     --border: 45 100% 55%;
     --input: 0 0% 100%;
     --input-border: 210 11% 71%;
     --ring: 45 100% 55%;
-    
+
     /* Muted elements */
     --muted: 210 11% 96%;
     --muted-foreground: 210 9% 53%;
-    
+
     /* Destructive (if needed) */
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
-    
+
     /* App-specific spacing and sizing */
     --card-radius: 1rem;
     --popup-radius: 0.75rem;
     --app-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    
+
     /* Mobile-specific */
     --safe-area-top: env(safe-area-inset-top);
     --safe-area-bottom: env(safe-area-inset-bottom);
@@ -100,29 +99,31 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     overflow: hidden;
     height: 100vh;
     height: 100dvh;
   }
-  
+
   /* Allow proper touch events for maps and other interactive elements */
   .maplibre-map {
     touch-action: pan-x pan-y !important;
   }
-  
+
   /* Ensure MapLibre canvas works properly on mobile */
   .maplibregl-canvas {
     touch-action: none !important;
   }
-  
+
   /* Fix for mobile map controls */
   .maplibregl-ctrl-group {
-    box-shadow: 0 0 0 2px rgba(0,0,0,.1) !important;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1) !important;
   }
-  
+
   /* Prevent scrolling on the main app */
-  html, body, #root {
+  html,
+  body,
+  #root {
     height: 100%;
     overflow: hidden;
     position: relative;
@@ -139,7 +140,7 @@
     -webkit-transform: translateZ(0); /* Force hardware acceleration on iOS */
     transform: translateZ(0);
   }
-  
+
   /* App Popup - smaller version of card */
   .app-popup {
     @apply w-[90vw] bg-white rounded-xl relative mx-auto;
@@ -147,7 +148,7 @@
     box-shadow: var(--app-shadow);
     max-width: 400px;
   }
-  
+
   /* App Popup Transparent - transparent version for posts */
   .app-popup-transparent {
     @apply w-[90vw] bg-white/100 backdrop-blur-sm rounded-xl relative mx-auto;
@@ -155,7 +156,7 @@
     box-shadow: var(--app-shadow);
     max-width: 400px;
   }
-  
+
   /* Input fields matching mockup styling */
   .app-input {
     @apply w-full px-4 py-3 bg-white text-black;
@@ -163,11 +164,11 @@
     border-radius: 0.5rem !important;
     font-size: 16px;
   }
-  
+
   .app-input::placeholder {
     color: hsl(var(--app-gray-medium));
   }
-  
+
   /* Search bar styling with button support - standardized to match card width */
   .search-bar {
     @apply w-[90vw] mx-auto px-4 py-3 bg-white;
@@ -176,17 +177,17 @@
     font-size: 16px;
     max-width: 400px;
   }
-  
+
   .search-bar::placeholder {
     color: hsl(var(--app-gray-medium));
   }
-  
+
   /* Transparent overlay for post text */
   .post-overlay {
     background: rgba(128, 128, 128, 0.8);
     backdrop-filter: blur(2px);
   }
-  
+
   /* Smooth transitions */
   .slide-transition {
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -211,16 +212,16 @@
   .scrollbar-thin {
     scrollbar-width: thin;
   }
-  
+
   .scrollbar-thumb-gray-300::-webkit-scrollbar-thumb {
     background-color: rgb(209 213 219);
     border-radius: 0.25rem;
   }
-  
+
   .scrollbar-track-transparent::-webkit-scrollbar-track {
     background-color: transparent;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
   }
