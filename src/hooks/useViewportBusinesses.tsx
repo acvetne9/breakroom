@@ -9,6 +9,37 @@ import { useMapWorker } from './useMapWorker';
 // Preloading and caching
 const inflightRequests = new Map<string, Promise<Business[]>>();
 
+// Concurrent request limiting based on zoom
+class RequestQueue {
+  private activeRequests = 0;
+  private maxConcurrent = 3;
+
+  setMaxConcurrent(zoom: number) {
+    if (zoom <= 10) this.maxConcurrent = 1; // Far zoom: 1 request at a time
+    else if (zoom <= 12) this.maxConcurrent = 2; // Medium zoom: 2 concurrent
+    else if (zoom <= 14) this.maxConcurrent = 3; // Close zoom: 3 concurrent
+    else this.maxConcurrent = 4; // Very close: 4 concurrent
+  }
+
+  async run<T>(fn: () => Promise<T>): Promise<T> {
+    while (this.activeRequests >= this.maxConcurrent) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    this.activeRequests++;
+    try {
+      return await fn();
+    } finally {
+      this.activeRequests--;
+    }
+  }
+
+  get active() {
+    return this.activeRequests;
+  }
+}
+
+const requestQueue = new RequestQueue();
+
 // Persistent details cache using localStorage
 class PersistentDetailsCache {
   private static CACHE_KEY = 'business_details_cache';
@@ -97,8 +128,16 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
 
       for (const area of adjacentAreas) {
         if (!getCachedBusinesses(area)) {
+          // Skip preloading at far zooms to prioritize viewport
+          if (zoom <= 11 && requestQueue.active > 0) {
+            console.log('⏭️ Skipping preload at far zoom - prioritizing viewport');
+            continue;
+          }
+          
           try {
-            const b = await getBusinessesInViewport(area, 2000, undefined, undefined, zoom);
+            const b = await requestQueue.run(() => 
+              getBusinessesInViewport(area, 2000, undefined, undefined, zoom)
+            );
             setCachedBusinesses(area, b);
             console.log(`🔮 Preloaded ${b.length} businesses for adjacent area`);
           } catch (err) {
@@ -149,7 +188,13 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
 
     loadTimeoutRef.current = setTimeout(async () => {
       setLoading(true);
-      const requestPromise = getBusinessesInViewport(viewportBounds, limit, searchFilters, undefined, zoom);
+      
+      // Set max concurrent requests based on zoom
+      requestQueue.setMaxConcurrent(zoom);
+      
+      const requestPromise = requestQueue.run(() => 
+        getBusinessesInViewport(viewportBounds, limit, searchFilters, undefined, zoom)
+      );
       inflightRequests.set(requestKey, requestPromise);
 
       try {
