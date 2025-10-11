@@ -131,7 +131,7 @@ export const searchBusinessesUnified = async (
     // Load basic businesses from database with minimal filtering
     // (we'll apply the full filtering logic later using applyBusinessFilters)
     let baseQuery = supabase.from('businesses').select(`
-      id, name, lat, lng, atmosphere, business_type, website, salary
+      id, name, lat, lng, atmosphere, business_type, website
     `);
     
     // Apply geographic bounds if specified
@@ -174,7 +174,7 @@ export const searchBusinessesUnified = async (
       const executeBatch = async (ids: string[]) => {
         const { data, error } = await supabase
           .from('business_roles')
-          .select('business_id, id, role, salary, upvotes, downvotes')
+          .select('business_id, id, role, salary, votes_total')
           .in('business_id', ids);
         if (error) {
           console.error('❌ Roles batch error:', error);
@@ -221,7 +221,6 @@ export const searchBusinessesUnified = async (
       name: business.name,
       position: { lat: business.lat, lng: business.lng },
       atmosphere: business.atmosphere || [],
-      salary: business.salary,
       businessType: business.business_type,
       website: business.website,
       roles: allRoles
@@ -230,8 +229,7 @@ export const searchBusinessesUnified = async (
           id: role.id,
           role: role.role,
           salary: role.salary,
-          upvotes: role.upvotes || 0,
-          downvotes: role.downvotes || 0,
+          votesTotal: role.votes_total || 0,
           userVote: null
         }))
     }));

@@ -159,8 +159,7 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
       id: role.id,
       role: role.role,
       salary: role.salary,
-      upvotes: role.upvotes || 0,
-      downvotes: role.downvotes || 0,
+      votesTotal: role.votes_total || 0,
       userVote: userVote === 'upvote' ? 'up' : userVote === 'downvote' ? 'down' : null,
     };
   });
@@ -172,7 +171,6 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
     businessType: businessData.business_type,
     position: { lat: businessData.lat, lng: businessData.lng },
     atmosphere: businessData.atmosphere || [],
-    salary: businessData.salary,
     roles: businessRoles,
     website: businessData.website,
   };

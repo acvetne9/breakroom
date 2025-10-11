@@ -112,8 +112,7 @@ export interface Post {
   isStory?: boolean;
   isJobUpdate?: boolean;
   linkedLocation?: string;
-  upvotes: number;
-  downvotes: number;
+  votesTotal: number;
   userVote?: 'up' | 'down' | null;
   createdAt: Date;
   timestamp?: string;
@@ -138,8 +137,7 @@ export const transformPost = async (dbPost: PostData, businesses: any[] = [], cu
     isStory: dbPost.post_type === 'story',
     isJobUpdate: dbPost.post_type === 'job_update',
     linkedLocation: business?.name,
-    upvotes: dbPost.upvotes,
-    downvotes: dbPost.downvotes,
+    votesTotal: dbPost.upvotes - dbPost.downvotes,
     userVote: null, // Will be determined by votes table
     createdAt: new Date(dbPost.created_at),
     timestamp: dbPost.created_at,

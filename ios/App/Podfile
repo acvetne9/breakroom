@@ -14,7 +14,10 @@ def capacitor_pods
 
 end
 
-target 'App' do
+# Skip CocoaPods project integration analysis for this target
+install! 'cocoapods', :deterministic_uuids => false, :integrate_targets => false, :disable_input_output_paths => true
+
+target 'breakroom' do
   capacitor_pods
   # Add your Pods here
 end

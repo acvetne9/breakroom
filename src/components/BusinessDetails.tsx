@@ -20,7 +20,6 @@ interface BusinessDetailsProps {
     id: string;
     name: string;
     atmosphere: string[];
-    salary?: string;
     address?: string;
     stories?: Array<{
       id: string;
@@ -30,8 +29,7 @@ interface BusinessDetailsProps {
     roles?: Array<{
       role: string;
       salary: string;
-      upvotes?: number;
-      downvotes?: number;
+      votesTotal?: number;
       userVote?: 'up' | 'down' | null;
     }>;
     website?: string;
@@ -121,7 +119,7 @@ return (
     onClick={handleBackgroundClick}
   >
     <div
-      className="app-card p-6 animate-fade-in flex flex-col max-h-[80vh] w-full md:w-[600px] relative"
+      className="app-card p-6 animate-fade-in flex flex-col max-h-[80vh] relative"
       onClick={handleCardClick}
     >
       {/* Scrollable content area */}
@@ -173,15 +171,14 @@ return (
 
                 <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
                   <span className="font-medium text-app-black">
-                    {typeof role.salary === 'string' ? role.salary : (business.salary || '$13.6')}
+                    {typeof role.salary === 'string' ? role.salary : '$13.6'}
                     {!(typeof role.salary === 'string' && role.salary.includes('/')) && (
                       <span className="text-xs text-app-gray-medium ml-1">/hr</span>
                     )}
                   </span>
 
                   <VotingComponent
-                    upvotes={role.upvotes || 0}
-                    downvotes={role.downvotes || 0}
+                    votesTotal={role.votesTotal || 0}
                     userVote={role.userVote}
                     onVote={(voteType) => handleRoleVote(index, voteType)}
                   />
@@ -191,10 +188,9 @@ return (
               <div className="flex justify-between items-center py-1">
                 <span className="text-app-black">Barista</span>
                 <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
-                  <span className="font-medium text-app-black">{business.salary || '$13.6'}</span>
+                  <span className="font-medium text-app-black">$13.6</span>
                   <VotingComponent
-                    upvotes={0}
-                    downvotes={0}
+                    votesTotal={0}
                     userVote={null}
                     onVote={() => {}}
                   />

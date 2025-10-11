@@ -18,35 +18,32 @@ export type Database = {
         Row: {
           business_id: string
           created_at: string
-          downvotes: number | null
           id: string
           pay_period: string | null
           role: string
           salary: string
           updated_at: string
-          upvotes: number | null
+          votes_total: number | null
         }
         Insert: {
           business_id: string
           created_at?: string
-          downvotes?: number | null
           id?: string
           pay_period?: string | null
           role: string
           salary: string
           updated_at?: string
-          upvotes?: number | null
+          votes_total?: number | null
         }
         Update: {
           business_id?: string
           created_at?: string
-          downvotes?: number | null
           id?: string
           pay_period?: string | null
           role?: string
           salary?: string
           updated_at?: string
-          upvotes?: number | null
+          votes_total?: number | null
         }
         Relationships: [
           {
@@ -69,7 +66,6 @@ export type Database = {
           lat: number
           lng: number
           name: string
-          salary: string | null
           updated_at: string
           website: string | null
         }
@@ -83,7 +79,6 @@ export type Database = {
           lat: number
           lng: number
           name: string
-          salary?: string | null
           updated_at?: string
           website?: string | null
         }
@@ -97,7 +92,6 @@ export type Database = {
           lat?: number
           lng?: number
           name?: string
-          salary?: string | null
           updated_at?: string
           website?: string | null
         }

@@ -17,8 +17,7 @@ interface Post {
   isStory?: boolean;
   isJobUpdate?: boolean;
   linkedLocation?: string;
-  upvotes: number;
-  downvotes: number;
+  votesTotal: number;
   userVote?: 'up' | 'down' | null;
   createdAt: Date;
   timestamp?: string;
@@ -239,8 +238,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
         text: 'Share a thought about this business 💭',
         businessId: filteredBusinessId,
         isStory: true,
-        upvotes: 0,
-        downvotes: 0,
+        votesTotal: 0,
         userVote: null,
         createdAt: new Date()
       };
@@ -358,10 +356,9 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                   
                   {/* Voting component in bottom right */}
                   {post.author !== 'System' && (
-                    <div className="absolute bottom-1 right-1">
+                     <div className="absolute bottom-1 right-1">
                        <VotingComponent 
-                        upvotes={post.upvotes} 
-                        downvotes={post.downvotes} 
+                        votesTotal={post.votesTotal} 
                         userVote={post.userVote} 
                         onVote={voteType => handlePostVote(post.id, voteType)}
                         isOwner={post.userId === '00000000-0000-0000-0000-000000000000' ? false : post.author === 'You'}
@@ -398,8 +395,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                           <TranslatedText text={comment.text} className="text-sm text-app-gray-dark pr-2" />
                           <div className="flex-shrink-0">
                             <VotingComponent
-                              upvotes={comment.upvotes}
-                              downvotes={comment.downvotes}
+                              votesTotal={comment.votesTotal}
                               userVote={comment.userVote}
                               onVote={(voteType) => handlePostVote(comment.id, voteType)}
                               isOwner={comment.author === 'You'}

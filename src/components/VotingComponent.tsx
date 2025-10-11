@@ -2,8 +2,7 @@ import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 
 interface VotingComponentProps {
-  upvotes: number;
-  downvotes: number;
+  votesTotal: number;
   userVote?: 'up' | 'down' | null;
   onVote: (voteType: 'up' | 'down') => void;
   className?: string;
@@ -12,8 +11,7 @@ interface VotingComponentProps {
 }
 
 const VotingComponent: React.FC<VotingComponentProps> = ({
-  upvotes,
-  downvotes,
+  votesTotal,
   userVote,
   onVote,
   className = "",
@@ -24,8 +22,6 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
   const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({});
   const deleteButtonRef = useRef<HTMLButtonElement | null>(null);
   const popupRef = useRef<HTMLDivElement | null>(null);
-
-  const netScore = upvotes - downvotes;
 
   const handleUpvote = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -181,7 +177,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
           </button>
 
           <span className="font-medium text-app-black min-w-[20px] text-center">
-            {netScore}
+            {votesTotal}
           </span>
 
           <button
@@ -205,7 +201,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
       {isOwner && (
         <div className="relative">
           <span className="font-medium text-app-black min-w-[20px] text-center">
-            {netScore}
+            {votesTotal}
           </span>
 
           <button

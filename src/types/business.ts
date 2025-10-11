@@ -2,8 +2,7 @@ export interface BusinessRole {
   id?: string;
   role: string;
   salary: string;
-  upvotes: number;
-  downvotes: number;
+  votesTotal: number;
   userVote?: 'up' | 'down' | null;
 }
 
@@ -12,7 +11,6 @@ export interface Business {
   name: string;
   position: { lat: number; lng: number };
   atmosphere: string[];
-  salary?: string;
   roles?: BusinessRole[];
   detailsLoaded?: boolean;
   businessType?: string;

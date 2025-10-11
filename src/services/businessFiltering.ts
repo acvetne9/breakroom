@@ -226,17 +226,7 @@ export function applyBusinessFilters(businesses: Business[], filters: SearchFilt
         return true;
       });
 
-      let topLevelSalaryMatch = false;
-      if (!roleSalaryMatch && business.salary) {
-        const topHourly = toHourly(business.salary || '');
-        if (topHourly != null && !isNaN(topHourly)) {
-          if ((min == null || topHourly >= min) && (max == null || topHourly <= max)) {
-            topLevelSalaryMatch = true;
-          }
-        }
-      }
-
-      if (!roleSalaryMatch && !topLevelSalaryMatch) return false;
+      if (!roleSalaryMatch) return false;
     }
 
     return true;

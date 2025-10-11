@@ -1,18 +1,18 @@
-import React, { useState, useRef, useEffect, Suspense } from 'react';
-import { motion, PanInfo } from 'framer-motion';
+import React, { useState, useRef, useEffect, Suspense } from "react";
+import { motion, PanInfo } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
-import InitiationPage from './InitiationPage';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { useDevice } from '@/contexts/DeviceContext';
+import InitiationPage from "./InitiationPage";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useDevice } from "@/contexts/DeviceContext";
 
-const HomePage = React.lazy(() => import('./HomePage'));
-const SettingsPage = React.lazy(() => import('./SettingsPage'));
-const ExplorePage = React.lazy(() => import('./ExplorePage'));
+const HomePage = React.lazy(() => import("./HomePage"));
+const SettingsPage = React.lazy(() => import("./SettingsPage"));
+const ExplorePage = React.lazy(() => import("./ExplorePage"));
 
-import { useBusinessesData } from '../hooks/useBusinessesData';
-import { handleRoleVote as handleRoleVoteService } from '@/services/roleVoting';
+import { useBusinessesData } from "../hooks/useBusinessesData";
+import { handleRoleVote as handleRoleVoteService } from "@/services/roleVoting";
 
 interface UserData {
   salary: string;
@@ -34,24 +34,24 @@ interface Post {
   linkedLocation?: string;
   upvotes: number;
   downvotes: number;
-  userVote?: 'up' | 'down' | null;
+  userVote?: "up" | "down" | null;
   createdAt: Date;
 }
 
 const MobileApp: React.FC = () => {
-  console.log('🚀 MobileApp component rendering');
+  console.log("🚀 MobileApp component rendering");
   const isMobile = useIsMobile();
   const { user } = useAuth();
-  const [currentView, setCurrentView] = useState<'initiation' | 'main'>('main');
+  const [currentView, setCurrentView] = useState<"initiation" | "main">("main");
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
   const [userData, setUserData] = useState<UserData | null>(null);
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
-  const [comments, setComments] = useState<{[postId: string]: string[]}>({});
+  const [comments, setComments] = useState<{ [postId: string]: string[] }>({});
   const [selectedBusiness, setSelectedBusiness] = useState<any>(null);
   const [previouslySelectedBusiness, setPreviouslySelectedBusiness] = useState<any>(null);
   const [filteredBusinessId, setFilteredBusinessId] = useState<string | null>(null);
   const [filteredUserStories, setFilteredUserStories] = useState(false);
-  
+
   const constraintsRef = useRef(null);
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
 
@@ -62,27 +62,27 @@ const MobileApp: React.FC = () => {
 
   useEffect(() => {
     if (hasInitialized.current) {
-      console.log('Skipping duplicate initialization (StrictMode)');
+      console.log("Skipping duplicate initialization (StrictMode)");
       return;
     }
-    
+
     if (deviceLoading) {
-      console.log('Waiting for device initialization...');
+      console.log("Waiting for device initialization...");
       return;
     }
-    
+
     hasInitialized.current = true;
-    console.log('MobileApp initialization starting');
-    
+    console.log("MobileApp initialization starting");
+
     const initializeApp = async () => {
       try {
-        console.log('Debug - isFirstSession:', isFirstSession);
-        
-        const { hasCurrentJob, getCurrentJob } = await import('../services/currentJobs');
+        console.log("Debug - isFirstSession:", isFirstSession);
+
+        const { hasCurrentJob, getCurrentJob } = await import("../services/currentJobs");
         const hasJob = await hasCurrentJob();
-        
-        console.log('Current job check:', hasJob);
-        
+
+        console.log("Current job check:", hasJob);
+
         if (hasJob) {
           const currentJob = await getCurrentJob();
           if (currentJob) {
@@ -91,61 +91,61 @@ const MobileApp: React.FC = () => {
               role: currentJob.role,
               location: currentJob.location,
               fullLocation: currentJob.location,
-              timePeriod: currentJob.time_period || 'HR'
+              timePeriod: currentJob.time_period || "HR",
             });
-            console.log('Loaded user data:', currentJob);
+            console.log("Loaded user data:", currentJob);
           }
-          console.log('Job found - going to main view');
-          setCurrentView('main');
+          console.log("Job found - going to main view");
+          setCurrentView("main");
         } else if (isFirstSession) {
-          console.log('First session - going to main');
-          setCurrentView('main');
+          console.log("First session - going to main");
+          setCurrentView("main");
         } else {
-          console.log('Not first session, no job - showing initiation');
-          setCurrentView('initiation');
+          console.log("Not first session, no job - showing initiation");
+          setCurrentView("initiation");
         }
       } catch (error) {
-        console.error('Error during app initialization:', error);
-        setCurrentView('main');
+        console.error("Error during app initialization:", error);
+        setCurrentView("main");
       }
     };
-  
+
     initializeApp();
   }, [isFirstSession, deviceLoading]);
 
   const handleInitiationComplete = async (data: UserData) => {
     setUserData(data);
-    setCurrentView('main');
-    
+    setCurrentView("main");
+
     // Save job data to database
     try {
       // Save current job
-      const { saveCurrentJob } = await import('../services/currentJobs');
-      const salary = parseInt(data.salary.replace(/[^0-9]/g, '')) || 0;
+      const { saveCurrentJob } = await import("../services/currentJobs");
+      const salary = parseInt(data.salary.replace(/[^0-9]/g, "")) || 0;
       await saveCurrentJob({
         role: data.role,
         salary: salary,
         location: data.location,
-        time_period: data.timePeriod || 'HR'
+        time_period: data.timePeriod || "HR",
       });
-      
+
       // Save business role
-      const { createOrUpdateBusinessRole } = await import('../services/businesses');
+      const { createOrUpdateBusinessRole } = await import("../services/businesses");
       await createOrUpdateBusinessRole(data.location, data.role, data.salary);
-      console.log('Job saved to database:', { location: data.location, role: data.role, salary: data.salary });
-      
+      console.log("Job saved to database:", { location: data.location, role: data.role, salary: data.salary });
+
       // Create job update post
-      const { createPost } = await import('../services/posts');
+      const { createPost } = await import("../services/posts");
       await createPost(
-        `New Job Update! ${data.salary}/${data.timePeriod || 'HR'} for ${data.role} 😳`,
-        'job_update',
+        `New Job Update! ${data.salary}/${data.timePeriod || "HR"} for ${data.role} 😳`,
+        "job_update",
         undefined,
         data.role,
         data.timePeriod,
-        salary
+        salary,
       );
     } catch (error) {
-      console.error('Error saving job data:', error);
+      console.error("Error saving job data:", error);
       // Continue to main view even if save fails
     }
   };
@@ -153,35 +153,35 @@ const MobileApp: React.FC = () => {
   const handleJobUpdate = async (jobData: { salary: string; role: string; location: string; timePeriod: string }) => {
     // Save job data to database
     try {
-      const { createOrUpdateBusinessRole } = await import('../services/businesses');
+      const { createOrUpdateBusinessRole } = await import("../services/businesses");
       await createOrUpdateBusinessRole(jobData.location, jobData.role, jobData.salary);
-      console.log('Job role updated in database:', jobData);
-      
+      console.log("Job role updated in database:", jobData);
+
       // Create job update post in backend
-      const { createPost } = await import('../services/posts');
-      const salary = parseInt(jobData.salary.replace(/[^0-9]/g, '')) || 0;
+      const { createPost } = await import("../services/posts");
+      const salary = parseInt(jobData.salary.replace(/[^0-9]/g, "")) || 0;
       await createPost(
         `New Job Update! ${jobData.salary}/${jobData.timePeriod} for ${jobData.role} 😳`,
-        'job_update',
+        "job_update",
         undefined,
         jobData.role,
         jobData.timePeriod,
-        salary
+        salary,
       );
     } catch (error) {
-      console.error('Error updating job role in database:', error);
+      console.error("Error updating job role in database:", error);
     }
   };
 
   // NEW: Handle saving location when user clicks on a business
   const handleLocationSave = (location: string, fullLocation: string) => {
-    console.log('Saving clicked business location:', { location, fullLocation });
-    setUserData(prev => {
+    console.log("Saving clicked business location:", { location, fullLocation });
+    setUserData((prev) => {
       if (prev) {
         return {
           ...prev,
           location: location,
-          fullLocation: fullLocation
+          fullLocation: fullLocation,
         };
       }
       return prev;
@@ -197,7 +197,7 @@ const MobileApp: React.FC = () => {
       setFilteredBusinessId(null);
       return;
     }
-    
+
     // Check if we need to fetch full details
     if (!business.atmosphere?.length && !business.roles?.length) {
       const fullBusiness = await fetchFullBusinessDetails(business.id);
@@ -205,7 +205,7 @@ const MobileApp: React.FC = () => {
         setSelectedBusiness(fullBusiness);
         // When selecting a business, we're not filtering posts by business
         setFilteredBusinessId(null);
-        
+
         // Save the clicked business location
         if (fullBusiness.name) {
           handleLocationSave(fullBusiness.name, fullBusiness.name);
@@ -215,7 +215,7 @@ const MobileApp: React.FC = () => {
       setSelectedBusiness(business);
       // When selecting a business, we're not filtering posts by business
       setFilteredBusinessId(null);
-      
+
       // Save the clicked business location
       if (business.name) {
         handleLocationSave(business.name, business.name);
@@ -240,20 +240,20 @@ const MobileApp: React.FC = () => {
 
   // Remove handlePostVote and handlePostDelete - now handled by ExplorePage directly
 
-  const handleRoleVote = async (businessId: string, roleIndex: number, voteType: 'up' | 'down') => {
+  const handleRoleVote = async (businessId: string, roleIndex: number, voteType: "up" | "down") => {
     // Find the role ID from the business
-    let business = businesses.find(b => b.id === businessId);
-    
+    let business = businesses.find((b) => b.id === businessId);
+
     // If business doesn't have role IDs, fetch full details first
     if (!business?.roles?.[roleIndex]?.id) {
-      console.log('🔄 Role missing ID, fetching full business details...');
+      console.log("🔄 Role missing ID, fetching full business details...");
       const fullBusiness = await fetchFullBusinessDetails(businessId);
       if (fullBusiness?.roles?.[roleIndex]?.id) {
         // Update the businesses array with full details
-        setBusinesses(prev => prev.map(b => b.id === businessId ? fullBusiness : b));
+        setBusinesses((prev) => prev.map((b) => (b.id === businessId ? fullBusiness : b)));
         business = fullBusiness;
       } else {
-        console.error('Role not found for voting after fetching full details');
+        console.error("Role not found for voting after fetching full details");
         return;
       }
     }
@@ -261,46 +261,42 @@ const MobileApp: React.FC = () => {
     const roleId = business.roles[roleIndex].id;
 
     // Optimistically update UI first
-    setBusinesses(prevBusinesses => {
-      const updatedBusinesses = prevBusinesses.map(business => {
+    setBusinesses((prevBusinesses) => {
+      const updatedBusinesses = prevBusinesses.map((business) => {
         if (business.id === businessId && business.roles) {
           const updatedRoles = business.roles.map((role, index) => {
             if (index === roleIndex) {
-              let newUpvotes = role.upvotes;
-              let newDownvotes = role.downvotes;
-              let newUserVote: 'up' | 'down' | null = role.userVote;
+              let newVotesTotal = role.votesTotal;
+              let newUserVote: "up" | "down" | null = role.userVote;
 
-              if (voteType === 'up') {
-                if (role.userVote === 'up') {
-                  newUpvotes--;
+              if (voteType === "up") {
+                if (role.userVote === "up") {
+                  newVotesTotal--;
                   newUserVote = null;
-                } else if (role.userVote === 'down') {
-                  newDownvotes--;
-                  newUpvotes++;
-                  newUserVote = 'up';
+                } else if (role.userVote === "down") {
+                  newVotesTotal += 2;
+                  newUserVote = "up";
                 } else {
-                  newUpvotes++;
-                  newUserVote = 'up';
+                  newVotesTotal++;
+                  newUserVote = "up";
                 }
               } else {
-                if (role.userVote === 'down') {
-                  newDownvotes--;
+                if (role.userVote === "down") {
+                  newVotesTotal++;
                   newUserVote = null;
-                } else if (role.userVote === 'up') {
-                  newUpvotes--;
-                  newDownvotes++;
-                  newUserVote = 'down';
+                } else if (role.userVote === "up") {
+                  newVotesTotal -= 2;
+                  newUserVote = "down";
                 } else {
-                  newDownvotes++;
-                  newUserVote = 'down';
+                  newVotesTotal--;
+                  newUserVote = "down";
                 }
               }
 
               return {
                 ...role,
-                upvotes: newUpvotes,
-                downvotes: newDownvotes,
-                userVote: newUserVote
+                votesTotal: newVotesTotal,
+                userVote: newUserVote,
               };
             }
             return role;
@@ -308,7 +304,7 @@ const MobileApp: React.FC = () => {
 
           return {
             ...business,
-            roles: updatedRoles
+            roles: updatedRoles,
           };
         }
         return business;
@@ -318,39 +314,36 @@ const MobileApp: React.FC = () => {
 
     // Then persist to database
     const result = await handleRoleVoteService(businessId, roleId, voteType);
-    
+
     if (!result.success) {
-      console.error('Failed to persist vote:', result.error);
+      console.error("Failed to persist vote:", result.error);
       // Revert optimistic update on error
-      setBusinesses(prevBusinesses => {
-        const updatedBusinesses = prevBusinesses.map(business => {
+      setBusinesses((prevBusinesses) => {
+        const updatedBusinesses = prevBusinesses.map((business) => {
           if (business.id === businessId && business.roles) {
             const updatedRoles = business.roles.map((role, index) => {
               if (index === roleIndex) {
-                let revertUpvotes = role.upvotes;
-                let revertDownvotes = role.downvotes;
-                let revertUserVote: 'up' | 'down' | null = role.userVote;
+                let revertVotesTotal = role.votesTotal;
+                let revertUserVote: "up" | "down" | null = role.userVote;
 
                 // Revert the optimistic update
-                if (voteType === 'up') {
+                if (voteType === "up") {
                   if (role.userVote === null) {
-                    revertUpvotes--;
-                    revertUserVote = 'up';
-                  } else if (role.userVote === 'up') {
-                    revertDownvotes++;
-                    revertUpvotes--;
-                    revertUserVote = 'down';
+                    revertVotesTotal--;
+                    revertUserVote = "up";
+                  } else if (role.userVote === "up") {
+                    revertVotesTotal -= 2;
+                    revertUserVote = "down";
                   } else {
                     revertUserVote = null;
                   }
                 } else {
                   if (role.userVote === null) {
-                    revertDownvotes--;
-                    revertUserVote = 'down';  
-                  } else if (role.userVote === 'down') {
-                    revertUpvotes++;
-                    revertDownvotes--;
-                    revertUserVote = 'up';
+                    revertVotesTotal++;
+                    revertUserVote = "down";
+                  } else if (role.userVote === "down") {
+                    revertVotesTotal += 2;
+                    revertUserVote = "up";
                   } else {
                     revertUserVote = null;
                   }
@@ -358,9 +351,8 @@ const MobileApp: React.FC = () => {
 
                 return {
                   ...role,
-                  upvotes: revertUpvotes,
-                  downvotes: revertDownvotes,
-                  userVote: revertUserVote
+                  votesTotal: revertVotesTotal,
+                  userVote: revertUserVote,
                 };
               }
               return role;
@@ -368,7 +360,7 @@ const MobileApp: React.FC = () => {
 
             return {
               ...business,
-              roles: updatedRoles
+              roles: updatedRoles,
             };
           }
           return business;
@@ -381,7 +373,7 @@ const MobileApp: React.FC = () => {
   // Sync selectedBusiness when businesses data changes (for voting updates)
   useEffect(() => {
     if (selectedBusiness) {
-      const updatedBusiness = businesses.find(b => b.id === selectedBusiness.id);
+      const updatedBusiness = businesses.find((b) => b.id === selectedBusiness.id);
       if (updatedBusiness) {
         setSelectedBusiness(updatedBusiness);
       }
@@ -401,7 +393,7 @@ const MobileApp: React.FC = () => {
       setSelectedBusiness(previouslySelectedBusiness);
       setPreviouslySelectedBusiness(null);
     }
-    
+
     // Clear user stories filter when navigating away from explore
     if (currentSlide !== 2 && filteredUserStories) {
       setFilteredUserStories(false);
@@ -413,12 +405,12 @@ const MobileApp: React.FC = () => {
     const dragStartX = event.clientX || event.touches?.[0]?.clientX || 0;
     const screenWidth = window.innerWidth;
     const edgeThreshold = 50; // Only allow swiping within 50px of screen edges
-    
+
     // Only allow swiping if drag started near screen edges
     const isNearLeftEdge = dragStartX < edgeThreshold;
     const isNearRightEdge = dragStartX > screenWidth - edgeThreshold;
-    
-    if ((isNearLeftEdge || isNearRightEdge)) {
+
+    if (isNearLeftEdge || isNearRightEdge) {
       if (info.offset.x > threshold && currentSlide > 0) {
         setCurrentSlide(currentSlide - 1);
       } else if (info.offset.x < -threshold && currentSlide < 2) {
@@ -431,7 +423,7 @@ const MobileApp: React.FC = () => {
     <div className="fixed inset-0 overflow-hidden">
       {/* Map is always the background */}
       <Suspense fallback={<Skeleton className="w-full h-full" />}>
-        <HomePage 
+        <HomePage
           currentSlide={currentSlide}
           currentView={currentView}
           selectedBusiness={selectedBusiness}
@@ -444,19 +436,17 @@ const MobileApp: React.FC = () => {
           onLocationSave={handleLocationSave}
         />
       </Suspense>
-      
+
       {/* Initiation Card - slides up and disappears */}
-      {currentView === 'initiation' && (
-        <InitiationPage onComplete={handleInitiationComplete} />
-      )}
-      
+      {currentView === "initiation" && <InitiationPage onComplete={handleInitiationComplete} />}
+
       {/* Settings Card - slides from left */}
-      {currentSlide === 0 && userData && (
+      {currentSlide === 0 && (
         <motion.div
-          initial={{ x: '-100%' }}
+          initial={{ x: "-100%" }}
           animate={{ x: 0 }}
-          exit={{ x: '-100%' }}
-          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          exit={{ x: "-100%" }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
           className="absolute inset-0 z-20"
           drag="x"
           dragConstraints={{ left: 0, right: 0 }}
@@ -468,8 +458,8 @@ const MobileApp: React.FC = () => {
           }}
         >
           <Suspense fallback={<Skeleton className="w-full h-full" />}>
-            <SettingsPage 
-              initialData={userData} 
+            <SettingsPage
+              initialData={userData || { salary: "", role: "", location: "", timePeriod: "HR" }}
               onStoriesClick={handleUserStoriesClick}
               onPostClick={(post) => {
                 setExpandedPost(post.id);
@@ -481,7 +471,7 @@ const MobileApp: React.FC = () => {
                 setCurrentSlide(1);
                 // Set search state that will be picked up by HomePage
                 setTimeout(() => {
-                  const searchEvent = new CustomEvent('triggerSearch', { detail: searchTerm });
+                  const searchEvent = new CustomEvent("triggerSearch", { detail: searchTerm });
                   window.dispatchEvent(searchEvent);
                 }, 100);
               }}
@@ -493,10 +483,10 @@ const MobileApp: React.FC = () => {
       {/* Explore Card - slides from right */}
       {currentSlide === 2 && (
         <motion.div
-          initial={{ x: '100%' }}
+          initial={{ x: "100%" }}
           animate={{ x: 0 }}
-          exit={{ x: '100%' }}
-          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          exit={{ x: "100%" }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
           className="absolute inset-0 z-20"
           drag="x"
           dragConstraints={{ left: 0, right: 0 }}
@@ -508,13 +498,13 @@ const MobileApp: React.FC = () => {
           }}
         >
           <Suspense fallback={<Skeleton className="w-full h-full" />}>
-            <ExplorePage 
+            <ExplorePage
               filteredBusinessId={filteredBusinessId || undefined}
               filteredUserStories={filteredUserStories}
               onBusinessView={(businessId) => {
-                const business = businesses.find(b => b.id === businessId);
+                const business = businesses.find((b) => b.id === businessId);
                 if (business) {
-                  setSelectedBusiness(business);  // ✅ MapLibreMap will auto-fly
+                  setSelectedBusiness(business); // ✅ MapLibreMap will auto-fly
                   setCurrentSlide(1);
                 } else {
                   (async () => {
@@ -532,7 +522,7 @@ const MobileApp: React.FC = () => {
               onCommentSubmit={(postId, comment) => {
                 setComments({
                   ...comments,
-                  [postId]: [...(comments[postId] || []), comment]
+                  [postId]: [...(comments[postId] || []), comment],
                 });
               }}
               onBackToAllPosts={handleBackToAllPosts}
@@ -542,11 +532,9 @@ const MobileApp: React.FC = () => {
       )}
 
       {/* Swipe detection overlay - only at screen edges */}
-      <div 
-        className="absolute inset-0 z-10 pointer-events-none"
-      >
+      <div className="absolute inset-0 z-10 pointer-events-none">
         {/* Left edge swipe area */}
-        <div 
+        <div
           className="absolute left-0 top-0 w-12 h-full pointer-events-auto"
           onTouchStart={(e) => {
             // Prevent swipe if multi-touch (zoom gesture)
@@ -556,57 +544,57 @@ const MobileApp: React.FC = () => {
               const handleTouchMove = (moveEvent: TouchEvent) => {
                 // Check if still single touch
                 if (moveEvent.touches.length !== 1) {
-                  document.removeEventListener('touchmove', handleTouchMove);
-                  document.removeEventListener('touchend', handleTouchEnd);
+                  document.removeEventListener("touchmove", handleTouchMove);
+                  document.removeEventListener("touchend", handleTouchEnd);
                   return;
                 }
                 const moveTouch = moveEvent.touches[0];
                 const deltaX = moveTouch.clientX - startX;
                 if (deltaX > 100) {
                   setCurrentSlide(currentSlide - 1);
-                  document.removeEventListener('touchmove', handleTouchMove);
-                  document.removeEventListener('touchend', handleTouchEnd);
+                  document.removeEventListener("touchmove", handleTouchMove);
+                  document.removeEventListener("touchend", handleTouchEnd);
                 }
               };
               const handleTouchEnd = () => {
-                document.removeEventListener('touchmove', handleTouchMove);
-                document.removeEventListener('touchend', handleTouchEnd);
+                document.removeEventListener("touchmove", handleTouchMove);
+                document.removeEventListener("touchend", handleTouchEnd);
               };
-              document.addEventListener('touchmove', handleTouchMove);
-              document.addEventListener('touchend', handleTouchEnd);
+              document.addEventListener("touchmove", handleTouchMove);
+              document.addEventListener("touchend", handleTouchEnd);
             }
           }}
         />
-        
+
         {/* Right edge swipe area */}
-        <div 
+        <div
           className="absolute right-0 top-0 w-12 h-full pointer-events-auto"
           onTouchStart={(e) => {
-             // Prevent swipe if multi-touch (zoom gesture)
-             if (currentSlide < 2 && e.touches.length === 1) {
+            // Prevent swipe if multi-touch (zoom gesture)
+            if (currentSlide < 2 && e.touches.length === 1) {
               const touch = e.touches[0];
               const startX = touch.clientX;
               const handleTouchMove = (moveEvent: TouchEvent) => {
                 // Check if still single touch
                 if (moveEvent.touches.length !== 1) {
-                  document.removeEventListener('touchmove', handleTouchMove);
-                  document.removeEventListener('touchend', handleTouchEnd);
+                  document.removeEventListener("touchmove", handleTouchMove);
+                  document.removeEventListener("touchend", handleTouchEnd);
                   return;
                 }
                 const moveTouch = moveEvent.touches[0];
                 const deltaX = startX - moveTouch.clientX;
                 if (deltaX > 100) {
                   setCurrentSlide(currentSlide + 1);
-                  document.removeEventListener('touchmove', handleTouchMove);
-                  document.removeEventListener('touchend', handleTouchEnd);
+                  document.removeEventListener("touchmove", handleTouchMove);
+                  document.removeEventListener("touchend", handleTouchEnd);
                 }
               };
               const handleTouchEnd = () => {
-                document.removeEventListener('touchmove', handleTouchMove);
-                document.removeEventListener('touchend', handleTouchEnd);
+                document.removeEventListener("touchmove", handleTouchMove);
+                document.removeEventListener("touchend", handleTouchEnd);
               };
-              document.addEventListener('touchmove', handleTouchMove);
-              document.addEventListener('touchend', handleTouchEnd);
+              document.addEventListener("touchmove", handleTouchMove);
+              document.addEventListener("touchend", handleTouchEnd);
             }
           }}
         />
@@ -615,12 +603,12 @@ const MobileApp: React.FC = () => {
       {/* Slide indicators - only show on desktop */}
       {!isMobile && (
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-50">
-          {[0, 1, 2].map(index => (
+          {[0, 1, 2].map((index) => (
             <button
               key={index}
               onClick={() => setCurrentSlide(index)}
               className={`w-3 h-3 rounded-full transition-colors ${
-                index === currentSlide ? 'bg-app-yellow' : 'bg-app-gray-light'
+                index === currentSlide ? "bg-app-yellow" : "bg-app-gray-light"
               }`}
             />
           ))}
