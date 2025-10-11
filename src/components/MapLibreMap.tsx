@@ -558,7 +558,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const vectorSource = {
         type: "vector" as const,
         tiles: [tiles],
-        minzoom: 10,
+        minzoom: 9,
         maxzoom: 16,
         scheme: "xyz" as const,
       };
@@ -581,7 +581,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         style,
         center: [-73.986104, 40.715245],
         zoom: 12.77,
-        maxZoom: 17,
+        maxZoom: 16,
         minZoom: 9,
         renderWorldCopies: false,
         attributionControl: false,
