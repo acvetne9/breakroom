@@ -463,6 +463,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               selectedBusinessId: selectedBusiness?.id,
               onBusinessClick: handleBusinessClick,
               neighborhoodBoundary: searchFilters?.neighborhoodFilter?.boundary || null,
+              searchActive: !!searchFilters,
             });
             layers.push(businessLayer);
             console.log("✅ Created scatterplot layer:", businessLayer);
