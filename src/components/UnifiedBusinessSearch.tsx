@@ -220,6 +220,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   // Enhanced debounced suggestions with relevance scoring
   useEffect(() => {
     const q = value.trim();
+    console.log(`🔍 [DROPDOWN] useEffect triggered with value: "${q}", mapBusinesses:`, mapBusinesses?.length);
     
     if (!q) {
       setSearchResults([]);
@@ -234,14 +235,19 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       return;
     }
     
+    console.log(`🔍 [DROPDOWN] Search value: "${q}", will search in ${300}ms`);
+    
     // Check cache first for better performance
     const cachedResults = resultsCache.current.get(q);
     if (cachedResults && Array.isArray(cachedResults)) {
+      console.log(`🔍 [DROPDOWN] Using cached results: ${cachedResults.length} items`);
       setSearchResults(cachedResults);
       setShowDropdown(true);
       setIsSearching(false);
       return;
     }
+    
+    console.log(`🔍 [DROPDOWN] No cache, will perform new search`);
     
     // Only show suggestions, don't execute search automatically
     setIsSearching(true);
@@ -315,8 +321,10 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         
         // Apply relevance-based filtering and sorting
         const relevantResults = getRelevantResults(businessResults, q, 8);
+        console.log(`🔍 [DROPDOWN] After relevance scoring: ${relevantResults.length} results`);
         
         results.push(...relevantResults);
+        console.log(`🔍 [DROPDOWN] Total results to show: ${results.length}`);
         
         // Check if this search was superseded
         if (seq !== searchSeqRef.current) return;
@@ -331,6 +339,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         }
         
         setSearchResults(Array.isArray(results) ? results : []);
+        console.log(`🔍 [DROPDOWN] Set searchResults state to ${results.length} items, showDropdown will be true`);
         
         // Debounced idle search: parse filters and push to parent for live filtering
         try {
