@@ -160,18 +160,8 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     onExpandedPostChange?.(expandedPost === postId ? null : postId);
   };
 
-  const handleCompassClick = async (e: React.MouseEvent, businessId: string) => {
+  const handleBusinessView = (e: React.MouseEvent, businessId: string) => {
     e.stopPropagation();
-    
-    // Use the same flyTo logic as business view
-    if (onFlyToBusiness) {
-      onFlyToBusiness(businessId);
-    } else if (onNavigateToHomeBusiness) {
-      onNavigateToHomeBusiness(businessId);
-    }
-  };
-
-  const handleBusinessView = (businessId: string) => {
     console.log('👀 Eye clicked - navigating and flying to business:', businessId);
   
     // First, request map fly-to if available
@@ -344,27 +334,15 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                           : 'text-app-black'
                       }`}
                     />
-                    <div className="flex-shrink-0 w-16 flex justify-end space-x-2 mt-1 my-0">
+                    <div className="flex-shrink-0 w-16 flex justify-end mt-1 my-0">
                       {post.businessId && (
-                        <>
-                          <button
-                            onClick={e => handleCompassClick(e, post.businessId!)}
-                            className="text-2xl hover:scale-110 transition-transform"
-                            title="Navigate to business on map"
-                          >
-                            🧭
-                          </button>
-                          <button
-                            onClick={e => {
-                              e.stopPropagation();
-                              handleBusinessView(post.businessId!);
-                            }}
-                            className="text-2xl hover:scale-110 transition-transform"
-                            title="View business details"
-                          >
-                            👀
-                          </button>
-                        </>
+                        <button
+                          onClick={e => handleBusinessView(e, post.businessId!)}
+                          className="text-2xl hover:scale-110 transition-transform"
+                          title="View business location and details"
+                        >
+                          👀
+                        </button>
                       )}
                     </div>
                   </div>
