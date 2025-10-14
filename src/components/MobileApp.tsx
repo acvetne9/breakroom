@@ -13,7 +13,6 @@ const SettingsPage = React.lazy(() => import("./SettingsPage"));
 const ExplorePage = React.lazy(() => import("./ExplorePage"));
 
 import { useBusinessesData } from "../hooks/useBusinessesData";
-import { handleRoleVote as handleRoleVoteService } from "@/services/roleVoting";
 
 interface UserData {
   salary: string;
