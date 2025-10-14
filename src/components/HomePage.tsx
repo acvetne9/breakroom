@@ -316,7 +316,7 @@ const HomePage: React.FC<HomePageProps> = ({
                 {showClearButton && (
                   <button
                     onClick={handleClearSearch}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                    className="absolute right-1 top-1/2 transform -translate-y-1/2 w-11 h-11 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
                     aria-label="Clear search"
                   >
                     <div className="relative w-3 h-3">

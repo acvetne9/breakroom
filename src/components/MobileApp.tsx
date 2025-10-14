@@ -238,6 +238,36 @@ const MobileApp: React.FC = () => {
     setFilteredUserStories(false);
   };
 
+  const handleFlyToBusiness = async (businessId: string) => {
+    // Find business in local state
+    let business = businesses.find((b) => b.id === businessId);
+    
+    // If not found or missing coordinates, fetch full details
+    if (!business?.position?.lat || !business?.position?.lng) {
+      const fullBusiness = await fetchFullBusinessDetails(businessId);
+      if (fullBusiness?.position?.lat && fullBusiness?.position?.lng) {
+        business = fullBusiness;
+      }
+    }
+    
+    if (business?.position?.lat && business?.position?.lng) {
+      // Dispatch flyTo event for the map
+      window.dispatchEvent(new CustomEvent('flyToBusiness', {
+        detail: {
+          lat: business.position.lat,
+          lng: business.position.lng,
+          businessId: businessId
+        }
+      }));
+      
+      // Navigate to home page
+      setCurrentSlide(1);
+      
+      // Set the business as selected so it shows in BusinessDetails
+      setSelectedBusiness(business);
+    }
+  };
+
   // Remove handlePostVote and handlePostDelete - now handled by ExplorePage directly
 
   const handleRoleVote = async (businessId: string, roleIndex: number, voteType: "up" | "down") => {
@@ -526,6 +556,10 @@ const MobileApp: React.FC = () => {
                 });
               }}
               onBackToAllPosts={handleBackToAllPosts}
+              onNavigateToHomeBusiness={(businessId) => {
+                handleFlyToBusiness(businessId);
+              }}
+              onFlyToBusiness={handleFlyToBusiness}
             />
           </Suspense>
         </motion.div>

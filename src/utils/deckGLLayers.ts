@@ -9,6 +9,7 @@ export interface DeckGLBusinessLayerProps {
   getTooltip?: (info: any) => string;
   map?: any;
   neighborhoodBoundary?: { lat: number; lon: number }[];
+  searchActive?: boolean;
 }
 
 export interface LandmarkEmojiLayerProps {
@@ -59,12 +60,18 @@ export const createBusinessScatterplotLayer = ({
   selectedBusinessId,
   onBusinessClick,
   getTooltip,
-  neighborhoodBoundary
+  neighborhoodBoundary,
+  searchActive = false
 }: DeckGLBusinessLayerProps) => {
   // Filter businesses inside the polygon
   const filteredBusinesses = filterBusinessesInPolygon(businesses, neighborhoodBoundary);
 
   console.log(`🎯 Creating scatterplot layer with ${filteredBusinesses.length} businesses inside polygon`);
+  
+  // Enhanced visibility during search
+  const radiusMin = searchActive ? 12 : 8;
+  const radiusMax = searchActive ? 18 : 12;
+  const baseRadius = searchActive ? 20 : 15;
   
   return new ScatterplotLayer({
     id: 'businesses-scatter',
@@ -76,18 +83,18 @@ export const createBusinessScatterplotLayer = ({
     stroked: true,
     filled: true,
     opacity: 1.0,
-    radiusMinPixels: 8, // Bigger dots for better visibility
-    radiusMaxPixels: 12, // Much larger maximum for visibility across zoom levels
+    radiusMinPixels: radiusMin,
+    radiusMaxPixels: radiusMax,
     lineWidthMinPixels: 2,
     getPosition: (d: Business) => [d.position.lng, d.position.lat],
-    getRadius: (_d: Business) => 15, // Bigger base radius
-    getFillColor: (_d: Business) => [250, 204, 21, 255],
+    getRadius: (_d: Business) => baseRadius,
+    getFillColor: (_d: Business) => searchActive ? [255, 215, 0, 255] : [250, 204, 21, 255], // Brighter gold when searching
     getLineColor: (_d: Business) => [255, 255, 255, 255],
     onClick: onBusinessClick ? (info) => info.object && onBusinessClick(info.object as Business) : undefined,
     updateTriggers: {
       getPosition: [filteredBusinesses],
-      getRadius: [filteredBusinesses],
-      getFillColor: [filteredBusinesses],
+      getRadius: [filteredBusinesses, searchActive],
+      getFillColor: [filteredBusinesses, searchActive],
     },
   });
 };

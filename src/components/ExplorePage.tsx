@@ -6,6 +6,7 @@ import VotingComponent from './VotingComponent';
 import { formatTimeAgo } from '../utils/timeAgo';
 import { TranslatedText } from './TranslatedText';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Post {
   id: string;
@@ -157,6 +158,17 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     // If clicking the same post, toggle closed
     setExpandedPost(prev => prev === postId ? null : postId);
     onExpandedPostChange?.(expandedPost === postId ? null : postId);
+  };
+
+  const handleCompassClick = async (e: React.MouseEvent, businessId: string) => {
+    e.stopPropagation();
+    
+    // Use the same flyTo logic as business view
+    if (onFlyToBusiness) {
+      onFlyToBusiness(businessId);
+    } else if (onNavigateToHomeBusiness) {
+      onNavigateToHomeBusiness(businessId);
+    }
   };
 
   const handleBusinessView = (businessId: string) => {
@@ -332,17 +344,27 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                           : 'text-app-black'
                       }`}
                     />
-                    <div className="flex-shrink-0 w-8 flex justify-center mt-1 my-0">
+                    <div className="flex-shrink-0 w-16 flex justify-end space-x-2 mt-1 my-0">
                       {post.businessId && (
-                        <button
-                          onClick={e => {
-                            e.stopPropagation();
-                            handleBusinessView(post.businessId);
-                          }}
-                          className="flex items-center space-x-1 text-app-gray-medium hover:text-app-black"
-                        >
-                          <span className="py-0 my-0">👀</span>
-                        </button>
+                        <>
+                          <button
+                            onClick={e => handleCompassClick(e, post.businessId!)}
+                            className="text-2xl hover:scale-110 transition-transform"
+                            title="Navigate to business on map"
+                          >
+                            🧭
+                          </button>
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              handleBusinessView(post.businessId!);
+                            }}
+                            className="text-2xl hover:scale-110 transition-transform"
+                            title="View business details"
+                          >
+                            👀
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>

@@ -93,7 +93,7 @@ export interface PostData {
   job_role?: string;
   time_period?: string;
   salary?: number;
-  bussiness_id?: string;
+  business_id?: string;
   user_id: string;
   upvotes: number;
   downvotes: number;
@@ -122,7 +122,7 @@ export interface Post {
 
 // Transform database post to frontend post format
 export const transformPost = async (dbPost: PostData, businesses: any[] = [], currentUserId?: string): Promise<Post> => {
-  const business = businesses.find(b => b.id === dbPost.bussiness_id);
+  const business = businesses.find(b => b.id === dbPost.business_id);
   
   // Use provided currentUserId or get it once
   const userId = currentUserId || await getUserId();
@@ -132,7 +132,7 @@ export const transformPost = async (dbPost: PostData, businesses: any[] = [], cu
     id: dbPost.id,
     author: isOwnPost ? 'You' : 'Other',
     text: dbPost.content,
-    businessId: dbPost.bussiness_id,
+    businessId: dbPost.business_id,
     businessName: business?.name,
     isStory: dbPost.post_type === 'story',
     isJobUpdate: dbPost.post_type === 'job_update',
@@ -187,7 +187,7 @@ export const createPost = async (
       content,
       post_type: postType,
       user_id: userId,
-      bussiness_id: businessId,
+      business_id: businessId,
       job_role: jobRole,
       time_period: timePeriod,
       salary,
