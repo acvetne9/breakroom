@@ -68,10 +68,10 @@ export const createBusinessScatterplotLayer = ({
 
   console.log(`🎯 Creating scatterplot layer with ${filteredBusinesses.length} businesses inside polygon`);
   
-  // Enhanced visibility during search
-  const radiusMin = searchActive ? 12 : 8;
-  const radiusMax = searchActive ? 18 : 12;
-  const baseRadius = searchActive ? 20 : 15;
+  // Consistent marker size (no change during search)
+  const radiusMin = 8;
+  const radiusMax = 12;
+  const baseRadius = 15;
   
   return new ScatterplotLayer({
     id: 'businesses-scatter',
