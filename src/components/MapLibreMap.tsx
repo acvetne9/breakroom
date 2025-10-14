@@ -27,6 +27,7 @@ interface MapLibreMapProps {
   neighborhoodCenter?: { lat: number; lon: number } | null;
   enableClustering?: boolean;
   isClusteredData?: boolean;
+  onBusinessesUpdate?: (businesses: Business[]) => void;
 }
 
 interface Bounds {
@@ -200,6 +201,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   neighborhoodCenter,
   enableClustering = true,
   isClusteredData = false,
+  onBusinessesUpdate,
 }) => {
   const [mapLoaded, setMapLoaded] = useState(false);
   const [deckOverlay, setDeckOverlay] = useState<MapboxOverlay | null>(null);
@@ -224,10 +226,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, []);
 
-  const callbackRefs = useRef({ onBusinessClick, onMapLoaded, onBusinessesLoaded });
+  const callbackRefs = useRef({ onBusinessClick, onMapLoaded, onBusinessesLoaded, onBusinessesUpdate });
   useEffect(() => {
-    callbackRefs.current = { onBusinessClick, onMapLoaded, onBusinessesLoaded };
-  }, [onBusinessClick, onMapLoaded, onBusinessesLoaded]);
+    callbackRefs.current = { onBusinessClick, onMapLoaded, onBusinessesLoaded, onBusinessesUpdate };
+  }, [onBusinessClick, onMapLoaded, onBusinessesLoaded, onBusinessesUpdate]);
 
   const { businesses, loading, loadBusinessesInViewport, fetchFullBusinessDetails, isSearching } =
     useViewportBusinesses(searchFilters);
@@ -235,6 +237,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (businesses && businesses.length > 0) {
       callbackRefs.current.onBusinessesLoaded?.();
+      callbackRefs.current.onBusinessesUpdate?.(businesses);
     }
   }, [businesses]);
 

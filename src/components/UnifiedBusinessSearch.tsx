@@ -18,6 +18,7 @@ interface UnifiedBusinessSearchProps {
   variant?: 'dropdown' | 'search-bar';
   showIcon?: boolean;
   onLocationSave?: (location: string, fullLocation: string) => void;
+  mapBusinesses?: any[];
 }
 
 interface NeighborhoodResult {
@@ -162,7 +163,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   className = "",
   variant = 'dropdown',
   showIcon = false,
-  onLocationSave
+  onLocationSave,
+  mapBusinesses = []
 }) => {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -261,16 +263,25 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           });
         }
         
-        // Get business results from in-memory index
+        // Use map businesses if available, otherwise fall back to search index
         let businessResults: EnhancedBusiness[] = [];
         
-        try {
-          const { searchFromIndex } = await import('@/utils/businessSearchIndex');
-          businessResults = searchFromIndex(q, 50);
-          console.log(`🔍 Found ${businessResults.length} businesses from in-memory index for "${q}"`);
-        } catch (searchError) {
-          console.error('Search index error:', searchError);
-          // Continue with empty results rather than throwing
+        if (mapBusinesses && mapBusinesses.length > 0) {
+          // Convert map businesses to EnhancedBusiness format and filter by query
+          businessResults = mapBusinesses.map(b => ({
+            ...b,
+            businessType: b.businessType || b.business_type
+          }));
+          console.log(`🔍 Using ${businessResults.length} businesses from map for "${q}"`);
+        } else {
+          // Fall back to in-memory index
+          try {
+            const { searchFromIndex } = await import('@/utils/businessSearchIndex');
+            businessResults = searchFromIndex(q, 50);
+            console.log(`🔍 Found ${businessResults.length} businesses from in-memory index for "${q}"`);
+          } catch (searchError) {
+            console.error('Search index error:', searchError);
+          }
         }
         
         // Apply relevance-based filtering and sorting
@@ -324,7 +335,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     }, 300); // Faster suggestions with caching
     
     return () => clearTimeout(timer);
-  }, [value, onChange]);
+  }, [value, onChange, mapBusinesses]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
