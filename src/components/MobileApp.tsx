@@ -242,20 +242,14 @@ const MobileApp: React.FC = () => {
 
   const handleFlyToBusiness = async (businessId: string, post?: any) => {
     console.log('🎯 handleFlyToBusiness called for:', businessId);
-    console.log('📦 Post object:', post);
-    console.log('📍 Has coordinates?', { 
-      businessLat: post?.businessLat, 
-      businessLng: post?.businessLng,
-      hasBoth: !!(post?.businessLat && post?.businessLng)
-    });
     const startTime = performance.now();
     
     // Change slide immediately
     setCurrentSlide(1);
     
-    // Check if post has coordinates cached (for fast fly-to from posts)
+    // Fast path: Use coordinates from post if available
     if (post?.businessLat && post?.businessLng) {
-      console.log('⚡ Using cached coordinates from post', performance.now() - startTime, 'ms');
+      console.log(`⚡ Fast fly-to using post coordinates in ${performance.now() - startTime}ms`);
       window.dispatchEvent(new CustomEvent('flyToBusiness', {
         detail: {
           lat: post.businessLat,
@@ -270,8 +264,6 @@ const MobileApp: React.FC = () => {
           setSelectedBusiness(fullBusiness);
         }
       });
-      
-      console.log(`✅ Fast fly from post completed in ${performance.now() - startTime}ms`);
       return;
     }
     

@@ -122,38 +122,27 @@ export interface Post {
   userId?: string;
 }
 
-// Transform database post to frontend post format
-export const transformPost = async (dbPost: PostData, businesses: any[] = [], currentUserId?: string): Promise<Post> => {
-  const business = businesses.find(b => b.id === dbPost.business_id);
-  
+// Transform database post to frontend post format (no businesses array needed - data is flattened)
+export const transformPost = async (dbPost: PostData, _businesses: any[] = [], currentUserId?: string): Promise<Post> => {
   // Use provided currentUserId or get it once
   const userId = currentUserId || await getUserId();
   const isOwnPost = dbPost.user_id === userId;
   
-  // Extract coordinates from flattened data or businesses array
-  const businessLat = (dbPost as any).business_lat || business?.lat;
-  const businessLng = (dbPost as any).business_lng || business?.lng;
-  
-  console.log('🔄 transformPost:', {
-    postId: dbPost.id,
-    businessId: dbPost.business_id,
-    hasBusinessLat: !!(dbPost as any).business_lat,
-    hasBusinessLng: !!(dbPost as any).business_lng,
-    finalLat: businessLat,
-    finalLng: businessLng
-  });
+  // Extract coordinates from flattened data (already joined in getPosts query)
+  const businessLat = (dbPost as any).business_lat;
+  const businessLng = (dbPost as any).business_lng;
   
   return {
     id: dbPost.id,
     author: isOwnPost ? 'You' : 'Other',
     text: dbPost.content,
     businessId: dbPost.business_id,
-    businessName: (dbPost as any).business_name || business?.name,
+    businessName: (dbPost as any).business_name,
     businessLat,
     businessLng,
     isStory: dbPost.post_type === 'story',
     isJobUpdate: dbPost.post_type === 'job_update',
-    linkedLocation: (dbPost as any).business_name || business?.name,
+    linkedLocation: (dbPost as any).business_name,
     votesTotal: dbPost.upvotes - dbPost.downvotes,
     userVote: null, // Will be determined by votes table
     createdAt: new Date(dbPost.created_at),

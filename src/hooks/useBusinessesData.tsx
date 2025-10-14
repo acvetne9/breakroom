@@ -41,8 +41,8 @@ export const useBusinessesData = () => {
     const fetchBasicBusinesses = async () => {
       try {
         console.log('🏢 Starting to fetch businesses...');
-        // Load ALL businesses with their roles
-        const basicBusinesses = await getBusinessesBasic(100000);
+        // Fetch a reasonable number of businesses (5000 instead of 100000 to avoid timeout)
+        const basicBusinesses = await getBusinessesBasic(5000);
         console.log(`🏢 Successfully loaded ${basicBusinesses.length} businesses`);
         
         // Verify roles were loaded

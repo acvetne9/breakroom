@@ -71,8 +71,7 @@ export const usePosts = () => {
         // Get current user ID once to avoid race conditions
         const { profileId: currentUserId } = await getUserProfile();
 
-        // ✅ Transform posts - businesses data is already joined and flattened in postsData
-        // No need to fetch businesses separately or pass empty array
+        // Transform posts - businesses data is already joined and flattened in postsData
         const transformedPosts = await Promise.all(
           postsData.map(post => transformPost(post, [], currentUserId))
         );
