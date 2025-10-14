@@ -166,8 +166,6 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   onLocationSave,
   mapBusinesses = []
 }) => {
-  console.log('🔍 [DROPDOWN] Component rendered with:', { value, mapBusinessesCount: mapBusinesses?.length });
-  
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -222,13 +220,11 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   // Enhanced debounced suggestions with relevance scoring
   useEffect(() => {
     const q = value.trim();
-    console.log(`🔍 [DROPDOWN] useEffect triggered with value: "${q}", mapBusinesses:`, mapBusinesses?.length);
     
     if (!q) {
       setSearchResults([]);
       setShowDropdown(false);
       setIsSearching(false);
-      // Clear filters when search is empty - only if there were filters before
       if (lastFiltersRef.current !== null) {
         lastFiltersRef.current = null;
         committedQueryRef.current = '';
@@ -237,21 +233,15 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       return;
     }
     
-    console.log(`🔍 [DROPDOWN] Search value: "${q}", will search in ${300}ms`);
-    
-    // Check cache first for better performance
+    // Check cache first
     const cachedResults = resultsCache.current.get(q);
     if (cachedResults && Array.isArray(cachedResults)) {
-      console.log(`🔍 [DROPDOWN] Using cached results: ${cachedResults.length} items`);
       setSearchResults(cachedResults);
       setShowDropdown(true);
       setIsSearching(false);
       return;
     }
     
-    console.log(`🔍 [DROPDOWN] No cache, will perform new search`);
-    
-    // Only show suggestions, don't execute search automatically
     setIsSearching(true);
     setShowDropdown(true);
     const seq = ++searchSeqRef.current;
@@ -260,7 +250,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       try {
         const results: SearchResult[] = [];
         
-        // Check if the query matches a neighborhood
+        // Check for neighborhood match
         const neighborhood = findNeighborhoodBoundaryByName(q);
         if (neighborhood) {
           results.push({
@@ -271,59 +261,43 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           });
         }
         
-        // Use the same unified search as the map (search full database)
+        // Search full database using same function as map
         let businessResults: EnhancedBusiness[] = [];
-        
-        console.log(`🔍 [DROPDOWN] Starting unified database search for "${q}"`);
         
         try {
           const filters = parseSearchFilters(q);
-          console.log(`🔍 [DROPDOWN] Parsed filters:`, filters);
           
           if (filters) {
-            // Use the same searchBusinessesUnified function as the map
             const { searchBusinessesUnified } = await import('@/services/unifiedSearch');
             const dbResults = await searchBusinessesUnified(filters, undefined, 50);
-            console.log(`🔍 [DROPDOWN] Database returned ${dbResults.length} businesses`);
             
-            // Convert to EnhancedBusiness format
             businessResults = dbResults.map(b => ({
               ...b,
               lat: b.position.lat,
               lng: b.position.lng,
               businessType: b.businessType || 'Business'
             })) as EnhancedBusiness[];
-            console.log(`🔍 [DROPDOWN] Converted to ${businessResults.length} enhanced businesses`);
-          } else {
-            console.log(`🔍 [DROPDOWN] No filters parsed, skipping search`);
           }
         } catch (searchError) {
-          console.error('🔍 [DROPDOWN] Database search error:', searchError);
+          console.error('Dropdown database search error:', searchError);
         }
         
-        // Apply relevance-based filtering and sorting
+        // Apply relevance scoring and sorting
         const relevantResults = getRelevantResults(businessResults, q, 8);
-        console.log(`🔍 [DROPDOWN] After relevance scoring: ${relevantResults.length} results`);
-        
         results.push(...relevantResults);
-        console.log(`🔍 [DROPDOWN] Total results to show: ${results.length}`);
         
-        // Check if this search was superseded
         if (seq !== searchSeqRef.current) return;
         
-        // Cache the results
+        // Cache results
         resultsCache.current.set(q, results);
-        
-        // Limit cache size to prevent memory issues
         if (resultsCache.current.size > 50) {
           const firstKey = resultsCache.current.keys().next().value;
           resultsCache.current.delete(firstKey);
         }
         
         setSearchResults(Array.isArray(results) ? results : []);
-        console.log(`🔍 [DROPDOWN] Set searchResults state to ${results.length} items, showDropdown will be true`);
         
-        // Debounced idle search: parse filters and push to parent for live filtering
+        // Update parent with filters
         try {
           const parsed = parseSearchFilters(q);
           const filtersKey = parsed ? JSON.stringify(parsed) : null;
@@ -340,10 +314,10 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
             }
           }
         } catch (e) {
-          console.warn('Idle search filter parse failed:', e);
+          console.warn('Filter parse failed:', e);
         }
       } catch (error) {
-        console.error('Search suggestions error:', error);
+        console.error('Search error:', error);
         if (seq === searchSeqRef.current) {
           setSearchResults([]);
         }
@@ -352,10 +326,10 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           setIsSearching(false);
         }
       }
-    }, 300); // Faster suggestions with caching
+    }, 300);
     
     return () => clearTimeout(timer);
-  }, [value, onChange, mapBusinesses]);
+  }, [value, onChange]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
