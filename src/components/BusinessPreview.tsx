@@ -21,8 +21,7 @@ interface BusinessPreviewProps {
     roles?: Array<{
       role: string;
       salary: string;
-      upvotes?: number;
-      downvotes?: number;
+      votesTotal?: number;
       userVote?: 'up' | 'down' | null;
     }>;
     stories?: Array<{ id: string; text: string; author: string }>;

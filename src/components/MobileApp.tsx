@@ -32,8 +32,7 @@ interface Post {
   isStory?: boolean;
   isJobUpdate?: boolean;
   linkedLocation?: string;
-  upvotes: number;
-  downvotes: number;
+  votesTotal: number;
   userVote?: "up" | "down" | null;
   createdAt: Date;
 }

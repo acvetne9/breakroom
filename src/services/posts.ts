@@ -95,10 +95,8 @@ export interface PostData {
   salary?: number;
   business_id?: string;
   user_id: string;
-  upvotes: number;
-  downvotes: number;
+  votes_total: number;
   created_at: string;
-  updated_at: string;
   is_comment?: string;
 }
 
@@ -143,7 +141,7 @@ export const transformPost = async (dbPost: PostData, _businesses: any[] = [], c
     isStory: dbPost.post_type === 'story',
     isJobUpdate: dbPost.post_type === 'job_update',
     linkedLocation: (dbPost as any).business_name,
-    votesTotal: dbPost.upvotes - dbPost.downvotes,
+    votesTotal: dbPost.votes_total || 0,
     userVote: null, // Will be determined by votes table
     createdAt: new Date(dbPost.created_at),
     timestamp: dbPost.created_at,

@@ -16,8 +16,7 @@ export interface EnhancedBusiness {
     id: string;
     role: string;
     salary: string;
-    upvotes: number;
-    downvotes: number;
+    votesTotal: number;
     userVote?: 'up' | 'down' | null;
   }>;
   formatted_address?: string;
@@ -127,8 +126,7 @@ export async function searchBusinessesEnhanced(query: string, limit: number = 50
           id,
           role,
           salary,
-          upvotes,
-          downvotes
+          votes_total
         )
       `)
       .or(`name.ilike.%${filters.place}%,business_type.ilike.%${filters.place}%`)
@@ -221,8 +219,7 @@ export async function searchBusinessesEnhanced(query: string, limit: number = 50
           id: role.id,
           role: role.role,
           salary: role.salary,
-          upvotes: role.upvotes || 0,
-          downvotes: role.downvotes || 0,
+          votesTotal: role.votes_total || 0,
           userVote: null
         })),
         // Set primary salary from the highest paying role

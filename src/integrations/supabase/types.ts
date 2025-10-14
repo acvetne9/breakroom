@@ -173,46 +173,37 @@ export type Database = {
           business_id: string | null
           content: string
           created_at: string | null
-          downvotes: number | null
           id: string
           is_comment: string | null
           job_role: string | null
           post_type: string
           salary: number | null
-          time_period: string | null
-          updated_at: string | null
-          upvotes: number | null
           user_id: string
+          votes_total: number
         }
         Insert: {
           business_id?: string | null
           content: string
           created_at?: string | null
-          downvotes?: number | null
           id?: string
           is_comment?: string | null
           job_role?: string | null
           post_type: string
           salary?: number | null
-          time_period?: string | null
-          updated_at?: string | null
-          upvotes?: number | null
           user_id: string
+          votes_total?: number
         }
         Update: {
           business_id?: string | null
           content?: string
           created_at?: string | null
-          downvotes?: number | null
           id?: string
           is_comment?: string | null
           job_role?: string | null
           post_type?: string
           salary?: number | null
-          time_period?: string | null
-          updated_at?: string | null
-          upvotes?: number | null
           user_id?: string
+          votes_total?: number
         }
         Relationships: [
           {

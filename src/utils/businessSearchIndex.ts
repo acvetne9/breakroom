@@ -129,8 +129,7 @@ class BusinessSearchIndex {
           id: r.id || '',
           role: r.role,
           salary: r.salary,
-          upvotes: 0,
-          downvotes: 0,
+          votesTotal: r.votesTotal || 0,
           userVote: r.userVote
         })) || []
       } as EnhancedBusiness));

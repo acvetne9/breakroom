@@ -207,7 +207,7 @@ export class ProgressiveBusinessSearch {
           .from('businesses')
           .select(`
             id, name, lat, lng, atmosphere, salary, business_type, website,
-            business_roles (id, role, salary, upvotes, downvotes)
+            business_roles (id, role, salary, votes_total)
           `)
           .gte('lat', ring.south)
           .lte('lat', ring.north)
@@ -229,8 +229,7 @@ export class ProgressiveBusinessSearch {
             ? b.business_roles.map((r: any) => ({
                 role: r.role,
                 salary: r.salary,
-                upvotes: r.upvotes || 0,
-                downvotes: r.downvotes || 0,
+                votesTotal: r.votes_total || 0,
                 userVote: null,
               }))
             : [],
@@ -337,7 +336,7 @@ export class ProgressiveBusinessSearch {
       const businessIds = businesses.map(b => b.id);
       const { data: roles, error } = await supabase
         .from('business_roles')
-        .select('business_id, role, salary, upvotes, downvotes')
+        .select('business_id, id, role, salary, votes_total')
         .in('business_id', businessIds);
       
       if (error) throw error;
@@ -349,8 +348,7 @@ export class ProgressiveBusinessSearch {
           id: role.id,
           role: role.role,
           salary: role.salary,
-          upvotes: role.upvotes || 0,
-          downvotes: role.downvotes || 0,
+          votesTotal: role.votes_total || 0,
           userVote: null,
         });
         return acc;

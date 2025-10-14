@@ -304,8 +304,7 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
         business_id: businessId,
         role: role,
         salary: salary,
-        upvotes: 0,
-        downvotes: 0
+        votes_total: 0
       });
 
     if (createRoleError) throw createRoleError;
