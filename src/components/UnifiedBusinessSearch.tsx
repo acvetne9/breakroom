@@ -139,7 +139,6 @@ const getRelevantResults = (businesses: EnhancedBusiness[], query: string, maxRe
       score: calculateRelevanceScore(business, query, index),
       originalIndex: index // Preserve original order for additional tie-breaking
     }))
-    .filter(result => result.score > 0) // Only keep results with some relevance
     .sort((a, b) => {
       // Primary sort: by score (descending)
       if (a.score !== b.score) {
@@ -276,7 +275,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         }
         
         // Apply relevance scoring and sorting
-        const relevantResults = getRelevantResults(businessResults, q, 8);
+        const relevantResults = getRelevantResults(businessResults, q, 30);
         results.push(...relevantResults);
         
         if (seq !== searchSeqRef.current) return;
