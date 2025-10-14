@@ -261,13 +261,15 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           });
         }
         
-        // Get business results with increased limit for filtering
+        // Get business results from in-memory index
         let businessResults: EnhancedBusiness[] = [];
         
         try {
-          businessResults = await searchBusinessesEnhanced(q, 50);
+          const { searchFromIndex } = await import('@/utils/businessSearchIndex');
+          businessResults = searchFromIndex(q, 50);
+          console.log(`🔍 Found ${businessResults.length} businesses from in-memory index for "${q}"`);
         } catch (searchError) {
-          console.error('Search API error:', searchError);
+          console.error('Search index error:', searchError);
           // Continue with empty results rather than throwing
         }
         

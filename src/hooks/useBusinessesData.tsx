@@ -45,6 +45,11 @@ export const useBusinessesData = () => {
         const basicBusinesses = await getBusinessesBasic(25000);
         console.log(`🏢 Successfully loaded ${basicBusinesses.length} businesses`);
         
+        // Build search index with all roles and business names
+        const { buildSearchIndex } = await import('@/utils/businessSearchIndex');
+        buildSearchIndex(basicBusinesses);
+        console.log(`🔍 Built search index with roles and business names`);
+        
         // Cache all business coordinates
         const newCache: Record<string, { lat: number; lng: number; name: string }> = {};
         basicBusinesses.forEach(b => {
