@@ -166,6 +166,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   onLocationSave,
   mapBusinesses = []
 }) => {
+  console.log('🔍 [DROPDOWN] Component rendered with:', { value, mapBusinessesCount: mapBusinesses?.length });
+  
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
