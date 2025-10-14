@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Business } from '@/types/business';
 import { applyBusinessFilters, SearchFilters } from './businessFiltering';
+import { expandQueryWithSynonyms, expandWithSynonyms } from '@/utils/searchSynonyms';
 
 // Search results cache to prevent repeated queries
 const searchCache = new Map<string, { results: Business[]; timestamp: number }>();
@@ -84,6 +85,10 @@ export const parseUnifiedSearchFilters = (searchQuery: string): UnifiedSearchFil
     .filter(term => term.length > 0)
     .map(term => term.toLowerCase());
   
+  // Expand text terms with synonyms for better matching  
+  const expandedTextTerms = textTerms.flatMap(term => expandWithSynonyms(term));
+  const uniqueExpandedTerms = [...new Set(expandedTextTerms)];
+  
   // Categorize terms
   const commonRoles = [
     'barista','manager','cashier','server','cook','chef','waiter','waitress','host','hostess',
@@ -102,7 +107,7 @@ export const parseUnifiedSearchFilters = (searchQuery: string): UnifiedSearchFil
   let roleFilter = textTerms.find(term => commonRoles.includes(term));
   let businessTypeFilter = textTerms.find(term => commonBusinessTypes.includes(term));
   
-  const filters: UnifiedSearchFilters = { textTerms };
+  const filters: UnifiedSearchFilters = { textTerms: uniqueExpandedTerms };
   
   if (salaryQuery) filters.salaryQuery = salaryQuery;
   if (roleFilter) filters.roleFilter = roleFilter;

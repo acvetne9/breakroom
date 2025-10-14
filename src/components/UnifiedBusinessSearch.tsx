@@ -5,6 +5,8 @@ import { findNeighborhoodBoundaryByName } from '@/utils/nyc_neighborhoods';
 import { isProfane } from '@/utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 import { Search } from 'lucide-react';
+import { calculateBusinessFuzzyScore } from '@/utils/fuzzySearch';
+import { expandWithSynonyms } from '@/utils/searchSynonyms';
 
 interface UnifiedBusinessSearchProps {
   value: string;
@@ -56,6 +58,15 @@ const calculateRelevanceScore = (business: EnhancedBusiness, query: string, inde
     score += 40;
   }
   
+  // Synonym-aware name matching
+  const expandedQueryTerms = expandWithSynonyms(queryLower);
+  const nameMatchesSynonym = expandedQueryTerms.some(term => 
+    nameLower.includes(term.toLowerCase())
+  );
+  if (nameMatchesSynonym && !nameLower.includes(queryLower)) {
+    score += 25; // Bonus for synonym match in name
+  }
+  
   // Check business type relevance
   if (businessType.includes(queryLower)) {
     score += 30;
@@ -68,14 +79,15 @@ const calculateRelevanceScore = (business: EnhancedBusiness, query: string, inde
     }
   });
   
-  // Fuzzy matching for typos (lower priority)
-  const editDistance = calculateEditDistance(nameLower, queryLower);
-  const maxLength = Math.max(nameLower.length, queryLower.length);
-  const similarity = 1 - (editDistance / maxLength);
-  
-  // Only add fuzzy score if similarity is high (> 70%)
-  if (similarity > 0.7 && editDistance <= 3) {
-    score += Math.round(similarity * 20);
+  // Fuzzy matching with Fuse.js (replaces simple edit distance)
+  const fuzzyScore = calculateBusinessFuzzyScore(
+    business.name, 
+    business.businessType || '', 
+    business.roles?.map(r => r.role) || [],
+    queryLower
+  );
+  if (fuzzyScore > 0.6) {
+    score += Math.floor(fuzzyScore * 30); // 0-30 points based on fuzzy match quality
   }
   
   // Bonus for shorter names (more likely to be relevant)

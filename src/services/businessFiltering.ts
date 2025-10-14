@@ -2,6 +2,7 @@ import { Business } from '@/types/business';
 import { parseSearchTerms } from '@/utils/searchUtils';
 import { findNeighborhoodBoundaryByName, nycNeighborhoodBoundaries, filterBusinessesByNeighborhood } from '@/utils/nyc_neighborhoods';
 import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods';
+import { expandWithSynonyms } from '@/utils/searchSynonyms';
 
 export interface SearchFilters {
   textTerms: string[];
@@ -156,7 +157,13 @@ export function applyBusinessFilters(businesses: Business[], filters: SearchFilt
 
   const matchesTermVariants = (haystack: string, term: string) => {
     const h = normalize(haystack);
-    return variantsOf(term).some(v => h.includes(v));
+    const expandedTerms = expandWithSynonyms(term);
+    
+    // Check if any expanded synonym matches
+    return expandedTerms.some(variant => {
+      const normalized = normalize(variant);
+      return h.includes(normalized);
+    });
   };
 
   const toHourly = (salary: string): number | null => {
