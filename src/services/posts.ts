@@ -160,7 +160,7 @@ export const getPosts = async (limit: number = 1000, offset: number = 0): Promis
     .from('posts')
     .select(`
       *,
-      businesses!inner(id, name, lat, lng)
+      businesses(id, name, lat, lng)
     `)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
@@ -170,12 +170,12 @@ export const getPosts = async (limit: number = 1000, offset: number = 0): Promis
     return { data: null, error };
   }
 
-  // Transform data to flatten business coordinates
+  // Transform data to flatten business coordinates (handle null businesses from left join)
   const transformedData = data?.map((post: any) => ({
     ...post,
-    business_lat: post.businesses?.lat,
-    business_lng: post.businesses?.lng,
-    business_name: post.businesses?.name
+    business_lat: post.businesses?.lat || null,
+    business_lng: post.businesses?.lng || null,
+    business_name: post.businesses?.name || null
   }));
 
   console.log(`✅ Fetched ${transformedData?.length || 0} posts with coordinates`);
