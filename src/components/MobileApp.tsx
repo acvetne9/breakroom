@@ -337,7 +337,6 @@ const MobileApp: React.FC = () => {
   // Remove handlePostVote and handlePostDelete - now handled by ExplorePage directly
 
   const handleRoleVote = async (businessId: string, roleIndex: number, voteType: "up" | "down") => {
-    console.log('🗳️ MobileApp handleRoleVote called:', { businessId, roleIndex, voteType });
     // Find the role ID from the business
     let business = businesses.find((b) => b.id === businessId);
 
@@ -418,11 +417,11 @@ const MobileApp: React.FC = () => {
   useEffect(() => {
     if (selectedBusiness) {
       const updatedBusiness = businesses.find((b) => b.id === selectedBusiness.id);
-      if (updatedBusiness) {
+      if (updatedBusiness && updatedBusiness !== selectedBusiness) {
         setSelectedBusiness(updatedBusiness);
       }
     }
-  }, [businesses, selectedBusiness?.id]);
+  }, [businesses]);
 
   // Handle business state when sliding to explore/settings and back
   useEffect(() => {

@@ -29,13 +29,11 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
 
   const handleUpvote = (e: React.MouseEvent) => {
     e.stopPropagation();
-    console.log('👆 VotingComponent handleUpvote clicked');
     onVote('up');
   };
 
   const handleDownvote = (e: React.MouseEvent) => {
     e.stopPropagation();
-    console.log('👇 VotingComponent handleDownvote clicked');
     onVote('down');
   };
 

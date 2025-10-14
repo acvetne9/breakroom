@@ -106,7 +106,6 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
 
   const handleRoleVote = (roleIndex: number, voteType: 'up' | 'down', e?: React.MouseEvent) => {
     e?.stopPropagation();
-    console.log('🗳️ BusinessDetails handleRoleVote called:', { businessId: business.id, roleIndex, voteType });
     onRoleVote?.(business.id, roleIndex, voteType);
   };
 
