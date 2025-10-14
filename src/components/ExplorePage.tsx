@@ -164,13 +164,10 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     e.stopPropagation();
     console.log('👀 Eye clicked - navigating and flying to business:', businessId);
   
-    // First, request map fly-to if available
+    // Call flyTo handler (no duplicate calls)
     if (onFlyToBusiness) {
       onFlyToBusiness(businessId);
-    }
-  
-    // Keep existing navigation fallback
-    if (onNavigateToHomeBusiness) {
+    } else if (onNavigateToHomeBusiness) {
       onNavigateToHomeBusiness(businessId);
     } else {
       onBusinessView?.(businessId);

@@ -242,29 +242,34 @@ const MobileApp: React.FC = () => {
     // Find business in local state
     let business = businesses.find((b) => b.id === businessId);
     
-    // Dispatch flyTo immediately if we have coordinates
+    // Change slide first
+    setCurrentSlide(1);
+    
+    // Dispatch flyTo after brief delay to allow slide transition
     if (business?.position?.lat && business?.position?.lng) {
-      window.dispatchEvent(new CustomEvent('flyToBusiness', {
-        detail: {
-          lat: business.position.lat,
-          lng: business.position.lng,
-          businessId: businessId
-        }
-      }));
-      setCurrentSlide(1);
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('flyToBusiness', {
+          detail: {
+            lat: business.position.lat,
+            lng: business.position.lng,
+            businessId: businessId
+          }
+        }));
+      }, 150);
       setSelectedBusiness(business);
     } else {
       // Only fetch details if coordinates are missing
       const fullBusiness = await fetchFullBusinessDetails(businessId);
       if (fullBusiness?.position?.lat && fullBusiness?.position?.lng) {
-        window.dispatchEvent(new CustomEvent('flyToBusiness', {
-          detail: {
-            lat: fullBusiness.position.lat,
-            lng: fullBusiness.position.lng,
-            businessId: businessId
-          }
-        }));
-        setCurrentSlide(1);
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('flyToBusiness', {
+            detail: {
+              lat: fullBusiness.position.lat,
+              lng: fullBusiness.position.lng,
+              businessId: businessId
+            }
+          }));
+        }, 150);
         setSelectedBusiness(fullBusiness);
       }
     }
