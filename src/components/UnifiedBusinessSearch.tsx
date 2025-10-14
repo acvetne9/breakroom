@@ -274,9 +274,10 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           console.error('Dropdown filtering error:', searchError);
         }
         
-        // Apply relevance scoring and sorting
-        const relevantResults = getRelevantResults(businessResults, q, 30);
-        results.push(...relevantResults);
+        // Display all filtered businesses (already filtered by applyBusinessFilters)
+        // Limit to 50 results for dropdown performance
+        const dropdownResults = businessResults.slice(0, 50);
+        results.push(...dropdownResults);
         
         if (seq !== searchSeqRef.current) return;
         
