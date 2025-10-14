@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, Suspense } from "react";
 import { motion, PanInfo } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useToast } from "@/hooks/use-toast";
 import InitiationPage from "./InitiationPage";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -42,6 +43,7 @@ const MobileApp: React.FC = () => {
   console.log("🚀 MobileApp component rendering");
   const isMobile = useIsMobile();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [currentView, setCurrentView] = useState<"initiation" | "main">("main");
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -242,14 +244,21 @@ const MobileApp: React.FC = () => {
     console.log('🎯 handleFlyToBusiness called for:', businessId);
     const startTime = performance.now();
     
-    // Find business in local state
-    let business = businesses.find((b) => b.id === businessId);
-    
-    // Change slide and dispatch flyTo immediately
+    // Change slide immediately
     setCurrentSlide(1);
     
+    // Find business in local state
+    let business = businesses.find((b) => b.id === businessId);
+    console.log('📍 Found business in state:', { 
+      found: !!business, 
+      hasPosition: !!business?.position,
+      hasLat: !!business?.position?.lat,
+      hasLng: !!business?.position?.lng,
+      coords: business?.position 
+    });
+    
     if (business?.position?.lat && business?.position?.lng) {
-      console.log('✅ Business has coordinates, dispatching flyTo immediately', performance.now() - startTime, 'ms');
+      console.log('✅ Using cached coordinates, dispatching flyTo immediately', performance.now() - startTime, 'ms');
       window.dispatchEvent(new CustomEvent('flyToBusiness', {
         detail: {
           lat: business.position.lat,
@@ -258,21 +267,51 @@ const MobileApp: React.FC = () => {
         }
       }));
       setSelectedBusiness(business);
-    } else {
-      console.log('⏳ Fetching business details...', performance.now() - startTime, 'ms');
-      // Only fetch details if coordinates are missing
+      return;
+    }
+    
+    // Coordinates missing - try to fetch full details
+    console.log('⏳ Coordinates missing, fetching full business details...', performance.now() - startTime, 'ms');
+    try {
       const fullBusiness = await fetchFullBusinessDetails(businessId);
-      console.log('✅ Details fetched, dispatching flyTo', performance.now() - startTime, 'ms');
-      if (fullBusiness?.position?.lat && fullBusiness?.position?.lng) {
-        window.dispatchEvent(new CustomEvent('flyToBusiness', {
-          detail: {
-            lat: fullBusiness.position.lat,
-            lng: fullBusiness.position.lng,
-            businessId: businessId
-          }
-        }));
-        setSelectedBusiness(fullBusiness);
+      
+      if (!fullBusiness) {
+        console.error('❌ Failed to fetch business details (returned null)', performance.now() - startTime, 'ms');
+        toast({
+          title: "Unable to locate business",
+          description: "Could not load business location. Please try again.",
+          variant: "destructive",
+        });
+        return;
       }
+      
+      if (!fullBusiness.position?.lat || !fullBusiness.position?.lng) {
+        console.error('❌ Business details missing coordinates', performance.now() - startTime, 'ms');
+        toast({
+          title: "Location unavailable",
+          description: "This business doesn't have location data.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      console.log('✅ Successfully fetched details, dispatching flyTo', performance.now() - startTime, 'ms');
+      window.dispatchEvent(new CustomEvent('flyToBusiness', {
+        detail: {
+          lat: fullBusiness.position.lat,
+          lng: fullBusiness.position.lng,
+          businessId: businessId
+        }
+      }));
+      setSelectedBusiness(fullBusiness);
+      
+    } catch (error) {
+      console.error('❌ Error in handleFlyToBusiness:', error, performance.now() - startTime, 'ms');
+      toast({
+        title: "Error loading business",
+        description: "Network error. Please check your connection and try again.",
+        variant: "destructive",
+      });
     }
   };
 
