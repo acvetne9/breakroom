@@ -161,69 +161,49 @@ export const usePosts = () => {
     return false;
   };
 
-  // Vote on a post
+  // Vote on a post with optimistic updates
   const votePost = async (postId: string, voteType: 'up' | 'down'): Promise<boolean> => {
-    try {
-      const dbVoteType = voteType === 'up' ? 'upvote' : 'downvote';
-      const { success, error } = await voteOnPost(postId, dbVoteType);
+    const post = posts.find(p => p.id === postId);
+    if (!post) return false;
 
-      if (!success) {
-        console.error('Error voting on post:', error);
-        return false;
-      }
+    // Import vote calculation utility
+    const { calculateVoteChange } = await import('@/utils/voteCalculations');
+    const { persistVote } = await import('@/services/voting');
 
-      // Update local state optimistically
-      setPosts(prevPosts => 
-        prevPosts.map(post => {
-          if (post.id === postId) {
-            let newVotesTotal = post.votesTotal;
-            let newUserVote: 'up' | 'down' | null = post.userVote;
+    // Calculate new state optimistically
+    const { newUserVote, newTotal } = calculateVoteChange(
+      post.userVote,
+      voteType,
+      post.votesTotal
+    );
 
-            if (voteType === 'up') {
-              if (post.userVote === 'up') {
-                // Remove upvote
-                newVotesTotal--;
-                newUserVote = null;
-              } else if (post.userVote === 'down') {
-                // Switch from downvote to upvote
-                newVotesTotal += 2;
-                newUserVote = 'up';
-              } else {
-                // Add upvote
-                newVotesTotal++;
-                newUserVote = 'up';
-              }
-            } else {
-              if (post.userVote === 'down') {
-                // Remove downvote
-                newVotesTotal++;
-                newUserVote = null;
-              } else if (post.userVote === 'up') {
-                // Switch from upvote to downvote
-                newVotesTotal -= 2;
-                newUserVote = 'down';
-              } else {
-                // Add downvote
-                newVotesTotal--;
-                newUserVote = 'down';
-              }
-            }
+    // Store previous state for rollback
+    const previousVotesTotal = post.votesTotal;
+    const previousUserVote = post.userVote;
 
-            return {
-              ...post,
-              votesTotal: newVotesTotal,
-              userVote: newUserVote
-            };
-          }
-          return post;
-        })
+    // Update UI immediately
+    setPosts(prevPosts =>
+      prevPosts.map(p =>
+        p.id === postId
+          ? { ...p, votesTotal: newTotal, userVote: newUserVote }
+          : p
+      )
+    );
+
+    // Persist in background (don't await!)
+    const dbVoteType = newUserVote === 'up' ? 'upvote' : newUserVote === 'down' ? 'downvote' : null;
+    persistVote('votes', 'post_id', postId, dbVoteType).catch(() => {
+      // Rollback on error
+      setPosts(prevPosts =>
+        prevPosts.map(p =>
+          p.id === postId
+            ? { ...p, votesTotal: previousVotesTotal, userVote: previousUserVote }
+            : p
+        )
       );
+    });
 
-      return true;
-    } catch (err) {
-      console.error('Vote error:', err);
-      return false;
-    }
+    return true;
   };
 
   // Delete a post

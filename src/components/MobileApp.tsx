@@ -326,7 +326,6 @@ const MobileApp: React.FC = () => {
       console.log("🔄 Role missing ID, fetching full business details...");
       const fullBusiness = await fetchFullBusinessDetails(businessId);
       if (fullBusiness?.roles?.[roleIndex]?.id) {
-        // Update the businesses array with full details
         setBusinesses((prev) => prev.map((b) => (b.id === businessId ? fullBusiness : b)));
         business = fullBusiness;
       } else {
@@ -336,114 +335,62 @@ const MobileApp: React.FC = () => {
     }
 
     const roleId = business.roles[roleIndex].id;
+    const role = business.roles[roleIndex];
 
-    // Optimistically update UI first
-    setBusinesses((prevBusinesses) => {
-      const updatedBusinesses = prevBusinesses.map((business) => {
-        if (business.id === businessId && business.roles) {
-          const updatedRoles = business.roles.map((role, index) => {
-            if (index === roleIndex) {
-              let newVotesTotal = role.votesTotal;
-              let newUserVote: "up" | "down" | null = role.userVote;
+    // Import utilities
+    const { calculateVoteChange } = await import('@/utils/voteCalculations');
+    const { persistVote } = await import('@/services/voting');
 
-              if (voteType === "up") {
-                if (role.userVote === "up") {
-                  newVotesTotal--;
-                  newUserVote = null;
-                } else if (role.userVote === "down") {
-                  newVotesTotal += 2;
-                  newUserVote = "up";
-                } else {
-                  newVotesTotal++;
-                  newUserVote = "up";
-                }
-              } else {
-                if (role.userVote === "down") {
-                  newVotesTotal++;
-                  newUserVote = null;
-                } else if (role.userVote === "up") {
-                  newVotesTotal -= 2;
-                  newUserVote = "down";
-                } else {
-                  newVotesTotal--;
-                  newUserVote = "down";
-                }
-              }
+    // Calculate new state optimistically
+    const { newUserVote, newTotal } = calculateVoteChange(
+      role.userVote,
+      voteType,
+      role.votesTotal
+    );
 
-              return {
-                ...role,
-                votesTotal: newVotesTotal,
-                userVote: newUserVote,
-              };
-            }
-            return role;
-          });
+    // Store previous state for rollback
+    const previousVotesTotal = role.votesTotal;
+    const previousUserVote = role.userVote;
 
+    // Update UI immediately
+    setBusinesses((prev) =>
+      prev.map((b) => {
+        if (b.id === businessId && b.roles) {
           return {
-            ...business,
-            roles: updatedRoles,
+            ...b,
+            roles: b.roles.map((r, idx) =>
+              idx === roleIndex
+                ? { ...r, votesTotal: newTotal, userVote: newUserVote }
+                : r
+            ),
           };
         }
-        return business;
-      });
-      return updatedBusinesses;
-    });
+        return b;
+      })
+    );
 
-    // Then persist to database
-    const result = await handleRoleVoteService(businessId, roleId, voteType);
+    // Persist in background
+    const dbVoteType = newUserVote === 'up' ? 'upvote' : newUserVote === 'down' ? 'downvote' : null;
+    const result = await persistVote('role_votes', 'business_role_id', roleId, dbVoteType);
 
     if (!result.success) {
       console.error("Failed to persist vote:", result.error);
-      // Revert optimistic update on error
-      setBusinesses((prevBusinesses) => {
-        const updatedBusinesses = prevBusinesses.map((business) => {
-          if (business.id === businessId && business.roles) {
-            const updatedRoles = business.roles.map((role, index) => {
-              if (index === roleIndex) {
-                let revertVotesTotal = role.votesTotal;
-                let revertUserVote: "up" | "down" | null = role.userVote;
-
-                // Revert the optimistic update
-                if (voteType === "up") {
-                  if (role.userVote === null) {
-                    revertVotesTotal--;
-                    revertUserVote = "up";
-                  } else if (role.userVote === "up") {
-                    revertVotesTotal -= 2;
-                    revertUserVote = "down";
-                  } else {
-                    revertUserVote = null;
-                  }
-                } else {
-                  if (role.userVote === null) {
-                    revertVotesTotal++;
-                    revertUserVote = "down";
-                  } else if (role.userVote === "down") {
-                    revertVotesTotal += 2;
-                    revertUserVote = "up";
-                  } else {
-                    revertUserVote = null;
-                  }
-                }
-
-                return {
-                  ...role,
-                  votesTotal: revertVotesTotal,
-                  userVote: revertUserVote,
-                };
-              }
-              return role;
-            });
-
+      // Rollback on error
+      setBusinesses((prev) =>
+        prev.map((b) => {
+          if (b.id === businessId && b.roles) {
             return {
-              ...business,
-              roles: updatedRoles,
+              ...b,
+              roles: b.roles.map((r, idx) =>
+                idx === roleIndex
+                  ? { ...r, votesTotal: previousVotesTotal, userVote: previousUserVote }
+                  : r
+              ),
             };
           }
-          return business;
-        });
-        return updatedBusinesses;
-      });
+          return b;
+        })
+      );
     }
   };
 
