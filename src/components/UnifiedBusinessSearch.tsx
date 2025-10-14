@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { searchBusinessesEnhanced, EnhancedBusiness } from '@/services/enhancedBusinessSearch';
-import { parseSearchFilters } from '@/services/businessFiltering';
+import { parseSearchFilters, applyBusinessFilters } from '@/services/businessFiltering';
 import { findNeighborhoodBoundaryByName } from '@/utils/nyc_neighborhoods';
 import { isProfane } from '@/utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
@@ -261,25 +261,18 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           });
         }
         
-        // Search full database using same function as map
+        // Filter mapBusinesses using same logic as search bar
         let businessResults: EnhancedBusiness[] = [];
         
         try {
           const filters = parseSearchFilters(q);
           
-          if (filters) {
-            const { searchBusinessesUnified } = await import('@/services/unifiedSearch');
-            const dbResults = await searchBusinessesUnified(filters, undefined, 50);
-            
-            businessResults = dbResults.map(b => ({
-              ...b,
-              lat: b.position.lat,
-              lng: b.position.lng,
-              businessType: b.businessType || 'Business'
-            })) as EnhancedBusiness[];
+          if (filters && mapBusinesses && Array.isArray(mapBusinesses)) {
+            // Apply the same filters that the map uses
+            businessResults = applyBusinessFilters(mapBusinesses, filters) as EnhancedBusiness[];
           }
         } catch (searchError) {
-          console.error('Dropdown database search error:', searchError);
+          console.error('Dropdown filtering error:', searchError);
         }
         
         // Apply relevance scoring and sorting
