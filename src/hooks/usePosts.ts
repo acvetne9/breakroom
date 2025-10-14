@@ -54,6 +54,8 @@ export const usePosts = () => {
     
     try {
       const currentOffset = isLoadMore ? offset : 0;
+      
+      // ✅ getPosts now returns posts WITH businesses joined (including lat/lng)
       const { data: postsData, error: postsError } = await getPosts(POSTS_PER_PAGE, currentOffset);
       
       if (postsError) {
@@ -65,18 +67,14 @@ export const usePosts = () => {
       if (postsData) {
         // Check if we've reached the end
         setHasMore(postsData.length === POSTS_PER_PAGE);
-        
-        // Get businesses
-        const { data: businesses } = await supabase
-          .from('businesses')
-          .select('*');
 
         // Get current user ID once to avoid race conditions
         const { profileId: currentUserId } = await getUserProfile();
 
-        // Transform posts with cached user ID
+        // ✅ Transform posts - businesses data is already joined and flattened in postsData
+        // No need to fetch businesses separately or pass empty array
         const transformedPosts = await Promise.all(
-          postsData.map(post => transformPost(post, businesses || [], currentUserId))
+          postsData.map(post => transformPost(post, [], currentUserId))
         );
         
         const postIds = transformedPosts.map(p => p.id);

@@ -242,6 +242,12 @@ const MobileApp: React.FC = () => {
 
   const handleFlyToBusiness = async (businessId: string, post?: any) => {
     console.log('🎯 handleFlyToBusiness called for:', businessId);
+    console.log('📦 Post object:', post);
+    console.log('📍 Has coordinates?', { 
+      businessLat: post?.businessLat, 
+      businessLng: post?.businessLng,
+      hasBoth: !!(post?.businessLat && post?.businessLng)
+    });
     const startTime = performance.now();
     
     // Change slide immediately

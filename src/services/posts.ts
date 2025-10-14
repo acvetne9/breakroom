@@ -130,14 +130,27 @@ export const transformPost = async (dbPost: PostData, businesses: any[] = [], cu
   const userId = currentUserId || await getUserId();
   const isOwnPost = dbPost.user_id === userId;
   
+  // Extract coordinates from flattened data or businesses array
+  const businessLat = (dbPost as any).business_lat || business?.lat;
+  const businessLng = (dbPost as any).business_lng || business?.lng;
+  
+  console.log('🔄 transformPost:', {
+    postId: dbPost.id,
+    businessId: dbPost.business_id,
+    hasBusinessLat: !!(dbPost as any).business_lat,
+    hasBusinessLng: !!(dbPost as any).business_lng,
+    finalLat: businessLat,
+    finalLng: businessLng
+  });
+  
   return {
     id: dbPost.id,
     author: isOwnPost ? 'You' : 'Other',
     text: dbPost.content,
     businessId: dbPost.business_id,
     businessName: (dbPost as any).business_name || business?.name,
-    businessLat: (dbPost as any).business_lat || business?.lat,
-    businessLng: (dbPost as any).business_lng || business?.lng,
+    businessLat,
+    businessLng,
     isStory: dbPost.post_type === 'story',
     isJobUpdate: dbPost.post_type === 'job_update',
     linkedLocation: (dbPost as any).business_name || business?.name,
