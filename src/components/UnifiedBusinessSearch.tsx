@@ -266,6 +266,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         // Use map businesses if available, applying proper filters
         let businessResults: EnhancedBusiness[] = [];
         
+        console.log(`🔍 [DROPDOWN] Starting search for "${q}" with ${mapBusinesses?.length || 0} map businesses`);
+        
         if (mapBusinesses && mapBusinesses.length > 0) {
           // Convert map businesses to the right format
           const convertedBusinesses = mapBusinesses.map(b => ({
@@ -277,30 +279,37 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
             lng: b.lng || b.position?.lng
           }));
           
+          console.log(`🔍 [DROPDOWN] Converted ${convertedBusinesses.length} businesses`);
+          
           // Parse filters and apply them (same as map does)
           const filters = parseSearchFilters(q);
+          console.log(`🔍 [DROPDOWN] Parsed filters:`, filters);
+          
           if (filters) {
             const { applyBusinessFilters } = await import('@/services/businessFiltering');
             const filtered = applyBusinessFilters(convertedBusinesses, filters);
+            console.log(`🔍 [DROPDOWN] After applyBusinessFilters: ${filtered.length} results`);
+            
             // Convert Business[] back to EnhancedBusiness[] format
             businessResults = filtered.map(b => ({
               ...b,
               lat: b.position.lat,
               lng: b.position.lng
             })) as EnhancedBusiness[];
-            console.log(`🔍 Filtered ${convertedBusinesses.length} map businesses to ${businessResults.length} matches for "${q}"`);
+            console.log(`🔍 [DROPDOWN] Final results: ${businessResults.length} matches for "${q}"`);
           } else {
             businessResults = convertedBusinesses;
-            console.log(`🔍 Using all ${businessResults.length} businesses from map (no filters) for "${q}"`);
+            console.log(`🔍 [DROPDOWN] No filters, using all ${businessResults.length} businesses`);
           }
         } else {
           // Fall back to in-memory index
+          console.log(`🔍 [DROPDOWN] No map businesses, falling back to index`);
           try {
             const { searchFromIndex } = await import('@/utils/businessSearchIndex');
             businessResults = searchFromIndex(q, 50);
-            console.log(`🔍 Found ${businessResults.length} businesses from in-memory index for "${q}"`);
+            console.log(`🔍 [DROPDOWN] Found ${businessResults.length} businesses from index`);
           } catch (searchError) {
-            console.error('Search index error:', searchError);
+            console.error('🔍 [DROPDOWN] Search index error:', searchError);
           }
         }
         
@@ -528,10 +537,10 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
 
       {/* Search Results Dropdown */}
       {showDropdown && (Array.isArray(searchResults) && searchResults.length > 0 || isSearching || (value.trim() && !isSearching && Array.isArray(searchResults) && searchResults.length === 0)) && (
-        <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 z-[60]`}>
+        <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 z-[9999]`}>
           <div 
-            className="bg-background shadow-lg border-2 max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
-            style={{ borderRadius: '6px', borderColor: 'hsl(var(--border))' }}
+            className="bg-card shadow-xl border border-border max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
+            style={{ borderRadius: '8px' }}
             onScroll={() => {
               isScrolling.current = true;
               setTimeout(() => { isScrolling.current = false; }, 200);
