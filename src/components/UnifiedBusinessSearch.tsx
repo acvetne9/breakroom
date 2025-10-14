@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { searchBusinessesEnhanced, EnhancedBusiness } from '@/services/enhancedBusinessSearch';
 import { parseSearchFilters } from '@/services/businessFiltering';
-import { searchBusinessesUnified, parseUnifiedSearchFilters } from '@/services/unifiedSearch';
 import { findNeighborhoodBoundaryByName } from '@/utils/nyc_neighborhoods';
 import { isProfane } from '@/utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
@@ -218,11 +217,11 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     };
   }, []);
 
-  // Dropdown search - queries ALL businesses from database
+  // Enhanced debounced suggestions with relevance scoring
   useEffect(() => {
     const q = value.trim();
     
-    if (!q || q.length < 2) {
+    if (!q) {
       setSearchResults([]);
       setShowDropdown(false);
       setIsSearching(false);
@@ -262,36 +261,30 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           });
         }
         
-        // Use unified search to handle role, pay, and address searches
-        const unifiedFilters = parseUnifiedSearchFilters(q);
+        // Search full database using same function as map
+        let businessResults: EnhancedBusiness[] = [];
         
-        if (unifiedFilters) {
-          // Search all businesses with unified search (handles role, pay, address)
-          const businesses = await searchBusinessesUnified(unifiedFilters, undefined, 50);
+        try {
+          const filters = parseSearchFilters(q);
           
-          // Convert to EnhancedBusiness format
-          const businessResults: EnhancedBusiness[] = businesses.map(b => ({
-            id: b.id,
-            name: b.name,
-            businessType: b.businessType || 'Business',
-            address: b.address,
-            position: b.position,
-            lat: b.position.lat,
-            lng: b.position.lng,
-            atmosphere: b.atmosphere || [],
-            roles: (b.roles || []).map(role => ({
-              id: role.id || '',
-              role: role.role,
-              salary: role.salary,
-              votesTotal: role.votesTotal,
-              userVote: role.userVote
-            }))
-          }));
-          
-          // Apply relevance scoring and sorting
-          const relevantResults = getRelevantResults(businessResults, q, 10);
-          results.push(...relevantResults);
+          if (filters) {
+            const { searchBusinessesUnified } = await import('@/services/unifiedSearch');
+            const dbResults = await searchBusinessesUnified(filters, undefined, 50);
+            
+            businessResults = dbResults.map(b => ({
+              ...b,
+              lat: b.position.lat,
+              lng: b.position.lng,
+              businessType: b.businessType || 'Business'
+            })) as EnhancedBusiness[];
+          }
+        } catch (searchError) {
+          console.error('Dropdown database search error:', searchError);
         }
+        
+        // Apply relevance scoring and sorting
+        const relevantResults = getRelevantResults(businessResults, q, 8);
+        results.push(...relevantResults);
         
         if (seq !== searchSeqRef.current) return;
         
@@ -303,8 +296,28 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         }
         
         setSearchResults(Array.isArray(results) ? results : []);
+        
+        // Update parent with filters
+        try {
+          const parsed = parseSearchFilters(q);
+          const filtersKey = parsed ? JSON.stringify(parsed) : null;
+          if (lastFiltersRef.current !== filtersKey) {
+            lastFiltersRef.current = filtersKey;
+            if (parsed?.neighborhoodFilter) {
+              const neighborhoodCoords = {
+                lat: parsed.neighborhoodFilter.center.lat,
+                lon: parsed.neighborhoodFilter.center.lon
+              };
+              onChange(q, undefined, parsed, neighborhoodCoords);
+            } else {
+              onChange(q, undefined, parsed || null);
+            }
+          }
+        } catch (e) {
+          console.warn('Filter parse failed:', e);
+        }
       } catch (error) {
-        console.error('Dropdown search error:', error);
+        console.error('Search error:', error);
         if (seq === searchSeqRef.current) {
           setSearchResults([]);
         }
@@ -491,48 +504,49 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       {showDropdown && (Array.isArray(searchResults) && searchResults.length > 0 || isSearching || (value.trim() && !isSearching && Array.isArray(searchResults) && searchResults.length === 0)) && (
         <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 z-[9999]`}>
           <div 
-            className="bg-white dark:bg-gray-800 shadow-2xl border border-gray-200 dark:border-gray-700 max-h-60 overflow-y-auto rounded-lg"
+            className="bg-card shadow-xl border border-border max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
+            style={{ borderRadius: '8px' }}
             onScroll={() => {
               isScrolling.current = true;
               setTimeout(() => { isScrolling.current = false; }, 200);
             }}
           >
             {isSearching ? (
-              <div className="flex items-center justify-center py-4 text-sm text-gray-600 dark:text-gray-400">
+              <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
                 Searching...
               </div>
             ) : Array.isArray(searchResults) && searchResults.length === 0 && value.trim() ? (
-              <div className="flex items-center justify-center py-4 text-sm text-gray-600 dark:text-gray-400">
-                No businesses found
+              <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+                No relevant businesses found
               </div>
             ) : (
               <div className="p-3">
                 {Array.isArray(searchResults) && searchResults.map((result, index) => (
                   <div key={result.id}>
                     <div
-                      className="cursor-pointer py-2 px-2 rounded transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
+                      className="cursor-pointer py-1.5 px-0 rounded transition-colors hover:bg-accent/20"
                       onClick={() => handleResultClick(result)}
                     >
                       {'isNeighborhood' in result && result.isNeighborhood ? (
                         // Neighborhood result
                         <div className="flex justify-between items-center">
-                          <span className="font-medium text-gray-900 dark:text-gray-100">{result.name}</span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">{result.borough}</span>
+                          <span className="font-medium">{result.name}</span>
+                          <span className="text-xs opacity-70">{result.borough}</span>
                         </div>
                       ) : (
                         // Business result
                         <div className="flex flex-col">
                           <div className="flex justify-between items-center">
-                            <span className="font-medium text-gray-900 dark:text-gray-100">{(result as EnhancedBusiness).name}</span>
-                            <span className="text-sm text-gray-600 dark:text-gray-400">
+                            <span className="font-medium">{(result as EnhancedBusiness).name}</span>
+                            <span className="text-sm opacity-70">
                               {(result as EnhancedBusiness).businessType === "Other"
                                 ? ""
                                 : (result as EnhancedBusiness).businessType || "Business"}
                             </span>
                           </div>
-                           {/* Show address if it exists */}
+                           {/* Show Supabase address if it exists, otherwise nothing */}
                            {(result as EnhancedBusiness).address && (
-                             <span className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                             <span className="text-xs text-gray-500 truncate mt-0.5">
                                {(result as EnhancedBusiness).address}
                              </span>
                            )}
@@ -542,7 +556,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                 
                     {/* Divider between results */}
                     {index < (Array.isArray(searchResults) ? searchResults.length - 1 : -1) && (
-                      <div className="h-px bg-gray-200 dark:bg-gray-700 my-1"></div>
+                      <div className="h-px bg-border/30 my-1.5"></div>
                     )}
                   </div>
                 ))}
