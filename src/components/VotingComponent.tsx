@@ -171,16 +171,19 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
         >
           <button
             onClick={handleUpvote}
-            className={`p-1 rounded transition-all ${
+            className={`p-3 rounded-lg transition-all ${
               userVote === 'up'
-                ? 'bg-green-100 scale-110'
+                ? 'bg-green-200 scale-110 ring-2 ring-green-400'
                 : 'hover:bg-green-50 hover:scale-105'
             }`}
             disabled={isVoting}
           >
             <span
-              className="transition-all"
-              style={{ filter: userVote === 'up' ? 'grayscale(0%)' : 'grayscale(90%)' }}
+              className="transition-all text-lg"
+              style={{ 
+                filter: userVote === 'up' ? 'grayscale(0%) brightness(1.1)' : 'grayscale(90%) opacity(0.6)',
+                transform: userVote === 'up' ? 'scale(1.1)' : 'scale(1)'
+              }}
             >
               ✅
             </span>
@@ -193,7 +196,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 10, opacity: 0 }}
               transition={{ duration: 0.15 }}
-              className="font-medium text-app-black min-w-[20px] text-center"
+              className="font-medium text-app-black min-w-[20px] text-center px-2"
             >
               {votesTotal}
             </motion.span>
@@ -201,16 +204,19 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
 
           <button
             onClick={handleDownvote}
-            className={`p-1 rounded transition-all ${
+            className={`p-3 rounded-lg transition-all ${
               userVote === 'down'
-                ? 'bg-red-100 scale-110'
+                ? 'bg-red-200 scale-110 ring-2 ring-red-400'
                 : 'hover:bg-red-50 hover:scale-105'
             }`}
             disabled={isVoting}
           >
             <span
-              className="transition-all"
-              style={{ filter: userVote === 'down' ? 'grayscale(0%)' : 'grayscale(90%)' }}
+              className="transition-all text-lg"
+              style={{ 
+                filter: userVote === 'down' ? 'grayscale(0%) brightness(1.1)' : 'grayscale(90%) opacity(0.6)',
+                transform: userVote === 'down' ? 'scale(1.1)' : 'scale(1)'
+              }}
             >
               🚫
             </span>
@@ -225,9 +231,9 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
           <button
             ref={deleteButtonRef}
             onClick={handleDelete}
-            className="p-1 rounded transition-all hover:bg-red-50 hover:scale-105"
+            className="p-3 rounded-lg transition-all hover:bg-red-50 hover:scale-105"
           >
-            <span className="transition-all">🗑️</span>
+            <span className="transition-all text-lg">🗑️</span>
           </button>
         </div>
       )}
