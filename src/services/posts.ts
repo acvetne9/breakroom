@@ -108,6 +108,8 @@ export interface Post {
   text: string;
   businessId?: string;
   businessName?: string;
+  businessLat?: number;
+  businessLng?: number;
   images?: string[];
   isStory?: boolean;
   isJobUpdate?: boolean;
@@ -133,10 +135,12 @@ export const transformPost = async (dbPost: PostData, businesses: any[] = [], cu
     author: isOwnPost ? 'You' : 'Other',
     text: dbPost.content,
     businessId: dbPost.business_id,
-    businessName: business?.name,
+    businessName: (dbPost as any).business_name || business?.name,
+    businessLat: (dbPost as any).business_lat || business?.lat,
+    businessLng: (dbPost as any).business_lng || business?.lng,
     isStory: dbPost.post_type === 'story',
     isJobUpdate: dbPost.post_type === 'job_update',
-    linkedLocation: business?.name,
+    linkedLocation: (dbPost as any).business_name || business?.name,
     votesTotal: dbPost.upvotes - dbPost.downvotes,
     userVote: null, // Will be determined by votes table
     createdAt: new Date(dbPost.created_at),
@@ -148,27 +152,32 @@ export const transformPost = async (dbPost: PostData, businesses: any[] = [], cu
 
 // Get posts with pagination
 export const getPosts = async (limit: number = 1000, offset: number = 0): Promise<{ data: PostData[] | null; error: any }> => {
-  console.log(`🔍 getPosts - fetching ${limit} posts from offset ${offset}...`);
+  console.log(`🔍 getPosts - fetching ${limit} posts with coordinates...`);
   
   const { data, error } = await supabase
     .from('posts')
-    .select('*')
+    .select(`
+      *,
+      businesses!inner(id, name, lat, lng)
+    `)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
-  console.log('🔍 getPosts result:', {
-    postCount: data?.length || 0,
-    error: error?.message || 'none',
-    offset,
-    limit,
-    firstPost: data?.[0] ? {
-      id: data[0].id,
-      content: data[0].content.substring(0, 50) + '...',
-      user_id: data[0].user_id
-    } : 'none'
-  });
+  if (error) {
+    console.error('❌ Error fetching posts:', error);
+    return { data: null, error };
+  }
 
-  return { data, error };
+  // Transform data to flatten business coordinates
+  const transformedData = data?.map((post: any) => ({
+    ...post,
+    business_lat: post.businesses?.lat,
+    business_lng: post.businesses?.lng,
+    business_name: post.businesses?.name
+  }));
+
+  console.log(`✅ Fetched ${transformedData?.length || 0} posts with coordinates`);
+  return { data: transformedData as PostData[], error: null };
 };
 
 // Create a new post

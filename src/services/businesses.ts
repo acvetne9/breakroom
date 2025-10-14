@@ -1,22 +1,29 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Business, BusinessRole } from '@/types/business';
 
-// Enhanced function using PostGIS spatial queries
+// Enhanced function using PostGIS spatial queries with user votes preloaded
 export async function getBusinessesNearPoint(
   centerLat: number, 
   centerLng: number, 
   radiusMeters: number = 5000,
   limit: number = 2000
 ): Promise<Business[]> {
-  console.log(`🌍 Fetching businesses near ${centerLat}, ${centerLng} within ${radiusMeters}m`);
+  console.log(`🌍 Fetching businesses with user votes near ${centerLat}, ${centerLng}`);
 
-  const { data: businessesData, error } = await supabase
-    .rpc('get_businesses_with_roles_near_point', {
+  // Get current user ID for vote loading
+  const { getUserProfile } = await import('./posts');
+  const { profileId: userProfileId } = await getUserProfile();
+
+  const { data: businessesData, error } = await supabase.rpc(
+    'get_businesses_with_roles_and_votes_near_point',
+    {
       center_lat: centerLat,
       center_lng: centerLng,
       radius_meters: radiusMeters,
-      limit_count: limit
-    });
+      limit_count: limit,
+      user_profile_id: userProfileId
+    }
+  );
 
   if (error) {
     console.error('❌ Spatial query error:', error);
@@ -27,8 +34,8 @@ export async function getBusinessesNearPoint(
 
   if (!businessesData) return [];
 
+  // Parse and return businesses with user votes already included
   const businesses: Business[] = businessesData.map((business: any) => {
-    // Parse roles from JSONB
     const roles: BusinessRole[] = business.roles 
       ? (typeof business.roles === 'string' 
           ? JSON.parse(business.roles) 
@@ -37,8 +44,9 @@ export async function getBusinessesNearPoint(
           id: role.id,
           role: role.role,
           salary: role.salary,
+          payPeriod: role.pay_period,
           votesTotal: role.votes_total || 0,
-          userVote: null
+          userVote: role.user_vote || null  // Already included from RPC!
         }))
       : [];
 
@@ -55,7 +63,7 @@ export async function getBusinessesNearPoint(
   });
 
   const totalRoles = businesses.reduce((sum, b) => sum + (b.roles?.length || 0), 0);
-  console.log(`✅ Processed ${businesses.length} businesses with ${totalRoles} total roles`);
+  console.log(`✅ Processed ${businesses.length} businesses with ${totalRoles} roles and user votes preloaded`);
   return businesses;
 }
 

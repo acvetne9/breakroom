@@ -240,12 +240,34 @@ const MobileApp: React.FC = () => {
     setFilteredUserStories(false);
   };
 
-  const handleFlyToBusiness = async (businessId: string) => {
+  const handleFlyToBusiness = async (businessId: string, post?: any) => {
     console.log('🎯 handleFlyToBusiness called for:', businessId);
     const startTime = performance.now();
     
     // Change slide immediately
     setCurrentSlide(1);
+    
+    // Check if post has coordinates cached (for fast fly-to from posts)
+    if (post?.businessLat && post?.businessLng) {
+      console.log('⚡ Using cached coordinates from post', performance.now() - startTime, 'ms');
+      window.dispatchEvent(new CustomEvent('flyToBusiness', {
+        detail: {
+          lat: post.businessLat,
+          lng: post.businessLng,
+          businessId: businessId
+        }
+      }));
+      
+      // Fetch full details in background (don't await)
+      fetchFullBusinessDetails(businessId).then(fullBusiness => {
+        if (fullBusiness) {
+          setSelectedBusiness(fullBusiness);
+        }
+      });
+      
+      console.log(`✅ Fast fly from post completed in ${performance.now() - startTime}ms`);
+      return;
+    }
     
     // Find business in local state
     let business = businesses.find((b) => b.id === businessId);
@@ -258,7 +280,7 @@ const MobileApp: React.FC = () => {
     });
     
     if (business?.position?.lat && business?.position?.lng) {
-      console.log('✅ Using cached coordinates, dispatching flyTo immediately', performance.now() - startTime, 'ms');
+      console.log('✅ Using cached business coordinates', performance.now() - startTime, 'ms');
       window.dispatchEvent(new CustomEvent('flyToBusiness', {
         detail: {
           lat: business.position.lat,

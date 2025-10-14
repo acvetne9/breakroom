@@ -878,6 +878,26 @@ export type Database = {
           name: string
         }[]
       }
+      get_businesses_with_roles_and_votes_near_point: {
+        Args: {
+          center_lat: number
+          center_lng: number
+          limit_count: number
+          radius_meters: number
+          user_profile_id?: string
+        }
+        Returns: {
+          address: string
+          atmosphere: string[]
+          business_type: string
+          id: string
+          lat: number
+          lng: number
+          name: string
+          roles: Json
+          website: string
+        }[]
+      }
       get_businesses_with_roles_near_point: {
         Args: {
           center_lat: number
