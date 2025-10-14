@@ -242,16 +242,8 @@ const MobileApp: React.FC = () => {
     // Find business in local state
     let business = businesses.find((b) => b.id === businessId);
     
-    // If not found or missing coordinates, fetch full details
-    if (!business?.position?.lat || !business?.position?.lng) {
-      const fullBusiness = await fetchFullBusinessDetails(businessId);
-      if (fullBusiness?.position?.lat && fullBusiness?.position?.lng) {
-        business = fullBusiness;
-      }
-    }
-    
+    // Dispatch flyTo immediately if we have coordinates
     if (business?.position?.lat && business?.position?.lng) {
-      // Dispatch flyTo event for the map
       window.dispatchEvent(new CustomEvent('flyToBusiness', {
         detail: {
           lat: business.position.lat,
@@ -259,12 +251,22 @@ const MobileApp: React.FC = () => {
           businessId: businessId
         }
       }));
-      
-      // Navigate to home page
       setCurrentSlide(1);
-      
-      // Set the business as selected so it shows in BusinessDetails
       setSelectedBusiness(business);
+    } else {
+      // Only fetch details if coordinates are missing
+      const fullBusiness = await fetchFullBusinessDetails(businessId);
+      if (fullBusiness?.position?.lat && fullBusiness?.position?.lng) {
+        window.dispatchEvent(new CustomEvent('flyToBusiness', {
+          detail: {
+            lat: fullBusiness.position.lat,
+            lng: fullBusiness.position.lng,
+            businessId: businessId
+          }
+        }));
+        setCurrentSlide(1);
+        setSelectedBusiness(fullBusiness);
+      }
     }
   };
 
