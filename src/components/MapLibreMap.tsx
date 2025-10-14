@@ -204,6 +204,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [deckOverlay, setDeckOverlay] = useState<MapboxOverlay | null>(null);
   const [overlayReady, setOverlayReady] = useState(false);
+  const [currentZoom, setCurrentZoom] = useState(12.77);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -456,6 +457,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         }
 
+        // Limit displayed businesses based on zoom to improve performance
+        if (currentZoom < 15 && validBusinesses.length > 0) {
+          const maxDisplay = currentZoom < 12 ? 500 : currentZoom < 13 ? 1000 : currentZoom < 14 ? 2000 : 5000;
+          
+          if (validBusinesses.length > maxDisplay && mapRef.current) {
+            const bounds = mapRef.current.getBounds();
+            const viewportBounds = {
+              north: bounds.getNorth(),
+              south: bounds.getSouth(),
+              east: bounds.getEast(),
+              west: bounds.getWest(),
+            };
+            validBusinesses = createOptimizedGridSampling(viewportBounds, validBusinesses, maxDisplay, true);
+            console.log(`📊 Zoom ${currentZoom.toFixed(1)}: Displaying ${validBusinesses.length}/${businesses.length} businesses`);
+          }
+        }
+
         if (validBusinesses.length > 0) {
           try {
             const businessLayer = createBusinessScatterplotLayer({
@@ -466,7 +484,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               searchActive: !!searchFilters,
             });
             layers.push(businessLayer);
-            console.log("✅ Created scatterplot layer:", businessLayer);
+            console.log("✅ Created scatterplot layer with", validBusinesses.length, "businesses");
           } catch (err) {
             console.error("❌ Failed to create scatterplot layer", err);
           }
@@ -475,7 +493,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
 
     return layers;
-  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, businesses, landmarks]);
+  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, businesses, landmarks, currentZoom]);
 
   const lastLoadTimeRef = useRef(0);
 
@@ -484,6 +502,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     const map = mapRef.current;
     const zoom = map.getZoom();
+    setCurrentZoom(zoom);
     const bounds = map.getBounds();
     const viewportBounds = {
       north: bounds.getNorth(),
