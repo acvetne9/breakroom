@@ -51,7 +51,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
 }) => {
   console.log('🔍 ExplorePage component initializing...');
   
-  const { posts, loading, submitPost, votePost, removePost, trackCommentedPost } = usePosts();
+  const { posts, loading, hasMore, submitPost, votePost, removePost, loadMore, trackCommentedPost } = usePosts();
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
   const [hideSystemPost, setHideSystemPost] = useState(false);
@@ -408,6 +408,19 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
             </div>
           ))}
         </div>
+        
+        {/* Load More Button */}
+        {!expandedPost && !filteredBusinessId && !filteredUserStories && hasMore && (
+          <div className="flex justify-center py-6">
+            <button
+              onClick={loadMore}
+              disabled={loading}
+              className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            >
+              {loading ? 'Loading...' : 'Load More Posts'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Input bar at bottom */}

@@ -146,18 +146,21 @@ export const transformPost = async (dbPost: PostData, businesses: any[] = [], cu
   };
 };
 
-// Get all posts
-export const getPosts = async (): Promise<{ data: PostData[] | null; error: any }> => {
-  console.log('🔍 getPosts - fetching posts from database...');
+// Get posts with pagination
+export const getPosts = async (limit: number = 1000, offset: number = 0): Promise<{ data: PostData[] | null; error: any }> => {
+  console.log(`🔍 getPosts - fetching ${limit} posts from offset ${offset}...`);
   
   const { data, error } = await supabase
     .from('posts')
     .select('*')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
 
   console.log('🔍 getPosts result:', {
     postCount: data?.length || 0,
     error: error?.message || 'none',
+    offset,
+    limit,
     firstPost: data?.[0] ? {
       id: data[0].id,
       content: data[0].content.substring(0, 50) + '...',

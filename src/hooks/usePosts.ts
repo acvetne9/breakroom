@@ -1,19 +1,60 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getPosts, createPost, voteOnPost, deletePost, getUserVotes, transformPost, getUserProfile, Post, PostData } from '@/services/posts';
 import { supabase } from '@/integrations/supabase/client';
 
+// SessionStorage cache for posts
+const POSTS_CACHE_KEY = 'posts_cache';
+const POSTS_CACHE_VERSION_KEY = 'posts_cache_version';
+const POSTS_CACHE_VERSION = '1.0';
+
+const getCachedPosts = (): Post[] => {
+  try {
+    const version = sessionStorage.getItem(POSTS_CACHE_VERSION_KEY);
+    if (version !== POSTS_CACHE_VERSION) {
+      sessionStorage.removeItem(POSTS_CACHE_KEY);
+      sessionStorage.setItem(POSTS_CACHE_VERSION_KEY, POSTS_CACHE_VERSION);
+      return [];
+    }
+    const cached = sessionStorage.getItem(POSTS_CACHE_KEY);
+    if (!cached) return [];
+    
+    const parsed = JSON.parse(cached);
+    // Convert date strings back to Date objects
+    return parsed.map((p: any) => ({
+      ...p,
+      createdAt: new Date(p.createdAt)
+    }));
+  } catch (error) {
+    console.warn('Failed to read posts cache:', error);
+    return [];
+  }
+};
+
+const saveCachedPosts = (posts: Post[]) => {
+  try {
+    sessionStorage.setItem(POSTS_CACHE_KEY, JSON.stringify(posts));
+  } catch (error) {
+    console.warn('Failed to save posts cache:', error);
+  }
+};
+
+const POSTS_PER_PAGE = 1000;
+
 export const usePosts = () => {
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [posts, setPosts] = useState<Post[]>(getCachedPosts());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [offset, setOffset] = useState(0);
 
-  // Fetch posts from backend
-  const fetchPosts = async () => {
+  // Fetch posts from backend with pagination
+  const fetchPosts = useCallback(async (isLoadMore: boolean = false) => {
     setLoading(true);
     setError(null);
     
     try {
-      const { data: postsData, error: postsError } = await getPosts();
+      const currentOffset = isLoadMore ? offset : 0;
+      const { data: postsData, error: postsError } = await getPosts(POSTS_PER_PAGE, currentOffset);
       
       if (postsError) {
         setError('Failed to fetch posts');
@@ -22,6 +63,9 @@ export const usePosts = () => {
       }
 
       if (postsData) {
+        // Check if we've reached the end
+        setHasMore(postsData.length === POSTS_PER_PAGE);
+        
         // Get businesses
         const { data: businesses } = await supabase
           .from('businesses')
@@ -44,7 +88,22 @@ export const usePosts = () => {
           userVote: userVotes[post.id] || null
         }));
         
-        setPosts(postsWithVotes);
+        if (isLoadMore) {
+          // Append to existing posts using functional update
+          setPosts(prevPosts => {
+            const updatedPosts = [...prevPosts, ...postsWithVotes];
+            saveCachedPosts(updatedPosts);
+            console.log(`✅ Loaded ${postsWithVotes.length} more posts. Total: ${updatedPosts.length}`);
+            return updatedPosts;
+          });
+          setOffset(currentOffset + POSTS_PER_PAGE);
+        } else {
+          // Replace posts (initial load or refresh)
+          setPosts(postsWithVotes);
+          saveCachedPosts(postsWithVotes);
+          setOffset(POSTS_PER_PAGE);
+          console.log(`✅ Loaded ${postsWithVotes.length} posts (initial)`);
+        }
       }
     } catch (err) {
       setError('Failed to load posts');
@@ -52,7 +111,13 @@ export const usePosts = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [offset]);
+
+  const loadMorePosts = useCallback(() => {
+    if (!loading && hasMore) {
+      fetchPosts(true);
+    }
+  }, [loading, hasMore, fetchPosts]);
 
   // Submit a new post
   const submitPost = async (
@@ -182,16 +247,24 @@ export const usePosts = () => {
 
   // Set up real-time subscription
   useEffect(() => {
-    fetchPosts();
+    // Load from cache immediately if available
+    const cachedPosts = getCachedPosts();
+    if (cachedPosts.length > 0) {
+      console.log(`📦 Loaded ${cachedPosts.length} posts from cache`);
+      setLoading(false);
+    }
+    
+    fetchPosts(false);
 
-    // Subscribe to real-time changes
+    // Subscribe to real-time changes for new posts only
     const channel = supabase
       .channel('posts-changes')
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'posts' },
+        { event: 'INSERT', schema: 'public', table: 'posts' },
         () => {
-          // Refetch posts when changes occur
-          fetchPosts();
+          // Refetch initial batch when new posts are added
+          setOffset(0);
+          fetchPosts(false);
         }
       )
       .subscribe();
@@ -241,10 +314,12 @@ export const usePosts = () => {
     posts,
     loading,
     error,
+    hasMore,
     submitPost,
     votePost,
     removePost,
-    refetch: fetchPosts,
+    refetch: () => fetchPosts(false),
+    loadMore: loadMorePosts,
     getBusinessPosts,
     getUserPosts,
     getUserPostsAndCommented,
