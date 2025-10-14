@@ -328,16 +328,11 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
-    
+    onChange(newValue);
     if (!newValue.trim()) {
-      onChange(newValue, undefined, null);
       setSearchResults([]);
       setShowDropdown(false);
       setIsSearching(false);
-    } else {
-      // Parse filters immediately when typing for live filtering
-      const filters = parseSearchFilters(newValue);
-      onChange(newValue, undefined, filters);
     }
   };
 
