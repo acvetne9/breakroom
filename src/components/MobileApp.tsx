@@ -337,6 +337,7 @@ const MobileApp: React.FC = () => {
   // Remove handlePostVote and handlePostDelete - now handled by ExplorePage directly
 
   const handleRoleVote = async (businessId: string, roleIndex: number, voteType: "up" | "down") => {
+    console.log('🗳️ MobileApp handleRoleVote called:', { businessId, roleIndex, voteType });
     // Find the role ID from the business
     let business = businesses.find((b) => b.id === businessId);
 
