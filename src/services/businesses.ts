@@ -48,8 +48,8 @@ export async function getBusinessesBasic(limit: number = 5000): Promise<Business
   const centerLat = 40.7589; // Times Square area
   const centerLng = -73.9851;
   
-  // Use the new spatial function for better performance
-  return getBusinessesNearPoint(centerLat, centerLng, 10000, limit);
+  // Expanded radius to 20km to cover all of NYC
+  return getBusinessesNearPoint(centerLat, centerLng, 20000, limit);
 }
 
 export const getBusinessesInViewport = async (
