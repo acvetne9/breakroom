@@ -142,6 +142,9 @@ export const getBusinessesInViewport = async (
 };
 
 export async function getFullBusinessDetails(businessId: string): Promise<Business | null> {
+  console.log('🔍 Fetching full business details for:', businessId);
+  const startTime = performance.now();
+  
   // Fetch base business
   const { data: businessData, error: businessError } = await supabase
     .from('businesses')
@@ -152,25 +155,37 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
   if (businessError) throw businessError;
   if (!businessData) return null;
 
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser();
-  const currentUserId = user?.id;
+  console.log(`✅ Fetched business data in ${performance.now() - startTime}ms`);
+
+  // Get current user profile ID
+  const { getUserProfile } = await import('./posts');
+  const { profileId: currentUserId } = await getUserProfile();
+
+  console.log(`✅ Got user profile in ${performance.now() - startTime}ms`);
 
   // Fetch roles
+  const rolesStartTime = performance.now();
   const { data: rolesData, error: rolesError } = await supabase
     .from('business_roles')
     .select('*')
     .eq('business_id', businessId);
 
   if (rolesError) throw rolesError;
+  console.log(`✅ Fetched ${rolesData?.length || 0} roles in ${performance.now() - rolesStartTime}ms`);
 
-  // Fetch user role votes
+  // Fetch user role votes ONLY for this business's roles
   let userVotesData: any[] = [];
-  if (currentUserId) {
+  if (currentUserId && rolesData && rolesData.length > 0) {
+    const votesStartTime = performance.now();
+    const roleIds = rolesData.map(r => r.id);
+    
     const { data: votesData, error: votesError } = await supabase
       .from('role_votes')
       .select('business_role_id, vote_type')
-      .eq('user_id', currentUserId);
+      .eq('user_id', currentUserId)
+      .in('business_role_id', roleIds);  // ✅ ONLY fetch votes for this business's roles!
+
+    console.log(`✅ Fetched votes for ${roleIds.length} roles in ${performance.now() - votesStartTime}ms`);
 
     if (votesError) {
       console.warn('Error fetching user votes:', votesError);
@@ -201,6 +216,7 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
     website: businessData.website,
   };
 
+  console.log(`✅ getFullBusinessDetails completed in ${performance.now() - startTime}ms`);
   return fullBusiness;
 }
 

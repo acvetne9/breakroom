@@ -35,7 +35,7 @@ interface ExplorePageProps {
   onBackToAllPosts?: () => void;
   onNavigateToHomeBusiness?: (businessId: string) => void;
   onBusinessPreview?: (businessId: string) => void;
-  onFlyToBusiness?: (businessId: string) => void; // 🚀 NEW
+  onFlyToBusiness?: (businessId: string, post?: any) => void; // 🚀 NEW - accepts optional post for cached coordinates
 }
 
 const ExplorePage: React.FC<ExplorePageProps> = ({
@@ -178,13 +178,13 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     onExpandedPostChange?.(expandedPost === postId ? null : postId);
   };
 
-  const handleBusinessView = (e: React.MouseEvent, businessId: string) => {
+  const handleBusinessView = (e: React.MouseEvent, businessId: string, post?: any) => {
     e.stopPropagation();
     console.log('👀 Eye clicked - navigating and flying to business:', businessId);
   
-    // Call flyTo handler (no duplicate calls)
+    // Call flyTo handler with post for cached coordinates (no duplicate calls)
     if (onFlyToBusiness) {
-      onFlyToBusiness(businessId);
+      onFlyToBusiness(businessId, post);
     } else if (onNavigateToHomeBusiness) {
       onNavigateToHomeBusiness(businessId);
     } else {
@@ -352,7 +352,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                     <div className="flex-shrink-0 w-16 flex justify-end mt-1 my-0">
                       {post.businessId && (
                         <button
-                          onClick={e => handleBusinessView(e, post.businessId!)}
+                          onClick={e => handleBusinessView(e, post.businessId!, post)}
                           className="text-2xl hover:scale-110 transition-transform"
                           title="View business location and details"
                         >
