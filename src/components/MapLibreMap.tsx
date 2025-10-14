@@ -608,14 +608,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       mapRef.current = mapInstance;
 
       const handleFlyToBusiness = (event: CustomEvent) => {
+        console.log('🗺️ flyToBusiness event received:', event.detail);
         const { lat, lng } = event.detail;
         if (mapRef.current && lat != null && lng != null) {
+          console.log('🚀 Starting flyTo animation to:', { lat, lng });
           mapRef.current.flyTo({
             center: [lng, lat],
             zoom: 16,
             speed: 3,
             curve: 1,
             essential: true,
+          });
+        } else {
+          console.warn('⚠️ Cannot flyTo - mapRef or coordinates missing:', { 
+            hasMap: !!mapRef.current, 
+            lat, 
+            lng 
           });
         }
       };

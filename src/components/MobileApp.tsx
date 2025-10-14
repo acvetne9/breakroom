@@ -239,37 +239,38 @@ const MobileApp: React.FC = () => {
   };
 
   const handleFlyToBusiness = async (businessId: string) => {
+    console.log('🎯 handleFlyToBusiness called for:', businessId);
+    const startTime = performance.now();
+    
     // Find business in local state
     let business = businesses.find((b) => b.id === businessId);
     
-    // Change slide first
+    // Change slide and dispatch flyTo immediately
     setCurrentSlide(1);
     
-    // Dispatch flyTo after brief delay to allow slide transition
     if (business?.position?.lat && business?.position?.lng) {
-      setTimeout(() => {
+      console.log('✅ Business has coordinates, dispatching flyTo immediately', performance.now() - startTime, 'ms');
+      window.dispatchEvent(new CustomEvent('flyToBusiness', {
+        detail: {
+          lat: business.position.lat,
+          lng: business.position.lng,
+          businessId: businessId
+        }
+      }));
+      setSelectedBusiness(business);
+    } else {
+      console.log('⏳ Fetching business details...', performance.now() - startTime, 'ms');
+      // Only fetch details if coordinates are missing
+      const fullBusiness = await fetchFullBusinessDetails(businessId);
+      console.log('✅ Details fetched, dispatching flyTo', performance.now() - startTime, 'ms');
+      if (fullBusiness?.position?.lat && fullBusiness?.position?.lng) {
         window.dispatchEvent(new CustomEvent('flyToBusiness', {
           detail: {
-            lat: business.position.lat,
-            lng: business.position.lng,
+            lat: fullBusiness.position.lat,
+            lng: fullBusiness.position.lng,
             businessId: businessId
           }
         }));
-      }, 150);
-      setSelectedBusiness(business);
-    } else {
-      // Only fetch details if coordinates are missing
-      const fullBusiness = await fetchFullBusinessDetails(businessId);
-      if (fullBusiness?.position?.lat && fullBusiness?.position?.lng) {
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('flyToBusiness', {
-            detail: {
-              lat: fullBusiness.position.lat,
-              lng: fullBusiness.position.lng,
-              businessId: businessId
-            }
-          }));
-        }, 150);
         setSelectedBusiness(fullBusiness);
       }
     }
