@@ -260,17 +260,27 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           });
         }
         
-        // Use businesses directly from map (already filtered by map's search logic)
-        // The map applies filters via useViewportBusinesses -> getBusinessesInViewport
-        let businessResults: EnhancedBusiness[] = [];
+        // Parse filters and call the SAME search function the map uses
+        const filters = parseSearchFilters(q);
         
-        if (mapBusinesses && Array.isArray(mapBusinesses)) {
-          businessResults = mapBusinesses as EnhancedBusiness[];
+        if (filters) {
+          // Import and call searchBusinessesUnified - same function map uses!
+          const { searchBusinessesUnified } = await import('@/services/unifiedSearch');
+          
+          // Call with no bounds for dropdown (show all matching businesses)
+          const businessResults = await searchBusinessesUnified(filters, undefined, 50);
+          
+          console.log(`🔍 Dropdown search for "${q}" returned ${businessResults.length} results`);
+          
+          // Map Business to EnhancedBusiness format (flatten position)
+          const enhancedResults = businessResults.map(b => ({
+            ...b,
+            lat: b.position.lat,
+            lng: b.position.lng
+          })) as EnhancedBusiness[];
+          
+          results.push(...enhancedResults);
         }
-        
-        // Display all businesses from map, limit to 50 for dropdown performance
-        const dropdownResults = businessResults.slice(0, 50);
-        results.push(...dropdownResults);
         
         if (seq !== searchSeqRef.current) return;
         
