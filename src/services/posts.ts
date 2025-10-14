@@ -132,9 +132,6 @@ export const transformPost = async (dbPost: PostData, _businesses: any[] = [], c
   const businessLat = (dbPost as any).business_lat;
   const businessLng = (dbPost as any).business_lng;
   
-  // Use time_period for createdAt if available, otherwise fall back to created_at
-  const dateToUse = dbPost.time_period || dbPost.created_at;
-  
   return {
     id: dbPost.id,
     author: isOwnPost ? 'You' : 'Other',
@@ -148,8 +145,8 @@ export const transformPost = async (dbPost: PostData, _businesses: any[] = [], c
     linkedLocation: (dbPost as any).business_name,
     votesTotal: dbPost.upvotes - dbPost.downvotes,
     userVote: null, // Will be determined by votes table
-    createdAt: new Date(dateToUse),
-    timestamp: dateToUse,
+    createdAt: new Date(dbPost.created_at),
+    timestamp: dbPost.created_at,
     isComment: dbPost.is_comment,
     userId: dbPost.user_id,
   };
