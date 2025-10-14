@@ -271,54 +271,34 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           });
         }
         
-        // Use map businesses if available, applying proper filters
+        // Use the same unified search as the map (search full database)
         let businessResults: EnhancedBusiness[] = [];
         
-        console.log(`🔍 [DROPDOWN] Starting search for "${q}" with ${mapBusinesses?.length || 0} map businesses`);
+        console.log(`🔍 [DROPDOWN] Starting unified database search for "${q}"`);
         
-        if (mapBusinesses && mapBusinesses.length > 0) {
-          // Convert map businesses to the right format
-          const convertedBusinesses = mapBusinesses.map(b => ({
-            ...b,
-            businessType: b.businessType || b.business_type,
-            // Ensure we have both formats for compatibility
-            position: b.position || { lat: b.lat, lng: b.lng },
-            lat: b.lat || b.position?.lat,
-            lng: b.lng || b.position?.lng
-          }));
-          
-          console.log(`🔍 [DROPDOWN] Converted ${convertedBusinesses.length} businesses`);
-          
-          // Parse filters and apply them (same as map does)
+        try {
           const filters = parseSearchFilters(q);
           console.log(`🔍 [DROPDOWN] Parsed filters:`, filters);
           
           if (filters) {
-            const { applyBusinessFilters } = await import('@/services/businessFiltering');
-            const filtered = applyBusinessFilters(convertedBusinesses, filters);
-            console.log(`🔍 [DROPDOWN] After applyBusinessFilters: ${filtered.length} results`);
+            // Use the same searchBusinessesUnified function as the map
+            const { searchBusinessesUnified } = await import('@/services/unifiedSearch');
+            const dbResults = await searchBusinessesUnified(filters, undefined, 50);
+            console.log(`🔍 [DROPDOWN] Database returned ${dbResults.length} businesses`);
             
-            // Convert Business[] back to EnhancedBusiness[] format
-            businessResults = filtered.map(b => ({
+            // Convert to EnhancedBusiness format
+            businessResults = dbResults.map(b => ({
               ...b,
               lat: b.position.lat,
-              lng: b.position.lng
+              lng: b.position.lng,
+              businessType: b.businessType || 'Business'
             })) as EnhancedBusiness[];
-            console.log(`🔍 [DROPDOWN] Final results: ${businessResults.length} matches for "${q}"`);
+            console.log(`🔍 [DROPDOWN] Converted to ${businessResults.length} enhanced businesses`);
           } else {
-            businessResults = convertedBusinesses;
-            console.log(`🔍 [DROPDOWN] No filters, using all ${businessResults.length} businesses`);
+            console.log(`🔍 [DROPDOWN] No filters parsed, skipping search`);
           }
-        } else {
-          // Fall back to in-memory index
-          console.log(`🔍 [DROPDOWN] No map businesses, falling back to index`);
-          try {
-            const { searchFromIndex } = await import('@/utils/businessSearchIndex');
-            businessResults = searchFromIndex(q, 50);
-            console.log(`🔍 [DROPDOWN] Found ${businessResults.length} businesses from index`);
-          } catch (searchError) {
-            console.error('🔍 [DROPDOWN] Search index error:', searchError);
-          }
+        } catch (searchError) {
+          console.error('🔍 [DROPDOWN] Database search error:', searchError);
         }
         
         // Apply relevance-based filtering and sorting
