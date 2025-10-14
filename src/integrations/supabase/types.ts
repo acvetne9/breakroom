@@ -878,6 +878,25 @@ export type Database = {
           name: string
         }[]
       }
+      get_businesses_with_roles_near_point: {
+        Args: {
+          center_lat: number
+          center_lng: number
+          limit_count?: number
+          radius_meters?: number
+        }
+        Returns: {
+          address: string
+          atmosphere: string[]
+          business_type: string
+          id: string
+          lat: number
+          lng: number
+          name: string
+          roles: Json
+          website: string
+        }[]
+      }
       get_proj4_from_srid: {
         Args: { "": number }
         Returns: string
@@ -986,7 +1005,7 @@ export type Database = {
         Args:
           | { tbl_oid: unknown; use_typmod?: boolean }
           | { use_typmod?: boolean }
-        Returns: number
+        Returns: string
       }
       postgis_addbbox: {
         Args: { "": unknown }

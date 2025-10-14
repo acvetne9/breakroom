@@ -11,7 +11,7 @@ export async function getBusinessesNearPoint(
   console.log(`🌍 Fetching businesses near ${centerLat}, ${centerLng} within ${radiusMeters}m`);
 
   const { data: businessesData, error } = await supabase
-    .rpc('get_businesses_near_point', {
+    .rpc('get_businesses_with_roles_near_point', {
       center_lat: centerLat,
       center_lng: centerLng,
       radius_meters: radiusMeters,
@@ -27,17 +27,35 @@ export async function getBusinessesNearPoint(
 
   if (!businessesData) return [];
 
-  const businesses: Business[] = businessesData.map((business: any) => ({
-    id: business.id,
-    name: business.name,
-    address: business.address,
-    position: { lat: business.lat, lng: business.lng },
-    atmosphere: [],
-    salary: '0',
-    roles: [],
-  }));
+  const businesses: Business[] = businessesData.map((business: any) => {
+    // Parse roles from JSONB
+    const roles: BusinessRole[] = business.roles 
+      ? (typeof business.roles === 'string' 
+          ? JSON.parse(business.roles) 
+          : business.roles
+        ).map((role: any) => ({
+          id: role.id,
+          role: role.role,
+          salary: role.salary,
+          votesTotal: role.votes_total || 0,
+          userVote: null
+        }))
+      : [];
 
-  console.log(`✅ Processed spatial businesses: ${businesses.length}`);
+    return {
+      id: business.id,
+      name: business.name,
+      address: business.address,
+      position: { lat: business.lat, lng: business.lng },
+      atmosphere: business.atmosphere || [],
+      businessType: business.business_type,
+      website: business.website,
+      roles: roles,
+    };
+  });
+
+  const totalRoles = businesses.reduce((sum, b) => sum + (b.roles?.length || 0), 0);
+  console.log(`✅ Processed ${businesses.length} businesses with ${totalRoles} total roles`);
   return businesses;
 }
 

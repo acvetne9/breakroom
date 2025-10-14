@@ -41,9 +41,13 @@ export const useBusinessesData = () => {
     const fetchBasicBusinesses = async () => {
       try {
         console.log('🏢 Starting to fetch businesses...');
-        // Load more businesses with wider coverage
-        const basicBusinesses = await getBusinessesBasic(25000);
+        // Load ALL businesses with their roles
+        const basicBusinesses = await getBusinessesBasic(100000);
         console.log(`🏢 Successfully loaded ${basicBusinesses.length} businesses`);
+        
+        // Verify roles were loaded
+        const totalRoles = basicBusinesses.reduce((sum, b) => sum + (b.roles?.length || 0), 0);
+        console.log(`📋 Loaded ${totalRoles} total roles across all businesses`);
         
         // Build search index with all roles and business names
         const { buildSearchIndex } = await import('@/utils/businessSearchIndex');
