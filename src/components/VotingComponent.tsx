@@ -164,26 +164,28 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
     <>
       {!isOwner ? (
         <motion.div 
-          className={`flex flex-col items-center gap-0.5 ${className}`}
+          className={`flex items-center space-x-1 text-sm ${className}`}
           initial={{ scale: 1 }}
           animate={{ scale: isVoting ? 0.98 : 1 }}
           transition={{ duration: 0.1 }}
         >
-          <motion.button
+          <button
             onClick={handleUpvote}
-            className={`p-1.5 rounded-md transition-colors duration-200 ${
+            className={`p-1 rounded transition-all ${
               userVote === 'up'
-                ? 'bg-green-500/20 text-green-600'
-                : 'hover:bg-accent'
+                ? 'bg-green-100 scale-110'
+                : 'hover:bg-green-50 hover:scale-105'
             }`}
-            aria-label="Upvote"
-            whileTap={{ scale: 0.9 }}
-            whileHover={{ scale: 1.05 }}
             disabled={isVoting}
           >
-            <ChevronUp className="w-5 h-5" />
-          </motion.button>
-          
+            <span
+              className="transition-all"
+              style={{ filter: userVote === 'up' ? 'grayscale(0%)' : 'grayscale(90%)' }}
+            >
+              ✅
+            </span>
+          </button>
+
           <AnimatePresence mode="wait">
             <motion.span
               key={votesTotal}
@@ -191,39 +193,41 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 10, opacity: 0 }}
               transition={{ duration: 0.15 }}
-              className="text-sm font-medium min-w-[2ch] text-center tabular-nums"
+              className="font-medium text-app-black min-w-[20px] text-center"
             >
               {votesTotal}
             </motion.span>
           </AnimatePresence>
-          
-          <motion.button
+
+          <button
             onClick={handleDownvote}
-            className={`p-1.5 rounded-md transition-colors duration-200 ${
+            className={`p-1 rounded transition-all ${
               userVote === 'down'
-                ? 'bg-red-500/20 text-red-600'
-                : 'hover:bg-accent'
+                ? 'bg-red-100 scale-110'
+                : 'hover:bg-red-50 hover:scale-105'
             }`}
-            aria-label="Downvote"
-            whileTap={{ scale: 0.9 }}
-            whileHover={{ scale: 1.05 }}
             disabled={isVoting}
           >
-            <ChevronDown className="w-5 h-5" />
-          </motion.button>
+            <span
+              className="transition-all"
+              style={{ filter: userVote === 'down' ? 'grayscale(0%)' : 'grayscale(90%)' }}
+            >
+              🚫
+            </span>
+          </button>
         </motion.div>
       ) : (
-        <div className={`flex flex-col items-center gap-2 ${className}`}>
-          <span className="text-sm font-medium min-w-[2ch] text-center tabular-nums">
+        <div className={`flex items-center space-x-1 text-sm ${className}`}>
+          <span className="font-medium text-app-black min-w-[20px] text-center">
             {votesTotal}
           </span>
+
           <button
             ref={deleteButtonRef}
             onClick={handleDelete}
-            className="p-2 rounded-md hover:bg-destructive/10 text-destructive transition-all duration-200 active:scale-95"
-            aria-label="Delete"
+            className="p-1 rounded transition-all hover:bg-red-50 hover:scale-105"
           >
-            <Trash2 className="w-4 h-4" />
+            <span className="transition-all">🗑️</span>
           </button>
         </div>
       )}
