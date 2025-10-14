@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { searchBusinessesEnhanced, EnhancedBusiness } from '@/services/enhancedBusinessSearch';
 import { parseSearchFilters } from '@/services/businessFiltering';
+import { searchBusinessesUnified, parseUnifiedSearchFilters } from '@/services/unifiedSearch';
 import { findNeighborhoodBoundaryByName } from '@/utils/nyc_neighborhoods';
 import { isProfane } from '@/utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
@@ -261,32 +262,30 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           });
         }
         
-        // Query ALL businesses from database matching search term
-        const { supabase } = await import('@/integrations/supabase/client');
+        // Use unified search to handle role, pay, and address searches
+        const unifiedFilters = parseUnifiedSearchFilters(q);
         
-        const searchTerm = `%${q.toLowerCase()}%`;
-        
-        // Search businesses by name or business type
-        const { data: businesses, error } = await supabase
-          .from('businesses')
-          .select('id, name, business_type, address, lat, lng')
-          .or(`name.ilike.${searchTerm},business_type.ilike.${searchTerm}`)
-          .limit(20);
-        
-        if (error) {
-          console.error('Database query error:', error);
-        } else if (businesses) {
+        if (unifiedFilters) {
+          // Search all businesses with unified search (handles role, pay, address)
+          const businesses = await searchBusinessesUnified(unifiedFilters, undefined, 50);
+          
           // Convert to EnhancedBusiness format
           const businessResults: EnhancedBusiness[] = businesses.map(b => ({
             id: b.id,
             name: b.name,
-            businessType: b.business_type || 'Business',
+            businessType: b.businessType || 'Business',
             address: b.address,
-            position: { lat: b.lat, lng: b.lng },
-            lat: b.lat,
-            lng: b.lng,
-            atmosphere: [],
-            roles: []
+            position: b.position,
+            lat: b.position.lat,
+            lng: b.position.lng,
+            atmosphere: b.atmosphere || [],
+            roles: (b.roles || []).map(role => ({
+              id: role.id || '',
+              role: role.role,
+              salary: role.salary,
+              votesTotal: role.votesTotal,
+              userVote: role.userVote
+            }))
           }));
           
           // Apply relevance scoring and sorting
