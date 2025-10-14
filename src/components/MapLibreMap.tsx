@@ -496,6 +496,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, businesses, landmarks, currentZoom]);
 
   const lastLoadTimeRef = useRef(0);
+  const viewportUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleViewportChange = useCallback(async () => {
     if (!mapRef.current || !mapLoaded) return;
@@ -513,9 +514,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     const boundsKey = `${viewportBounds.north.toFixed(4)}-${viewportBounds.south.toFixed(4)}-${viewportBounds.east.toFixed(4)}-${viewportBounds.west.toFixed(4)}`;
 
+    // Adaptive throttling: higher zooms need more throttling for performance
+    const throttleMs = zoom >= 15 ? 500 : zoom >= 13 ? 350 : 250;
+    
     const now = Date.now();
-    if (lastBoundsRef.current === boundsKey && now - lastLoadTimeRef.current < 250) {
+    if (lastBoundsRef.current === boundsKey && now - lastLoadTimeRef.current < throttleMs) {
       return;
+    }
+
+    // Clear any pending viewport update
+    if (viewportUpdateTimeoutRef.current) {
+      clearTimeout(viewportUpdateTimeoutRef.current);
     }
 
     lastBoundsRef.current = boundsKey;

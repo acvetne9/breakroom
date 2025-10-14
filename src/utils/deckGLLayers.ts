@@ -92,9 +92,9 @@ export const createBusinessScatterplotLayer = ({
     getLineColor: (_d: Business) => [255, 255, 255, 255],
     onClick: onBusinessClick ? (info) => info.object && onBusinessClick(info.object as Business) : undefined,
     updateTriggers: {
-      getPosition: [filteredBusinesses],
-      getRadius: [filteredBusinesses, searchActive],
-      getFillColor: [filteredBusinesses, searchActive],
+      getPosition: filteredBusinesses.length,
+      getRadius: [filteredBusinesses.length, searchActive],
+      getFillColor: [filteredBusinesses.length, searchActive],
     },
   });
 };
@@ -119,8 +119,8 @@ export const createEmojiLandmarkLayer = ({
       depthTest: false
     },
     updateTriggers: {
-      getPosition: [landmarks],
-      getText: [landmarks],
+      getPosition: landmarks.length,
+      getText: landmarks.length,
     },
   });
 };
@@ -178,9 +178,9 @@ export const createBusinessClusterLayer = (
       }
     },
     updateTriggers: {
-      getPosition: [filteredData],
-      getRadius: [filteredData],
-      getFillColor: [filteredData],
+      getPosition: filteredData.length,
+      getRadius: filteredData.length,
+      getFillColor: filteredData.length,
     },
   });
 };
