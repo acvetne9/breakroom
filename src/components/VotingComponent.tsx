@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
 
 interface VotingComponentProps {
   votesTotal: number;
@@ -8,6 +10,7 @@ interface VotingComponentProps {
   className?: string;
   isOwner?: boolean;
   onDelete?: () => void;
+  isVoting?: boolean;
 }
 
 const VotingComponent: React.FC<VotingComponentProps> = ({
@@ -16,7 +19,8 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
   onVote,
   className = "",
   isOwner = false,
-  onDelete
+  onDelete,
+  isVoting = false
 }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({});
@@ -157,59 +161,69 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
   }, [showDeleteConfirm]);
 
   return (
-    <div className={`flex items-center space-x-1 text-sm ${className}`} data-voting-component>
-      {!isOwner && (
-        <div>
-          <button
+    <>
+      {!isOwner ? (
+        <motion.div 
+          className={`flex flex-col items-center gap-0.5 ${className}`}
+          initial={{ scale: 1 }}
+          animate={{ scale: isVoting ? 0.98 : 1 }}
+          transition={{ duration: 0.1 }}
+        >
+          <motion.button
             onClick={handleUpvote}
-            className={`p-1 rounded transition-all ${
+            className={`p-1.5 rounded-md transition-colors duration-200 ${
               userVote === 'up'
-                ? 'bg-green-100 scale-110'
-                : 'hover:bg-green-50 hover:scale-105'
+                ? 'bg-green-500/20 text-green-600'
+                : 'hover:bg-accent'
             }`}
+            aria-label="Upvote"
+            whileTap={{ scale: 0.9 }}
+            whileHover={{ scale: 1.05 }}
+            disabled={isVoting}
           >
-            <span
-              className="transition-all"
-              style={{ filter: userVote === 'up' ? 'grayscale(0%)' : 'grayscale(90%)' }}
+            <ChevronUp className="w-5 h-5" />
+          </motion.button>
+          
+          <AnimatePresence mode="wait">
+            <motion.span
+              key={votesTotal}
+              initial={{ y: -10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 10, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="text-sm font-medium min-w-[2ch] text-center tabular-nums"
             >
-              ✅
-            </span>
-          </button>
-
-          <span className="font-medium text-app-black min-w-[20px] text-center">
-            {votesTotal}
-          </span>
-
-          <button
+              {votesTotal}
+            </motion.span>
+          </AnimatePresence>
+          
+          <motion.button
             onClick={handleDownvote}
-            className={`p-1 rounded transition-all ${
+            className={`p-1.5 rounded-md transition-colors duration-200 ${
               userVote === 'down'
-                ? 'bg-red-100 scale-110'
-                : 'hover:bg-red-50 hover:scale-105'
+                ? 'bg-red-500/20 text-red-600'
+                : 'hover:bg-accent'
             }`}
+            aria-label="Downvote"
+            whileTap={{ scale: 0.9 }}
+            whileHover={{ scale: 1.05 }}
+            disabled={isVoting}
           >
-            <span
-              className="transition-all"
-              style={{ filter: userVote === 'down' ? 'grayscale(0%)' : 'grayscale(90%)' }}
-            >
-              🚫
-            </span>
-          </button>
-        </div>
-      )}
-
-      {isOwner && (
-        <div className="relative">
-          <span className="font-medium text-app-black min-w-[20px] text-center">
+            <ChevronDown className="w-5 h-5" />
+          </motion.button>
+        </motion.div>
+      ) : (
+        <div className={`flex flex-col items-center gap-2 ${className}`}>
+          <span className="text-sm font-medium min-w-[2ch] text-center tabular-nums">
             {votesTotal}
           </span>
-
           <button
             ref={deleteButtonRef}
             onClick={handleDelete}
-            className="p-1 rounded transition-all hover:bg-red-50 hover:scale-105"
+            className="p-2 rounded-md hover:bg-destructive/10 text-destructive transition-all duration-200 active:scale-95"
+            aria-label="Delete"
           >
-            <span className="transition-all">🗑️</span>
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       )}
@@ -227,7 +241,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
           </div>,
           document.body
         )}
-    </div>
+    </>
   );
 };
 

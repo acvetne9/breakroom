@@ -42,7 +42,7 @@ export function useOptimisticVote({
   onError
 }: UseOptimisticVoteOptions): UseOptimisticVoteReturn {
   const [votesTotal, setVotesTotal] = useState(initialVotesTotal);
-  const [userVote, setUserVote] = useState(initialUserVote);
+  const [userVote, setUserVote] = useState<'up' | 'down' | null>(initialUserVote);
   const [isVoting, setIsVoting] = useState(false);
 
   const handleVote = useCallback(async (voteType: 'up' | 'down') => {
@@ -63,9 +63,8 @@ export function useOptimisticVote({
     setIsVoting(true);
 
     try {
-      // Persist in background
-      const dbVoteType = newUserVote === 'up' ? 'upvote' : newUserVote === 'down' ? 'downvote' : null;
-      const success = await onPersist(dbVoteType);
+      // Persist in background - onPersist expects null or 'upvote'/'downvote'
+      const success = await onPersist(newUserVote);
 
       if (!success) {
         // Rollback on error

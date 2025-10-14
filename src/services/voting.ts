@@ -28,7 +28,7 @@ export async function persistVote(
     if (voteType === null) {
       // Remove vote
       const { error } = await supabase
-        .from(tableName)
+        .from(tableName as any)
         .delete()
         .eq(itemIdField, itemId)
         .eq('user_id', userId);
@@ -39,15 +39,13 @@ export async function persistVote(
       }
     } else {
       // Upsert vote (insert or update)
-      const voteData = {
-        [itemIdField]: itemId,
-        user_id: userId,
-        vote_type: voteType
-      };
-
       const { error } = await supabase
-        .from(tableName)
-        .upsert(voteData, {
+        .from(tableName as any)
+        .upsert({
+          [itemIdField]: itemId,
+          user_id: userId,
+          vote_type: voteType
+        } as any, {
           onConflict: `user_id,${itemIdField}`
         });
 
