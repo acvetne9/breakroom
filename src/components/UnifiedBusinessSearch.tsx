@@ -263,16 +263,36 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           });
         }
         
-        // Use map businesses if available, otherwise fall back to search index
+        // Use map businesses if available, applying proper filters
         let businessResults: EnhancedBusiness[] = [];
         
         if (mapBusinesses && mapBusinesses.length > 0) {
-          // Convert map businesses to EnhancedBusiness format and filter by query
-          businessResults = mapBusinesses.map(b => ({
+          // Convert map businesses to the right format
+          const convertedBusinesses = mapBusinesses.map(b => ({
             ...b,
-            businessType: b.businessType || b.business_type
+            businessType: b.businessType || b.business_type,
+            // Ensure we have both formats for compatibility
+            position: b.position || { lat: b.lat, lng: b.lng },
+            lat: b.lat || b.position?.lat,
+            lng: b.lng || b.position?.lng
           }));
-          console.log(`🔍 Using ${businessResults.length} businesses from map for "${q}"`);
+          
+          // Parse filters and apply them (same as map does)
+          const filters = parseSearchFilters(q);
+          if (filters) {
+            const { applyBusinessFilters } = await import('@/services/businessFiltering');
+            const filtered = applyBusinessFilters(convertedBusinesses, filters);
+            // Convert Business[] back to EnhancedBusiness[] format
+            businessResults = filtered.map(b => ({
+              ...b,
+              lat: b.position.lat,
+              lng: b.position.lng
+            })) as EnhancedBusiness[];
+            console.log(`🔍 Filtered ${convertedBusinesses.length} map businesses to ${businessResults.length} matches for "${q}"`);
+          } else {
+            businessResults = convertedBusinesses;
+            console.log(`🔍 Using all ${businessResults.length} businesses from map (no filters) for "${q}"`);
+          }
         } else {
           // Fall back to in-memory index
           try {
