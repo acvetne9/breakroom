@@ -56,6 +56,24 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
   const [hideSystemPost, setHideSystemPost] = useState(false);
 
+  // Infinite scroll - load more posts when scrolling to bottom
+  useEffect(() => {
+    const handleScroll = () => {
+      // Check if user is near bottom (within 500px)
+      const scrollHeight = document.documentElement.scrollHeight;
+      const scrollTop = document.documentElement.scrollTop;
+      const clientHeight = document.documentElement.clientHeight;
+      
+      if (scrollHeight - scrollTop - clientHeight < 500 && !loading && hasMore) {
+        console.log('📜 Near bottom, loading more posts...');
+        loadMore();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [loading, hasMore, loadMore]);
+
   const defaultPlaceholder = filteredBusinessId ? "Thoughts about this business?" : "How's work?";
   const [postPlaceholder, setPostPlaceholder] = useState(defaultPlaceholder);
   
@@ -409,16 +427,10 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
           ))}
         </div>
         
-        {/* Load More Button */}
-        {!expandedPost && !filteredBusinessId && !filteredUserStories && hasMore && (
+        {/* Loading indicator when fetching more posts */}
+        {loading && posts.length > 0 && (
           <div className="flex justify-center py-6">
-            <button
-              onClick={loadMore}
-              disabled={loading}
-              className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-            >
-              {loading ? 'Loading...' : 'Load More Posts'}
-            </button>
+            <div className="text-muted-foreground">Loading more posts...</div>
           </div>
         )}
       </div>
