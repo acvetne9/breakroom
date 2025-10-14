@@ -85,6 +85,18 @@ export const usePosts = () => {
           userVote: userVotes[post.id] || null
         }));
         
+        console.log('🎯 FINAL POSTS WITH VOTES:', {
+          totalPosts: postsWithVotes.length,
+          firstThree: postsWithVotes.slice(0, 3).map(p => ({
+            id: p.id,
+            text: p.text?.substring(0, 30),
+            businessId: p.businessId,
+            businessName: p.businessName,
+            votesTotal: p.votesTotal,
+            author: p.author
+          }))
+        });
+        
         if (isLoadMore) {
           // Append to existing posts using functional update
           setPosts(prevPosts => {

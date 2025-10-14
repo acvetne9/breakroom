@@ -232,6 +232,18 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
 
 
   const displayPosts = useMemo(() => {
+    console.log('📱 EXPLORE PAGE - Computing displayPosts:', {
+      totalPosts: posts.length,
+      filteredBusinessId,
+      filteredUserStories,
+      firstThreePosts: posts.slice(0, 3).map(p => ({
+        id: p.id,
+        text: p.text?.substring(0, 30),
+        businessId: p.businessId,
+        author: p.author
+      }))
+    });
+    
     let filtered: Post[] = [];
   
     if (filteredBusinessId) {
@@ -243,6 +255,11 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
       // Filter out comments from main feed
       filtered = posts.filter(post => !post.isComment);
     }
+    
+    console.log('📱 EXPLORE PAGE - After filtering:', {
+      filteredCount: filtered.length,
+      filter: filteredBusinessId ? 'business' : filteredUserStories ? 'userStories' : 'all'
+    });
   
     // Check for real (non-system) posts for this business
     const realBusinessPosts = filtered.filter(post => post.author !== 'System');

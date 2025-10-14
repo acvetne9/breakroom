@@ -165,6 +165,12 @@ export const getPosts = async (limit: number = 1000, offset: number = 0): Promis
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
+  console.log('📊 RAW SUPABASE RESPONSE:', { 
+    dataLength: data?.length || 0, 
+    error, 
+    firstPost: data?.[0] 
+  });
+
   if (error) {
     console.error('❌ Error fetching posts:', error);
     return { data: null, error };
@@ -179,6 +185,16 @@ export const getPosts = async (limit: number = 1000, offset: number = 0): Promis
   }));
 
   console.log(`✅ Fetched ${transformedData?.length || 0} posts with coordinates`);
+  console.log('🔍 TRANSFORMED DATA SAMPLE:', {
+    totalPosts: transformedData?.length,
+    firstThreePosts: transformedData?.slice(0, 3).map(p => ({
+      id: p.id,
+      text: p.content?.substring(0, 30),
+      business_id: p.business_id,
+      business_name: p.business_name,
+      hasCoordinates: !!(p.business_lat && p.business_lng)
+    }))
+  });
   return { data: transformedData as PostData[], error: null };
 };
 
