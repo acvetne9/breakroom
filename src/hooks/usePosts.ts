@@ -160,8 +160,23 @@ export const usePosts = () => {
       if (data) {
         // Get current user ID and transform the new post
         const { profileId: currentUserId } = await getUserProfile();
+        
+        // Transform the post (business data is already flattened in the response)
         const newPost = await transformPost(data, [], currentUserId);
-        setPosts(prevPosts => [newPost, ...prevPosts]);
+        
+        // Verify the post has a proper createdAt date
+        if (!(newPost.createdAt instanceof Date) || isNaN(newPost.createdAt.getTime())) {
+          console.error('⚠️ Post created without valid date:', newPost);
+          newPost.createdAt = new Date(); // Fallback to current time
+        }
+        
+        // Add to posts list and save to cache
+        setPosts(prevPosts => {
+          const updatedPosts = [newPost, ...prevPosts];
+          saveCachedPosts(updatedPosts);
+          return updatedPosts;
+        });
+        
         return true;
       }
     } catch (err) {

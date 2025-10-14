@@ -223,10 +223,25 @@ export const createPost = async (
       salary,
       is_comment: isComment,
     })
-    .select()
+    .select(`
+      *,
+      businesses(id, name, lat, lng)
+    `)
     .single();
 
-  return { data, error };
+  if (error) {
+    return { data: null, error };
+  }
+
+  // Flatten business data like in getPosts
+  const transformedData = {
+    ...data,
+    business_lat: data.businesses?.lat || null,
+    business_lng: data.businesses?.lng || null,
+    business_name: data.businesses?.name || null
+  };
+
+  return { data: transformedData as PostData, error: null };
 };
 
 // Vote on a post

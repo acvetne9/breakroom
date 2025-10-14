@@ -164,25 +164,24 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
     <>
       {!isOwner ? (
         <motion.div 
-          className={`flex items-center space-x-1 text-sm ${className}`}
+          className={`flex items-center gap-0.5 text-sm ${className}`}
           initial={{ scale: 1 }}
           animate={{ scale: isVoting ? 0.98 : 1 }}
           transition={{ duration: 0.1 }}
         >
           <button
             onClick={handleUpvote}
-            className={`p-3 rounded-lg transition-all ${
+            className={`p-1.5 rounded-lg transition-all ${
               userVote === 'up'
-                ? 'bg-green-200 scale-110 ring-2 ring-green-400'
-                : 'hover:bg-green-50 hover:scale-105'
+                ? 'bg-green-200 ring-1 ring-green-400'
+                : 'hover:bg-green-50'
             }`}
             disabled={isVoting}
           >
             <span
-              className="transition-all text-lg"
+              className="transition-all text-sm"
               style={{ 
                 filter: userVote === 'up' ? 'grayscale(0%) brightness(1.1)' : 'grayscale(90%) opacity(0.6)',
-                transform: userVote === 'up' ? 'scale(1.1)' : 'scale(1)'
               }}
             >
               ✅
@@ -192,11 +191,11 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
           <AnimatePresence mode="wait">
             <motion.span
               key={votesTotal}
-              initial={{ y: -10, opacity: 0 }}
+              initial={{ y: -5, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 10, opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="font-medium text-app-black min-w-[20px] text-center px-2"
+              exit={{ y: 5, opacity: 0 }}
+              transition={{ duration: 0.1 }}
+              className="font-medium text-app-black min-w-[16px] text-center px-1 text-xs"
             >
               {votesTotal}
             </motion.span>
@@ -204,18 +203,17 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
 
           <button
             onClick={handleDownvote}
-            className={`p-3 rounded-lg transition-all ${
+            className={`p-1.5 rounded-lg transition-all ${
               userVote === 'down'
-                ? 'bg-red-200 scale-110 ring-2 ring-red-400'
-                : 'hover:bg-red-50 hover:scale-105'
+                ? 'bg-red-200 ring-1 ring-red-400'
+                : 'hover:bg-red-50'
             }`}
             disabled={isVoting}
           >
             <span
-              className="transition-all text-lg"
+              className="transition-all text-sm"
               style={{ 
                 filter: userVote === 'down' ? 'grayscale(0%) brightness(1.1)' : 'grayscale(90%) opacity(0.6)',
-                transform: userVote === 'down' ? 'scale(1.1)' : 'scale(1)'
               }}
             >
               🚫
@@ -223,17 +221,17 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
           </button>
         </motion.div>
       ) : (
-        <div className={`flex items-center space-x-1 text-sm ${className}`}>
-          <span className="font-medium text-app-black min-w-[20px] text-center">
+        <div className={`flex items-center gap-0.5 text-sm ${className}`}>
+          <span className="font-medium text-app-black min-w-[16px] text-center text-xs">
             {votesTotal}
           </span>
 
           <button
             ref={deleteButtonRef}
             onClick={handleDelete}
-            className="p-3 rounded-lg transition-all hover:bg-red-50 hover:scale-105"
+            className="p-1.5 rounded-lg transition-all hover:bg-red-50"
           >
-            <span className="transition-all text-lg">🗑️</span>
+            <span className="transition-all text-sm">🗑️</span>
           </button>
         </div>
       )}
