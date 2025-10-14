@@ -613,8 +613,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           mapRef.current.flyTo({
             center: [lng, lat],
             zoom: 16,
-            speed: 1.2,
-            curve: 1.2,
+            speed: 3,
+            curve: 1,
             essential: true,
           });
         }
