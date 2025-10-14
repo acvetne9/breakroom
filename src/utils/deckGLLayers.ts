@@ -90,7 +90,15 @@ export const createBusinessScatterplotLayer = ({
     getRadius: (_d: Business) => baseRadius,
     getFillColor: (_d: Business) => searchActive ? [255, 215, 0, 255] : [250, 204, 21, 255], // Brighter gold when searching
     getLineColor: (_d: Business) => [255, 255, 255, 255],
-    onClick: onBusinessClick ? (info) => info.object && onBusinessClick(info.object as Business) : undefined,
+    onClick: onBusinessClick ? (info) => {
+      console.log('🖱️ Deck.GL layer clicked:', info);
+      if (info.object) {
+        console.log('🎯 Business clicked:', (info.object as Business).name);
+        onBusinessClick(info.object as Business);
+      } else {
+        console.log('⚠️ Click registered but no object found');
+      }
+    } : undefined,
     updateTriggers: {
       getPosition: filteredBusinesses.length,
       getRadius: [filteredBusinesses.length, searchActive],

@@ -182,6 +182,7 @@ const HomePage: React.FC<HomePageProps> = ({
   };
 
   const handleBusinessClick = (business: any) => {
+    console.log('🏠 HomePage handleBusinessClick called:', business?.name);
     console.log('🔍 DEBUG: handleBusinessClick deps check', { 
       onBusinessSelect: typeof onBusinessSelect,
       onLocationSave: typeof onLocationSave 

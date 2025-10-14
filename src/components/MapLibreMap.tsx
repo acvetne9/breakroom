@@ -381,7 +381,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   const handleBusinessClick = useCallback(
     async (business: any) => {
-      if (!business || !callbackRefs.current.onBusinessClick) return;
+      console.log('🗺️ MapLibreMap handleBusinessClick called:', business?.name);
+      if (!business || !callbackRefs.current.onBusinessClick) {
+        console.log('⚠️ No business or no callback:', { hasBusiness: !!business, hasCallback: !!callbackRefs.current.onBusinessClick });
+        return;
+      }
 
       try {
         let businessToReturn = business;
