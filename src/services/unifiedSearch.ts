@@ -133,33 +133,76 @@ export const searchBusinessesUnified = async (
   }
   
   try {
-    // Load basic businesses from database with minimal filtering
-    // (we'll apply the full filtering logic later using applyBusinessFilters)
-    let baseQuery = supabase.from('businesses').select(`
-      id, name, lat, lng, atmosphere, business_type, website
-    `);
+    // Use database-level text search for comprehensive matching
+    let businesses: any[] = [];
     
-    // Apply geographic bounds if specified
-    if (bounds) {
-      baseQuery = baseQuery
-        .gte('lat', bounds.south)
-        .lte('lat', bounds.north)
-        .gte('lng', bounds.west)
-        .lte('lng', bounds.east);
+    // Build text search conditions for name, business_type, and address
+    if (filters.textTerms && filters.textTerms.length > 0) {
+      const searchConditions: string[] = [];
+      
+      filters.textTerms.forEach(term => {
+        // Search in business name, business_type, and address
+        searchConditions.push(`name.ilike.%${term}%`);
+        searchConditions.push(`business_type.ilike.%${term}%`);
+        searchConditions.push(`address.ilike.%${term}%`);
+      });
+      
+      let textQuery = supabase
+        .from('businesses')
+        .select('id, name, lat, lng, atmosphere, business_type, website, address');
+      
+      // Apply geographic bounds if specified
+      if (bounds) {
+        textQuery = textQuery
+          .gte('lat', bounds.south)
+          .lte('lat', bounds.north)
+          .gte('lng', bounds.west)
+          .lte('lng', bounds.east);
+      }
+      
+      // Apply OR text search across name, business_type, and address
+      textQuery = textQuery.or(searchConditions.join(','));
+      
+      // Load more businesses for filtering (5000 for dropdown, 10k for map)
+      const queryLimit = bounds ? Math.min(limit * 10, 10000) : 5000;
+      textQuery = textQuery.limit(queryLimit);
+      
+      const { data: textMatches, error: textError } = await textQuery;
+      
+      if (textError) {
+        console.error('❌ Text search error:', textError);
+      } else if (textMatches && textMatches.length > 0) {
+        businesses = textMatches;
+        console.log(`🔍 Text search found ${textMatches.length} businesses`);
+      }
+    } else {
+      // No text terms - load businesses based on bounds only
+      let baseQuery = supabase
+        .from('businesses')
+        .select('id, name, lat, lng, atmosphere, business_type, website, address');
+      
+      if (bounds) {
+        baseQuery = baseQuery
+          .gte('lat', bounds.south)
+          .lte('lat', bounds.north)
+          .gte('lng', bounds.west)
+          .lte('lng', bounds.east);
+      }
+      
+      baseQuery = baseQuery.limit(bounds ? Math.min(limit * 10, 10000) : 5000);
+      
+      const { data: allBusinesses, error: businessError } = await baseQuery;
+      
+      if (businessError) {
+        console.error('❌ Business search error:', businessError);
+        return [];
+      }
+      
+      businesses = allBusinesses || [];
     }
     
-    // For keyword search, we'll load more businesses and filter them with applyBusinessFilters
-    // This ensures consistent filtering logic across the app
-    baseQuery = baseQuery.limit(Math.min(limit * 3, 10000)); // Load more for filtering
-    
-    const { data: businesses, error: businessError } = await baseQuery;
-    if (businessError) {
-      console.error('❌ Business search error:', businessError);
-      return [];
-    }
-    
-    if (!businesses || businesses.length === 0) {
-      return [];
+    if (businesses.length === 0) {
+      console.log('⚠️ No businesses found from text search');
     }
     
     console.log(`🔍 Found ${businesses.length} businesses, loading all roles...`);
@@ -218,6 +261,59 @@ export const searchBusinessesUnified = async (
     // Only check for empty roles table if no roles loaded and we expected some
     if (allRoles.length === 0 && businesses.length > 0) {
       console.warn('⚠️ No roles loaded for businesses - roles table may be empty');
+    }
+    
+    // If we don't have enough results yet, search by roles in business_roles table
+    if (filters.textTerms && filters.textTerms.length > 0 && businesses.length < limit * 2) {
+      console.log(`🔍 Searching roles table for additional matches...`);
+      
+      const roleSearchConditions = filters.textTerms.map(term => 
+        `role.ilike.%${term}%`
+      ).join(',');
+      
+      const { data: matchingRoles, error: roleError } = await supabase
+        .from('business_roles')
+        .select('business_id')
+        .or(roleSearchConditions)
+        .limit(1000);
+      
+      if (!roleError && matchingRoles && matchingRoles.length > 0) {
+        const roleBusinessIds = [...new Set(matchingRoles.map(r => r.business_id))];
+        
+        // Filter out businesses we already have
+        const existingIds = new Set(businesses.map(b => b.id));
+        const newBusinessIds = roleBusinessIds.filter(id => !existingIds.has(id));
+        
+        if (newBusinessIds.length > 0) {
+          console.log(`🔍 Found ${newBusinessIds.length} additional business IDs from role search`);
+          
+          // Fetch these additional businesses in batches
+          const FETCH_BATCH_SIZE = 200;
+          for (let i = 0; i < newBusinessIds.length; i += FETCH_BATCH_SIZE) {
+            const batchIds = newBusinessIds.slice(i, i + FETCH_BATCH_SIZE);
+            
+            let additionalQuery = supabase
+              .from('businesses')
+              .select('id, name, lat, lng, atmosphere, business_type, website, address')
+              .in('id', batchIds);
+            
+            if (bounds) {
+              additionalQuery = additionalQuery
+                .gte('lat', bounds.south)
+                .lte('lat', bounds.north)
+                .gte('lng', bounds.west)
+                .lte('lng', bounds.east);
+            }
+            
+            const { data: additionalBusinesses } = await additionalQuery;
+            if (additionalBusinesses && additionalBusinesses.length > 0) {
+              businesses.push(...additionalBusinesses);
+            }
+          }
+          
+          console.log(`✅ Total businesses after role search: ${businesses.length}`);
+        }
+      }
     }
     
     // Combine businesses with their roles

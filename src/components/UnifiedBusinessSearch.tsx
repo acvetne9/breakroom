@@ -268,7 +268,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           const { searchBusinessesUnified } = await import('@/services/unifiedSearch');
           
           // Call with no bounds for dropdown (show all matching businesses)
-          const businessResults = await searchBusinessesUnified(filters, undefined, 50);
+          const businessResults = await searchBusinessesUnified(filters, undefined, 30);
           
           console.log(`🔍 Dropdown search for "${q}" returned ${businessResults.length} results`);
           
