@@ -5,7 +5,6 @@ declare module "synonyms" {
 
 import winkNLP from "wink-nlp";
 import model from "wink-eng-lite-web-model";
-import synonyms from "synonyms"; // <-- lightweight WordNet-based synonym lookup
 
 // Initialize wink-nlp with web model (lazy loaded)
 let nlp: any = null;
