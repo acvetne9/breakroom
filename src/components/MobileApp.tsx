@@ -388,11 +388,11 @@ const MobileApp: React.FC = () => {
     const previousVotesTotal = role.votesTotal;
     const previousUserVote = role.userVote;
 
-    // Update UI immediately
+    // Update UI immediately - both businesses array and selectedBusiness
     setBusinesses((prev) =>
       prev.map((b) => {
         if (b.id === businessId && b.roles) {
-          return {
+          const updatedBusiness = {
             ...b,
             roles: b.roles.map((r, idx) =>
               idx === roleIndex
@@ -400,6 +400,13 @@ const MobileApp: React.FC = () => {
                 : r
             ),
           };
+          
+          // Also update selectedBusiness if it's the same business
+          if (selectedBusiness?.id === businessId) {
+            setSelectedBusiness(updatedBusiness);
+          }
+          
+          return updatedBusiness;
         }
         return b;
       })
@@ -412,11 +419,11 @@ const MobileApp: React.FC = () => {
     if (!result.success) {
       console.error("❌ Failed to persist vote:", result.error);
       alert('Vote failed to save. Please try again.');
-      // Rollback on error
+      // Rollback on error - both businesses array and selectedBusiness
       setBusinesses((prev) =>
         prev.map((b) => {
           if (b.id === businessId && b.roles) {
-            return {
+            const rolledBackBusiness = {
               ...b,
               roles: b.roles.map((r, idx) =>
                 idx === roleIndex
@@ -424,6 +431,13 @@ const MobileApp: React.FC = () => {
                   : r
               ),
             };
+            
+            // Also rollback selectedBusiness if it's the same business
+            if (selectedBusiness?.id === businessId) {
+              setSelectedBusiness(rolledBackBusiness);
+            }
+            
+            return rolledBackBusiness;
           }
           return b;
         })
