@@ -13,6 +13,7 @@ const SettingsPage = React.lazy(() => import("./SettingsPage"));
 const ExplorePage = React.lazy(() => import("./ExplorePage"));
 
 import { useBusinessesData } from "../hooks/useBusinessesData";
+import { Business } from "@/types/business";
 
 interface UserData {
   salary: string;
@@ -389,6 +390,8 @@ const MobileApp: React.FC = () => {
     const previousUserVote = role.userVote;
 
     // Update UI immediately - both businesses array and selectedBusiness
+    let updatedBusinessForSelection: Business | null = null;
+
     setBusinesses((prev) =>
       prev.map((b) => {
         if (b.id === businessId && b.roles) {
@@ -401,9 +404,9 @@ const MobileApp: React.FC = () => {
             ),
           };
           
-          // Also update selectedBusiness if it's the same business
+          // Store for selectedBusiness update
           if (selectedBusiness?.id === businessId) {
-            setSelectedBusiness(updatedBusiness);
+            updatedBusinessForSelection = updatedBusiness;
           }
           
           return updatedBusiness;
@@ -411,6 +414,11 @@ const MobileApp: React.FC = () => {
         return b;
       })
     );
+
+    // Update selectedBusiness separately to avoid closure issues
+    if (updatedBusinessForSelection) {
+      setSelectedBusiness(updatedBusinessForSelection);
+    }
 
     // Persist in background
     const dbVoteType = newUserVote === 'up' ? 'upvote' : newUserVote === 'down' ? 'downvote' : null;
@@ -420,6 +428,8 @@ const MobileApp: React.FC = () => {
       console.error("❌ Failed to persist vote:", result.error);
       alert('Vote failed to save. Please try again.');
       // Rollback on error - both businesses array and selectedBusiness
+      let rolledBackBusinessForSelection: Business | null = null;
+
       setBusinesses((prev) =>
         prev.map((b) => {
           if (b.id === businessId && b.roles) {
@@ -432,9 +442,9 @@ const MobileApp: React.FC = () => {
               ),
             };
             
-            // Also rollback selectedBusiness if it's the same business
+            // Store for selectedBusiness update
             if (selectedBusiness?.id === businessId) {
-              setSelectedBusiness(rolledBackBusiness);
+              rolledBackBusinessForSelection = rolledBackBusiness;
             }
             
             return rolledBackBusiness;
@@ -442,6 +452,11 @@ const MobileApp: React.FC = () => {
           return b;
         })
       );
+
+      // Update selectedBusiness separately to avoid closure issues
+      if (rolledBackBusinessForSelection) {
+        setSelectedBusiness(rolledBackBusinessForSelection);
+      }
     } else {
       console.log('✅ Vote persisted successfully');
     }
