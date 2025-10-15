@@ -343,7 +343,10 @@ const MobileApp: React.FC = () => {
     console.log('🗳️ MobileApp.handleRoleVote called:', { businessId, roleIndex, voteType });
     
     // Find the role ID from the business
-    let business = businesses.find((b) => b.id === businessId);
+    // Check selectedBusiness first since that's what's being displayed
+    let business = selectedBusiness?.id === businessId 
+      ? selectedBusiness 
+      : businesses.find((b) => b.id === businessId);
     
     console.log('📍 Found business:', {
       found: !!business,
