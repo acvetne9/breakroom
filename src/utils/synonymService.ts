@@ -1,5 +1,11 @@
 import hospitalitySynonyms from '@/data/hospitalitySynonyms.json';
 import nlp from 'compromise';
+import { 
+  expandWithSemantics, 
+  calculateSimilarity,
+  preloadSemanticSearch,
+  clearSemanticCache as clearSemanticSearchCache
+} from './semanticSearch';
 
 // In-memory cache for synonym lookups
 const synonymCache = new Map<string, string[]>();
@@ -8,6 +14,16 @@ const cacheTimestamps = new Map<string, number>();
 
 // Pre-computed top hospitality terms
 let precomputedTerms: Set<string> | null = null;
+const COMMON_HOSPITALITY_ROLES = [
+  'server', 'bartender', 'barista', 'cook', 'chef', 'manager', 'host', 'hostess',
+  'dishwasher', 'busser', 'cashier', 'shift lead', 'supervisor', 'assistant manager',
+  'general manager', 'kitchen manager', 'line cook', 'prep cook', 'sous chef',
+  'food runner', 'expediter', 'barback', 'sommelier', 'mixologist', 'waiter', 'waitress',
+  'table server', 'dining server', 'restaurant server', 'catering server',
+  'banquet server', 'event server', 'cafe worker', 'coffee maker', 'kitchen staff',
+  'front desk', 'receptionist', 'concierge', 'room service', 'housekeeper',
+  'maintenance', 'porter', 'valet', 'attendant', 'coordinator'
+];
 
 /**
  * Get synonyms from hospitality industry supplement (fast, domain-specific)
@@ -62,11 +78,12 @@ function isCacheValid(term: string): boolean {
 /**
  * Expand a term with synonyms using hybrid approach
  * 1. Check cache
- * 2. Check hospitality supplement (industry-specific)
- * 3. Query Moby thesaurus (general synonyms)
- * 4. Cache and return results
+ * 2. Check hospitality slang supplement (industry abbreviations)
+ * 3. Use semantic similarity with wink-nlp (intelligent matching)
+ * 4. Get word variations (plural/singular)
+ * 5. Cache and return results
  */
-export function expandWithSynonyms(term: string): string[] {
+export async function expandWithSynonyms(term: string): Promise<string[]> {
   const normalized = term.toLowerCase().trim();
   
   // Check cache first
@@ -76,11 +93,23 @@ export function expandWithSynonyms(term: string): string[] {
   
   const allSynonyms = new Set<string>([normalized]);
   
-  // 1. Get hospitality-specific synonyms (highest priority)
+  // 1. Get hospitality slang/abbreviations (instant lookup)
   const hospitalityResults = getHospitalitySynonyms(normalized);
   hospitalityResults.forEach(syn => allSynonyms.add(syn.toLowerCase()));
   
-  // 2. Get word variations (plural/singular) using Compromise
+  // 2. Use semantic search to find similar terms (intelligent matching)
+  try {
+    const semanticExpansions = await expandWithSemantics(
+      normalized,
+      COMMON_HOSPITALITY_ROLES,
+      0.65 // Similarity threshold (0.0 - 1.0)
+    );
+    semanticExpansions.forEach(syn => allSynonyms.add(syn.toLowerCase()));
+  } catch (error) {
+    console.warn('Semantic expansion failed, falling back to basic expansion:', error);
+  }
+  
+  // 3. Get word variations (plural/singular) using Compromise
   const variations = getWordVariations(normalized);
   variations.forEach(variant => {
     allSynonyms.add(variant.toLowerCase());
@@ -98,9 +127,41 @@ export function expandWithSynonyms(term: string): string[] {
 }
 
 /**
- * Expand all terms in a search query
+ * Synchronous version for backward compatibility
+ * Returns basic expansions immediately, semantic expansions happen in background
  */
-export function expandQueryWithSynonyms(query: string): string[] {
+export function expandWithSynonymsSync(term: string): string[] {
+  const normalized = term.toLowerCase().trim();
+  
+  // Check cache first
+  if (isCacheValid(normalized) && synonymCache.has(normalized)) {
+    return synonymCache.get(normalized)!;
+  }
+  
+  const allSynonyms = new Set<string>([normalized]);
+  
+  // Get hospitality slang/abbreviations
+  const hospitalityResults = getHospitalitySynonyms(normalized);
+  hospitalityResults.forEach(syn => allSynonyms.add(syn.toLowerCase()));
+  
+  // Get word variations
+  const variations = getWordVariations(normalized);
+  variations.forEach(variant => {
+    allSynonyms.add(variant.toLowerCase());
+    const variantSynonyms = getHospitalitySynonyms(variant);
+    variantSynonyms.forEach(syn => allSynonyms.add(syn.toLowerCase()));
+  });
+  
+  // Trigger async semantic expansion in background
+  expandWithSynonyms(term).catch(() => {});
+  
+  return Array.from(allSynonyms);
+}
+
+/**
+ * Expand all terms in a search query (async version)
+ */
+export async function expandQueryWithSynonyms(query: string): Promise<string[]> {
   const normalized = query.toLowerCase().trim();
   
   // Check if entire query matches a phrase in hospitality synonyms
@@ -108,9 +169,10 @@ export function expandQueryWithSynonyms(query: string): string[] {
   if (phraseMatch.length > 0) {
     // Expand each matched term as well
     const expandedSet = new Set<string>([normalized, ...phraseMatch]);
-    phraseMatch.forEach(term => {
-      expandWithSynonyms(term).forEach(syn => expandedSet.add(syn));
-    });
+    for (const term of phraseMatch) {
+      const expansions = await expandWithSynonyms(term);
+      expansions.forEach(syn => expandedSet.add(syn));
+    }
     return Array.from(expandedSet);
   }
   
@@ -118,23 +180,70 @@ export function expandQueryWithSynonyms(query: string): string[] {
   const terms = normalized.split(/\s+/).filter(t => t.length > 1);
   const expandedSet = new Set<string>();
   
+  for (const term of terms) {
+    const expansions = await expandWithSynonyms(term);
+    expansions.forEach(syn => expandedSet.add(syn));
+  }
+  
+  return Array.from(expandedSet);
+}
+
+/**
+ * Synchronous version of expandQueryWithSynonyms
+ */
+export function expandQueryWithSynonymsSync(query: string): string[] {
+  const normalized = query.toLowerCase().trim();
+  
+  const phraseMatch = getHospitalitySynonyms(normalized);
+  if (phraseMatch.length > 0) {
+    const expandedSet = new Set<string>([normalized, ...phraseMatch]);
+    phraseMatch.forEach(term => {
+      expandWithSynonymsSync(term).forEach(syn => expandedSet.add(syn));
+    });
+    return Array.from(expandedSet);
+  }
+  
+  const terms = normalized.split(/\s+/).filter(t => t.length > 1);
+  const expandedSet = new Set<string>();
+  
   terms.forEach(term => {
-    expandWithSynonyms(term).forEach(syn => expandedSet.add(syn));
+    expandWithSynonymsSync(term).forEach(syn => expandedSet.add(syn));
   });
   
   return Array.from(expandedSet);
 }
 
 /**
- * Check if two terms are synonyms
+ * Check if two terms are synonyms (async version)
  */
-export function areSynonyms(term1: string, term2: string): boolean {
+export async function areSynonyms(term1: string, term2: string): Promise<boolean> {
   const t1 = term1.toLowerCase().trim();
   const t2 = term2.toLowerCase().trim();
   
   if (t1 === t2) return true;
   
-  const expandedT1 = expandWithSynonyms(t1);
+  // Try semantic similarity first
+  try {
+    const similarity = await calculateSimilarity(t1, t2);
+    if (similarity >= 0.7) return true;
+  } catch (error) {
+    // Fall back to expansion check
+  }
+  
+  const expandedT1 = await expandWithSynonyms(t1);
+  return expandedT1.includes(t2);
+}
+
+/**
+ * Synchronous version of areSynonyms
+ */
+export function areSynonymsSync(term1: string, term2: string): boolean {
+  const t1 = term1.toLowerCase().trim();
+  const t2 = term2.toLowerCase().trim();
+  
+  if (t1 === t2) return true;
+  
+  const expandedT1 = expandWithSynonymsSync(t1);
   return expandedT1.includes(t2);
 }
 
@@ -142,19 +251,22 @@ export function areSynonyms(term1: string, term2: string): boolean {
  * Pre-compute synonyms for common hospitality terms (optimization)
  * Call this on app initialization for better performance
  */
-export function precomputeCommonTerms(): void {
+export async function precomputeCommonTerms(): Promise<void> {
   if (precomputedTerms) return; // Already precomputed
   
+  // Preload semantic search model
+  await preloadSemanticSearch();
+  
   precomputedTerms = new Set();
-  const commonTerms = Object.keys(hospitalitySynonyms);
+  const commonTerms = [...Object.keys(hospitalitySynonyms), ...COMMON_HOSPITALITY_ROLES];
   
   // Precompute in background
-  setTimeout(() => {
-    commonTerms.forEach(term => {
-      expandWithSynonyms(term);
+  setTimeout(async () => {
+    for (const term of commonTerms) {
+      await expandWithSynonyms(term);
       precomputedTerms?.add(term);
-    });
-    console.log(`Precomputed synonyms for ${commonTerms.length} hospitality terms`);
+    }
+    console.log(`Precomputed synonyms for ${commonTerms.length} hospitality terms using semantic search`);
   }, 100);
 }
 
@@ -164,6 +276,7 @@ export function precomputeCommonTerms(): void {
 export function clearSynonymCache(): void {
   synonymCache.clear();
   cacheTimestamps.clear();
+  clearSemanticSearchCache();
 }
 
 /**

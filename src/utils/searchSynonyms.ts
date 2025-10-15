@@ -1,29 +1,29 @@
 import nlp from 'compromise';
 import { 
-  expandWithSynonyms as expandWithSynonymsService,
-  expandQueryWithSynonyms as expandQueryService,
-  areSynonyms as areSynonymsService,
+  expandWithSynonymsSync,
+  expandQueryWithSynonymsSync,
+  areSynonymsSync,
   precomputeCommonTerms
 } from './synonymService';
 
-// Re-export the enhanced synonym service functions
-export { expandWithSynonymsService as expandWithSynonyms };
-export { expandQueryService as expandQueryWithSynonyms };
-export { areSynonymsService as areSynonyms };
+// Re-export the synchronous versions for immediate use
+export { expandWithSynonymsSync as expandWithSynonyms };
+export { expandQueryWithSynonymsSync as expandQueryWithSynonyms };
+export { areSynonymsSync as areSynonyms };
 
-// Initialize precomputation on module load
+// Initialize precomputation on module load (async in background)
 precomputeCommonTerms();
 
 /**
  * Legacy: Expand a single search term with synonyms
- * Now uses hybrid Moby + hospitality approach via synonymService
+ * Now uses semantic search + hospitality approach via synonymService
  */
 export function expandWithSynonymsLegacy(term: string): string[] {
   const normalized = term.toLowerCase().trim();
   const allTerms = new Set<string>([normalized]);
   
-  // Get synonyms from new service
-  const synonyms = expandWithSynonymsService(term);
+  // Get synonyms from new service (sync version)
+  const synonyms = expandWithSynonymsSync(term);
   synonyms.forEach(syn => allTerms.add(syn));
   
   // Handle plurals/singulars with Compromise
