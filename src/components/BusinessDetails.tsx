@@ -42,6 +42,7 @@ interface BusinessDetailsProps {
   onStoriesClick?: () => void;
   onPostClick?: (post: Post) => void;
   onRoleVote?: (businessId: string, roleIndex: number, voteType: 'up' | 'down') => void;
+  votingRoles?: Set<string>;
 }
 
 const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
@@ -51,7 +52,8 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
   onBackToPreview,
   onStoriesClick,
   onPostClick,
-  onRoleVote
+  onRoleVote,
+  votingRoles
 }) => {
 
   const [showHelpPopup, setShowHelpPopup] = useState(false);
@@ -196,6 +198,7 @@ return (
                     votesTotal={role.votesTotal || 0}
                     userVote={role.userVote}
                     onVote={(voteType) => handleRoleVote(index, voteType)}
+                    isVoting={votingRoles?.has(role.id || '')}
                   />
                 </div>
               </div>

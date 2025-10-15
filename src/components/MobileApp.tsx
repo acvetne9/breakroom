@@ -52,6 +52,7 @@ const MobileApp: React.FC = () => {
   const [previouslySelectedBusiness, setPreviouslySelectedBusiness] = useState<any>(null);
   const [filteredBusinessId, setFilteredBusinessId] = useState<string | null>(null);
   const [filteredUserStories, setFilteredUserStories] = useState(false);
+  const [votingRoles, setVotingRoles] = useState<Set<string>>(new Set());
 
   const constraintsRef = useRef(null);
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
@@ -373,6 +374,9 @@ const MobileApp: React.FC = () => {
     const roleId = business.roles[roleIndex].id;
     console.log('✅ Role ID found:', roleId);
     const role = business.roles[roleIndex];
+    
+    // Mark role as voting
+    setVotingRoles(prev => new Set(prev).add(roleId));
 
     // Import utilities
     const { calculateVoteChange } = await import('@/utils/voteCalculations');
@@ -460,6 +464,13 @@ const MobileApp: React.FC = () => {
     } else {
       console.log('✅ Vote persisted successfully');
     }
+    
+    // Remove from voting state
+    setVotingRoles(prev => {
+      const next = new Set(prev);
+      next.delete(roleId);
+      return next;
+    });
   };
 
   // Sync selectedBusiness when businesses data changes (for voting updates)
@@ -526,6 +537,7 @@ const MobileApp: React.FC = () => {
           }}
           onRoleVote={handleRoleVote}
           onLocationSave={handleLocationSave}
+          votingRoles={votingRoles}
         />
       </Suspense>
 

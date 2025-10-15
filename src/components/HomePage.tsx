@@ -55,6 +55,7 @@ interface HomePageProps {
   onPostClick?: (post: Post) => void;
   onRoleVote?: (businessId: string, roleIndex: number, voteType: 'up' | 'down') => void;
   onLocationSave?: (location: string, fullLocation: string) => void;
+  votingRoles?: Set<string>;
 }
 
 const HomePage: React.FC<HomePageProps> = ({ 
@@ -66,7 +67,8 @@ const HomePage: React.FC<HomePageProps> = ({
   onBusinessStoriesClick,
   onPostClick,
   onRoleVote,
-  onLocationSave
+  onLocationSave,
+  votingRoles
 }) => {
   const [searchValue, setSearchValue] = useState('');
   const [searchFilters, setSearchFilters] = useState<any>(null);
@@ -298,6 +300,7 @@ const HomePage: React.FC<HomePageProps> = ({
               onStoriesClick={() => onBusinessStoriesClick?.(selectedBusiness.id)}
               onPostClick={onPostClick}
               onRoleVote={onRoleVote}
+              votingRoles={votingRoles}
             />
           )}
 
