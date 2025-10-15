@@ -107,7 +107,21 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
 
   const handleRoleVote = (roleIndex: number, voteType: 'up' | 'down', e?: React.MouseEvent) => {
     e?.stopPropagation();
-    onRoleVote?.(business.id, roleIndex, voteType);
+    console.log('🗳️ BusinessDetails.handleRoleVote called:', {
+      roleIndex,
+      voteType,
+      businessId: business.id,
+      hasOnRoleVote: !!onRoleVote,
+      role: business.roles?.[roleIndex]
+    });
+    
+    if (!onRoleVote) {
+      console.error('❌ onRoleVote prop is undefined!');
+      alert('Unable to vote: Handler not available. Please refresh the page.');
+      return;
+    }
+    
+    onRoleVote(business.id, roleIndex, voteType);
   };
 
   const roles = Array.isArray(business.roles) ? business.roles : [];

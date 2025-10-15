@@ -340,17 +340,34 @@ const MobileApp: React.FC = () => {
   // Remove handlePostVote and handlePostDelete - now handled by ExplorePage directly
 
   const handleRoleVote = async (businessId: string, roleIndex: number, voteType: "up" | "down") => {
+    console.log('🗳️ MobileApp.handleRoleVote called:', { businessId, roleIndex, voteType });
+    
     // Find the role ID from the business
     let business = businesses.find((b) => b.id === businessId);
+    
+    console.log('📍 Found business:', {
+      found: !!business,
+      hasRoles: !!business?.roles,
+      roleCount: business?.roles?.length,
+      targetRole: business?.roles?.[roleIndex],
+      hasRoleId: !!business?.roles?.[roleIndex]?.id
+    });
 
     // If business doesn't have role IDs, fetch full details first
     // Defensive check - should not happen if handleBusinessClick works correctly
     if (!business?.roles?.[roleIndex]?.id) {
-      console.error("❌ Role missing ID - this should not happen!", { businessId, roleIndex });
+      console.error("❌ Role missing ID - this should not happen!", { 
+        businessId, 
+        roleIndex,
+        business: business,
+        role: business?.roles?.[roleIndex]
+      });
+      alert('Unable to vote: Role data is incomplete. Please try closing and reopening the business details.');
       return;
     }
 
     const roleId = business.roles[roleIndex].id;
+    console.log('✅ Role ID found:', roleId);
     const role = business.roles[roleIndex];
 
     // Import utilities
@@ -390,7 +407,8 @@ const MobileApp: React.FC = () => {
     const result = await persistVote('role_votes', 'business_role_id', roleId, dbVoteType);
 
     if (!result.success) {
-      console.error("Failed to persist vote:", result.error);
+      console.error("❌ Failed to persist vote:", result.error);
+      alert('Vote failed to save. Please try again.');
       // Rollback on error
       setBusinesses((prev) =>
         prev.map((b) => {
@@ -407,6 +425,8 @@ const MobileApp: React.FC = () => {
           return b;
         })
       );
+    } else {
+      console.log('✅ Vote persisted successfully');
     }
   };
 
