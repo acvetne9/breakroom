@@ -1,5 +1,5 @@
-import moby from 'moby';
 import hospitalitySynonyms from '@/data/hospitalitySynonyms.json';
+import nlp from 'compromise';
 
 // In-memory cache for synonym lookups
 const synonymCache = new Map<string, string[]>();
@@ -31,14 +31,21 @@ function getHospitalitySynonyms(term: string): string[] {
 }
 
 /**
- * Get synonyms from Moby thesaurus (comprehensive, general)
+ * Get plural/singular variations using Compromise NLP
  */
-function getMobySynonyms(term: string): string[] {
+function getWordVariations(term: string): string[] {
   try {
-    const synonyms = moby.search(term.toLowerCase().trim());
-    return synonyms || [];
+    const doc = nlp(term);
+    const variations: string[] = [];
+    
+    const singular = doc.nouns().toSingular().text();
+    const plural = doc.nouns().toPlural().text();
+    
+    if (singular && singular !== term) variations.push(singular);
+    if (plural && plural !== term) variations.push(plural);
+    
+    return variations;
   } catch (e) {
-    // Silent fail for Moby errors
     return [];
   }
 }
@@ -73,10 +80,14 @@ export function expandWithSynonyms(term: string): string[] {
   const hospitalityResults = getHospitalitySynonyms(normalized);
   hospitalityResults.forEach(syn => allSynonyms.add(syn.toLowerCase()));
   
-  // 2. Get Moby thesaurus synonyms (broad coverage)
-  const mobyResults = getMobySynonyms(normalized);
-  // Limit Moby results to avoid explosion (top 15 most relevant)
-  mobyResults.slice(0, 15).forEach(syn => allSynonyms.add(syn.toLowerCase()));
+  // 2. Get word variations (plural/singular) using Compromise
+  const variations = getWordVariations(normalized);
+  variations.forEach(variant => {
+    allSynonyms.add(variant.toLowerCase());
+    // Also expand variations through hospitality synonyms
+    const variantSynonyms = getHospitalitySynonyms(variant);
+    variantSynonyms.forEach(syn => allSynonyms.add(syn.toLowerCase()));
+  });
   
   // Convert to array and cache
   const results = Array.from(allSynonyms);
