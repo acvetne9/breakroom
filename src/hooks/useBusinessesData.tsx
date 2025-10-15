@@ -83,22 +83,7 @@ export const useBusinessesData = () => {
 
   const fetchFullBusinessDetails = async (businessId: string) => {
     try {
-      // Check cache first
-      const cachedCoords = coordinatesCache[businessId];
-      if (cachedCoords) {
-        console.log(`✅ Found business coordinates in cache:`, cachedCoords);
-        // Return a minimal business object with cached coordinates
-        return {
-          id: businessId,
-          name: cachedCoords.name,
-          position: { lat: cachedCoords.lat, lng: cachedCoords.lng },
-          address: '',
-          atmosphere: [],
-          roles: []
-        } as Business;
-      }
-
-      console.log(`⏳ Business ${businessId} not in cache, fetching from database...`);
+      console.log(`⏳ Fetching full business details for ${businessId}...`);
       const fullBusiness = await getFullBusinessDetailsService(businessId);
       if (!fullBusiness) {
         return null;
