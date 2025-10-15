@@ -235,37 +235,27 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(
                 className={`space-y-2 ${shouldScroll ? "max-h-64 overflow-y-auto pr-2" : ""}`}
                 style={shouldScroll ? { scrollbarWidth: "thin" } : undefined}
               >
-                {displayRoles.length > 0 ? (
-                  displayRoles.map((role, index) => (
-                    <div key={index} className="flex justify-between items-center py-1">
-                      <span className="text-app-black">{role.role}</span>
+                {displayRoles.map((role, index) => (
+                  <div key={index} className="flex justify-between items-center py-1">
+                    <span className="text-app-black">{role.role}</span>
 
-                      <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
-                        <span className="font-medium text-app-black">
-                          {typeof role.salary === "string" ? role.salary : "$13.6"}
-                          {!(typeof role.salary === "string" && role.salary.includes("/")) && (
-                            <span className="text-xs text-app-gray-medium ml-1">/hr</span>
-                          )}
-                        </span>
-
-                        <VotingComponent
-                          votesTotal={role.votesTotal || 0}
-                          userVote={role.userVote}
-                          onVote={(voteType) => handleRoleVote(index, voteType)}
-                          isVoting={votingRoles.has(`${business.id}-${index}`)}
-                        />
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="flex justify-between items-center py-1">
-                    <span className="text-app-black">Barista</span>
                     <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
-                      <span className="font-medium text-app-black">$13.6</span>
-                      <VotingComponent votesTotal={0} userVote={null} onVote={() => {}} />
+                      <span className="font-medium text-app-black">
+                        {typeof role.salary === "string" ? role.salary : "$13.6"}
+                        {!(typeof role.salary === "string" && role.salary.includes("/")) && (
+                          <span className="text-xs text-app-gray-medium ml-1">/hr</span>
+                        )}
+                      </span>
+
+                      <VotingComponent
+                        votesTotal={role.votesTotal || 0}
+                        userVote={role.userVote}
+                        onVote={(voteType) => handleRoleVote(index, voteType)}
+                        isVoting={votingRoles.has(`${business.id}-${index}`)}
+                      />
                     </div>
                   </div>
-                )}
+                ))}
               </div>
 
               <div className="flex justify-end mt-2">
