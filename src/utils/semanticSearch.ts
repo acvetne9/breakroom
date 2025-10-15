@@ -1,8 +1,3 @@
-declare module "synonyms" {
-  function synonyms(word: string): Record<string, string[]> | null;
-  export = synonyms;
-}
-
 import winkNLP from "wink-nlp";
 import model from "wink-eng-lite-web-model";
 
@@ -51,19 +46,6 @@ function lexicalSimilarity(a: string, b: string): number {
   return intersection.size / union.size;
 }
 
-/**
- * Get synonyms for a term using `synonyms` package
- */
-function getSynonyms(term: string): string[] {
-  try {
-    const syns: Record<string, string[]> | null = synonyms(term.toLowerCase());
-    if (!syns) return [];
-    // Flatten categories (noun, verb, adj, adv)
-    return Object.values(syns).flatMap((v) => v as string[]);
-  } catch {
-    return [];
-  }
-}
 
 /**
  * Calculate pseudo-semantic similarity between two terms
@@ -86,16 +68,8 @@ export async function calculateSimilarity(term1: string, term2: string): Promise
     return 1.0;
   }
 
-  // Compute lexical similarity
-  let similarity = lexicalSimilarity(normalized1, normalized2);
-
-  // Check synonym overlap
-  const syn1 = new Set(getSynonyms(normalized1));
-  const syn2 = new Set(getSynonyms(normalized2));
-  const overlap = [...syn1].filter((x) => syn2.has(x));
-  if (overlap.length > 0) {
-    similarity = Math.max(similarity, 0.9);
-  }
+  // Compute lexical similarity as baseline
+  const similarity = lexicalSimilarity(normalized1, normalized2);
 
   // Cache result
   if (!similarityCache.has(normalized1)) {
@@ -150,10 +124,6 @@ export async function expandWithSemantics(
   }
 
   const expansions = new Set<string>([normalized]);
-
-  // Add WordNet synonyms
-  const syns = getSynonyms(normalized);
-  syns.forEach((s) => expansions.add(s.toLowerCase()));
 
   // Check common terms for semantic similarity
   if (commonTerms.length > 0) {
