@@ -1,3 +1,8 @@
+declare module "synonyms" {
+  function synonyms(word: string): Record<string, string[]> | null;
+  export = synonyms;
+}
+
 import winkNLP from "wink-nlp";
 import model from "wink-eng-lite-web-model";
 import synonyms from "synonyms"; // <-- lightweight WordNet-based synonym lookup
@@ -6,11 +11,6 @@ import synonyms from "synonyms"; // <-- lightweight WordNet-based synonym lookup
 let nlp: any = null;
 let isInitialized = false;
 let initializationPromise: Promise<void> | null = null;
-
-declare module "synonyms" {
-  function synonyms(word: string): Record<string, string[]> | null;
-  export = synonyms;
-}
 
 // Cache for semantic similarity calculations
 const similarityCache = new Map<string, Map<string, number>>();
