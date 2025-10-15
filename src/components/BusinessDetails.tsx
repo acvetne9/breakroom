@@ -27,6 +27,7 @@ interface BusinessDetailsProps {
       author: string;
     }>;
     roles?: Array<{
+      id?: string;
       role: string;
       salary: string;
       votesTotal?: number;
