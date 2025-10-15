@@ -7,6 +7,11 @@ let nlp: any = null;
 let isInitialized = false;
 let initializationPromise: Promise<void> | null = null;
 
+declare module "synonyms" {
+  function synonyms(word: string): Record<string, string[]> | null;
+  export = synonyms;
+}
+
 // Cache for semantic similarity calculations
 const similarityCache = new Map<string, Map<string, number>>();
 const termExpansionCache = new Map<string, string[]>();
@@ -52,10 +57,10 @@ function lexicalSimilarity(a: string, b: string): number {
  */
 function getSynonyms(term: string): string[] {
   try {
-    const syns = synonyms(term.toLowerCase());
+    const syns: Record<string, string[]> | null = synonyms(term.toLowerCase());
     if (!syns) return [];
     // Flatten categories (noun, verb, adj, adv)
-    return Object.values(syns).flat();
+    return Object.values(syns).flatMap((v) => v as string[]);
   } catch {
     return [];
   }
