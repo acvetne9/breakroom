@@ -41,7 +41,7 @@ interface BusinessDetailsProps {
   onBackToPreview?: () => void;
   onStoriesClick?: () => void;
   onPostClick?: (post: Post) => void;
-  onRoleVote?: (businessId: string, roleIndex: number, voteType: "up" | "down") => Promise<void>;
+  onRoleVote?: (businessId: string, roleIndex: number, voteType: "up" | "down") => void | Promise<void>;
   votingRoles?: Set<string>;
 }
 
