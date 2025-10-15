@@ -27,6 +27,7 @@ interface MapLibreMapProps {
   neighborhoodCenter?: { lat: number; lon: number } | null;
   enableClustering?: boolean;
   isClusteredData?: boolean;
+  onBusinessesUpdate?: (businesses: Business[]) => void;
 }
 
 interface Bounds {
@@ -200,10 +201,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   neighborhoodCenter,
   enableClustering = true,
   isClusteredData = false,
+  onBusinessesUpdate,
 }) => {
   const [mapLoaded, setMapLoaded] = useState(false);
   const [deckOverlay, setDeckOverlay] = useState<MapboxOverlay | null>(null);
   const [overlayReady, setOverlayReady] = useState(false);
+  const [currentZoom, setCurrentZoom] = useState(12.77);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -223,10 +226,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, []);
 
-  const callbackRefs = useRef({ onBusinessClick, onMapLoaded, onBusinessesLoaded });
+  const callbackRefs = useRef({ onBusinessClick, onMapLoaded, onBusinessesLoaded, onBusinessesUpdate });
   useEffect(() => {
-    callbackRefs.current = { onBusinessClick, onMapLoaded, onBusinessesLoaded };
-  }, [onBusinessClick, onMapLoaded, onBusinessesLoaded]);
+    callbackRefs.current = { onBusinessClick, onMapLoaded, onBusinessesLoaded, onBusinessesUpdate };
+  }, [onBusinessClick, onMapLoaded, onBusinessesLoaded, onBusinessesUpdate]);
 
   const { businesses, loading, loadBusinessesInViewport, fetchFullBusinessDetails, isSearching } =
     useViewportBusinesses(searchFilters);
@@ -234,6 +237,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (businesses && businesses.length > 0) {
       callbackRefs.current.onBusinessesLoaded?.();
+      callbackRefs.current.onBusinessesUpdate?.(businesses);
     }
   }, [businesses]);
 
@@ -380,7 +384,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   const handleBusinessClick = useCallback(
     async (business: any) => {
-      if (!business || !callbackRefs.current.onBusinessClick) return;
+      console.log('🗺️ MapLibreMap handleBusinessClick called:', business?.name);
+      if (!business || !callbackRefs.current.onBusinessClick) {
+        console.log('⚠️ No business or no callback:', { hasBusiness: !!business, hasCallback: !!callbackRefs.current.onBusinessClick });
+        return;
+      }
 
       try {
         let businessToReturn = business;
@@ -456,6 +464,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           }
         }
 
+        // Limit displayed businesses based on zoom to improve performance
+        if (currentZoom < 15 && validBusinesses.length > 0) {
+          const maxDisplay = currentZoom < 12 ? 500 : currentZoom < 13 ? 1000 : currentZoom < 14 ? 2000 : 5000;
+          
+          if (validBusinesses.length > maxDisplay && mapRef.current) {
+            const bounds = mapRef.current.getBounds();
+            const viewportBounds = {
+              north: bounds.getNorth(),
+              south: bounds.getSouth(),
+              east: bounds.getEast(),
+              west: bounds.getWest(),
+            };
+            validBusinesses = createOptimizedGridSampling(viewportBounds, validBusinesses, maxDisplay, true);
+            console.log(`📊 Zoom ${currentZoom.toFixed(1)}: Displaying ${validBusinesses.length}/${businesses.length} businesses`);
+          }
+        }
+
         if (validBusinesses.length > 0) {
           try {
             const businessLayer = createBusinessScatterplotLayer({
@@ -466,7 +491,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               searchActive: !!searchFilters,
             });
             layers.push(businessLayer);
-            console.log("✅ Created scatterplot layer:", businessLayer);
+            console.log("✅ Created scatterplot layer with", validBusinesses.length, "businesses");
           } catch (err) {
             console.error("❌ Failed to create scatterplot layer", err);
           }
@@ -475,15 +500,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
 
     return layers;
-  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, businesses, landmarks]);
+  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, searchFilters, businesses, landmarks, currentZoom]);
 
   const lastLoadTimeRef = useRef(0);
+  const viewportUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleViewportChange = useCallback(async () => {
     if (!mapRef.current || !mapLoaded) return;
 
     const map = mapRef.current;
     const zoom = map.getZoom();
+    setCurrentZoom(zoom);
     const bounds = map.getBounds();
     const viewportBounds = {
       north: bounds.getNorth(),
@@ -494,9 +521,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     const boundsKey = `${viewportBounds.north.toFixed(4)}-${viewportBounds.south.toFixed(4)}-${viewportBounds.east.toFixed(4)}-${viewportBounds.west.toFixed(4)}`;
 
+    // Adaptive throttling: higher zooms need more throttling for performance
+    const throttleMs = zoom >= 15 ? 500 : zoom >= 13 ? 350 : 250;
+    
     const now = Date.now();
-    if (lastBoundsRef.current === boundsKey && now - lastLoadTimeRef.current < 250) {
+    if (lastBoundsRef.current === boundsKey && now - lastLoadTimeRef.current < throttleMs) {
       return;
+    }
+
+    // Clear any pending viewport update
+    if (viewportUpdateTimeoutRef.current) {
+      clearTimeout(viewportUpdateTimeoutRef.current);
     }
 
     lastBoundsRef.current = boundsKey;
@@ -608,14 +643,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       mapRef.current = mapInstance;
 
       const handleFlyToBusiness = (event: CustomEvent) => {
+        console.log('🗺️ flyToBusiness event received:', event.detail);
         const { lat, lng } = event.detail;
         if (mapRef.current && lat != null && lng != null) {
+          console.log('🚀 Starting flyTo animation to:', { lat, lng });
           mapRef.current.flyTo({
             center: [lng, lat],
             zoom: 16,
-            speed: 1.2,
-            curve: 1.2,
+            speed: 3,
+            curve: 1,
             essential: true,
+          });
+        } else {
+          console.warn('⚠️ Cannot flyTo - mapRef or coordinates missing:', { 
+            hasMap: !!mapRef.current, 
+            lat, 
+            lng 
           });
         }
       };

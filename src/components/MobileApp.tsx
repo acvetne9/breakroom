@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, Suspense } from "react";
 import { motion, PanInfo } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useToast } from "@/hooks/use-toast";
 import InitiationPage from "./InitiationPage";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,7 +13,6 @@ const SettingsPage = React.lazy(() => import("./SettingsPage"));
 const ExplorePage = React.lazy(() => import("./ExplorePage"));
 
 import { useBusinessesData } from "../hooks/useBusinessesData";
-import { handleRoleVote as handleRoleVoteService } from "@/services/roleVoting";
 
 interface UserData {
   salary: string;
@@ -32,8 +32,7 @@ interface Post {
   isStory?: boolean;
   isJobUpdate?: boolean;
   linkedLocation?: string;
-  upvotes: number;
-  downvotes: number;
+  votesTotal: number;
   userVote?: "up" | "down" | null;
   createdAt: Date;
 }
@@ -42,6 +41,7 @@ const MobileApp: React.FC = () => {
   console.log("🚀 MobileApp component rendering");
   const isMobile = useIsMobile();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [currentView, setCurrentView] = useState<"initiation" | "main">("main");
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -238,20 +238,45 @@ const MobileApp: React.FC = () => {
     setFilteredUserStories(false);
   };
 
-  const handleFlyToBusiness = async (businessId: string) => {
-    // Find business in local state
-    let business = businesses.find((b) => b.id === businessId);
+  const handleFlyToBusiness = async (businessId: string, post?: any) => {
+    console.log('🎯 handleFlyToBusiness called for:', businessId);
+    const startTime = performance.now();
     
-    // If not found or missing coordinates, fetch full details
-    if (!business?.position?.lat || !business?.position?.lng) {
-      const fullBusiness = await fetchFullBusinessDetails(businessId);
-      if (fullBusiness?.position?.lat && fullBusiness?.position?.lng) {
-        business = fullBusiness;
-      }
+    // Change slide immediately
+    setCurrentSlide(1);
+    
+    // Fast path: Use coordinates from post if available
+    if (post?.businessLat && post?.businessLng) {
+      console.log(`⚡ Fast fly-to using post coordinates in ${performance.now() - startTime}ms`);
+      window.dispatchEvent(new CustomEvent('flyToBusiness', {
+        detail: {
+          lat: post.businessLat,
+          lng: post.businessLng,
+          businessId: businessId
+        }
+      }));
+      
+      // Fetch full details in background (don't await)
+      fetchFullBusinessDetails(businessId).then(fullBusiness => {
+        if (fullBusiness) {
+          setSelectedBusiness(fullBusiness);
+        }
+      });
+      return;
     }
     
+    // Find business in local state
+    let business = businesses.find((b) => b.id === businessId);
+    console.log('📍 Found business in state:', { 
+      found: !!business, 
+      hasPosition: !!business?.position,
+      hasLat: !!business?.position?.lat,
+      hasLng: !!business?.position?.lng,
+      coords: business?.position 
+    });
+    
     if (business?.position?.lat && business?.position?.lng) {
-      // Dispatch flyTo event for the map
+      console.log('✅ Using cached business coordinates', performance.now() - startTime, 'ms');
       window.dispatchEvent(new CustomEvent('flyToBusiness', {
         detail: {
           lat: business.position.lat,
@@ -259,12 +284,52 @@ const MobileApp: React.FC = () => {
           businessId: businessId
         }
       }));
-      
-      // Navigate to home page
-      setCurrentSlide(1);
-      
-      // Set the business as selected so it shows in BusinessDetails
       setSelectedBusiness(business);
+      return;
+    }
+    
+    // Coordinates missing - try to fetch full details
+    console.log('⏳ Coordinates missing, fetching full business details...', performance.now() - startTime, 'ms');
+    try {
+      const fullBusiness = await fetchFullBusinessDetails(businessId);
+      
+      if (!fullBusiness) {
+        console.error('❌ Failed to fetch business details (returned null)', performance.now() - startTime, 'ms');
+        toast({
+          title: "Unable to locate business",
+          description: "Could not load business location. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (!fullBusiness.position?.lat || !fullBusiness.position?.lng) {
+        console.error('❌ Business details missing coordinates', performance.now() - startTime, 'ms');
+        toast({
+          title: "Location unavailable",
+          description: "This business doesn't have location data.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      console.log('✅ Successfully fetched details, dispatching flyTo', performance.now() - startTime, 'ms');
+      window.dispatchEvent(new CustomEvent('flyToBusiness', {
+        detail: {
+          lat: fullBusiness.position.lat,
+          lng: fullBusiness.position.lng,
+          businessId: businessId
+        }
+      }));
+      setSelectedBusiness(fullBusiness);
+      
+    } catch (error) {
+      console.error('❌ Error in handleFlyToBusiness:', error, performance.now() - startTime, 'ms');
+      toast({
+        title: "Error loading business",
+        description: "Network error. Please check your connection and try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -279,7 +344,6 @@ const MobileApp: React.FC = () => {
       console.log("🔄 Role missing ID, fetching full business details...");
       const fullBusiness = await fetchFullBusinessDetails(businessId);
       if (fullBusiness?.roles?.[roleIndex]?.id) {
-        // Update the businesses array with full details
         setBusinesses((prev) => prev.map((b) => (b.id === businessId ? fullBusiness : b)));
         business = fullBusiness;
       } else {
@@ -289,114 +353,62 @@ const MobileApp: React.FC = () => {
     }
 
     const roleId = business.roles[roleIndex].id;
+    const role = business.roles[roleIndex];
 
-    // Optimistically update UI first
-    setBusinesses((prevBusinesses) => {
-      const updatedBusinesses = prevBusinesses.map((business) => {
-        if (business.id === businessId && business.roles) {
-          const updatedRoles = business.roles.map((role, index) => {
-            if (index === roleIndex) {
-              let newVotesTotal = role.votesTotal;
-              let newUserVote: "up" | "down" | null = role.userVote;
+    // Import utilities
+    const { calculateVoteChange } = await import('@/utils/voteCalculations');
+    const { persistVote } = await import('@/services/voting');
 
-              if (voteType === "up") {
-                if (role.userVote === "up") {
-                  newVotesTotal--;
-                  newUserVote = null;
-                } else if (role.userVote === "down") {
-                  newVotesTotal += 2;
-                  newUserVote = "up";
-                } else {
-                  newVotesTotal++;
-                  newUserVote = "up";
-                }
-              } else {
-                if (role.userVote === "down") {
-                  newVotesTotal++;
-                  newUserVote = null;
-                } else if (role.userVote === "up") {
-                  newVotesTotal -= 2;
-                  newUserVote = "down";
-                } else {
-                  newVotesTotal--;
-                  newUserVote = "down";
-                }
-              }
+    // Calculate new state optimistically
+    const { newUserVote, newTotal } = calculateVoteChange(
+      role.userVote,
+      voteType,
+      role.votesTotal
+    );
 
-              return {
-                ...role,
-                votesTotal: newVotesTotal,
-                userVote: newUserVote,
-              };
-            }
-            return role;
-          });
+    // Store previous state for rollback
+    const previousVotesTotal = role.votesTotal;
+    const previousUserVote = role.userVote;
 
+    // Update UI immediately
+    setBusinesses((prev) =>
+      prev.map((b) => {
+        if (b.id === businessId && b.roles) {
           return {
-            ...business,
-            roles: updatedRoles,
+            ...b,
+            roles: b.roles.map((r, idx) =>
+              idx === roleIndex
+                ? { ...r, votesTotal: newTotal, userVote: newUserVote }
+                : r
+            ),
           };
         }
-        return business;
-      });
-      return updatedBusinesses;
-    });
+        return b;
+      })
+    );
 
-    // Then persist to database
-    const result = await handleRoleVoteService(businessId, roleId, voteType);
+    // Persist in background
+    const dbVoteType = newUserVote === 'up' ? 'upvote' : newUserVote === 'down' ? 'downvote' : null;
+    const result = await persistVote('role_votes', 'business_role_id', roleId, dbVoteType);
 
     if (!result.success) {
       console.error("Failed to persist vote:", result.error);
-      // Revert optimistic update on error
-      setBusinesses((prevBusinesses) => {
-        const updatedBusinesses = prevBusinesses.map((business) => {
-          if (business.id === businessId && business.roles) {
-            const updatedRoles = business.roles.map((role, index) => {
-              if (index === roleIndex) {
-                let revertVotesTotal = role.votesTotal;
-                let revertUserVote: "up" | "down" | null = role.userVote;
-
-                // Revert the optimistic update
-                if (voteType === "up") {
-                  if (role.userVote === null) {
-                    revertVotesTotal--;
-                    revertUserVote = "up";
-                  } else if (role.userVote === "up") {
-                    revertVotesTotal -= 2;
-                    revertUserVote = "down";
-                  } else {
-                    revertUserVote = null;
-                  }
-                } else {
-                  if (role.userVote === null) {
-                    revertVotesTotal++;
-                    revertUserVote = "down";
-                  } else if (role.userVote === "down") {
-                    revertVotesTotal += 2;
-                    revertUserVote = "up";
-                  } else {
-                    revertUserVote = null;
-                  }
-                }
-
-                return {
-                  ...role,
-                  votesTotal: revertVotesTotal,
-                  userVote: revertUserVote,
-                };
-              }
-              return role;
-            });
-
+      // Rollback on error
+      setBusinesses((prev) =>
+        prev.map((b) => {
+          if (b.id === businessId && b.roles) {
             return {
-              ...business,
-              roles: updatedRoles,
+              ...b,
+              roles: b.roles.map((r, idx) =>
+                idx === roleIndex
+                  ? { ...r, votesTotal: previousVotesTotal, userVote: previousUserVote }
+                  : r
+              ),
             };
           }
-          return business;
-        });
-        return updatedBusinesses;
-      });
+          return b;
+        })
+      );
     }
   };
 
@@ -404,11 +416,11 @@ const MobileApp: React.FC = () => {
   useEffect(() => {
     if (selectedBusiness) {
       const updatedBusiness = businesses.find((b) => b.id === selectedBusiness.id);
-      if (updatedBusiness) {
+      if (updatedBusiness && updatedBusiness !== selectedBusiness) {
         setSelectedBusiness(updatedBusiness);
       }
     }
-  }, [businesses, selectedBusiness?.id]);
+  }, [businesses]);
 
   // Handle business state when sliding to explore/settings and back
   useEffect(() => {

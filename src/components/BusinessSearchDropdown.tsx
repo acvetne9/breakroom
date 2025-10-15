@@ -102,16 +102,29 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
     }
 
     if (inputValue.length > 2) {
+      console.log('🔍 BusinessSearchDropdown searching for:', inputValue);
+      console.log('📦 Available businesses:', businesses.length);
+      
       // Check cache first
       const cachedResults = resultsCache.current.get(inputValue.toLowerCase());
       if (cachedResults) {
+        console.log('✅ Using cached results:', cachedResults.length);
         setSearchResults(cachedResults.slice(0, 5));
         setShowDropdown(true);
         setInternalShowAddForm(false);
         return;
       }
       
+      // Check if businesses are loaded
+      if (businesses.length === 0) {
+        console.warn('⚠️ No businesses loaded yet');
+        setSearchResults([]);
+        setShowDropdown(false);
+        return;
+      }
+      
       const { filteredBusinesses } = searchBusinesses(businesses, inputValue);
+      console.log('🎯 Search results:', filteredBusinesses.length);
       const results = filteredBusinesses.slice(0, 5);
       
       // Cache the results
@@ -134,7 +147,20 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
   };
 
   const handleBusinessSelect = (business: any) => {
-    onChange(business.name, business.formatted_address || business.vicinity || business.name);
+    console.log('🎯 Business selected:', business.name);
+    
+    // Dispatch fly-to event with coordinates (same pattern as UnifiedBusinessSearch)
+    if (business.position?.lat && business.position?.lng) {
+      window.dispatchEvent(new CustomEvent('flyToBusiness', {
+        detail: {
+          lat: business.position.lat,
+          lng: business.position.lng,
+          businessId: business.id
+        }
+      }));
+    }
+    
+    onChange(business.name, business.address || business.name);
     setShowDropdown(false);
     setInternalShowAddForm(false);
     onSelect?.(business);
@@ -295,7 +321,7 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
 
       {/* Search Results Dropdown */}
       {showDropdown && searchResults.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-[60] max-h-60 overflow-y-auto">
           {searchResults.map(business => (
             <div
               key={business.id}

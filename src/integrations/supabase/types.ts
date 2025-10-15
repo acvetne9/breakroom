@@ -173,48 +173,46 @@ export type Database = {
           business_id: string | null
           content: string
           created_at: string | null
-          downvotes: number | null
           id: string
           is_comment: string | null
           job_role: string | null
           post_type: string
           salary: number | null
-          time_period: string | null
-          updated_at: string | null
-          upvotes: number | null
           user_id: string
+          votes_total: number
         }
         Insert: {
           business_id?: string | null
           content: string
           created_at?: string | null
-          downvotes?: number | null
           id?: string
           is_comment?: string | null
           job_role?: string | null
           post_type: string
           salary?: number | null
-          time_period?: string | null
-          updated_at?: string | null
-          upvotes?: number | null
           user_id: string
+          votes_total?: number
         }
         Update: {
           business_id?: string | null
           content?: string
           created_at?: string | null
-          downvotes?: number | null
           id?: string
           is_comment?: string | null
           job_role?: string | null
           post_type?: string
           salary?: number | null
-          time_period?: string | null
-          updated_at?: string | null
-          upvotes?: number | null
           user_id?: string
+          votes_total?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "posts_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "posts_user_id_fkey"
             columns: ["user_id"]
@@ -878,6 +876,45 @@ export type Database = {
           name: string
         }[]
       }
+      get_businesses_with_roles_and_votes_near_point: {
+        Args: {
+          center_lat: number
+          center_lng: number
+          limit_count: number
+          radius_meters: number
+          user_profile_id?: string
+        }
+        Returns: {
+          address: string
+          atmosphere: string[]
+          business_type: string
+          id: string
+          lat: number
+          lng: number
+          name: string
+          roles: Json
+          website: string
+        }[]
+      }
+      get_businesses_with_roles_near_point: {
+        Args: {
+          center_lat: number
+          center_lng: number
+          limit_count?: number
+          radius_meters?: number
+        }
+        Returns: {
+          address: string
+          atmosphere: string[]
+          business_type: string
+          id: string
+          lat: number
+          lng: number
+          name: string
+          roles: Json
+          website: string
+        }[]
+      }
       get_proj4_from_srid: {
         Args: { "": number }
         Returns: string
@@ -986,7 +1023,7 @@ export type Database = {
         Args:
           | { tbl_oid: unknown; use_typmod?: boolean }
           | { use_typmod?: boolean }
-        Returns: number
+        Returns: string
       }
       postgis_addbbox: {
         Args: { "": unknown }

@@ -35,7 +35,7 @@ interface ExplorePageProps {
   onBackToAllPosts?: () => void;
   onNavigateToHomeBusiness?: (businessId: string) => void;
   onBusinessPreview?: (businessId: string) => void;
-  onFlyToBusiness?: (businessId: string) => void; // 🚀 NEW
+  onFlyToBusiness?: (businessId: string, post?: any) => void; // 🚀 NEW - accepts optional post for cached coordinates
 }
 
 const ExplorePage: React.FC<ExplorePageProps> = ({
@@ -51,10 +51,28 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
 }) => {
   console.log('🔍 ExplorePage component initializing...');
   
-  const { posts, loading, submitPost, votePost, removePost, trackCommentedPost } = usePosts();
+  const { posts, loading, hasMore, submitPost, votePost, removePost, loadMore, trackCommentedPost } = usePosts();
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
   const [hideSystemPost, setHideSystemPost] = useState(false);
+
+  // Infinite scroll - load more posts when scrolling to bottom
+  useEffect(() => {
+    const handleScroll = () => {
+      // Check if user is near bottom (within 500px)
+      const scrollHeight = document.documentElement.scrollHeight;
+      const scrollTop = document.documentElement.scrollTop;
+      const clientHeight = document.documentElement.clientHeight;
+      
+      if (scrollHeight - scrollTop - clientHeight < 500 && !loading && hasMore) {
+        console.log('📜 Near bottom, loading more posts...');
+        loadMore();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [loading, hasMore, loadMore]);
 
   const defaultPlaceholder = filteredBusinessId ? "Thoughts about this business?" : "How's work?";
   const [postPlaceholder, setPostPlaceholder] = useState(defaultPlaceholder);
@@ -160,27 +178,14 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     onExpandedPostChange?.(expandedPost === postId ? null : postId);
   };
 
-  const handleCompassClick = async (e: React.MouseEvent, businessId: string) => {
+  const handleBusinessView = (e: React.MouseEvent, businessId: string, post?: any) => {
     e.stopPropagation();
-    
-    // Use the same flyTo logic as business view
-    if (onFlyToBusiness) {
-      onFlyToBusiness(businessId);
-    } else if (onNavigateToHomeBusiness) {
-      onNavigateToHomeBusiness(businessId);
-    }
-  };
-
-  const handleBusinessView = (businessId: string) => {
     console.log('👀 Eye clicked - navigating and flying to business:', businessId);
   
-    // First, request map fly-to if available
+    // Call flyTo handler with post for cached coordinates (no duplicate calls)
     if (onFlyToBusiness) {
-      onFlyToBusiness(businessId);
-    }
-  
-    // Keep existing navigation fallback
-    if (onNavigateToHomeBusiness) {
+      onFlyToBusiness(businessId, post);
+    } else if (onNavigateToHomeBusiness) {
       onNavigateToHomeBusiness(businessId);
     } else {
       onBusinessView?.(businessId);
@@ -227,6 +232,18 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
 
 
   const displayPosts = useMemo(() => {
+    console.log('📱 EXPLORE PAGE - Computing displayPosts:', {
+      totalPosts: posts.length,
+      filteredBusinessId,
+      filteredUserStories,
+      firstThreePosts: posts.slice(0, 3).map(p => ({
+        id: p.id,
+        text: p.text?.substring(0, 30),
+        businessId: p.businessId,
+        author: p.author
+      }))
+    });
+    
     let filtered: Post[] = [];
   
     if (filteredBusinessId) {
@@ -238,6 +255,11 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
       // Filter out comments from main feed
       filtered = posts.filter(post => !post.isComment);
     }
+    
+    console.log('📱 EXPLORE PAGE - After filtering:', {
+      filteredCount: filtered.length,
+      filter: filteredBusinessId ? 'business' : filteredUserStories ? 'userStories' : 'all'
+    });
   
     // Check for real (non-system) posts for this business
     const realBusinessPosts = filtered.filter(post => post.author !== 'System');
@@ -344,27 +366,15 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                           : 'text-app-black'
                       }`}
                     />
-                    <div className="flex-shrink-0 w-16 flex justify-end space-x-2 mt-1 my-0">
+                    <div className="flex-shrink-0 w-16 flex justify-end mt-1 my-0">
                       {post.businessId && (
-                        <>
-                          <button
-                            onClick={e => handleCompassClick(e, post.businessId!)}
-                            className="text-2xl hover:scale-110 transition-transform"
-                            title="Navigate to business on map"
-                          >
-                            🧭
-                          </button>
-                          <button
-                            onClick={e => {
-                              e.stopPropagation();
-                              handleBusinessView(post.businessId!);
-                            }}
-                            className="text-2xl hover:scale-110 transition-transform"
-                            title="View business details"
-                          >
-                            👀
-                          </button>
-                        </>
+                        <button
+                          onClick={e => handleBusinessView(e, post.businessId!, post)}
+                          className="text-2xl hover:scale-110 transition-transform"
+                          title="View business location and details"
+                        >
+                          👀
+                        </button>
                       )}
                     </div>
                   </div>
@@ -433,6 +443,13 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
             </div>
           ))}
         </div>
+        
+        {/* Loading indicator when fetching more posts */}
+        {loading && posts.length > 0 && (
+          <div className="flex justify-center py-6">
+            <div className="text-muted-foreground">Loading more posts...</div>
+          </div>
+        )}
       </div>
 
       {/* Input bar at bottom */}

@@ -1,22 +1,29 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Business, BusinessRole } from '@/types/business';
 
-// Enhanced function using PostGIS spatial queries
+// Enhanced function using PostGIS spatial queries with user votes preloaded
 export async function getBusinessesNearPoint(
   centerLat: number, 
   centerLng: number, 
   radiusMeters: number = 5000,
   limit: number = 2000
 ): Promise<Business[]> {
-  console.log(`🌍 Fetching businesses near ${centerLat}, ${centerLng} within ${radiusMeters}m`);
+  console.log(`🌍 Fetching businesses with user votes near ${centerLat}, ${centerLng}`);
 
-  const { data: businessesData, error } = await supabase
-    .rpc('get_businesses_near_point', {
+  // Get current user ID for vote loading
+  const { getUserProfile } = await import('./posts');
+  const { profileId: userProfileId } = await getUserProfile();
+
+  const { data: businessesData, error } = await supabase.rpc(
+    'get_businesses_with_roles_and_votes_near_point',
+    {
       center_lat: centerLat,
       center_lng: centerLng,
       radius_meters: radiusMeters,
-      limit_count: limit
-    });
+      limit_count: limit,
+      user_profile_id: userProfileId
+    }
+  );
 
   if (error) {
     console.error('❌ Spatial query error:', error);
@@ -27,17 +34,36 @@ export async function getBusinessesNearPoint(
 
   if (!businessesData) return [];
 
-  const businesses: Business[] = businessesData.map((business: any) => ({
-    id: business.id,
-    name: business.name,
-    address: business.address,
-    position: { lat: business.lat, lng: business.lng },
-    atmosphere: [],
-    salary: '0',
-    roles: [],
-  }));
+  // Parse and return businesses with user votes already included
+  const businesses: Business[] = businessesData.map((business: any) => {
+    const roles: BusinessRole[] = business.roles 
+      ? (typeof business.roles === 'string' 
+          ? JSON.parse(business.roles) 
+          : business.roles
+        ).map((role: any) => ({
+          id: role.id,
+          role: role.role,
+          salary: role.salary,
+          payPeriod: role.pay_period,
+          votesTotal: role.votes_total || 0,
+          userVote: role.user_vote || null  // Already included from RPC!
+        }))
+      : [];
 
-  console.log(`✅ Processed spatial businesses: ${businesses.length}`);
+    return {
+      id: business.id,
+      name: business.name,
+      address: business.address,
+      position: { lat: business.lat, lng: business.lng },
+      atmosphere: business.atmosphere || [],
+      businessType: business.business_type,
+      website: business.website,
+      roles: roles,
+    };
+  });
+
+  const totalRoles = businesses.reduce((sum, b) => sum + (b.roles?.length || 0), 0);
+  console.log(`✅ Processed ${businesses.length} businesses with ${totalRoles} roles and user votes preloaded`);
   return businesses;
 }
 
@@ -48,8 +74,8 @@ export async function getBusinessesBasic(limit: number = 5000): Promise<Business
   const centerLat = 40.7589; // Times Square area
   const centerLng = -73.9851;
   
-  // Use the new spatial function for better performance
-  return getBusinessesNearPoint(centerLat, centerLng, 10000, limit);
+  // Expanded radius to 20km to cover all of NYC
+  return getBusinessesNearPoint(centerLat, centerLng, 20000, limit);
 }
 
 export const getBusinessesInViewport = async (
@@ -116,6 +142,9 @@ export const getBusinessesInViewport = async (
 };
 
 export async function getFullBusinessDetails(businessId: string): Promise<Business | null> {
+  console.log('🔍 Fetching full business details for:', businessId);
+  const startTime = performance.now();
+  
   // Fetch base business
   const { data: businessData, error: businessError } = await supabase
     .from('businesses')
@@ -126,25 +155,37 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
   if (businessError) throw businessError;
   if (!businessData) return null;
 
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser();
-  const currentUserId = user?.id;
+  console.log(`✅ Fetched business data in ${performance.now() - startTime}ms`);
+
+  // Get current user profile ID
+  const { getUserProfile } = await import('./posts');
+  const { profileId: currentUserId } = await getUserProfile();
+
+  console.log(`✅ Got user profile in ${performance.now() - startTime}ms`);
 
   // Fetch roles
+  const rolesStartTime = performance.now();
   const { data: rolesData, error: rolesError } = await supabase
     .from('business_roles')
     .select('*')
     .eq('business_id', businessId);
 
   if (rolesError) throw rolesError;
+  console.log(`✅ Fetched ${rolesData?.length || 0} roles in ${performance.now() - rolesStartTime}ms`);
 
-  // Fetch user role votes
+  // Fetch user role votes ONLY for this business's roles
   let userVotesData: any[] = [];
-  if (currentUserId) {
+  if (currentUserId && rolesData && rolesData.length > 0) {
+    const votesStartTime = performance.now();
+    const roleIds = rolesData.map(r => r.id);
+    
     const { data: votesData, error: votesError } = await supabase
       .from('role_votes')
       .select('business_role_id, vote_type')
-      .eq('user_id', currentUserId);
+      .eq('user_id', currentUserId)
+      .in('business_role_id', roleIds);  // ✅ ONLY fetch votes for this business's roles!
+
+    console.log(`✅ Fetched votes for ${roleIds.length} roles in ${performance.now() - votesStartTime}ms`);
 
     if (votesError) {
       console.warn('Error fetching user votes:', votesError);
@@ -175,6 +216,7 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
     website: businessData.website,
   };
 
+  console.log(`✅ getFullBusinessDetails completed in ${performance.now() - startTime}ms`);
   return fullBusiness;
 }
 
@@ -262,8 +304,7 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
         business_id: businessId,
         role: role,
         salary: salary,
-        upvotes: 0,
-        downvotes: 0
+        votes_total: 0
       });
 
     if (createRoleError) throw createRoleError;

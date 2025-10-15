@@ -68,10 +68,10 @@ export const createBusinessScatterplotLayer = ({
 
   console.log(`🎯 Creating scatterplot layer with ${filteredBusinesses.length} businesses inside polygon`);
   
-  // Enhanced visibility during search
-  const radiusMin = searchActive ? 12 : 8;
-  const radiusMax = searchActive ? 18 : 12;
-  const baseRadius = searchActive ? 20 : 15;
+  // Consistent marker size (no change during search)
+  const radiusMin = 8;
+  const radiusMax = 12;
+  const baseRadius = 15;
   
   return new ScatterplotLayer({
     id: 'businesses-scatter',
@@ -90,11 +90,19 @@ export const createBusinessScatterplotLayer = ({
     getRadius: (_d: Business) => baseRadius,
     getFillColor: (_d: Business) => searchActive ? [255, 215, 0, 255] : [250, 204, 21, 255], // Brighter gold when searching
     getLineColor: (_d: Business) => [255, 255, 255, 255],
-    onClick: onBusinessClick ? (info) => info.object && onBusinessClick(info.object as Business) : undefined,
+    onClick: onBusinessClick ? (info) => {
+      console.log('🖱️ Deck.GL layer clicked:', info);
+      if (info.object) {
+        console.log('🎯 Business clicked:', (info.object as Business).name);
+        onBusinessClick(info.object as Business);
+      } else {
+        console.log('⚠️ Click registered but no object found');
+      }
+    } : undefined,
     updateTriggers: {
-      getPosition: [filteredBusinesses],
-      getRadius: [filteredBusinesses, searchActive],
-      getFillColor: [filteredBusinesses, searchActive],
+      getPosition: filteredBusinesses.length,
+      getRadius: [filteredBusinesses.length, searchActive],
+      getFillColor: [filteredBusinesses.length, searchActive],
     },
   });
 };
@@ -119,8 +127,8 @@ export const createEmojiLandmarkLayer = ({
       depthTest: false
     },
     updateTriggers: {
-      getPosition: [landmarks],
-      getText: [landmarks],
+      getPosition: landmarks.length,
+      getText: landmarks.length,
     },
   });
 };
@@ -178,9 +186,9 @@ export const createBusinessClusterLayer = (
       }
     },
     updateTriggers: {
-      getPosition: [filteredData],
-      getRadius: [filteredData],
-      getFillColor: [filteredData],
+      getPosition: filteredData.length,
+      getRadius: filteredData.length,
+      getFillColor: filteredData.length,
     },
   });
 };

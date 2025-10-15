@@ -95,10 +95,8 @@ export interface PostData {
   salary?: number;
   business_id?: string;
   user_id: string;
-  upvotes: number;
-  downvotes: number;
+  votes_total: number;
   created_at: string;
-  updated_at: string;
   is_comment?: string;
 }
 
@@ -108,6 +106,8 @@ export interface Post {
   text: string;
   businessId?: string;
   businessName?: string;
+  businessLat?: number;
+  businessLng?: number;
   images?: string[];
   isStory?: boolean;
   isJobUpdate?: boolean;
@@ -120,24 +120,28 @@ export interface Post {
   userId?: string;
 }
 
-// Transform database post to frontend post format
-export const transformPost = async (dbPost: PostData, businesses: any[] = [], currentUserId?: string): Promise<Post> => {
-  const business = businesses.find(b => b.id === dbPost.business_id);
-  
+// Transform database post to frontend post format (no businesses array needed - data is flattened)
+export const transformPost = async (dbPost: PostData, _businesses: any[] = [], currentUserId?: string): Promise<Post> => {
   // Use provided currentUserId or get it once
   const userId = currentUserId || await getUserId();
   const isOwnPost = dbPost.user_id === userId;
+  
+  // Extract coordinates from flattened data (already joined in getPosts query)
+  const businessLat = (dbPost as any).business_lat;
+  const businessLng = (dbPost as any).business_lng;
   
   return {
     id: dbPost.id,
     author: isOwnPost ? 'You' : 'Other',
     text: dbPost.content,
     businessId: dbPost.business_id,
-    businessName: business?.name,
+    businessName: (dbPost as any).business_name,
+    businessLat,
+    businessLng,
     isStory: dbPost.post_type === 'story',
     isJobUpdate: dbPost.post_type === 'job_update',
-    linkedLocation: business?.name,
-    votesTotal: dbPost.upvotes - dbPost.downvotes,
+    linkedLocation: (dbPost as any).business_name,
+    votesTotal: dbPost.votes_total || 0,
     userVote: null, // Will be determined by votes table
     createdAt: new Date(dbPost.created_at),
     timestamp: dbPost.created_at,
@@ -146,26 +150,50 @@ export const transformPost = async (dbPost: PostData, businesses: any[] = [], cu
   };
 };
 
-// Get all posts
-export const getPosts = async (): Promise<{ data: PostData[] | null; error: any }> => {
-  console.log('🔍 getPosts - fetching posts from database...');
+// Get posts with pagination
+export const getPosts = async (limit: number = 1000, offset: number = 0): Promise<{ data: PostData[] | null; error: any }> => {
+  console.log(`🔍 getPosts - fetching ${limit} posts with coordinates...`);
   
   const { data, error } = await supabase
     .from('posts')
-    .select('*')
-    .order('created_at', { ascending: false });
+    .select(`
+      *,
+      businesses(id, name, lat, lng)
+    `)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
 
-  console.log('🔍 getPosts result:', {
-    postCount: data?.length || 0,
-    error: error?.message || 'none',
-    firstPost: data?.[0] ? {
-      id: data[0].id,
-      content: data[0].content.substring(0, 50) + '...',
-      user_id: data[0].user_id
-    } : 'none'
+  console.log('📊 RAW SUPABASE RESPONSE:', { 
+    dataLength: data?.length || 0, 
+    error, 
+    firstPost: data?.[0] 
   });
 
-  return { data, error };
+  if (error) {
+    console.error('❌ Error fetching posts:', error);
+    return { data: null, error };
+  }
+
+  // Transform data to flatten business coordinates (handle null businesses from left join)
+  const transformedData = data?.map((post: any) => ({
+    ...post,
+    business_lat: post.businesses?.lat || null,
+    business_lng: post.businesses?.lng || null,
+    business_name: post.businesses?.name || null
+  }));
+
+  console.log(`✅ Fetched ${transformedData?.length || 0} posts with coordinates`);
+  console.log('🔍 TRANSFORMED DATA SAMPLE:', {
+    totalPosts: transformedData?.length,
+    firstThreePosts: transformedData?.slice(0, 3).map(p => ({
+      id: p.id,
+      text: p.content?.substring(0, 30),
+      business_id: p.business_id,
+      business_name: p.business_name,
+      hasCoordinates: !!(p.business_lat && p.business_lng)
+    }))
+  });
+  return { data: transformedData as PostData[], error: null };
 };
 
 // Create a new post
@@ -193,10 +221,25 @@ export const createPost = async (
       salary,
       is_comment: isComment,
     })
-    .select()
+    .select(`
+      *,
+      businesses(id, name, lat, lng)
+    `)
     .single();
 
-  return { data, error };
+  if (error) {
+    return { data: null, error };
+  }
+
+  // Flatten business data like in getPosts
+  const transformedData = {
+    ...data,
+    business_lat: data.businesses?.lat || null,
+    business_lng: data.businesses?.lng || null,
+    business_name: data.businesses?.name || null
+  };
+
+  return { data: transformedData as PostData, error: null };
 };
 
 // Vote on a post

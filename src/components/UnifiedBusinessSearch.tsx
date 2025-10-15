@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { searchBusinessesEnhanced, EnhancedBusiness } from '@/services/enhancedBusinessSearch';
-import { parseSearchFilters } from '@/services/businessFiltering';
+import { parseSearchFilters, applyBusinessFilters } from '@/services/businessFiltering';
 import { findNeighborhoodBoundaryByName } from '@/utils/nyc_neighborhoods';
 import { isProfane } from '@/utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 import { Search } from 'lucide-react';
+import { calculateBusinessFuzzyScore } from '@/utils/fuzzySearch';
+import { expandWithSynonyms } from '@/utils/searchSynonyms';
 
 interface UnifiedBusinessSearchProps {
   value: string;
@@ -16,6 +18,7 @@ interface UnifiedBusinessSearchProps {
   variant?: 'dropdown' | 'search-bar';
   showIcon?: boolean;
   onLocationSave?: (location: string, fullLocation: string) => void;
+  mapBusinesses?: any[];
 }
 
 interface NeighborhoodResult {
@@ -56,6 +59,15 @@ const calculateRelevanceScore = (business: EnhancedBusiness, query: string, inde
     score += 40;
   }
   
+  // Synonym-aware name matching
+  const expandedQueryTerms = expandWithSynonyms(queryLower);
+  const nameMatchesSynonym = expandedQueryTerms.some(term => 
+    nameLower.includes(term.toLowerCase())
+  );
+  if (nameMatchesSynonym && !nameLower.includes(queryLower)) {
+    score += 25; // Bonus for synonym match in name
+  }
+  
   // Check business type relevance
   if (businessType.includes(queryLower)) {
     score += 30;
@@ -68,14 +80,15 @@ const calculateRelevanceScore = (business: EnhancedBusiness, query: string, inde
     }
   });
   
-  // Fuzzy matching for typos (lower priority)
-  const editDistance = calculateEditDistance(nameLower, queryLower);
-  const maxLength = Math.max(nameLower.length, queryLower.length);
-  const similarity = 1 - (editDistance / maxLength);
-  
-  // Only add fuzzy score if similarity is high (> 70%)
-  if (similarity > 0.7 && editDistance <= 3) {
-    score += Math.round(similarity * 20);
+  // Fuzzy matching with Fuse.js (replaces simple edit distance)
+  const fuzzyScore = calculateBusinessFuzzyScore(
+    business.name, 
+    business.businessType || '', 
+    business.roles?.map(r => r.role) || [],
+    queryLower
+  );
+  if (fuzzyScore > 0.6) {
+    score += Math.floor(fuzzyScore * 30); // 0-30 points based on fuzzy match quality
   }
   
   // Bonus for shorter names (more likely to be relevant)
@@ -126,7 +139,6 @@ const getRelevantResults = (businesses: EnhancedBusiness[], query: string, maxRe
       score: calculateRelevanceScore(business, query, index),
       originalIndex: index // Preserve original order for additional tie-breaking
     }))
-    .filter(result => result.score > 0) // Only keep results with some relevance
     .sort((a, b) => {
       // Primary sort: by score (descending)
       if (a.score !== b.score) {
@@ -150,7 +162,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   className = "",
   variant = 'dropdown',
   showIcon = false,
-  onLocationSave
+  onLocationSave,
+  mapBusinesses = []
 }) => {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -211,7 +224,6 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       setSearchResults([]);
       setShowDropdown(false);
       setIsSearching(false);
-      // Clear filters when search is empty - only if there were filters before
       if (lastFiltersRef.current !== null) {
         lastFiltersRef.current = null;
         committedQueryRef.current = '';
@@ -220,7 +232,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       return;
     }
     
-    // Check cache first for better performance
+    // Check cache first
     const cachedResults = resultsCache.current.get(q);
     if (cachedResults && Array.isArray(cachedResults)) {
       setSearchResults(cachedResults);
@@ -229,7 +241,6 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       return;
     }
     
-    // Only show suggestions, don't execute search automatically
     setIsSearching(true);
     setShowDropdown(true);
     const seq = ++searchSeqRef.current;
@@ -238,7 +249,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       try {
         const results: SearchResult[] = [];
         
-        // Check if the query matches a neighborhood
+        // Check for neighborhood match
         const neighborhood = findNeighborhoodBoundaryByName(q);
         if (neighborhood) {
           results.push({
@@ -249,28 +260,22 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           });
         }
         
-        // Get business results with increased limit for filtering
+        // Use businesses directly from map (already filtered by map's search logic)
+        // The map applies filters via useViewportBusinesses -> getBusinessesInViewport
         let businessResults: EnhancedBusiness[] = [];
         
-        try {
-          businessResults = await searchBusinessesEnhanced(q, 50);
-        } catch (searchError) {
-          console.error('Search API error:', searchError);
-          // Continue with empty results rather than throwing
+        if (mapBusinesses && Array.isArray(mapBusinesses)) {
+          businessResults = mapBusinesses as EnhancedBusiness[];
         }
         
-        // Apply relevance-based filtering and sorting
-        const relevantResults = getRelevantResults(businessResults, q, 8);
+        // Display all businesses from map, limit to 50 for dropdown performance
+        const dropdownResults = businessResults.slice(0, 50);
+        results.push(...dropdownResults);
         
-        results.push(...relevantResults);
-        
-        // Check if this search was superseded
         if (seq !== searchSeqRef.current) return;
         
-        // Cache the results
+        // Cache results
         resultsCache.current.set(q, results);
-        
-        // Limit cache size to prevent memory issues
         if (resultsCache.current.size > 50) {
           const firstKey = resultsCache.current.keys().next().value;
           resultsCache.current.delete(firstKey);
@@ -278,7 +283,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         
         setSearchResults(Array.isArray(results) ? results : []);
         
-        // Debounced idle search: parse filters and push to parent for live filtering
+        // Update parent with filters
         try {
           const parsed = parseSearchFilters(q);
           const filtersKey = parsed ? JSON.stringify(parsed) : null;
@@ -295,10 +300,10 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
             }
           }
         } catch (e) {
-          console.warn('Idle search filter parse failed:', e);
+          console.warn('Filter parse failed:', e);
         }
       } catch (error) {
-        console.error('Search suggestions error:', error);
+        console.error('Search error:', error);
         if (seq === searchSeqRef.current) {
           setSearchResults([]);
         }
@@ -307,7 +312,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           setIsSearching(false);
         }
       }
-    }, 300); // Faster suggestions with caching
+    }, 300);
     
     return () => clearTimeout(timer);
   }, [value, onChange]);
@@ -483,10 +488,10 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
 
       {/* Search Results Dropdown */}
       {showDropdown && (Array.isArray(searchResults) && searchResults.length > 0 || isSearching || (value.trim() && !isSearching && Array.isArray(searchResults) && searchResults.length === 0)) && (
-        <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 z-[60]`}>
+        <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 z-[9999]`}>
           <div 
-            className="bg-background shadow-lg border-2 max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
-            style={{ borderRadius: '6px', borderColor: 'hsl(var(--border))' }}
+            className="bg-card shadow-xl border border-border max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
+            style={{ borderRadius: '8px' }}
             onScroll={() => {
               isScrolling.current = true;
               setTimeout(() => { isScrolling.current = false; }, 200);

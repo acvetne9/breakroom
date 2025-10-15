@@ -74,6 +74,7 @@ const HomePage: React.FC<HomePageProps> = ({
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
   const [showLoading, setShowLoading] = useState(true);
   const [searchCompleted, setSearchCompleted] = useState(false); // Track if a search has been completed
+  const [mapBusinesses, setMapBusinesses] = useState<any[]>([]); // Track businesses from the map
 
   // 👇 state for welcome banner
   const [showWelcome, setShowWelcome] = useState(false);
@@ -182,6 +183,7 @@ const HomePage: React.FC<HomePageProps> = ({
   };
 
   const handleBusinessClick = (business: any) => {
+    console.log('🏠 HomePage handleBusinessClick called:', business?.name);
     console.log('🔍 DEBUG: handleBusinessClick deps check', { 
       onBusinessSelect: typeof onBusinessSelect,
       onLocationSave: typeof onLocationSave 
@@ -272,6 +274,7 @@ const HomePage: React.FC<HomePageProps> = ({
             landmarks={LANDMARKS}
             searchFilters={searchFilters}
             neighborhoodCenter={neighborhoodCenter}
+            onBusinessesUpdate={setMapBusinesses}
           />
         
           {/* Business Preview Popup */}
@@ -310,6 +313,7 @@ const HomePage: React.FC<HomePageProps> = ({
                   variant="search-bar"
                   showIcon={!showClearButton} // Hide search icon when clear button should show
                   onLocationSave={onLocationSave}
+                  mapBusinesses={mapBusinesses}
                 />
                 
                 {/* Clear search button (X) that replaces the search icon */}
