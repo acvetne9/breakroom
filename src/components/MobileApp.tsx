@@ -198,8 +198,12 @@ const MobileApp: React.FC = () => {
       return;
     }
 
-    // Check if we need to fetch full details
-    if (!business.atmosphere?.length && !business.roles?.length) {
+    // Check if we need full details: missing atmosphere, missing roles, OR roles without IDs
+    const needsFullDetails = !business.atmosphere?.length || 
+                             !business.roles?.length ||
+                             (business.roles && business.roles.length > 0 && !business.roles[0]?.id);
+
+    if (needsFullDetails) {
       const fullBusiness = await fetchFullBusinessDetails(business.id);
       if (fullBusiness) {
         setSelectedBusiness(fullBusiness);
@@ -340,16 +344,10 @@ const MobileApp: React.FC = () => {
     let business = businesses.find((b) => b.id === businessId);
 
     // If business doesn't have role IDs, fetch full details first
+    // Defensive check - should not happen if handleBusinessClick works correctly
     if (!business?.roles?.[roleIndex]?.id) {
-      console.log("🔄 Role missing ID, fetching full business details...");
-      const fullBusiness = await fetchFullBusinessDetails(businessId);
-      if (fullBusiness?.roles?.[roleIndex]?.id) {
-        setBusinesses((prev) => prev.map((b) => (b.id === businessId ? fullBusiness : b)));
-        business = fullBusiness;
-      } else {
-        console.error("Role not found for voting after fetching full details");
-        return;
-      }
+      console.error("❌ Role missing ID - this should not happen!", { businessId, roleIndex });
+      return;
     }
 
     const roleId = business.roles[roleIndex].id;
