@@ -1,8 +1,8 @@
-import React, { memo, useRef, useState } from 'react';
-import { Compass } from 'lucide-react';
-import VotingComponent from './VotingComponent';
-import { formatTimeAgo } from '../utils/timeAgo';
-import { TranslatedText } from './TranslatedText';
+import React, { memo, useRef, useState } from "react";
+import { Compass } from "lucide-react";
+import VotingComponent from "./VotingComponent";
+import { formatTimeAgo } from "../utils/timeAgo";
+import { TranslatedText } from "./TranslatedText";
 
 interface Post {
   id: string;
@@ -31,7 +31,7 @@ interface BusinessDetailsProps {
       role: string;
       salary: string;
       votesTotal?: number;
-      userVote?: 'up' | 'down' | null;
+      userVote?: "up" | "down" | null;
     }>;
     website?: string;
     url?: string;
@@ -41,288 +41,329 @@ interface BusinessDetailsProps {
   onBackToPreview?: () => void;
   onStoriesClick?: () => void;
   onPostClick?: (post: Post) => void;
-  onRoleVote?: (businessId: string, roleIndex: number, voteType: 'up' | 'down') => void;
+  onRoleVote?: (businessId: string, roleIndex: number, voteType: "up" | "down") => Promise<void>;
   votingRoles?: Set<string>;
 }
 
-const BusinessDetails: React.FC<BusinessDetailsProps> = memo(({
-  business,
-  posts,
-  onClose,
-  onBackToPreview,
-  onStoriesClick,
-  onPostClick,
-  onRoleVote,
-  votingRoles
-}) => {
+const BusinessDetails: React.FC<BusinessDetailsProps> = memo(
+  ({
+    business,
+    posts,
+    onClose,
+    onBackToPreview,
+    onStoriesClick,
+    onPostClick,
+    onRoleVote,
+    votingRoles: externalVotingRoles,
+  }) => {
+    const [showHelpPopup, setShowHelpPopup] = useState(false);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const [showHelpPopup, setShowHelpPopup] = useState(false);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+    // Internal voting state management
+    const [internalVotingRoles, setInternalVotingRoles] = useState<Set<string>>(new Set());
+    const [localRoles, setLocalRoles] = useState(business.roles || []);
 
-  const handleBackgroundClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
+    // Use external voting state if provided, otherwise use internal
+    const votingRoles = externalVotingRoles || internalVotingRoles;
 
-  const handleCompassClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    const destination = business.website ||
-                       business.url ||
-                       `https://www.google.com/search?q=${encodeURIComponent(business.name)}`;
-
-    if (destination.includes("google.com/search")) {
-      window.location.href = destination;
-    } else {
-      window.open(destination, "_blank");
-    }
-  };
-  
-  // Handle help button click with scroll to bottom
-  const handleHelpButtonClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowHelpPopup(!showHelpPopup);
-    
-    // Scroll to bottom after a short delay to allow popup to render
-    setTimeout(() => {
-      if (scrollContainerRef.current) {
-        scrollContainerRef.current.scrollTo({
-          top: scrollContainerRef.current.scrollHeight,
-          behavior: 'smooth'
-        });
+    const handleBackgroundClick = (e: React.MouseEvent) => {
+      if (e.target === e.currentTarget) {
+        onClose();
       }
-    }, 100);
-  };
+    };
 
-  const businessStories = Array.isArray(posts) ? posts.filter(post => post.businessId === business.id && post.isStory) : [];
+    const handleCompassClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
 
-  const handleCardClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onBackToPreview?.();
-  };
+      const destination =
+        business.website || business.url || `https://www.google.com/search?q=${encodeURIComponent(business.name)}`;
 
-  const handleStoryClick = (post: Post, e: React.MouseEvent) => {
-    e.stopPropagation();
-    onPostClick?.(post);
-  };
+      if (destination.includes("google.com/search")) {
+        window.location.href = destination;
+      } else {
+        window.open(destination, "_blank");
+      }
+    };
 
-  const handleRoleVote = (roleIndex: number, voteType: 'up' | 'down', e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    console.log('🗳️ BusinessDetails.handleRoleVote called:', {
-      roleIndex,
-      voteType,
-      businessId: business.id,
-      hasOnRoleVote: !!onRoleVote,
-      role: business.roles?.[roleIndex]
-    });
-    
-    if (!onRoleVote) {
-      console.error('❌ onRoleVote prop is undefined!');
-      alert('Unable to vote: Handler not available. Please refresh the page.');
-      return;
-    }
-    
-    onRoleVote(business.id, roleIndex, voteType);
-  };
+    // Handle help button click with scroll to bottom
+    const handleHelpButtonClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setShowHelpPopup(!showHelpPopup);
 
-  const roles = Array.isArray(business.roles) ? business.roles : [];
-  const shouldScroll = roles.length > 6;
+      // Scroll to bottom after a short delay to allow popup to render
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTo({
+            top: scrollContainerRef.current.scrollHeight,
+            behavior: "smooth",
+          });
+        }
+      }, 100);
+    };
 
-return (
-  <div
-    className="fixed inset-0 z-40 flex items-start justify-center"
-    style={{ paddingTop: '8vh' }}
-    onClick={handleBackgroundClick}
-  >
-    <div
-      className="app-card p-6 animate-fade-in flex flex-col max-h-[80vh] relative"
-      onClick={handleCardClick}
-    >
-      {/* Scrollable content area */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pr-2">
-        <div className="flex justify-between items-start mb-2">
-          <div>
-            <TranslatedText
-              text={business.name}
-              className="text-xl font-medium text-app-black"
-            />
+    const businessStories = Array.isArray(posts)
+      ? posts.filter((post) => post.businessId === business.id && post.isStory)
+      : [];
 
-            {(business.address?.trim() || (Array.isArray(business.atmosphere) && business.atmosphere.length > 0)) && (
-              <div className="mt-1 flex flex-col gap-0.5">
-                {business.address && (
-                  <span className="text-sm text-app-gray-medium">
-                    {business.address}
-                  </span>
-                )}
-                {Array.isArray(business.atmosphere) && business.atmosphere.length > 0 && (
-                  <span className="text-sm text-app-gray-medium">
-                    {business.atmosphere.join(' • ')}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
+    const handleCardClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onBackToPreview?.();
+    };
 
-          <button
-            onClick={handleCompassClick}
-            className="compass-button p-2 rounded-lg bg-gray-100/0 py-0"
-          >
-            <span className="text-3xl">🧭</span>
-          </button>
-        </div>
+    const handleStoryClick = (post: Post, e: React.MouseEvent) => {
+      e.stopPropagation();
+      onPostClick?.(post);
+    };
 
-        {/* Job roles and salaries */}
-        <div className="mb-2">
-          <h3 className="text-lg font-medium text-app-black mb-2">
-            Roles & Salaries
-          </h3>
+    const handleRoleVote = async (roleIndex: number, voteType: "up" | "down", e?: React.MouseEvent) => {
+      e?.stopPropagation();
 
-          <div
-            className={`space-y-2 ${shouldScroll ? 'max-h-64 overflow-y-auto pr-2' : ''}`}
-            style={shouldScroll ? { scrollbarWidth: 'thin' } : undefined}
-          >
-            {business.roles ? business.roles.map((role, index) => (
-              <div key={index} className="flex justify-between items-center py-1">
-                <span className="text-app-black">{role.role}</span>
+      const voteKey = `${business.id}-${roleIndex}`;
 
-                <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
-                  <span className="font-medium text-app-black">
-                    {typeof role.salary === 'string' ? role.salary : '$13.6'}
-                    {!(typeof role.salary === 'string' && role.salary.includes('/')) && (
-                      <span className="text-xs text-app-gray-medium ml-1">/hr</span>
+      // Start loading state
+      if (!externalVotingRoles) {
+        setInternalVotingRoles((prev) => new Set(prev).add(voteKey));
+      }
+
+      // Optimistically update UI
+      setLocalRoles((prevRoles) => {
+        const newRoles = [...prevRoles];
+        const role = newRoles[roleIndex];
+
+        if (role) {
+          const currentVote = role.userVote;
+          const currentTotal = role.votesTotal || 0;
+
+          // Calculate new vote total
+          let newTotal = currentTotal;
+          let newUserVote: "up" | "down" | null = voteType;
+
+          if (currentVote === voteType) {
+            // Removing vote
+            newTotal = currentTotal - (voteType === "up" ? 1 : -1);
+            newUserVote = null;
+          } else if (currentVote) {
+            // Changing vote
+            newTotal = currentTotal + (voteType === "up" ? 2 : -2);
+            newUserVote = voteType;
+          } else {
+            // New vote
+            newTotal = currentTotal + (voteType === "up" ? 1 : -1);
+            newUserVote = voteType;
+          }
+
+          newRoles[roleIndex] = {
+            ...role,
+            votesTotal: newTotal,
+            userVote: newUserVote,
+          };
+        }
+
+        return newRoles;
+      });
+
+      // Call parent handler if provided
+      if (onRoleVote) {
+        try {
+          await onRoleVote(business.id, roleIndex, voteType);
+        } catch (error) {
+          console.error("Vote failed:", error);
+          // Revert optimistic update on error
+          setLocalRoles(business.roles || []);
+        } finally {
+          // Stop loading state
+          if (!externalVotingRoles) {
+            setInternalVotingRoles((prev) => {
+              const next = new Set(prev);
+              next.delete(voteKey);
+              return next;
+            });
+          }
+        }
+      } else {
+        // If no handler, just stop loading after a short delay
+        if (!externalVotingRoles) {
+          setTimeout(() => {
+            setInternalVotingRoles((prev) => {
+              const next = new Set(prev);
+              next.delete(voteKey);
+              return next;
+            });
+          }, 500);
+        }
+      }
+    };
+
+    // Use local roles if we're managing state internally, otherwise use business.roles
+    const displayRoles = externalVotingRoles ? business.roles || [] : localRoles;
+    const shouldScroll = displayRoles.length > 6;
+
+    return (
+      <div
+        className="fixed inset-0 z-40 flex items-start justify-center"
+        style={{ paddingTop: "8vh" }}
+        onClick={handleBackgroundClick}
+      >
+        <div className="app-card p-6 animate-fade-in flex flex-col max-h-[80vh] relative" onClick={handleCardClick}>
+          {/* Scrollable content area */}
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pr-2">
+            <div className="flex justify-between items-start mb-2">
+              <div>
+                <TranslatedText text={business.name} className="text-xl font-medium text-app-black" />
+
+                {(business.address?.trim() ||
+                  (Array.isArray(business.atmosphere) && business.atmosphere.length > 0)) && (
+                  <div className="mt-1 flex flex-col gap-0.5">
+                    {business.address && <span className="text-sm text-app-gray-medium">{business.address}</span>}
+                    {Array.isArray(business.atmosphere) && business.atmosphere.length > 0 && (
+                      <span className="text-sm text-app-gray-medium">{business.atmosphere.join(" • ")}</span>
                     )}
-                  </span>
-
-                  <VotingComponent
-                    votesTotal={role.votesTotal || 0}
-                    userVote={role.userVote}
-                    onVote={(voteType) => handleRoleVote(index, voteType)}
-                    isVoting={votingRoles?.has(role.id || '')}
-                  />
-                </div>
-              </div>
-            )) : (
-              <div className="flex justify-between items-center py-1">
-                <span className="text-app-black">Barista</span>
-                <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
-                  <span className="font-medium text-app-black">$13.6</span>
-                  <VotingComponent
-                    votesTotal={0}
-                    userVote={null}
-                    onVote={() => {}}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex justify-end mt-2">
-            <span className="text-xs text-app-gray-medium">Do these seem right?</span>
-          </div>
-        </div>
-
-        {/* Stories section */}
-        <div>
-          <h3 className="text-lg font-medium text-app-black mb-3">
-            More Stories 📖
-          </h3>
-
-          <div className="space-y-4">
-            {Array.isArray(businessStories) && businessStories.length > 0 ? (
-              <>
-                {businessStories.slice(0, 5).map(story => (
-                  <div
-                    key={story.id}
-                    className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded relative"
-                    onClick={(e) => handleStoryClick(story, e)}
-                  >
-                    <TranslatedText
-                      text={(story.text && story.text.length > 100)
-                        ? `${story.text.substring(0, 100)}...`
-                        : (story.text || '')}
-                      className="text-app-gray-dark text-sm pb-4"
-                    />
-                    <span className="absolute bottom-2 left-4 text-xs text-gray-400">
-                      {formatTimeAgo(story.createdAt)}
-                    </span>
                   </div>
-                ))}
-
-                {Array.isArray(businessStories) && businessStories.length > 5 && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onStoriesClick?.(); }}
-                    className="w-full mt-3 px-4 py-2 bg-app-yellow text-app-black rounded hover:bg-app-yellow/90 transition-colors"
-                  >
-                    View all Stories ({businessStories.length})
-                  </button>
                 )}
-              </>
-            ) : (
-              <div
-                className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded"
-                onClick={(e) => { e.stopPropagation(); onStoriesClick?.(); }}
-              >
-                <p className="text-app-gray-dark text-sm font-medium">
-                  Be the first to post! 🚀
-                </p>
               </div>
-            )}
+
+              <button onClick={handleCompassClick} className="compass-button p-2 rounded-lg bg-gray-100/0 py-0">
+                <span className="text-3xl">🧭</span>
+              </button>
+            </div>
+
+            {/* Job roles and salaries */}
+            <div className="mb-2">
+              <h3 className="text-lg font-medium text-app-black mb-2">Roles & Salaries</h3>
+
+              <div
+                className={`space-y-2 ${shouldScroll ? "max-h-64 overflow-y-auto pr-2" : ""}`}
+                style={shouldScroll ? { scrollbarWidth: "thin" } : undefined}
+              >
+                {displayRoles.length > 0 ? (
+                  displayRoles.map((role, index) => (
+                    <div key={index} className="flex justify-between items-center py-1">
+                      <span className="text-app-black">{role.role}</span>
+
+                      <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
+                        <span className="font-medium text-app-black">
+                          {typeof role.salary === "string" ? role.salary : "$13.6"}
+                          {!(typeof role.salary === "string" && role.salary.includes("/")) && (
+                            <span className="text-xs text-app-gray-medium ml-1">/hr</span>
+                          )}
+                        </span>
+
+                        <VotingComponent
+                          votesTotal={role.votesTotal || 0}
+                          userVote={role.userVote}
+                          onVote={(voteType) => handleRoleVote(index, voteType)}
+                          isVoting={votingRoles.has(`${business.id}-${index}`)}
+                        />
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-app-black">Barista</span>
+                    <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
+                      <span className="font-medium text-app-black">$13.6</span>
+                      <VotingComponent votesTotal={0} userVote={null} onVote={() => {}} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end mt-2">
+                <span className="text-xs text-app-gray-medium">Do these seem right?</span>
+              </div>
+            </div>
+
+            {/* Stories section */}
+            <div>
+              <h3 className="text-lg font-medium text-app-black mb-3">More Stories 📖</h3>
+
+              <div className="space-y-4">
+                {Array.isArray(businessStories) && businessStories.length > 0 ? (
+                  <>
+                    {businessStories.slice(0, 5).map((story) => (
+                      <div
+                        key={story.id}
+                        className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded relative"
+                        onClick={(e) => handleStoryClick(story, e)}
+                      >
+                        <TranslatedText
+                          text={
+                            story.text && story.text.length > 100
+                              ? `${story.text.substring(0, 100)}...`
+                              : story.text || ""
+                          }
+                          className="text-app-gray-dark text-sm pb-4"
+                        />
+                        <span className="absolute bottom-2 left-4 text-xs text-gray-400">
+                          {formatTimeAgo(story.createdAt)}
+                        </span>
+                      </div>
+                    ))}
+
+                    {Array.isArray(businessStories) && businessStories.length > 5 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onStoriesClick?.();
+                        }}
+                        className="w-full mt-3 px-4 py-2 bg-app-yellow text-app-black rounded hover:bg-app-yellow/90 transition-colors"
+                      >
+                        View all Stories ({businessStories.length})
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <div
+                    className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onStoriesClick?.();
+                    }}
+                  >
+                    <p className="text-app-gray-dark text-sm font-medium">Be the first to post! 🚀</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div className="pt-4 flex items-center shrink-0">
-        <button
-          onClick={handleHelpButtonClick}
-          className="w-6 h-6 bg-app-gray-light rounded-full flex items-center justify-center hover:bg-app-gray-medium transition-colors text-app-white font-bold text-sm"
-        >
-          ?
-        </button>
-        <p className="text-xs text-app-gray-medium ml-4">
-          Is this business accurate?
-        </p>
-      </div>
-
-      {/* Help Popup - Styled like other cards with rounded edges */}
-      {showHelpPopup && (
-        <div
-          className="mt-4 w-full bg-white border-2 border-app-yellow rounded-xl p-4 shadow-lg space-y-2"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Condensed input fields */}
-          <input
-            type="text"
-            placeholder="Business name..."
-            className="app-input w-full h-10 text-sm"
-          />
-          <input
-            type="text"
-            placeholder="Job role..."
-            className="app-input w-full h-10 text-sm"
-          />
-          <input
-            type="text"
-            placeholder="Salary..."
-            className="app-input w-full h-10 text-sm"
-          />
-      
-          {/* Footer row with checkbox + submit */}
-          <div className="flex items-center justify-between pt-2">
-            <label className="flex items-center text-xs text-app-gray-dark">
-              <input type="checkbox" className="mr-2" />
-              Did this business close?
-            </label>
+          <div className="pt-4 flex items-center shrink-0">
             <button
-              className="px-3 py-1 bg-app-yellow text-app-black rounded text-xs hover:bg-app-yellow/90 transition-colors"
+              onClick={handleHelpButtonClick}
+              className="w-6 h-6 bg-app-gray-light rounded-full flex items-center justify-center hover:bg-app-gray-medium transition-colors text-app-white font-bold text-sm"
             >
-              Submit
+              ?
             </button>
+            <p className="text-xs text-app-gray-medium ml-4">Is this business accurate?</p>
           </div>
+
+          {/* Help Popup - Styled like other cards with rounded edges */}
+          {showHelpPopup && (
+            <div
+              className="mt-4 w-full bg-white border-2 border-app-yellow rounded-xl p-4 shadow-lg space-y-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Condensed input fields */}
+              <input type="text" placeholder="Business name..." className="app-input w-full h-10 text-sm" />
+              <input type="text" placeholder="Job role..." className="app-input w-full h-10 text-sm" />
+              <input type="text" placeholder="Salary..." className="app-input w-full h-10 text-sm" />
+
+              {/* Footer row with checkbox + submit */}
+              <div className="flex items-center justify-between pt-2">
+                <label className="flex items-center text-xs text-app-gray-dark">
+                  <input type="checkbox" className="mr-2" />
+                  Did this business close?
+                </label>
+                <button className="px-3 py-1 bg-app-yellow text-app-black rounded text-xs hover:bg-app-yellow/90 transition-colors">
+                  Submit
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
-    </div>
-  </div>
-)});
+      </div>
+    );
+  },
+);
 
 export default BusinessDetails;
