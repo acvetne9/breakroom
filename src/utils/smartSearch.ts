@@ -2,27 +2,10 @@ import nlp from "compromise";
 import winkNLP from "wink-nlp";
 import model from "wink-eng-lite-web-model";
 import Fuse from "fuse.js";
-import { pipeline } from "@xenova/transformers"; // 🧠 NEW
 
 // Initialize wink-nlp
 let winkInstance: any = null;
 let winkInitialized = false;
-
-// Initialize transformer model
-let embedder: any = null;
-let embedderReady = false;
-
-async function ensureEmbedder() {
-  if (!embedderReady) {
-    try {
-      embedder = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
-      embedderReady = true;
-    } catch (e) {
-      console.warn("Failed to initialize transformer embedder:", e);
-    }
-  }
-  return embedder;
-}
 
 function ensureWinkNLP() {
   if (!winkInitialized) {
@@ -110,27 +93,6 @@ function fuzzyMatch(term: string, candidates: string[]): string[] {
   return fuse.search(term).map((r) => r.item);
 }
 
-/**
- * Get semantic neighbors using embeddings
- */
-async function getSemanticNeighbors(term: string, candidates: string[]): Promise<string[]> {
-  const model = await ensureEmbedder();
-  if (!model) return [];
-
-  const queryVec = (await model(term)).data[0];
-  const candidateVecs = await Promise.all(candidates.map(async (c) => (await model(c)).data[0]));
-
-  function cosine(a: number[], b: number[]) {
-    const dot = a.reduce((sum, v, i) => sum + v * b[i], 0);
-    const normA = Math.sqrt(a.reduce((sum, v) => sum + v ** 2, 0));
-    const normB = Math.sqrt(b.reduce((sum, v) => sum + v ** 2, 0));
-    return dot / (normA * normB);
-  }
-
-  const scores = candidates.map((c, i) => ({ term: c, score: cosine(queryVec, candidateVecs[i]) }));
-  scores.sort((a, b) => b.score - a.score);
-  return scores.filter((s) => s.score > 0.55).map((s) => s.term);
-}
 
 /**
  * Get word variations and lemmas
@@ -184,19 +146,29 @@ export async function expandTerm(term: string): Promise<string[]> {
   getWordVariations(normalized).forEach((v) => expansions.add(v));
   getLemmas(normalized).forEach((v) => expansions.add(v));
 
-  // 3️⃣ Semantic similarity (local embeddings)
-  const allCandidates = Array.from(expansions);
-  const semanticNeighbors = await getSemanticNeighbors(normalized, allCandidates);
-  semanticNeighbors.forEach((v) => expansions.add(v));
-
-  // 4️⃣ Fuzzy expansion
+  // 3️⃣ Fuzzy expansion
   const fuzzy = fuzzyMatch(normalized, Array.from(expansions));
   fuzzy.forEach((v) => expansions.add(v));
 
-  // 5️⃣ Cache
+  // 4️⃣ Cache
   const results = Array.from(expansions);
   expansionCache.set(normalized, { terms: results, timestamp: Date.now() });
   saveCache();
 
   return results;
+}
+
+/**
+ * Pre-compute expansions for common hospitality terms
+ */
+export async function precomputeCommonTerms(): Promise<void> {
+  const commonTerms = [
+    "waitress", "waiter", "server", "barista", "bartender", 
+    "cook", "chef", "host", "hostess", "busser", "runner",
+    "manager", "sommelier", "mixologist", "cashier"
+  ];
+  
+  for (const term of commonTerms) {
+    await expandTerm(term);
+  }
 }
