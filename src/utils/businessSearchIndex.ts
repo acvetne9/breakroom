@@ -1,5 +1,5 @@
 import { Business } from '@/types/business';
-import { expandWithSynonyms } from './searchSynonyms';
+import { expandTerm } from './smartSearch';
 import { EnhancedBusiness } from '@/services/enhancedBusinessSearch';
 
 interface IndexedBusiness extends Business {
@@ -14,7 +14,7 @@ class BusinessSearchIndex {
   private nameIndex: Map<string, string> = new Map(); // normalized name -> business ID
   private isBuilt: boolean = false;
 
-  buildIndex(businesses: Business[]): void {
+  async buildIndex(businesses: Business[]): Promise<void> {
     console.log(`🔍 Building search index for ${businesses.length} businesses...`);
     const startTime = performance.now();
 
@@ -22,21 +22,26 @@ class BusinessSearchIndex {
     this.roleIndex.clear();
     this.nameIndex.clear();
 
-    businesses.forEach(business => {
+    // Build index with async synonym expansion
+    for (const business of businesses) {
       // Normalize searchable fields
       const searchableName = business.name.toLowerCase().trim();
       const searchableType = (business.businessType || '').toLowerCase().trim();
       
-      // Expand roles with synonyms (sync - uses cache or triggers background expansion)
+      // Expand roles with synonyms (async with API calls)
       const originalRoles = business.roles?.map(r => r.role.toLowerCase().trim()) || [];
       const expandedRoles = new Set<string>();
       
-      originalRoles.forEach(role => {
+      // Expand all roles in parallel
+      const expansionPromises = originalRoles.map(async role => {
         expandedRoles.add(role); // Add original
-        expandWithSynonyms(role).forEach(synonym => {
+        const synonyms = await expandTerm(role);
+        synonyms.forEach(synonym => {
           expandedRoles.add(synonym.toLowerCase().trim()); // Add synonyms
         });
       });
+      
+      await Promise.all(expansionPromises);
 
       const searchableRoles = Array.from(expandedRoles);
 
@@ -60,7 +65,7 @@ class BusinessSearchIndex {
         }
         this.roleIndex.get(role)!.add(business.id);
       });
-    });
+    }
 
     this.isBuilt = true;
     const endTime = performance.now();
@@ -94,27 +99,22 @@ class BusinessSearchIndex {
       }
     });
 
-    // Search by roles (exact match from index)
+    // Search by roles - using already-expanded terms from index
     queryTerms.forEach(term => {
-      // Expand the search term with synonyms (sync - uses cache)
-      const expandedTerms = expandWithSynonyms(term);
+      const normalizedTerm = term.toLowerCase().trim();
       
-      expandedTerms.forEach(expandedTerm => {
-        const normalizedTerm = expandedTerm.toLowerCase().trim();
-        
-        // Check role index for exact matches
-        if (this.roleIndex.has(normalizedTerm)) {
-          this.roleIndex.get(normalizedTerm)!.forEach(id => {
-            matchingBusinessIds.add(id);
-          });
-        }
-        
-        // Also check for partial role matches
-        this.roleIndex.forEach((ids, role) => {
-          if (role.includes(normalizedTerm)) {
-            ids.forEach(id => matchingBusinessIds.add(id));
-          }
+      // Check role index for exact matches
+      if (this.roleIndex.has(normalizedTerm)) {
+        this.roleIndex.get(normalizedTerm)!.forEach(id => {
+          matchingBusinessIds.add(id);
         });
+      }
+      
+      // Also check for partial role matches
+      this.roleIndex.forEach((ids, role) => {
+        if (role.includes(normalizedTerm)) {
+          ids.forEach(id => matchingBusinessIds.add(id));
+        }
       });
     });
 
@@ -155,8 +155,8 @@ class BusinessSearchIndex {
 const searchIndex = new BusinessSearchIndex();
 
 // Export functions
-export const buildSearchIndex = (businesses: Business[]) => {
-  searchIndex.buildIndex(businesses);
+export const buildSearchIndex = async (businesses: Business[]) => {
+  await searchIndex.buildIndex(businesses);
 };
 
 export const searchFromIndex = (query: string, limit?: number): EnhancedBusiness[] => {

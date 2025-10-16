@@ -2,7 +2,7 @@ import { Business } from '@/types/business';
 import { parseSearchTerms } from '@/utils/searchUtils';
 import { findNeighborhoodBoundaryByName, nycNeighborhoodBoundaries, filterBusinessesByNeighborhood } from '@/utils/nyc_neighborhoods';
 import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods';
-import { expandWithSynonyms } from '@/utils/searchSynonyms';
+import { expandTerm } from '@/utils/smartSearch';
 
 export interface SearchFilters {
   textTerms: string[];
@@ -155,16 +155,10 @@ export function applyBusinessFilters(businesses: Business[], filters: SearchFilt
     return Array.from(variants);
   };
 
-  const matchesTermVariants = (haystack: string, term: string) => {
+  const matchesTermVariantsSync = (haystack: string, term: string) => {
     const h = normalize(haystack);
-    // Use sync version which returns cached results or triggers background expansion
-    const expandedTerms = expandWithSynonyms(term);
-    
-    // Check if any expanded synonym matches
-    return expandedTerms.some(variant => {
-      const normalized = normalize(variant);
-      return h.includes(normalized);
-    });
+    const variants = variantsOf(term);
+    return variants.some(v => h.includes(v));
   };
 
   const toHourly = (salary: string): number | null => {
@@ -209,12 +203,12 @@ export function applyBusinessFilters(businesses: Business[], filters: SearchFilt
     // This prevents over-filtering when the same search term creates multiple filter types
     if (filters.roleFilter && !hasMatch) {
       hasMatch = roles.some(r => {
-        return matchesTermVariants(r.role || '', filters.roleFilter!);
+        return matchesTermVariantsSync(r.role || '', filters.roleFilter!);
       });
     }
 
     if (filters.businessTypeFilter && !hasMatch) {
-      hasMatch = matchesTermVariants(type, filters.businessTypeFilter!);
+      hasMatch = matchesTermVariantsSync(type, filters.businessTypeFilter!);
     }
 
     // If no match found from text/role/type searches, exclude

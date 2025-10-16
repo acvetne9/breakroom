@@ -6,7 +6,7 @@ import { isProfane } from '@/utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 import { Search } from 'lucide-react';
 import { calculateBusinessFuzzyScore } from '@/utils/fuzzySearch';
-import { expandWithSynonyms } from '@/utils/searchSynonyms';
+import { expandTerm } from '@/utils/smartSearch';
 
 interface UnifiedBusinessSearchProps {
   value: string;
@@ -57,15 +57,6 @@ const calculateRelevanceScore = (business: EnhancedBusiness, query: string, inde
   // Contains query as substring (medium priority)
   else if (nameLower.includes(queryLower)) {
     score += 40;
-  }
-  
-  // Synonym-aware name matching (sync - uses cache)
-  const expandedQueryTerms = expandWithSynonyms(queryLower);
-  const nameMatchesSynonym = expandedQueryTerms.some(term => 
-    nameLower.includes(term.toLowerCase())
-  );
-  if (nameMatchesSynonym && !nameLower.includes(queryLower)) {
-    score += 25; // Bonus for synonym match in name
   }
   
   // Check business type relevance

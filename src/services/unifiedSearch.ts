@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Business } from '@/types/business';
 import { applyBusinessFilters, SearchFilters } from './businessFiltering';
-import { expandQueryWithSynonyms, expandWithSynonyms } from '@/utils/searchSynonyms';
+import { expandTerm } from '@/utils/smartSearch';
 
 // Search results cache to prevent repeated queries
 const searchCache = new Map<string, { results: Business[]; timestamp: number }>();
@@ -30,8 +30,8 @@ const parseSalaryToHourly = (salary: string): number | null => {
   return numericValue; // Default to hourly
 };
 
-// Enhanced search term parsing with better AND logic
-export const parseUnifiedSearchFilters = (searchQuery: string): UnifiedSearchFilters | null => {
+// Enhanced search term parsing with better AND logic - NOW ASYNC
+export const parseUnifiedSearchFilters = async (searchQuery: string): Promise<UnifiedSearchFilters | null> => {
   if (!searchQuery.trim()) return null;
 
   const query = searchQuery.toLowerCase().trim();
@@ -85,8 +85,11 @@ export const parseUnifiedSearchFilters = (searchQuery: string): UnifiedSearchFil
     .filter(term => term.length > 0)
     .map(term => term.toLowerCase());
   
-  // Expand text terms with synonyms for better matching (now sync - uses cache or triggers background expansion)
-  const expandedTextTerms = textTerms.flatMap(term => expandWithSynonyms(term));
+  // Expand text terms with synonyms - NOW ASYNC with API calls
+  const expandedTermsArrays = await Promise.all(
+    textTerms.map(term => expandTerm(term))
+  );
+  const expandedTextTerms = expandedTermsArrays.flat();
   const uniqueExpandedTerms = [...new Set(expandedTextTerms)];
   
   const filters: UnifiedSearchFilters = { textTerms: uniqueExpandedTerms };
@@ -362,7 +365,7 @@ export const searchBusinessesByQuery = async (
   
   if (!query.trim()) return [];
   
-  const filters = parseUnifiedSearchFilters(query);
+  const filters = await parseUnifiedSearchFilters(query);
   if (!filters) return [];
   
   return searchBusinessesUnified(filters, bounds, limit);

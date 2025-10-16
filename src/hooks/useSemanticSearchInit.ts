@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { precomputeCommonTerms } from '@/utils/synonymService';
+import { precomputeCommonTerms } from '@/utils/smartSearch';
 
 /**
  * Hook to initialize semantic search on app load
@@ -8,8 +8,11 @@ import { precomputeCommonTerms } from '@/utils/synonymService';
 export function useSemanticSearchInit() {
   useEffect(() => {
     // Precompute common terms in background (non-blocking)
-    precomputeCommonTerms().catch(err => {
-      console.warn('Failed to precompute semantic search terms:', err);
-    });
+    console.log('🚀 Starting semantic search precomputation...');
+    precomputeCommonTerms()
+      .then(() => console.log('✅ Semantic search precomputation complete'))
+      .catch(err => {
+        console.warn('Failed to precompute semantic search terms:', err);
+      });
   }, []);
 }
