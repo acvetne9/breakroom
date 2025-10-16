@@ -1,28 +1,21 @@
 import winkNLP from "wink-nlp";
 import model from "wink-eng-lite-web-model";
 
-// Lazy import (Node-only)
-let synonymFn: ((word: string) => Record<string, string[]> | null) | null = null;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  synonymFn = require("synonyms");
-} catch {
-  // Running in browser — skip
-  synonymFn = null;
-}
+// Small local fallback synonym map (you can extend this)
+const LOCAL_SYNONYMS: Record<string, string[]> = {
+  job: ["work", "employment", "position", "occupation", "career"],
+  haircut: ["trim", "barber", "style", "cut"],
+  happy: ["joyful", "content", "cheerful", "glad"],
+  fast: ["quick", "rapid", "speedy", "swift"],
+};
 
+// ---- SYNONYM FUNCTION ----
 function getSynonyms(term: string): string[] {
-  if (!synonymFn) return []; // Browser fallback
-  try {
-    const syns = synonymFn(term.toLowerCase());
-    if (!syns) return [];
-    return Object.values(syns).flatMap((v) => v as string[]);
-  } catch {
-    return [];
-  }
+  const lower = term.toLowerCase().trim();
+  return LOCAL_SYNONYMS[lower] ?? [];
 }
 
-// Initialize wink-nlp with web model (lazy loaded)
+// ---- wink-nlp setup ----
 let nlp: any = null;
 let isInitialized = false;
 let initializationPromise: Promise<void> | null = null;
@@ -52,33 +45,18 @@ async function initializeNLP(): Promise<void> {
 }
 
 /**
- * Instead of word vectors, use lexical + synonym expansion similarity
+ * Lexical similarity (simple character-level Jaccard)
  */
 function lexicalSimilarity(a: string, b: string): number {
   a = a.toLowerCase();
   b = b.toLowerCase();
   if (a === b) return 1.0;
 
-  // Simple character-level similarity (Jaccard)
   const setA = new Set(a.split(""));
   const setB = new Set(b.split(""));
   const intersection = new Set([...setA].filter((x) => setB.has(x)));
   const union = new Set([...setA, ...setB]);
   return intersection.size / union.size;
-}
-
-/**
- * Get synonyms for a term using `synonyms` package
- */
-function getSynonyms(term: string): string[] {
-  try {
-    const syns: Record<string, string[]> | null = synonyms(term.toLowerCase());
-    if (!syns) return [];
-    // Flatten categories (noun, verb, adj, adv)
-    return Object.values(syns).flatMap((v) => v as string[]);
-  } catch {
-    return [];
-  }
 }
 
 /**
@@ -90,7 +68,7 @@ export async function calculateSimilarity(term1: string, term2: string): Promise
   const normalized1 = term1.toLowerCase().trim();
   const normalized2 = term2.toLowerCase().trim();
 
-  // Check cache
+  // Cache check
   if (similarityCache.has(normalized1)) {
     const term1Cache = similarityCache.get(normalized1)!;
     if (term1Cache.has(normalized2)) {
@@ -98,14 +76,12 @@ export async function calculateSimilarity(term1: string, term2: string): Promise
     }
   }
 
-  if (normalized1 === normalized2) {
-    return 1.0;
-  }
+  if (normalized1 === normalized2) return 1.0;
 
   // Compute lexical similarity
   let similarity = lexicalSimilarity(normalized1, normalized2);
 
-  // Check synonym overlap
+  // Synonym overlap
   const syn1 = new Set(getSynonyms(normalized1));
   const syn2 = new Set(getSynonyms(normalized2));
   const overlap = [...syn1].filter((x) => syn2.has(x));
@@ -113,7 +89,7 @@ export async function calculateSimilarity(term1: string, term2: string): Promise
     similarity = Math.max(similarity, 0.9);
   }
 
-  // Cache result
+  // Cache
   if (!similarityCache.has(normalized1)) {
     similarityCache.set(normalized1, new Map());
   }
@@ -167,11 +143,11 @@ export async function expandWithSemantics(
 
   const expansions = new Set<string>([normalized]);
 
-  // Add WordNet synonyms
+  // Add synonyms
   const syns = getSynonyms(normalized);
   syns.forEach((s) => expansions.add(s.toLowerCase()));
 
-  // Check common terms for semantic similarity
+  // Check similar common terms
   if (commonTerms.length > 0) {
     const similar = await findSimilarTerms(normalized, commonTerms, threshold);
     similar.forEach(({ term }) => expansions.add(term.toLowerCase()));
