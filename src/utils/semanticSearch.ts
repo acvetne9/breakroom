@@ -1,7 +1,26 @@
-// @ts-ignore: untyped CommonJS module
-import synonyms from "synonyms";
 import winkNLP from "wink-nlp";
 import model from "wink-eng-lite-web-model";
+
+// Lazy import (Node-only)
+let synonymFn: ((word: string) => Record<string, string[]> | null) | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  synonymFn = require("synonyms");
+} catch {
+  // Running in browser — skip
+  synonymFn = null;
+}
+
+function getSynonyms(term: string): string[] {
+  if (!synonymFn) return []; // Browser fallback
+  try {
+    const syns = synonymFn(term.toLowerCase());
+    if (!syns) return [];
+    return Object.values(syns).flatMap((v) => v as string[]);
+  } catch {
+    return [];
+  }
+}
 
 // Initialize wink-nlp with web model (lazy loaded)
 let nlp: any = null;
