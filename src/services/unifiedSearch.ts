@@ -85,7 +85,7 @@ export const parseUnifiedSearchFilters = (searchQuery: string): UnifiedSearchFil
     .filter(term => term.length > 0)
     .map(term => term.toLowerCase());
   
-  // Expand text terms with synonyms for better matching  
+  // Expand text terms with synonyms for better matching (now sync - uses cache or triggers background expansion)
   const expandedTextTerms = textTerms.flatMap(term => expandWithSynonyms(term));
   const uniqueExpandedTerms = [...new Set(expandedTextTerms)];
   

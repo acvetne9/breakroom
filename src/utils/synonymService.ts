@@ -9,8 +9,46 @@ import {
 
 // In-memory cache for synonym lookups
 const synonymCache = new Map<string, string[]>();
-const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
-const cacheTimestamps = new Map<string, number>();
+const CACHE_KEY = 'breakroom_synonym_cache_v1';
+const CACHE_TIMESTAMP_KEY = 'breakroom_synonym_cache_timestamp_v1';
+
+// Load cache from localStorage on initialization
+const loadCacheFromStorage = (): void => {
+  try {
+    const stored = localStorage.getItem(CACHE_KEY);
+    const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+    if (stored && timestamp) {
+      const cacheAge = Date.now() - parseInt(timestamp, 10);
+      // Keep cache for 24 hours
+      if (cacheAge < 24 * 60 * 60 * 1000) {
+        const parsed = JSON.parse(stored);
+        Object.entries(parsed).forEach(([key, value]) => {
+          synonymCache.set(key, value as string[]);
+        });
+        console.log(`✅ Loaded ${synonymCache.size} cached synonym entries from localStorage`);
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to load synonym cache from localStorage:', e);
+  }
+};
+
+// Save cache to localStorage
+const saveCacheToStorage = (): void => {
+  try {
+    const cacheObj: Record<string, string[]> = {};
+    synonymCache.forEach((value, key) => {
+      cacheObj[key] = value;
+    });
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cacheObj));
+    localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+  } catch (e) {
+    console.warn('Failed to save synonym cache to localStorage:', e);
+  }
+};
+
+// Initialize cache from storage
+loadCacheFromStorage();
 
 // Pre-computed top hospitality terms
 let precomputedTerms: Set<string> | null = null;
@@ -104,12 +142,10 @@ function getWordVariations(term: string): string[] {
 }
 
 /**
- * Check if cache entry is still valid
+ * Check if term is in cache (cache never expires, loaded from localStorage)
  */
 function isCacheValid(term: string): boolean {
-  const timestamp = cacheTimestamps.get(term);
-  if (!timestamp) return false;
-  return Date.now() - timestamp < CACHE_DURATION;
+  return synonymCache.has(term);
 }
 
 /**
@@ -158,7 +194,11 @@ export async function expandWithSynonyms(term: string): Promise<string[]> {
   // Convert to array and cache
   const results = Array.from(allSynonyms);
   synonymCache.set(normalized, results);
-  cacheTimestamps.set(normalized, Date.now());
+  
+  // Periodically save to localStorage (debounced)
+  if (synonymCache.size % 10 === 0) {
+    saveCacheToStorage();
+  }
 
   return results;
 }
@@ -312,8 +352,13 @@ export async function precomputeCommonTerms(): Promise<void> {
  */
 export function clearSynonymCache(): void {
   synonymCache.clear();
-  cacheTimestamps.clear();
   clearSemanticSearchCache();
+  try {
+    localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem(CACHE_TIMESTAMP_KEY);
+  } catch (e) {
+    console.warn('Failed to clear localStorage cache:', e);
+  }
 }
 
 /**

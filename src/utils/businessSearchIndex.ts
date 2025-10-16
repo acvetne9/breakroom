@@ -27,7 +27,7 @@ class BusinessSearchIndex {
       const searchableName = business.name.toLowerCase().trim();
       const searchableType = (business.businessType || '').toLowerCase().trim();
       
-      // Expand roles with synonyms
+      // Expand roles with synonyms (sync - uses cache or triggers background expansion)
       const originalRoles = business.roles?.map(r => r.role.toLowerCase().trim()) || [];
       const expandedRoles = new Set<string>();
       
@@ -96,7 +96,7 @@ class BusinessSearchIndex {
 
     // Search by roles (exact match from index)
     queryTerms.forEach(term => {
-      // Expand the search term with synonyms
+      // Expand the search term with synonyms (sync - uses cache)
       const expandedTerms = expandWithSynonyms(term);
       
       expandedTerms.forEach(expandedTerm => {

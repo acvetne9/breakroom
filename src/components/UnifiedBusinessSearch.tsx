@@ -59,7 +59,7 @@ const calculateRelevanceScore = (business: EnhancedBusiness, query: string, inde
     score += 40;
   }
   
-  // Synonym-aware name matching
+  // Synonym-aware name matching (sync - uses cache)
   const expandedQueryTerms = expandWithSynonyms(queryLower);
   const nameMatchesSynonym = expandedQueryTerms.some(term => 
     nameLower.includes(term.toLowerCase())

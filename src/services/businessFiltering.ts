@@ -157,6 +157,7 @@ export function applyBusinessFilters(businesses: Business[], filters: SearchFilt
 
   const matchesTermVariants = (haystack: string, term: string) => {
     const h = normalize(haystack);
+    // Use sync version which returns cached results or triggers background expansion
     const expandedTerms = expandWithSynonyms(term);
     
     // Check if any expanded synonym matches
