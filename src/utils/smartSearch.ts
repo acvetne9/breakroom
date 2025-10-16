@@ -200,3 +200,18 @@ export async function expandTerm(term: string): Promise<string[]> {
 
   return results;
 }
+
+/**
+ * Precompute common hospitality terms in background
+ */
+export async function precomputeCommonTerms(): Promise<void> {
+  const commonTerms = [
+    "waitress", "waiter", "server", "bartender", "barista", 
+    "cook", "chef", "host", "hostess", "busser", 
+    "dishwasher", "manager", "supervisor", "cashier"
+  ];
+  
+  for (const term of commonTerms) {
+    await expandTerm(term);
+  }
+}
