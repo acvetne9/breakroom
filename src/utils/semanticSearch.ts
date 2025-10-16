@@ -1,8 +1,5 @@
-declare module "synonyms" {
-  function synonyms(word: string): Record<string, string[]> | null;
-  export = synonyms;
-}
-
+// @ts-ignore: untyped CommonJS module
+import synonyms from "synonyms";
 import winkNLP from "wink-nlp";
 import model from "wink-eng-lite-web-model";
 
