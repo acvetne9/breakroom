@@ -1,18 +1,16 @@
 import winkNLP from "wink-nlp";
 import model from "wink-eng-lite-web-model";
 
-// Small local fallback synonym map (you can extend this)
-const LOCAL_SYNONYMS: Record<string, string[]> = {
-  job: ["work", "employment", "position", "occupation", "career"],
-  haircut: ["trim", "barber", "style", "cut"],
-  happy: ["joyful", "content", "cheerful", "glad"],
-  fast: ["quick", "rapid", "speedy", "swift"],
-};
-
-// ---- SYNONYM FUNCTION ----
-function getSynonyms(term: string): string[] {
-  const lower = term.toLowerCase().trim();
-  return LOCAL_SYNONYMS[lower] ?? [];
+async function getSynonyms(term: string): Promise<string[]> {
+  try {
+    const response = await fetch(`https://api.datamuse.com/words?ml=${encodeURIComponent(term)}`);
+    if (!response.ok) return [];
+    const data = await response.json();
+    // Map to just the word strings
+    return data.map((entry: { word: string }) => entry.word);
+  } catch {
+    return [];
+  }
 }
 
 // ---- wink-nlp setup ----
