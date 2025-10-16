@@ -136,8 +136,12 @@ export async function expandWithSemantics(
   syns.forEach((s) => expansions.add(s.toLowerCase()));
 
   if (commonTerms.length > 0) {
-    const similar = await findSimilarTerms(normalized, commonTerms, threshold);
-    similar.forEach(({ term }) => expansions.add(term.toLowerCase()));
+    for (const candidateTerm of commonTerms) {
+      const similarity = await calculateSimilarity(normalized, candidateTerm);
+      if (similarity >= threshold) {
+        expansions.add(candidateTerm.toLowerCase());
+      }
+    }
   }
 
   try {
@@ -164,6 +168,19 @@ export function clearSemanticCache() {
   // cache clearing logic
 }
 
-export async function findSimilarTerms(term: string): Promise<string[]> {
-  return [term, `${term}s`, `${term}ing`, `${term}ed`];
+export async function findSimilarTerms(
+  term: string,
+  candidates: string[] = [],
+  threshold: number = 0.65,
+): Promise<string[]> {
+  const results: string[] = [term];
+  
+  for (const candidate of candidates) {
+    const similarity = await calculateSimilarity(term, candidate);
+    if (similarity >= threshold) {
+      results.push(candidate);
+    }
+  }
+  
+  return results;
 }
