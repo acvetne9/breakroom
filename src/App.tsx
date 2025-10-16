@@ -5,13 +5,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DeviceProvider } from "./contexts/DeviceContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { useSemanticSearchInit } from "./hooks/useSemanticSearchInit";
+import { clearSearchCache } from "./services/unifiedSearch";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
 const App = () => {
-  // Initialize semantic search on app load
+  // Clear search cache and initialize semantic search on app load
+  clearSearchCache();
   useSemanticSearchInit();
   
   return (
