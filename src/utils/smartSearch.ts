@@ -152,49 +152,74 @@ export async function expandTerm(term: string): Promise<string[]> {
   const normalized = term.toLowerCase().trim();
   if (!normalized) return [];
 
+  // Check cache first
   if (isCacheValid(normalized)) {
     const cached = expansionCache.get(normalized);
-    if (cached) return cached.terms;
+    if (cached) {
+      console.log(`📦 Cache hit for term: ${normalized}`);
+      return cached.terms;
+    }
   }
 
+  // Always start with the original term
   const expansions = new Set<string>([normalized]);
 
-  // Lemmas and morphological variations
-  getWordVariations(normalized).forEach((v) => expansions.add(v));
-  getLemmas(normalized).forEach((v) => expansions.add(v));
+  try {
+    // Add morphological variations (plural/singular)
+    const variations = getWordVariations(normalized);
+    variations.forEach((v) => expansions.add(v));
 
-  // Use semantic similarity to find conceptually close words
-  // Instead of Datamuse, we use a local embedding-based search
-  const allCandidates = Array.from(expansions);
-  const semanticNeighbors = await getSemanticNeighbors(
-    normalized,
-    allCandidates.concat([
-      // add a general pool of context terms to help semantic comparison
-      "server",
-      "waiter",
-      "waitress",
-      "restaurant",
-      "kitchen",
-      "barista",
-      "bartender",
-      "nurse",
-      "teacher",
-      "engineer",
-      "developer",
-      "chef",
-      "cashier",
-    ]),
-  );
-  semanticNeighbors.forEach((v) => expansions.add(v));
+    // Add lemmatized forms
+    const lemmas = getLemmas(normalized);
+    lemmas.forEach((v) => expansions.add(v));
 
-  // Add fuzzy spell variants
-  const fuzzy = fuzzyMatch(normalized, Array.from(expansions));
-  fuzzy.forEach((v) => expansions.add(v));
+    // Try semantic expansion with timeout
+    try {
+      const semanticPromise = getSemanticNeighbors(
+        normalized,
+        Array.from(expansions).concat([
+          "server",
+          "waiter",
+          "waitress",
+          "restaurant",
+          "kitchen",
+          "barista",
+          "bartender",
+          "chef",
+          "cook",
+          "cashier",
+          "host",
+          "hostess",
+        ]),
+      );
+
+      // Add 2 second timeout for semantic search
+      const timeoutPromise = new Promise<string[]>((resolve) => 
+        setTimeout(() => resolve([]), 2000)
+      );
+
+      const semanticNeighbors = await Promise.race([semanticPromise, timeoutPromise]);
+      semanticNeighbors.forEach((v) => expansions.add(v));
+    } catch (e) {
+      console.warn("Semantic expansion failed:", e);
+    }
+
+    // Add fuzzy matches
+    const currentExpansions = Array.from(expansions);
+    const fuzzy = fuzzyMatch(normalized, currentExpansions);
+    fuzzy.forEach((v) => expansions.add(v));
+
+  } catch (error) {
+    console.warn(`Failed to expand term "${normalized}":`, error);
+  }
 
   const results = Array.from(expansions);
+  
+  // Cache results
   expansionCache.set(normalized, { terms: results, timestamp: Date.now() });
   saveCache();
 
+  console.log(`🔍 Expanded "${normalized}" to: ${results.join(', ')}`);
   return results;
 }
 
