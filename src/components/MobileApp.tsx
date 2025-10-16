@@ -13,6 +13,7 @@ const SettingsPage = React.lazy(() => import("./SettingsPage"));
 const ExplorePage = React.lazy(() => import("./ExplorePage"));
 
 import { useBusinessesData } from "../hooks/useBusinessesData";
+import { Business } from "@/types/business";
 
 interface UserData {
   salary: string;
@@ -51,6 +52,7 @@ const MobileApp: React.FC = () => {
   const [previouslySelectedBusiness, setPreviouslySelectedBusiness] = useState<any>(null);
   const [filteredBusinessId, setFilteredBusinessId] = useState<string | null>(null);
   const [filteredUserStories, setFilteredUserStories] = useState(false);
+  const [votingRoles, setVotingRoles] = useState<Set<string>>(new Set());
 
   const constraintsRef = useRef(null);
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
@@ -198,8 +200,12 @@ const MobileApp: React.FC = () => {
       return;
     }
 
-    // Check if we need to fetch full details
-    if (!business.atmosphere?.length && !business.roles?.length) {
+    // Check if we need full details: missing atmosphere, missing roles, OR roles without IDs
+    const needsFullDetails = !business.atmosphere?.length || 
+                             !business.roles?.length ||
+                             (business.roles && business.roles.length > 0 && !business.roles[0]?.id);
+
+    if (needsFullDetails) {
       const fullBusiness = await fetchFullBusinessDetails(business.id);
       if (fullBusiness) {
         setSelectedBusiness(fullBusiness);
@@ -336,79 +342,162 @@ const MobileApp: React.FC = () => {
   // Remove handlePostVote and handlePostDelete - now handled by ExplorePage directly
 
   const handleRoleVote = async (businessId: string, roleIndex: number, voteType: "up" | "down") => {
+    console.log('🗳️ MobileApp.handleRoleVote called:', { businessId, roleIndex, voteType });
+    
     // Find the role ID from the business
-    let business = businesses.find((b) => b.id === businessId);
+    // Check selectedBusiness first since that's what's being displayed
+    let business = selectedBusiness?.id === businessId 
+      ? selectedBusiness 
+      : businesses.find((b) => b.id === businessId);
+    
+    console.log('📍 Found business:', {
+      found: !!business,
+      hasRoles: !!business?.roles,
+      roleCount: business?.roles?.length,
+      targetRole: business?.roles?.[roleIndex],
+      hasRoleId: !!business?.roles?.[roleIndex]?.id
+    });
 
     // If business doesn't have role IDs, fetch full details first
+    // Defensive check - should not happen if handleBusinessClick works correctly
     if (!business?.roles?.[roleIndex]?.id) {
-      console.log("🔄 Role missing ID, fetching full business details...");
-      const fullBusiness = await fetchFullBusinessDetails(businessId);
-      if (fullBusiness?.roles?.[roleIndex]?.id) {
-        setBusinesses((prev) => prev.map((b) => (b.id === businessId ? fullBusiness : b)));
-        business = fullBusiness;
-      } else {
-        console.error("Role not found for voting after fetching full details");
-        return;
-      }
+      console.error("❌ Role missing ID - this should not happen!", { 
+        businessId, 
+        roleIndex,
+        business: business,
+        role: business?.roles?.[roleIndex]
+      });
+      alert('Unable to vote: Role data is incomplete. Please try closing and reopening the business details.');
+      return;
     }
 
     const roleId = business.roles[roleIndex].id;
+    console.log('✅ Role ID found:', roleId);
     const role = business.roles[roleIndex];
+    
+    // Mark role as voting
+    setVotingRoles(prev => new Set(prev).add(roleId));
 
-    // Import utilities
-    const { calculateVoteChange } = await import('@/utils/voteCalculations');
-    const { persistVote } = await import('@/services/voting');
+    try {
+      // Import utilities
+      const { calculateVoteChange } = await import('@/utils/voteCalculations');
+      const { persistVote } = await import('@/services/voting');
 
-    // Calculate new state optimistically
-    const { newUserVote, newTotal } = calculateVoteChange(
-      role.userVote,
-      voteType,
-      role.votesTotal
-    );
+      // Calculate new state optimistically
+      const { newUserVote, newTotal } = calculateVoteChange(
+        role.userVote,
+        voteType,
+        role.votesTotal
+      );
 
-    // Store previous state for rollback
-    const previousVotesTotal = role.votesTotal;
-    const previousUserVote = role.userVote;
+      // Store previous state for rollback
+      const previousVotesTotal = role.votesTotal;
+      const previousUserVote = role.userVote;
 
-    // Update UI immediately
-    setBusinesses((prev) =>
-      prev.map((b) => {
-        if (b.id === businessId && b.roles) {
-          return {
-            ...b,
-            roles: b.roles.map((r, idx) =>
-              idx === roleIndex
-                ? { ...r, votesTotal: newTotal, userVote: newUserVote }
-                : r
-            ),
-          };
-        }
-        return b;
-      })
-    );
+      // Update UI immediately - both businesses array and selectedBusiness
+      let updatedBusinessForSelection: Business | null = null;
 
-    // Persist in background
-    const dbVoteType = newUserVote === 'up' ? 'upvote' : newUserVote === 'down' ? 'downvote' : null;
-    const result = await persistVote('role_votes', 'business_role_id', roleId, dbVoteType);
-
-    if (!result.success) {
-      console.error("Failed to persist vote:", result.error);
-      // Rollback on error
       setBusinesses((prev) =>
         prev.map((b) => {
           if (b.id === businessId && b.roles) {
-            return {
+            const updatedBusiness = {
               ...b,
               roles: b.roles.map((r, idx) =>
                 idx === roleIndex
-                  ? { ...r, votesTotal: previousVotesTotal, userVote: previousUserVote }
+                  ? { ...r, votesTotal: newTotal, userVote: newUserVote }
                   : r
               ),
             };
+            
+            // Store for selectedBusiness update
+            if (selectedBusiness?.id === businessId) {
+              updatedBusinessForSelection = updatedBusiness;
+            }
+            
+            return updatedBusiness;
           }
           return b;
         })
       );
+
+      // Update selectedBusiness separately to avoid closure issues
+      if (updatedBusinessForSelection) {
+        setSelectedBusiness(updatedBusinessForSelection);
+      }
+
+      // Persist in background
+      const dbVoteType = newUserVote === 'up' ? 'upvote' : newUserVote === 'down' ? 'downvote' : null;
+      const result = await persistVote('role_votes', 'business_role_id', roleId, dbVoteType);
+
+      if (!result.success) {
+        console.error("❌ Failed to persist vote:", result.error);
+        alert('Vote failed to save. Please try again.');
+        // Rollback on error - both businesses array and selectedBusiness
+        let rolledBackBusinessForSelection: Business | null = null;
+
+        setBusinesses((prev) =>
+          prev.map((b) => {
+            if (b.id === businessId && b.roles) {
+              const rolledBackBusiness = {
+                ...b,
+                roles: b.roles.map((r, idx) =>
+                  idx === roleIndex
+                    ? { ...r, votesTotal: previousVotesTotal, userVote: previousUserVote }
+                    : r
+                ),
+              };
+              
+              // Store for selectedBusiness update
+              if (selectedBusiness?.id === businessId) {
+                rolledBackBusinessForSelection = rolledBackBusiness;
+              }
+              
+              return rolledBackBusiness;
+            }
+            return b;
+          })
+        );
+
+        // Update selectedBusiness separately to avoid closure issues
+        if (rolledBackBusinessForSelection) {
+          setSelectedBusiness(rolledBackBusinessForSelection);
+        }
+      } else {
+        console.log('✅ Vote persisted, syncing with database...');
+        
+        // Sync with database to get actual votes_total and userVote
+        try {
+          const refreshedBusiness = await fetchFullBusinessDetails(businessId);
+          
+          if (refreshedBusiness) {
+            // Update both businesses array and selectedBusiness with database values
+            setBusinesses((prev) =>
+              prev.map((b) => b.id === businessId ? refreshedBusiness : b)
+            );
+            
+            if (selectedBusiness?.id === businessId) {
+              setSelectedBusiness(refreshedBusiness);
+            }
+            
+            console.log('✅ Business synced with database:', {
+              roleIndex,
+              dbVotesTotal: refreshedBusiness.roles?.[roleIndex]?.votesTotal,
+              dbUserVote: refreshedBusiness.roles?.[roleIndex]?.userVote
+            });
+          }
+        } catch (syncError) {
+          console.warn('⚠️ Failed to sync with database after vote:', syncError);
+          // Don't rollback - the vote succeeded, we just couldn't refresh
+          // The optimistic value is close enough
+        }
+      }
+    } finally {
+      // Always clear the voting state
+      setVotingRoles(prev => {
+        const next = new Set(prev);
+        next.delete(roleId);
+        return next;
+      });
     }
   };
 
@@ -476,6 +565,7 @@ const MobileApp: React.FC = () => {
           }}
           onRoleVote={handleRoleVote}
           onLocationSave={handleLocationSave}
+          votingRoles={votingRoles}
         />
       </Suspense>
 

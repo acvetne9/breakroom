@@ -171,7 +171,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
         >
           <button
             onClick={handleUpvote}
-            className={`p-1.5 rounded-lg transition-all ${
+            className={`p-2 rounded-lg transition-all ${
               userVote === 'up'
                 ? 'bg-green-200 ring-1 ring-green-400'
                 : 'hover:bg-green-50'
@@ -203,7 +203,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
 
           <button
             onClick={handleDownvote}
-            className={`p-1.5 rounded-lg transition-all ${
+            className={`p-2 rounded-lg transition-all ${
               userVote === 'down'
                 ? 'bg-red-200 ring-1 ring-red-400'
                 : 'hover:bg-red-50'
@@ -229,7 +229,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
           <button
             ref={deleteButtonRef}
             onClick={handleDelete}
-            className="p-1.5 rounded-lg transition-all hover:bg-red-50"
+            className="p-2 rounded-lg transition-all hover:bg-red-50"
           >
             <span className="transition-all text-sm">🗑️</span>
           </button>
