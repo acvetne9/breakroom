@@ -85,6 +85,8 @@ export const parseUnifiedSearchFilters = async (searchQuery: string): Promise<Un
     .filter(term => term.length > 0)
     .map(term => term.toLowerCase());
   
+  console.log(`🔍 [parseSearchFilters] Original terms: ${textTerms.join(', ')}`);
+  
   // Expand text terms with synonyms - NOW ASYNC with API calls
   const expandedTermsArrays = await Promise.all(
     textTerms.map(term => expandTerm(term))
@@ -92,11 +94,13 @@ export const parseUnifiedSearchFilters = async (searchQuery: string): Promise<Un
   const expandedTextTerms = expandedTermsArrays.flat();
   const uniqueExpandedTerms = [...new Set(expandedTextTerms)];
   
+  console.log(`🔍 [parseSearchFilters] Expanded to: ${uniqueExpandedTerms.join(', ')}`);
+  
   const filters: UnifiedSearchFilters = { textTerms: uniqueExpandedTerms };
   
   if (salaryQuery) filters.salaryQuery = salaryQuery;
   
-  console.log('🔍 [parseSearchFilters] Final filters:', filters);
+  console.log('✅ [parseSearchFilters] Final filters:', filters);
   
   return filters;
 };
@@ -123,7 +127,7 @@ export const searchBusinessesUnified = async (
     
     // Universal search across ALL fields (name, type, address, roles)
     if (filters.textTerms && filters.textTerms.length > 0) {
-      console.log(`🔍 Starting universal search for terms: ${filters.textTerms.join(', ')}`);
+      console.log(`🔍 [searchBusinessesUnified] Starting universal search for ${filters.textTerms.length} expanded terms: ${filters.textTerms.join(', ')}`);
       
       // Build search conditions for ALL business fields
       const searchConditions: string[] = [];
@@ -132,6 +136,8 @@ export const searchBusinessesUnified = async (
         searchConditions.push(`business_type.ilike.%${term}%`);
         searchConditions.push(`address.ilike.%${term}%`);
       });
+      
+      console.log(`🔍 [searchBusinessesUnified] SQL conditions: ${searchConditions.join(' OR ')}`);
       
       // QUERY 1: Search businesses table (name, type, address) in parallel
       const businessSearchPromise = (async () => {
@@ -165,6 +171,8 @@ export const searchBusinessesUnified = async (
         const roleConditions = filters.textTerms.map(term => 
           `role.ilike.%${term}%`
         ).join(',');
+        
+        console.log(`🔍 [searchBusinessesUnified] Role SQL conditions: ${roleConditions}`);
         
         const { data: matchingRoles, error } = await supabase
           .from('business_roles')

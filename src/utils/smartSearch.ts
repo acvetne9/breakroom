@@ -37,9 +37,12 @@ function ensureWinkNLP() {
 
 // -------------------- Cache Management --------------------
 
+const CACHE_VERSION = "v2"; // Increment to invalidate old caches
+
 interface CacheEntry {
   terms: string[];
   timestamp: number;
+  version: string;
 }
 
 const expansionCache = new Map<string, CacheEntry>();
@@ -51,12 +54,29 @@ function loadCache() {
     const stored = localStorage.getItem(CACHE_KEY);
     if (stored) {
       const data = JSON.parse(stored);
+      let validEntries = 0;
+      let invalidEntries = 0;
+      
       Object.entries(data).forEach(([key, value]: [string, any]) => {
-        expansionCache.set(key, value as CacheEntry);
+        const entry = value as CacheEntry;
+        // Only load entries with current version
+        if (entry.version === CACHE_VERSION) {
+          expansionCache.set(key, entry);
+          validEntries++;
+        } else {
+          invalidEntries++;
+        }
       });
+      
+      if (invalidEntries > 0) {
+        console.log(`🧹 Cleared ${invalidEntries} outdated cache entries (kept ${validEntries})`);
+        saveCache(); // Save cleaned cache
+      }
     }
   } catch (e) {
     console.warn("Failed to load search cache:", e);
+    // Clear corrupted cache
+    localStorage.removeItem(CACHE_KEY);
   }
 }
 
@@ -75,6 +95,7 @@ function saveCache() {
 function isCacheValid(term: string): boolean {
   const entry = expansionCache.get(term);
   if (!entry) return false;
+  if (entry.version !== CACHE_VERSION) return false;
   return Date.now() - entry.timestamp < CACHE_DURATION;
 }
 
@@ -152,14 +173,18 @@ export async function expandTerm(term: string): Promise<string[]> {
   const normalized = term.toLowerCase().trim();
   if (!normalized) return [];
 
+  console.log(`🔍 [expandTerm] Expanding: "${normalized}"`);
+
   // Check cache first
   if (isCacheValid(normalized)) {
     const cached = expansionCache.get(normalized);
     if (cached) {
-      console.log(`📦 Cache hit for term: ${normalized}`);
+      console.log(`📦 [expandTerm] Cache hit for "${normalized}": ${cached.terms.join(', ')}`);
       return cached.terms;
     }
   }
+
+  console.log(`🆕 [expandTerm] No cache for "${normalized}", computing expansions...`);
 
   // Always start with the original term
   const expansions = new Set<string>([normalized]);
@@ -175,6 +200,7 @@ export async function expandTerm(term: string): Promise<string[]> {
 
     // Try semantic expansion with timeout
     try {
+      console.log(`🧠 [expandTerm] Starting semantic expansion for "${normalized}"...`);
       const semanticPromise = getSemanticNeighbors(
         normalized,
         Array.from(expansions).concat([
@@ -193,15 +219,23 @@ export async function expandTerm(term: string): Promise<string[]> {
         ]),
       );
 
-      // Add 2 second timeout for semantic search
+      // Add 5 second timeout for semantic search (increased from 2s)
       const timeoutPromise = new Promise<string[]>((resolve) => 
-        setTimeout(() => resolve([]), 2000)
+        setTimeout(() => {
+          console.log(`⏱️ [expandTerm] Semantic expansion timed out for "${normalized}"`);
+          resolve([]);
+        }, 5000)
       );
 
       const semanticNeighbors = await Promise.race([semanticPromise, timeoutPromise]);
-      semanticNeighbors.forEach((v) => expansions.add(v));
+      if (semanticNeighbors.length > 0) {
+        console.log(`✅ [expandTerm] Semantic expansion found: ${semanticNeighbors.join(', ')}`);
+        semanticNeighbors.forEach((v) => expansions.add(v));
+      } else {
+        console.log(`⚠️ [expandTerm] No semantic neighbors found for "${normalized}"`);
+      }
     } catch (e) {
-      console.warn("Semantic expansion failed:", e);
+      console.warn(`❌ [expandTerm] Semantic expansion failed for "${normalized}":`, e);
     }
 
     // Add fuzzy matches
@@ -215,11 +249,15 @@ export async function expandTerm(term: string): Promise<string[]> {
 
   const results = Array.from(expansions);
   
-  // Cache results
-  expansionCache.set(normalized, { terms: results, timestamp: Date.now() });
+  // Cache results with version
+  expansionCache.set(normalized, { 
+    terms: results, 
+    timestamp: Date.now(),
+    version: CACHE_VERSION 
+  });
   saveCache();
 
-  console.log(`🔍 Expanded "${normalized}" to: ${results.join(', ')}`);
+  console.log(`✅ [expandTerm] Expanded "${normalized}" to: ${results.join(', ')}`);
   return results;
 }
 
