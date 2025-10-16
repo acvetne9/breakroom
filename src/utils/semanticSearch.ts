@@ -155,3 +155,15 @@ export async function expandWithSemantics(
   cacheTimestamps.set(cacheKey, Date.now());
   return results;
 }
+
+export async function preloadSemanticSearch() {
+  // initialization logic
+}
+
+export function clearSemanticCache() {
+  // cache clearing logic
+}
+
+export async function findSimilarTerms(term: string): Promise<string[]> {
+  return [term, `${term}s`, `${term}ing`, `${term}ed`];
+}
