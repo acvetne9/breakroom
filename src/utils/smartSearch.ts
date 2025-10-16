@@ -2,7 +2,7 @@ import nlp from "compromise";
 import winkNLP from "wink-nlp";
 import model from "wink-eng-lite-web-model";
 import Fuse from "fuse.js";
-import { pipeline } from "@xenova/transformers"; // 🧠 NEW
+import { pipeline } from "@xenova/transformers";
 
 // Initialize wink-nlp
 let winkInstance: any = null;
