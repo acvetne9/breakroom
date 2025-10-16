@@ -1,19 +1,7 @@
 import winkNLP from "wink-nlp";
 import model from "wink-eng-lite-web-model";
 
-async function getSynonyms(term: string): Promise<string[]> {
-  try {
-    const response = await fetch(`https://api.datamuse.com/words?ml=${encodeURIComponent(term)}`);
-    if (!response.ok) return [];
-    const data = await response.json();
-    // Map to just the word strings
-    return data.map((entry: { word: string }) => entry.word);
-  } catch {
-    return [];
-  }
-}
-
-// ---- wink-nlp setup ----
+// Initialize wink-nlp with web model (lazy loaded)
 let nlp: any = null;
 let isInitialized = false;
 let initializationPromise: Promise<void> | null = null;
@@ -23,6 +11,15 @@ const similarityCache = new Map<string, Map<string, number>>();
 const termExpansionCache = new Map<string, string[]>();
 const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 const cacheTimestamps = new Map<string, number>();
+
+// Local fallback synonyms
+const LOCAL_SYNONYMS: Record<string, string[]> = {
+  job: ["work", "employment", "position", "occupation", "career"],
+  haircut: ["trim", "barber", "style", "cut"],
+  waitress: ["server", "waiter", "attendant", "hostess"],
+  happy: ["joyful", "content", "cheerful", "glad"],
+  fast: ["quick", "rapid", "speedy", "swift"],
+};
 
 async function initializeNLP(): Promise<void> {
   if (isInitialized) return;
@@ -43,7 +40,23 @@ async function initializeNLP(): Promise<void> {
 }
 
 /**
- * Lexical similarity (simple character-level Jaccard)
+ * Get synonyms dynamically via Datamuse API, with local fallback.
+ */
+async function getSynonyms(term: string): Promise<string[]> {
+  const local = LOCAL_SYNONYMS[term.toLowerCase()];
+  try {
+    const res = await fetch(`https://api.datamuse.com/words?ml=${encodeURIComponent(term)}`);
+    if (!res.ok) return local || [];
+    const data = await res.json();
+    const words = data.map((entry: { word: string }) => entry.word);
+    return Array.from(new Set([...(local || []), ...words]));
+  } catch {
+    return local || [];
+  }
+}
+
+/**
+ * Lexical (character-level) similarity
  */
 function lexicalSimilarity(a: string, b: string): number {
   a = a.toLowerCase();
@@ -66,7 +79,6 @@ export async function calculateSimilarity(term1: string, term2: string): Promise
   const normalized1 = term1.toLowerCase().trim();
   const normalized2 = term2.toLowerCase().trim();
 
-  // Cache check
   if (similarityCache.has(normalized1)) {
     const term1Cache = similarityCache.get(normalized1)!;
     if (term1Cache.has(normalized2)) {
@@ -74,49 +86,27 @@ export async function calculateSimilarity(term1: string, term2: string): Promise
     }
   }
 
-  if (normalized1 === normalized2) return 1.0;
+  if (normalized1 === normalized2) {
+    return 1.0;
+  }
 
-  // Compute lexical similarity
   let similarity = lexicalSimilarity(normalized1, normalized2);
 
-  // Synonym overlap
-  const syn1 = new Set(getSynonyms(normalized1));
-  const syn2 = new Set(getSynonyms(normalized2));
+  // ✅ Await async synonym lookup
+  const syn1 = new Set(await getSynonyms(normalized1));
+  const syn2 = new Set(await getSynonyms(normalized2));
+
   const overlap = [...syn1].filter((x) => syn2.has(x));
   if (overlap.length > 0) {
     similarity = Math.max(similarity, 0.9);
   }
 
-  // Cache
   if (!similarityCache.has(normalized1)) {
     similarityCache.set(normalized1, new Map());
   }
   similarityCache.get(normalized1)!.set(normalized2, similarity);
 
   return similarity;
-}
-
-/**
- * Find semantically similar terms from a list of candidates
- */
-export async function findSimilarTerms(
-  term: string,
-  candidates: string[],
-  threshold: number = 0.6,
-): Promise<Array<{ term: string; similarity: number }>> {
-  await initializeNLP();
-
-  const results: Array<{ term: string; similarity: number }> = [];
-
-  for (const candidate of candidates) {
-    const similarity = await calculateSimilarity(term, candidate);
-    if (similarity >= threshold) {
-      results.push({ term: candidate, similarity });
-    }
-  }
-
-  results.sort((a, b) => b.similarity - a.similarity);
-  return results;
 }
 
 /**
@@ -141,17 +131,15 @@ export async function expandWithSemantics(
 
   const expansions = new Set<string>([normalized]);
 
-  // Add synonyms
-  const syns = getSynonyms(normalized);
+  // ✅ Await async synonyms
+  const syns = await getSynonyms(normalized);
   syns.forEach((s) => expansions.add(s.toLowerCase()));
 
-  // Check similar common terms
   if (commonTerms.length > 0) {
     const similar = await findSimilarTerms(normalized, commonTerms, threshold);
     similar.forEach(({ term }) => expansions.add(term.toLowerCase()));
   }
 
-  // Lemmas from wink-nlp
   try {
     const doc = nlp.readDoc(normalized);
     doc.tokens().each((token: any) => {
@@ -166,18 +154,4 @@ export async function expandWithSemantics(
   termExpansionCache.set(cacheKey, results);
   cacheTimestamps.set(cacheKey, Date.now());
   return results;
-}
-
-export function isSemanticSearchReady(): boolean {
-  return isInitialized;
-}
-
-export async function preloadSemanticSearch(): Promise<void> {
-  await initializeNLP();
-}
-
-export function clearSemanticCache(): void {
-  similarityCache.clear();
-  termExpansionCache.clear();
-  cacheTimestamps.clear();
 }
