@@ -210,18 +210,18 @@ export async function expandWithSynonyms(term: string): Promise<string[]> {
 export function expandWithSynonymsSync(term: string): string[] {
   const normalized = term.toLowerCase().trim();
 
-  // Check cache first
+  // Check cache first - return immediately if cached
   if (isCacheValid(normalized) && synonymCache.has(normalized)) {
     return synonymCache.get(normalized)!;
   }
 
   const allSynonyms = new Set<string>([normalized]);
 
-  // Get hospitality slang/abbreviations
+  // Get hospitality slang/abbreviations (instant)
   const hospitalityResults = getHospitalitySynonyms(normalized);
   hospitalityResults.forEach((syn) => allSynonyms.add(syn.toLowerCase()));
 
-  // Get word variations
+  // Get word variations (instant)
   const variations = getWordVariations(normalized);
   variations.forEach((variant) => {
     allSynonyms.add(variant.toLowerCase());
@@ -229,10 +229,15 @@ export function expandWithSynonymsSync(term: string): string[] {
     variantSynonyms.forEach((syn) => allSynonyms.add(syn.toLowerCase()));
   });
 
-  // Trigger async semantic expansion in background
+  const results = Array.from(allSynonyms);
+  
+  // Cache the basic results immediately
+  synonymCache.set(normalized, results);
+  
+  // Trigger async semantic expansion in background to update cache
   expandWithSynonyms(term).catch(() => {});
 
-  return Array.from(allSynonyms);
+  return results;
 }
 
 /**

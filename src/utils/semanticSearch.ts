@@ -40,6 +40,33 @@ async function initializeNLP(): Promise<void> {
 }
 
 /**
+ * Get synonyms from Datamuse API with local fallback
+ */
+async function getSynonymsFromAPI(term: string): Promise<string[]> {
+  const local = LOCAL_SYNONYMS[term.toLowerCase()] || [];
+  
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
+    
+    const res = await fetch(
+      `https://api.datamuse.com/words?ml=${encodeURIComponent(term)}&max=10`,
+      { signal: controller.signal }
+    );
+    clearTimeout(timeoutId);
+    
+    if (!res.ok) return local;
+    
+    const data = await res.json();
+    const apiWords = data.slice(0, 10).map((entry: { word: string }) => entry.word);
+    return Array.from(new Set([...local, ...apiWords]));
+  } catch (error) {
+    // Timeout or network error - return local only
+    return local;
+  }
+}
+
+/**
  * Get synonyms from local fallback only (no external API calls)
  */
 function getLocalSynonyms(term: string): string[] {
@@ -83,9 +110,9 @@ export async function calculateSimilarity(term1: string, term2: string): Promise
 
   let similarity = lexicalSimilarity(normalized1, normalized2);
 
-  // Check local synonyms for quick boost
-  const syn1 = new Set(getLocalSynonyms(normalized1));
-  const syn2 = new Set(getLocalSynonyms(normalized2));
+  // Get synonyms from API (with timeout)
+  const syn1 = new Set(await getSynonymsFromAPI(normalized1));
+  const syn2 = new Set(await getSynonymsFromAPI(normalized2));
 
   const overlap = [...syn1].filter((x) => syn2.has(x));
   if (overlap.length > 0) {
@@ -122,8 +149,8 @@ export async function expandWithSemantics(
 
   const expansions = new Set<string>([normalized]);
 
-  // Add local synonyms
-  const syns = getLocalSynonyms(normalized);
+  // Get API synonyms (with fast timeout)
+  const syns = await getSynonymsFromAPI(normalized);
   syns.forEach((s) => expansions.add(s.toLowerCase()));
 
   if (commonTerms.length > 0) {
