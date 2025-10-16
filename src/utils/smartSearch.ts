@@ -166,11 +166,56 @@ export async function expandTerm(term: string): Promise<string[]> {
   // Use semantic similarity to find conceptually close words
   // Instead of Datamuse, we use a local embedding-based search
   const allCandidates = Array.from(expansions);
-  const semanticNeighbors = await getSemanticNeighbors(normalized, allCandidates.concat([
-    // add a general pool of context terms to help semantic comparison
-    "server", "waiter", "waitress", "restaurant", "kitchen", "barista", "bartender",
-    "nurse", "teacher", "engineer", "developer", "chef", "cashier"
-  ]));
+  const semanticNeighbors = await getSemanticNeighbors(
+    normalized,
+    allCandidates.concat([
+      // add a general pool of context terms to help semantic comparison
+      "server",
+      "waiter",
+      "waitress",
+      "restaurant",
+      "kitchen",
+      "barista",
+      "bartender",
+      "nurse",
+      "teacher",
+      "engineer",
+      "developer",
+      "chef",
+      "cashier",
+    ]),
+  );
   semanticNeighbors.forEach((v) => expansions.add(v));
 
-  // Add fuzzy spell var
+  // Add fuzzy spell variants
+  const fuzzy = fuzzyMatch(normalized, Array.from(expansions));
+  fuzzy.forEach((v) => expansions.add(v));
+
+  const results = Array.from(expansions);
+  expansionCache.set(normalized, { terms: results, timestamp: Date.now() });
+  saveCache();
+
+  return results;
+}
+
+// -------------------- Optional Precomputation --------------------
+
+export async function precomputeCommonTerms(): Promise<void> {
+  const commonTerms = [
+    "waitress",
+    "waiter",
+    "server",
+    "bartender",
+    "barista",
+    "cook",
+    "chef",
+    "host",
+    "hostess",
+    "busser",
+    "dishwasher",
+    "manager",
+    "supervisor",
+    "cashier",
+  ];
+  for (const term of commonTerms) await expandTerm(term);
+}
