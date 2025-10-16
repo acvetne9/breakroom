@@ -1,10 +1,10 @@
-import nlp from 'compromise';
-import { 
+import nlp from "compromise";
+import {
   expandWithSynonymsSync,
   expandQueryWithSynonymsSync,
   areSynonymsSync,
-  precomputeCommonTerms
-} from './synonymService';
+  precomputeCommonTerms,
+} from "./synonymService";
 
 // Re-export the synchronous versions for immediate use
 export { expandWithSynonymsSync as expandWithSynonyms };
@@ -21,11 +21,11 @@ precomputeCommonTerms();
 export function expandWithSynonymsLegacy(term: string): string[] {
   const normalized = term.toLowerCase().trim();
   const allTerms = new Set<string>([normalized]);
-  
+
   // Get synonyms from new service (sync version)
   const synonyms = expandWithSynonymsSync(term);
-  synonyms.forEach(syn => allTerms.add(syn));
-  
+  synonyms.forEach((syn) => allTerms.add(syn));
+
   // Handle plurals/singulars with Compromise
   try {
     const doc = nlp(normalized);
@@ -36,6 +36,6 @@ export function expandWithSynonymsLegacy(term: string): string[] {
   } catch (e) {
     // Silent fail for NLP processing errors
   }
-  
+
   return Array.from(allTerms);
 }
