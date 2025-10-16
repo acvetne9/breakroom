@@ -4,11 +4,10 @@ import model from "wink-eng-lite-web-model";
 import Fuse from "fuse.js";
 import { pipeline } from "@xenova/transformers";
 
-// Initialize wink-nlp
+// -------------------- Initialization --------------------
+
 let winkInstance: any = null;
 let winkInitialized = false;
-
-// Initialize transformer model
 let embedder: any = null;
 let embedderReady = false;
 
@@ -36,9 +35,8 @@ function ensureWinkNLP() {
   return winkInstance;
 }
 
-/**
- * Cache management
- */
+// -------------------- Cache Management --------------------
+
 interface CacheEntry {
   terms: string[];
   timestamp: number;
@@ -80,39 +78,17 @@ function isCacheValid(term: string): boolean {
   return Date.now() - entry.timestamp < CACHE_DURATION;
 }
 
-// Initialize cache
 loadCache();
 
-/**
- * Fetch synonyms from Datamuse (if online)
- */
-async function fetchDatamuseSynonyms(term: string, timeoutMs: number = 2000): Promise<string[]> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-    const res = await fetch(`https://api.datamuse.com/words?ml=${encodeURIComponent(term)}&max=20`, {
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.map((entry: { word: string }) => entry.word.toLowerCase());
-  } catch {
-    return [];
-  }
-}
+// -------------------- Helpers --------------------
 
-/**
- * Fuzzy match helper
- */
+// Fuzzy search to catch misspellings and small variations
 function fuzzyMatch(term: string, candidates: string[]): string[] {
   const fuse = new Fuse(candidates, { includeScore: true, threshold: 0.4 });
   return fuse.search(term).map((r) => r.item);
 }
 
-/**
- * Get semantic neighbors using embeddings
- */
+// Compute semantic similarity using embeddings
 async function getSemanticNeighbors(term: string, candidates: string[]): Promise<string[]> {
   const model = await ensureEmbedder();
   if (!model) return [];
@@ -129,12 +105,12 @@ async function getSemanticNeighbors(term: string, candidates: string[]): Promise
 
   const scores = candidates.map((c, i) => ({ term: c, score: cosine(queryVec, candidateVecs[i]) }));
   scores.sort((a, b) => b.score - a.score);
-  return scores.filter((s) => s.score > 0.55).map((s) => s.term);
+
+  // return the most semantically similar ones
+  return scores.filter((s) => s.score > 0.6).map((s) => s.term);
 }
 
-/**
- * Get word variations and lemmas
- */
+// Get plural/singular variants
 function getWordVariations(term: string): string[] {
   const variations = new Set<string>();
   try {
@@ -147,6 +123,7 @@ function getWordVariations(term: string): string[] {
   return Array.from(variations);
 }
 
+// Get lemmatized forms (verb/noun base forms)
 function getLemmas(term: string): string[] {
   const wink = ensureWinkNLP();
   if (!wink) return [];
@@ -163,11 +140,17 @@ function getLemmas(term: string): string[] {
   }
 }
 
+// -------------------- Main Expansion --------------------
+
 /**
- * 🔍 Main: Expand a term semantically, fuzzily, and morphologically
+ * Expand a search term:
+ * - Handles fuzzy matching (misspellings)
+ * - Expands to lemmas/plurals
+ * - Finds semantically similar words (locally)
  */
 export async function expandTerm(term: string): Promise<string[]> {
   const normalized = term.toLowerCase().trim();
+  if (!normalized) return [];
 
   if (isCacheValid(normalized)) {
     const cached = expansionCache.get(normalized);
@@ -176,42 +159,18 @@ export async function expandTerm(term: string): Promise<string[]> {
 
   const expansions = new Set<string>([normalized]);
 
-  // 1️⃣ Datamuse synonyms
-  const apiResults = await fetchDatamuseSynonyms(normalized);
-  apiResults.forEach((r) => expansions.add(r));
-
-  // 2️⃣ NLP variations + lemmas
+  // Lemmas and morphological variations
   getWordVariations(normalized).forEach((v) => expansions.add(v));
   getLemmas(normalized).forEach((v) => expansions.add(v));
 
-  // 3️⃣ Semantic similarity (local embeddings)
+  // Use semantic similarity to find conceptually close words
+  // Instead of Datamuse, we use a local embedding-based search
   const allCandidates = Array.from(expansions);
-  const semanticNeighbors = await getSemanticNeighbors(normalized, allCandidates);
+  const semanticNeighbors = await getSemanticNeighbors(normalized, allCandidates.concat([
+    // add a general pool of context terms to help semantic comparison
+    "server", "waiter", "waitress", "restaurant", "kitchen", "barista", "bartender",
+    "nurse", "teacher", "engineer", "developer", "chef", "cashier"
+  ]));
   semanticNeighbors.forEach((v) => expansions.add(v));
 
-  // 4️⃣ Fuzzy expansion
-  const fuzzy = fuzzyMatch(normalized, Array.from(expansions));
-  fuzzy.forEach((v) => expansions.add(v));
-
-  // 5️⃣ Cache
-  const results = Array.from(expansions);
-  expansionCache.set(normalized, { terms: results, timestamp: Date.now() });
-  saveCache();
-
-  return results;
-}
-
-/**
- * Precompute common hospitality terms in background
- */
-export async function precomputeCommonTerms(): Promise<void> {
-  const commonTerms = [
-    "waitress", "waiter", "server", "bartender", "barista", 
-    "cook", "chef", "host", "hostess", "busser", 
-    "dishwasher", "manager", "supervisor", "cashier"
-  ];
-  
-  for (const term of commonTerms) {
-    await expandTerm(term);
-  }
-}
+  // Add fuzzy spell var
