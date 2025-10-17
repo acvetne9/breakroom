@@ -1,284 +1,62 @@
-import nlp from "compromise";
-import winkNLP from "wink-nlp";
-import model from "wink-eng-lite-web-model";
-import Fuse from "fuse.js";
-import { pipeline } from "@xenova/transformers";
+import natural from "natural";
+import { distance as levenshtein } from "fastest-levenshtein";
 
-// -------------------- Initialization --------------------
+const tokenizer = new natural.WordTokenizer();
 
-let winkInstance: any = null;
-let winkInitialized = false;
-let embedder: any = null;
-let embedderReady = false;
+// Simple fuzzy + semantic similarity measure
+function similarity(a: string, b: string): number {
+  a = a.toLowerCase();
+  b = b.toLowerCase();
 
-async function ensureEmbedder() {
-  if (!embedderReady) {
-    try {
-      embedder = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
-      embedderReady = true;
-    } catch (e) {
-      console.warn("Failed to initialize transformer embedder:", e);
+  if (a === b) return 1;
+
+  const levSim = 1 - levenshtein(a, b) / Math.max(a.length, b.length);
+  const soundexA = natural.SoundEx.process(a);
+  const soundexB = natural.SoundEx.process(b);
+  const soundexSim = soundexA === soundexB ? 0.8 : 0;
+
+  return Math.max(levSim, soundexSim);
+}
+
+// Break phrases into word vectors and compare averaged similarity
+export function multiWordSimilarity(termA: string, termB: string): number {
+  const tokensA = tokenizer.tokenize(termA);
+  const tokensB = tokenizer.tokenize(termB);
+
+  if (!tokensA.length || !tokensB.length) return 0;
+
+  let total = 0;
+  let count = 0;
+
+  for (const wordA of tokensA) {
+    let best = 0;
+    for (const wordB of tokensB) {
+      best = Math.max(best, similarity(wordA, wordB));
     }
-  }
-  return embedder;
-}
-
-function ensureWinkNLP() {
-  if (!winkInitialized) {
-    try {
-      winkInstance = winkNLP(model);
-      winkInitialized = true;
-    } catch (e) {
-      console.warn("Failed to initialize wink-nlp:", e);
-    }
-  }
-  return winkInstance;
-}
-
-// -------------------- Cache Management --------------------
-
-const CACHE_VERSION = "v2"; // Increment to invalidate old caches
-
-interface CacheEntry {
-  terms: string[];
-  timestamp: number;
-  version: string;
-}
-
-const expansionCache = new Map<string, CacheEntry>();
-const CACHE_KEY = "smartSearchCache";
-const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-
-function loadCache() {
-  try {
-    const stored = localStorage.getItem(CACHE_KEY);
-    if (stored) {
-      const data = JSON.parse(stored);
-      let validEntries = 0;
-      let invalidEntries = 0;
-      
-      Object.entries(data).forEach(([key, value]: [string, any]) => {
-        const entry = value as CacheEntry;
-        // Only load entries with current version
-        if (entry.version === CACHE_VERSION) {
-          expansionCache.set(key, entry);
-          validEntries++;
-        } else {
-          invalidEntries++;
-        }
-      });
-      
-      if (invalidEntries > 0) {
-        console.log(`🧹 Cleared ${invalidEntries} outdated cache entries (kept ${validEntries})`);
-        saveCache(); // Save cleaned cache
-      }
-    }
-  } catch (e) {
-    console.warn("Failed to load search cache:", e);
-    // Clear corrupted cache
-    localStorage.removeItem(CACHE_KEY);
-  }
-}
-
-function saveCache() {
-  try {
-    const data: Record<string, CacheEntry> = {};
-    expansionCache.forEach((value, key) => {
-      data[key] = value;
-    });
-    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
-  } catch (e) {
-    console.warn("Failed to save search cache:", e);
-  }
-}
-
-function isCacheValid(term: string): boolean {
-  const entry = expansionCache.get(term);
-  if (!entry) return false;
-  if (entry.version !== CACHE_VERSION) return false;
-  return Date.now() - entry.timestamp < CACHE_DURATION;
-}
-
-loadCache();
-
-// -------------------- Helpers --------------------
-
-// Fuzzy search to catch misspellings and small variations
-function fuzzyMatch(term: string, candidates: string[]): string[] {
-  const fuse = new Fuse(candidates, { includeScore: true, threshold: 0.4 });
-  return fuse.search(term).map((r) => r.item);
-}
-
-// Compute semantic similarity using embeddings
-async function getSemanticNeighbors(term: string, candidates: string[]): Promise<string[]> {
-  const model = await ensureEmbedder();
-  if (!model) return [];
-
-  const queryVec = (await model(term)).data[0];
-  const candidateVecs = await Promise.all(candidates.map(async (c) => (await model(c)).data[0]));
-
-  function cosine(a: number[], b: number[]) {
-    const dot = a.reduce((sum, v, i) => sum + v * b[i], 0);
-    const normA = Math.sqrt(a.reduce((sum, v) => sum + v ** 2, 0));
-    const normB = Math.sqrt(b.reduce((sum, v) => sum + v ** 2, 0));
-    return dot / (normA * normB);
+    total += best;
+    count++;
   }
 
-  const scores = candidates.map((c, i) => ({ term: c, score: cosine(queryVec, candidateVecs[i]) }));
-  scores.sort((a, b) => b.score - a.score);
-
-  // return the most semantically similar ones
-  return scores.filter((s) => s.score > 0.6).map((s) => s.term);
+  return total / count;
 }
-
-// Get plural/singular variants
-function getWordVariations(term: string): string[] {
-  const variations = new Set<string>();
-  try {
-    const doc = nlp(term);
-    const singular = doc.nouns().toSingular().text();
-    const plural = doc.nouns().toPlural().text();
-    if (singular && singular !== term) variations.add(singular);
-    if (plural && plural !== term) variations.add(plural);
-  } catch {}
-  return Array.from(variations);
-}
-
-// Get lemmatized forms (verb/noun base forms)
-function getLemmas(term: string): string[] {
-  const wink = ensureWinkNLP();
-  if (!wink) return [];
-  try {
-    const doc = wink.readDoc(term);
-    const lemmas = new Set<string>();
-    doc.tokens().each((token: any) => {
-      const lemma = token.out(wink.its.lemma);
-      if (lemma && lemma !== term) lemmas.add(lemma.toLowerCase());
-    });
-    return Array.from(lemmas);
-  } catch {
-    return [];
-  }
-}
-
-// -------------------- Main Expansion --------------------
 
 /**
- * Expand a search term:
- * - Handles fuzzy matching (misspellings)
- * - Expands to lemmas/plurals
- * - Finds semantically similar words (locally)
+ * Finds terms from a list that are semantically or fuzzily similar.
+ * @param query - The search input (e.g., "waitress")
+ * @param terms - The list of terms to compare against
+ * @param threshold - How similar a term must be to count (0–1)
  */
-export async function expandTerm(term: string): Promise<string[]> {
-  const normalized = term.toLowerCase().trim();
-  if (!normalized) return [];
+export function findSimilarTerms(query: string, terms: string[], threshold = 0.6): string[] {
+  if (!query.trim()) return [];
 
-  console.log(`🔍 [expandTerm] Expanding: "${normalized}"`);
+  const results = terms
+    .map((term) => ({
+      term,
+      score: multiWordSimilarity(query, term),
+    }))
+    .filter((t) => t.score >= threshold)
+    .sort((a, b) => b.score - a.score)
+    .map((t) => t.term);
 
-  // Check cache first
-  if (isCacheValid(normalized)) {
-    const cached = expansionCache.get(normalized);
-    if (cached) {
-      console.log(`📦 [expandTerm] Cache hit for "${normalized}": ${cached.terms.join(', ')}`);
-      return cached.terms;
-    }
-  }
-
-  console.log(`🆕 [expandTerm] No cache for "${normalized}", computing expansions...`);
-
-  // Always start with the original term
-  const expansions = new Set<string>([normalized]);
-
-  try {
-    // Add morphological variations (plural/singular)
-    const variations = getWordVariations(normalized);
-    variations.forEach((v) => expansions.add(v));
-
-    // Add lemmatized forms
-    const lemmas = getLemmas(normalized);
-    lemmas.forEach((v) => expansions.add(v));
-
-    // Try semantic expansion with timeout
-    try {
-      console.log(`🧠 [expandTerm] Starting semantic expansion for "${normalized}"...`);
-      const semanticPromise = getSemanticNeighbors(
-        normalized,
-        Array.from(expansions).concat([
-          "server",
-          "waiter",
-          "waitress",
-          "restaurant",
-          "kitchen",
-          "barista",
-          "bartender",
-          "chef",
-          "cook",
-          "cashier",
-          "host",
-          "hostess",
-        ]),
-      );
-
-      // Add 5 second timeout for semantic search (increased from 2s)
-      const timeoutPromise = new Promise<string[]>((resolve) => 
-        setTimeout(() => {
-          console.log(`⏱️ [expandTerm] Semantic expansion timed out for "${normalized}"`);
-          resolve([]);
-        }, 5000)
-      );
-
-      const semanticNeighbors = await Promise.race([semanticPromise, timeoutPromise]);
-      if (semanticNeighbors.length > 0) {
-        console.log(`✅ [expandTerm] Semantic expansion found: ${semanticNeighbors.join(', ')}`);
-        semanticNeighbors.forEach((v) => expansions.add(v));
-      } else {
-        console.log(`⚠️ [expandTerm] No semantic neighbors found for "${normalized}"`);
-      }
-    } catch (e) {
-      console.warn(`❌ [expandTerm] Semantic expansion failed for "${normalized}":`, e);
-    }
-
-    // Add fuzzy matches
-    const currentExpansions = Array.from(expansions);
-    const fuzzy = fuzzyMatch(normalized, currentExpansions);
-    fuzzy.forEach((v) => expansions.add(v));
-
-  } catch (error) {
-    console.warn(`Failed to expand term "${normalized}":`, error);
-  }
-
-  const results = Array.from(expansions);
-  
-  // Cache results with version
-  expansionCache.set(normalized, { 
-    terms: results, 
-    timestamp: Date.now(),
-    version: CACHE_VERSION 
-  });
-  saveCache();
-
-  console.log(`✅ [expandTerm] Expanded "${normalized}" to: ${results.join(', ')}`);
   return results;
-}
-
-// -------------------- Optional Precomputation --------------------
-
-export async function precomputeCommonTerms(): Promise<void> {
-  const commonTerms = [
-    "waitress",
-    "waiter",
-    "server",
-    "bartender",
-    "barista",
-    "cook",
-    "chef",
-    "host",
-    "hostess",
-    "busser",
-    "dishwasher",
-    "manager",
-    "supervisor",
-    "cashier",
-  ];
-  for (const term of commonTerms) await expandTerm(term);
 }
