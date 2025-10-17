@@ -88,15 +88,6 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
 }
 
 /**
- * Get semantic embedding for a text
- */
-async function getEmbedding(text: string): Promise<number[]> {
-  const model = await getEmbedder();
-  const output = await model(text, { pooling: "mean", normalize: true });
-  return Array.from(output.data);
-}
-
-/**
  * Find semantically similar terms using Datamuse API fallback
  */
 async function getDatamuseSynonyms(query: string): Promise<string[]> {
