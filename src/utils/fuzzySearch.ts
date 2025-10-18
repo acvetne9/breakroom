@@ -1,6 +1,6 @@
 import Fuse from 'fuse.js';
 import { Business } from '@/types/business';
-import { expandWithSynonyms } from './searchSynonyms';
+import { expandTerm } from './smartSearch';
 
 export interface FuzzySearchOptions {
   threshold?: number; // 0.0 = exact, 1.0 = match anything (default: 0.4)
@@ -30,11 +30,11 @@ export function createBusinessFuseIndex(businesses: Business[]): Fuse<Business> 
 /**
  * Fuzzy search businesses with synonym expansion
  */
-export function fuzzySearchBusinesses(
+export async function fuzzySearchBusinesses(
   businesses: Business[],
   query: string,
   options: FuzzySearchOptions = {}
-): Array<{ business: Business; score: number }> {
+): Promise<Array<{ business: Business; score: number }>> {
   const {
     threshold = 0.4,
     limit = 50,
@@ -47,7 +47,8 @@ export function fuzzySearchBusinesses(
   
   // Parse query into terms and expand with synonyms
   const terms = query.toLowerCase().split(/\s+/).filter(t => t.length > 1);
-  const expandedTerms = terms.flatMap(expandWithSynonyms);
+  const expandedTermsArrays = await Promise.all(terms.map(term => expandTerm(term)));
+  const expandedTerms = expandedTermsArrays.flat();
   
   console.log(`🔍 Fuzzy search: "${query}" expanded to:`, expandedTerms.slice(0, 10));
   
@@ -81,11 +82,11 @@ export function fuzzySearchBusinesses(
 
 /**
  * Calculate fuzzy match score between a business and query (0-1, higher = better match)
+ * Note: This function is synchronous for performance, uses basic expansion only
  */
 export function calculateBusinessFuzzyScore(businessName: string, businessType: string, roles: string[], query: string): number {
   const queryLower = query.toLowerCase();
   const terms = queryLower.split(/\s+/).filter(t => t.length > 1);
-  const expandedTerms = terms.flatMap(expandWithSynonyms);
   
   // Create searchable content from business
   const searchableContent = [
@@ -101,7 +102,7 @@ export function calculateBusinessFuzzyScore(businessName: string, businessType: 
   });
   
   let bestScore = 0;
-  expandedTerms.forEach(term => {
+  terms.forEach(term => {
     const results = fuse.search(term);
     if (results.length > 0) {
       const score = 1 - (results[0].score || 0);

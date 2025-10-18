@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Business } from '@/types/business';
 import { applyBusinessFilters, SearchFilters } from './businessFiltering';
-import { expandQueryWithSynonyms, expandWithSynonyms } from '@/utils/searchSynonyms';
+import { expandTerm } from '@/utils/smartSearch';
 
 // Search results cache to prevent repeated queries
 const searchCache = new Map<string, { results: Business[]; timestamp: number }>();
@@ -30,8 +30,8 @@ const parseSalaryToHourly = (salary: string): number | null => {
   return numericValue; // Default to hourly
 };
 
-// Enhanced search term parsing with better AND logic
-export const parseUnifiedSearchFilters = (searchQuery: string): UnifiedSearchFilters | null => {
+// Enhanced search term parsing with better AND logic - NOW ASYNC
+export const parseUnifiedSearchFilters = async (searchQuery: string): Promise<UnifiedSearchFilters | null> => {
   if (!searchQuery.trim()) return null;
 
   const query = searchQuery.toLowerCase().trim();
@@ -85,15 +85,22 @@ export const parseUnifiedSearchFilters = (searchQuery: string): UnifiedSearchFil
     .filter(term => term.length > 0)
     .map(term => term.toLowerCase());
   
-  // Expand text terms with synonyms for better matching  
-  const expandedTextTerms = textTerms.flatMap(term => expandWithSynonyms(term));
+  console.log(`🔍 [parseSearchFilters] Original terms: ${textTerms.join(', ')}`);
+  
+  // Expand text terms with synonyms - NOW ASYNC with API calls
+  const expandedTermsArrays = await Promise.all(
+    textTerms.map(term => expandTerm(term))
+  );
+  const expandedTextTerms = expandedTermsArrays.flat();
   const uniqueExpandedTerms = [...new Set(expandedTextTerms)];
+  
+  console.log(`🔍 [parseSearchFilters] Expanded to: ${uniqueExpandedTerms.join(', ')}`);
   
   const filters: UnifiedSearchFilters = { textTerms: uniqueExpandedTerms };
   
   if (salaryQuery) filters.salaryQuery = salaryQuery;
   
-  console.log('🔍 [parseSearchFilters] Final filters:', filters);
+  console.log('✅ [parseSearchFilters] Final filters:', filters);
   
   return filters;
 };
@@ -120,7 +127,7 @@ export const searchBusinessesUnified = async (
     
     // Universal search across ALL fields (name, type, address, roles)
     if (filters.textTerms && filters.textTerms.length > 0) {
-      console.log(`🔍 Starting universal search for terms: ${filters.textTerms.join(', ')}`);
+      console.log(`🔍 [searchBusinessesUnified] Starting universal search for ${filters.textTerms.length} expanded terms: ${filters.textTerms.join(', ')}`);
       
       // Build search conditions for ALL business fields
       const searchConditions: string[] = [];
@@ -129,6 +136,8 @@ export const searchBusinessesUnified = async (
         searchConditions.push(`business_type.ilike.%${term}%`);
         searchConditions.push(`address.ilike.%${term}%`);
       });
+      
+      console.log(`🔍 [searchBusinessesUnified] SQL conditions: ${searchConditions.join(' OR ')}`);
       
       // QUERY 1: Search businesses table (name, type, address) in parallel
       const businessSearchPromise = (async () => {
@@ -162,6 +171,8 @@ export const searchBusinessesUnified = async (
         const roleConditions = filters.textTerms.map(term => 
           `role.ilike.%${term}%`
         ).join(',');
+        
+        console.log(`🔍 [searchBusinessesUnified] Role SQL conditions: ${roleConditions}`);
         
         const { data: matchingRoles, error } = await supabase
           .from('business_roles')
@@ -362,7 +373,7 @@ export const searchBusinessesByQuery = async (
   
   if (!query.trim()) return [];
   
-  const filters = parseUnifiedSearchFilters(query);
+  const filters = await parseUnifiedSearchFilters(query);
   if (!filters) return [];
   
   return searchBusinessesUnified(filters, bounds, limit);
