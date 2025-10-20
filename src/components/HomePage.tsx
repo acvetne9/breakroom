@@ -79,12 +79,19 @@ const HomePage: React.FC<HomePageProps> = ({
   const [mapBusinesses, setMapBusinesses] = useState<any[]>([]);
   const [showWelcome, setShowWelcome] = useState(false);
 
-  // Debounce search value updates
+  // Debounce search value updates (2 seconds as requested)
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchValue(searchValue);
-    }, 300);
+    }, 2000);
     return () => clearTimeout(timer);
+  }, [searchValue]);
+
+  // Handle Enter key to trigger immediate search
+  const handleSearchKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      setDebouncedSearchValue(searchValue);
+    }
   }, [searchValue]);
 
   // Memoize searchFilters to prevent recreation on every render

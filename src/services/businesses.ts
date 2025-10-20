@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Business, BusinessRole } from '@/types/business';
 import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods';
 import { searchBusinessesUnified, parseUnifiedSearchFilters } from './unifiedSearch';
+import { expandTerm } from '@/utils/smartSearch';
 
 // Enhanced function using PostGIS spatial queries with user votes preloaded
 export async function getBusinessesNearPoint(
@@ -95,10 +96,29 @@ export const getBusinessesInViewport = async (
     if (searchFilters) {
       console.log(`🔍 [getBusinessesInViewport] Using unified search with filters`);
       
-      // Always re-parse with semantic expansion, even if object is passed
-      const unifiedFilters = await parseUnifiedSearchFilters(
-        typeof searchFilters === 'string' ? searchFilters : JSON.stringify(searchFilters)
-      );
+      let unifiedFilters: any;
+      
+      // If filters are already parsed as an object, expand the terms
+      if (typeof searchFilters === 'object' && searchFilters !== null) {
+        // Expand textTerms if they exist
+        if (searchFilters.textTerms && Array.isArray(searchFilters.textTerms)) {
+          const expandedTerms = await Promise.all(
+            searchFilters.textTerms.map((term: string) => expandTerm(term))
+          );
+          // Flatten and deduplicate
+          const allExpandedTerms = [...new Set(expandedTerms.flat())];
+          unifiedFilters = {
+            ...searchFilters,
+            textTerms: allExpandedTerms
+          };
+          console.log(`🔍 [getBusinessesInViewport] Expanded ${searchFilters.textTerms.length} terms to ${allExpandedTerms.length} terms`);
+        } else {
+          unifiedFilters = searchFilters;
+        }
+      } else if (typeof searchFilters === 'string') {
+        // Parse string filters with semantic expansion
+        unifiedFilters = await parseUnifiedSearchFilters(searchFilters);
+      }
       
       if (!unifiedFilters) {
         console.log('🔍 No valid filters parsed');
