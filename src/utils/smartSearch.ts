@@ -1,12 +1,12 @@
-// smartSearch.ts
-// Browser-safe, dynamic synonym + fuzzy job term expansion using Datamuse API.
-// Includes gender-neutral filtering and fuzzy matching.
+// src/utils/smartSearch.ts
+// Browser-safe, workforce-oriented synonym expansion.
+// Expands job roles dynamically using Datamuse's concept API.
 
 type CacheEntry = { data: string[]; timestamp: number };
 const CACHE: Record<string, CacheEntry> = {};
 const CACHE_TTL = 1000 * 60 * 60 * 12; // 12 hours
 
-// Gendered / irrelevant words to exclude
+// Exclude these from results
 const EXCLUDED_TERMS = new Set([
   "girl",
   "boy",
@@ -16,30 +16,65 @@ const EXCLUDED_TERMS = new Set([
   "gentleman",
   "maid",
   "barmaid",
-  "housemaid",
-  "handmaid",
   "mistress",
-  "mastress",
-  "waitress", // we’ll include this if it’s the base term
   "wench",
   "heroine",
   "hostess",
-  "goddess",
   "queen",
   "princess",
   "wife",
   "husband",
   "bride",
   "groom",
-  "actor",
-  "actress",
 ]);
 
+// Role-related keyword whitelist — ensures workforce context
+const WORKFORCE_KEYWORDS = [
+  "work",
+  "job",
+  "position",
+  "staff",
+  "role",
+  "employee",
+  "team",
+  "career",
+  "occupation",
+  "profession",
+  "trade",
+  "service",
+  "technician",
+  "engineer",
+  "cook",
+  "chef",
+  "server",
+  "waiter",
+  "manager",
+  "supervisor",
+  "barista",
+  "bartender",
+  "attendant",
+  "associate",
+  "specialist",
+  "assistant",
+  "operator",
+  "worker",
+  "teacher",
+  "instructor",
+  "driver",
+  "sales",
+  "representative",
+  "agent",
+  "technician",
+  "laborer",
+  "clerk",
+  "developer",
+];
+
 /**
- * Fetches related words from Datamuse with caching.
+ * Fetches Datamuse results safely with caching.
  */
-async function fetchDatamuseWords(term: string, type: "ml" | "sp", limit = 6): Promise<string[]> {
-  const key = `${type}:${term}`;
+async function fetchDatamuse(term: string, params: string): Promise<string[]> {
+  const key = `${term}:${params}`;
   const now = Date.now();
 
   if (CACHE[key] && now - CACHE[key].timestamp < CACHE_TTL) {
@@ -47,14 +82,12 @@ async function fetchDatamuseWords(term: string, type: "ml" | "sp", limit = 6): P
   }
 
   try {
-    const res = await fetch(`https://api.datamuse.com/words?${type}=${encodeURIComponent(term)}&max=${limit}`);
-    if (!res.ok) throw new Error(`Datamuse error ${res.status}`);
-
+    const res = await fetch(`https://api.datamuse.com/words?${params}&max=8`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const words = data
-      .map((item: any) => item.word.toLowerCase())
+      .map((w: any) => w.word.toLowerCase())
       .filter((w: string) => /^[a-z\s]+$/.test(w) && w.length > 2);
-
     CACHE[key] = { data: words, timestamp: now };
     return words;
   } catch (err) {
@@ -64,42 +97,53 @@ async function fetchDatamuseWords(term: string, type: "ml" | "sp", limit = 6): P
 }
 
 /**
- * Expands a search term with synonyms and fuzzy matches.
- * Filters out gendered and irrelevant terms.
+ * Expands one or more search terms into related workforce terms.
  */
 export async function expandTerm(input: string): Promise<string[]> {
   console.log("🔍 [smartSearch] Expanding search for:", input);
 
   const baseTerms = input.toLowerCase().split(/\s+/).filter(Boolean);
-
   const expanded = new Set<string>(baseTerms);
 
   for (const term of baseTerms) {
-    const [synonyms, fuzzy] = await Promise.all([fetchDatamuseWords(term, "ml", 8), fetchDatamuseWords(term, "sp", 5)]);
+    const [related, synonyms, fuzzy] = await Promise.all([
+      fetchDatamuse(term, `rel_jja=${term}`), // adjectives used with
+      fetchDatamuse(term, `ml=${term}`), // meaning-like
+      fetchDatamuse(term, `sp=${term}*`), // fuzzy match
+    ]);
 
-    for (const word of [...synonyms, ...fuzzy]) {
-      if (!EXCLUDED_TERMS.has(word) && isSimilar(term, word)) {
+    const candidates = [...related, ...synonyms, ...fuzzy];
+
+    for (const word of candidates) {
+      if (!EXCLUDED_TERMS.has(word) && isWorkforceRelated(word) && isSimilar(term, word)) {
         expanded.add(word);
       }
     }
   }
 
-  const result = Array.from(expanded);
-  console.log(`✨ [smartSearch] Expanded ${baseTerms.length} terms → ${result.length} total:`, result);
-  return result;
+  const results = Array.from(expanded);
+  console.log(`✨ [smartSearch] Expanded ${baseTerms.length} → ${results.length}:`, results);
+  return results;
 }
 
 /**
- * Simple Levenshtein-based similarity check to filter unrelated terms.
+ * Filters out unrelated non-workforce words.
+ */
+function isWorkforceRelated(word: string): boolean {
+  return WORKFORCE_KEYWORDS.some((kw) => word.includes(kw)) || /\b(er|ist|or|ian|ant|ent|ive|ess)\b/.test(word); // common role suffixes
+}
+
+/**
+ * Fuzzy similarity using Levenshtein distance.
  */
 function isSimilar(a: string, b: string): boolean {
   const dist = levenshtein(a, b);
   const threshold = Math.ceil(Math.max(a.length, b.length) * 0.6);
-  return dist <= threshold;
+  return dist <= threshold || a[0] === b[0];
 }
 
 /**
- * Levenshtein distance implementation.
+ * Levenshtein distance
  */
 function levenshtein(a: string, b: string): number {
   const dp = Array.from({ length: a.length + 1 }, (_, i) => [i]);
@@ -112,7 +156,3 @@ function levenshtein(a: string, b: string): number {
   }
   return dp[a.length][b.length];
 }
-
-// Example:
-// const expanded = await expandSearchTerms("waitress");
-// console.log(expanded);
