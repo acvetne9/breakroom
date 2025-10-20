@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useBusinessesData } from '@/hooks/useBusinessesData';
-import { searchBusinesses } from '@/utils/searchUtils';
 import { isProfane } from '@/utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 import { createOrUpdateBusinessRole } from '@/services/businesses';
@@ -123,7 +122,12 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
         return;
       }
       
-      const { filteredBusinesses } = searchBusinesses(businesses, inputValue);
+      // Simple inline search
+      const query = inputValue.toLowerCase();
+      const filteredBusinesses = businesses.filter(b => 
+        b.name?.toLowerCase().includes(query) || 
+        b.businessType?.toLowerCase().includes(query)
+      );
       console.log('🎯 Search results:', filteredBusinesses.length);
       const results = filteredBusinesses.slice(0, 5);
       

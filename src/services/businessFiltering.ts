@@ -1,7 +1,40 @@
 import { Business } from '@/types/business';
-import { parseSearchTerms } from '@/utils/searchUtils';
 import { findNeighborhoodBoundaryByName, nycNeighborhoodBoundaries, filterBusinessesByNeighborhood } from '@/utils/nyc_neighborhoods';
 import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods';
+
+// Inline parseSearchTerms function
+function parseSearchTerms(query: string): { 
+  salaryQuery?: { min?: number; max?: number; isRange: boolean }; 
+  textTerms?: string[] 
+} {
+  const words = query.toLowerCase().split(/\s+/);
+  let salaryQuery: { min?: number; max?: number; isRange: boolean } | undefined;
+  const textTerms: string[] = [];
+
+  for (const word of words) {
+    // Salary patterns: $20, $20-30, 20-30, etc
+    if (word.includes('$') || /^\d+(-\d+)?$/.test(word)) {
+      const cleaned = word.replace(/\$/g, '');
+      if (cleaned.includes('-')) {
+        const [min, max] = cleaned.split('-').map(n => parseFloat(n));
+        if (!isNaN(min) && !isNaN(max)) {
+          salaryQuery = { min, max, isRange: true };
+          continue;
+        }
+      } else {
+        const num = parseFloat(cleaned);
+        if (!isNaN(num)) {
+          salaryQuery = { min: num, isRange: false };
+          continue;
+        }
+      }
+    }
+    // Everything else is a text search term
+    if (word.length > 1) textTerms.push(word);
+  }
+
+  return { salaryQuery, textTerms: textTerms.length > 0 ? textTerms : undefined };
+}
 
 export interface SearchFilters {
   textTerms: string[];

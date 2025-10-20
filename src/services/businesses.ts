@@ -116,24 +116,30 @@ export const getBusinessesInViewport = async (
       return results;
     }
 
-    // Regular viewport load without search - use enhanced progressive search
-    const { progressiveSearch } = await import('./progressiveSearch');
+    // Regular viewport load without search - simple database query
+    const { data: businesses, error } = await supabase
+      .from('businesses')
+      .select('id, name, lat, lng, business_type, atmosphere')
+      .gte('lat', bounds.south)
+      .lte('lat', bounds.north)
+      .gte('lng', bounds.west)
+      .lte('lng', bounds.east)
+      .limit(limit);
     
-    const onProgressWrapper = onProgress ? (businesses: Business[], isComplete: boolean) => {
-      console.log(`📍 Progressive load progress: ${businesses.length} businesses loaded`);
-      onProgress(businesses, isComplete);
-    } : undefined;
-    
-    const businesses = await progressiveSearch.searchBusinesses(
-      bounds,
-      null, // No search filters
-      onProgressWrapper || (() => {}),
-      limit,
-      zoom
-    );
+    if (error) {
+      console.error('Error loading businesses:', error);
+      return [];
+    }
 
-    console.log(`✅ Enhanced viewport load completed with ${businesses.length} businesses`);
-    return businesses;
+    // Transform to Business type with position object
+    const transformedBusinesses: Business[] = (businesses || []).map(b => ({
+      ...b,
+      position: { lat: b.lat, lng: b.lng },
+      businessType: b.business_type
+    }));
+
+    console.log(`✅ Viewport load completed with ${transformedBusinesses.length} businesses`);
+    return transformedBusinesses;
 
   } catch (error) {
     console.error('❌ Critical error in getBusinessesInViewport:', error);

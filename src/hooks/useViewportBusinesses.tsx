@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Business } from '@/types/business';
 import { getBusinessesInViewport, getFullBusinessDetails as getFullBusinessDetailsService } from '@/services/businesses';
-import { progressiveSearch } from '@/services/progressiveSearch';
 import { isPointInPolygon } from '@/utils/nyc_neighborhoods'
 import { useTileCache } from './useTileCache';
 import { useMapWorker } from './useMapWorker';
@@ -263,7 +262,6 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
 
   // Cleanup on filter changes
   useEffect(() => {
-    progressiveSearch.abort();
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
     if (preloadTimeoutRef.current) clearTimeout(preloadTimeoutRef.current);
   }, [searchFilters]);
