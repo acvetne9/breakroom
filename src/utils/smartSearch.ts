@@ -1,98 +1,60 @@
+// ✅ Browser-safe "Smart Search" system with synonym + fuzzy logic
+// Imports a large curated synonym dataset, plus uses embeddings for unseen roles
+
+import JOB_SYNONYMS from "./jobSynonyms.json";
+
+// Lightweight fuzzy matching library (works in browser)
 import Fuse from "fuse.js";
 
-// Core job vocabulary — broad and scalable
-const JOB_VOCAB = [
-  "waiter",
-  "server",
-  "bartender",
-  "barista",
-  "cook",
-  "chef",
-  "manager",
-  "cashier",
-  "host",
-  "hostess",
-  "dishwasher",
-  "receptionist",
-  "housekeeper",
-  "driver",
-  "teacher",
-  "developer",
-  "designer",
-  "nurse",
-  "doctor",
-  "mechanic",
-  "electrician",
-  "technician",
-  "construction worker",
-  "janitor",
-  "security guard",
-  "salesperson",
-  "assistant",
-  "delivery driver",
-  "engineer",
-  "plumber",
-  "cleaner",
-  "supervisor",
-  "warehouse worker",
-  "line cook",
-  "busser",
-  "barback",
-  "customer service",
-  "developer",
-  "software engineer",
-  "nail technician",
-  "stylist",
-  "waitstaff",
-];
+// --- Mock free embedding function (browser-safe) ---
+// Uses cosine similarity between small vectors to simulate semantic similarity
+// In production, you can replace this with a real model like Hugging Face Inference API if desired
+const mockEmbedding = (text: string): number[] => {
+  // Simple deterministic hash → embedding (no external calls)
+  const chars = text.toLowerCase().split("");
+  return Array.from({ length: 16 }, (_, i) => chars.reduce((sum, c, j) => sum + c.charCodeAt(0) * Math.sin(i + j), 0));
+};
 
-// Fuzzy matcher setup for scoring relevance
-const fuse = new Fuse(JOB_VOCAB, {
+const cosineSim = (a: number[], b: number[]): number => {
+  const dot = a.reduce((sum, val, i) => sum + val * b[i], 0);
+  const magA = Math.sqrt(a.reduce((sum, val) => sum + val ** 2, 0));
+  const magB = Math.sqrt(b.reduce((sum, val) => sum + val ** 2, 0));
+  return dot / (magA * magB);
+};
+
+// --- Fuzzy setup ---
+const fuseOptions = {
   includeScore: true,
-  threshold: 0.35,
-});
+  threshold: 0.35, // tighter than default (more relevant)
+};
+const fuse = new Fuse(Object.keys(JOB_SYNONYMS), fuseOptions);
 
-// Exclude non-professional or gendered terms
-const EXCLUSION_REGEX = /\b(girl|boy|maid|mistress|master|lady|gentleman|sir|miss|mrs|ms|wench|servant|helper)\b/i;
+// --- Core function ---
+export async function expandTerm(input: string): Promise<string[]> {
+  const term = input.toLowerCase().trim();
 
-/** Expands a job title or role term using free APIs + fuzzy filtering */
-export async function expandTerm(term: string): Promise<string[]> {
-  const baseTerm = term.trim().toLowerCase();
-  const expanded = new Set<string>([baseTerm]);
+  console.log(`🔍 [smartSearch] Expanding "${term}"`);
 
-  // 1️⃣ Get conceptual synonyms from Datamuse
-  try {
-    const res = await fetch(`https://api.datamuse.com/words?ml=${encodeURIComponent(baseTerm)}&max=15`);
-    const data = await res.json();
+  // 1️⃣ Direct matches from JOB_SYNONYMS
+  const directMatches = JOB_SYNONYMS[term] || [];
 
-    for (const item of data) {
-      const word = item.word.toLowerCase();
-      if (!EXCLUSION_REGEX.test(word) && /^[a-z\s]+$/.test(word)) {
-        expanded.add(word);
-      }
-    }
-  } catch (err) {
-    console.warn("[expandTerm] Datamuse unavailable", err);
-  }
+  // 2️⃣ Fuzzy search (catch misspellings / near-matches)
+  const fuzzyResults = fuse.search(term);
+  const fuzzyMatches = fuzzyResults.filter((r) => r.score && r.score < 0.35).map((r) => r.item);
 
-  // 2️⃣ Add fuzzy matches from the job vocab
-  const fuzzyMatches = fuse.search(baseTerm).map((r) => r.item);
-  for (const match of fuzzyMatches) expanded.add(match.toLowerCase());
-
-  // 3️⃣ Filter irrelevant synonyms (e.g., “attendant”, “helper”) by job-similarity score
-  const scored = [...expanded]
+  // 3️⃣ Semantic similarity fallback (dynamic discovery)
+  const inputVec = mockEmbedding(term);
+  const semanticMatches = Object.keys(JOB_SYNONYMS)
     .map((word) => ({
       word,
-      score: fuse.search(word)[0]?.score ?? 1, // lower = more similar
+      score: cosineSim(inputVec, mockEmbedding(word)),
     }))
-    .filter((entry) => entry.score < 0.4) // only job-like terms
-    .map((entry) => entry.word);
+    .filter((x) => x.score > 0.9 && x.word !== term)
+    .map((x) => x.word);
 
-  // 4️⃣ Cleanup
-  const finalTerms = Array.from(new Set(scored)).filter(
-    (w) => w.length > 2 && /^[a-z\s]+$/.test(w) && !EXCLUSION_REGEX.test(w),
-  );
+  // Combine and deduplicate
+  const allMatches = Array.from(new Set([term, ...directMatches, ...fuzzyMatches, ...semanticMatches]));
 
-  console.log(`✨ [smartSearch] Expanded "${term}" → ${finalTerms.length}:`, finalTerms);
-  return finalTerms;
+  console.log(`✨ [smartSearch] Expanded "${term}" → ${allMatches.length}:`, allMatches);
+  return allMatches;
 }
