@@ -1,19 +1,47 @@
 // smartSearch.ts
-// Dynamic synonym + fuzzy search expansion that works fully in the browser.
-// Uses Datamuse API (free, no key, no CORS issues).
+// Browser-safe, dynamic synonym + fuzzy job term expansion using Datamuse API.
+// Includes gender-neutral filtering and fuzzy matching.
 
 type CacheEntry = { data: string[]; timestamp: number };
-const CACHE_TTL = 1000 * 60 * 60 * 12; // 12 hours
 const CACHE: Record<string, CacheEntry> = {};
+const CACHE_TTL = 1000 * 60 * 60 * 12; // 12 hours
+
+// Gendered / irrelevant words to exclude
+const EXCLUDED_TERMS = new Set([
+  "girl",
+  "boy",
+  "woman",
+  "man",
+  "lady",
+  "gentleman",
+  "maid",
+  "barmaid",
+  "housemaid",
+  "handmaid",
+  "mistress",
+  "mastress",
+  "waitress", // we’ll include this if it’s the base term
+  "wench",
+  "heroine",
+  "hostess",
+  "goddess",
+  "queen",
+  "princess",
+  "wife",
+  "husband",
+  "bride",
+  "groom",
+  "actor",
+  "actress",
+]);
 
 /**
- * Fetches related words from Datamuse with caching and error handling.
+ * Fetches related words from Datamuse with caching.
  */
 async function fetchDatamuseWords(term: string, type: "ml" | "sp", limit = 6): Promise<string[]> {
   const key = `${type}:${term}`;
   const now = Date.now();
 
-  // Return cached result if available and not stale
   if (CACHE[key] && now - CACHE[key].timestamp < CACHE_TTL) {
     return CACHE[key].data;
   }
@@ -36,9 +64,10 @@ async function fetchDatamuseWords(term: string, type: "ml" | "sp", limit = 6): P
 }
 
 /**
- * Expands a search query with synonyms and fuzzy matches.
+ * Expands a search term with synonyms and fuzzy matches.
+ * Filters out gendered and irrelevant terms.
  */
-export async function expandTerm(input: string): Promise<string[]> {
+export async function expandSearchTerms(input: string): Promise<string[]> {
   console.log("🔍 [smartSearch] Expanding search for:", input);
 
   const baseTerms = input.toLowerCase().split(/\s+/).filter(Boolean);
@@ -46,12 +75,10 @@ export async function expandTerm(input: string): Promise<string[]> {
   const expanded = new Set<string>(baseTerms);
 
   for (const term of baseTerms) {
-    // Fetch synonyms (ml = "means like") and fuzzy matches (sp = "spelled like")
     const [synonyms, fuzzy] = await Promise.all([fetchDatamuseWords(term, "ml", 8), fetchDatamuseWords(term, "sp", 5)]);
 
     for (const word of [...synonyms, ...fuzzy]) {
-      // Filter out too-distant terms (e.g., “janitor” for “waitress”) using simple heuristic
-      if (word.length > 2 && levenshtein(term, word) < Math.max(term.length, 5)) {
+      if (!EXCLUDED_TERMS.has(word) && isSimilar(term, word)) {
         expanded.add(word);
       }
     }
@@ -63,20 +90,29 @@ export async function expandTerm(input: string): Promise<string[]> {
 }
 
 /**
- * Simple Levenshtein distance implementation for fuzzy filtering.
+ * Simple Levenshtein-based similarity check to filter unrelated terms.
+ */
+function isSimilar(a: string, b: string): boolean {
+  const dist = levenshtein(a, b);
+  const threshold = Math.ceil(Math.max(a.length, b.length) * 0.6);
+  return dist <= threshold;
+}
+
+/**
+ * Levenshtein distance implementation.
  */
 function levenshtein(a: string, b: string): number {
-  const m = Array.from({ length: a.length + 1 }, (_, i) => [i]);
-  for (let j = 1; j <= b.length; j++) m[0][j] = j;
+  const dp = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) dp[0][j] = j;
   for (let i = 1; i <= a.length; i++) {
     for (let j = 1; j <= b.length; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      m[i][j] = Math.min(m[i - 1][j] + 1, m[i][j - 1] + 1, m[i - 1][j - 1] + cost);
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
     }
   }
-  return m[a.length][b.length];
+  return dp[a.length][b.length];
 }
 
-// Example usage (in your search function):
-// const expandedTerms = await expandSearchTerms("waitress");
-// console.log(expandedTerms);
+// Example:
+// const expanded = await expandSearchTerms("waitress");
+// console.log(expanded);
