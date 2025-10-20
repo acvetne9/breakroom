@@ -61,6 +61,7 @@ export async function expandTerm(job: string, enableLogging: boolean = true): Pr
     "missy",
     "mademoiselle",
     "monsieur",
+    "wench",
     // Food items
     "pizza",
     "stew",
@@ -85,10 +86,90 @@ export async function expandTerm(job: string, enableLogging: boolean = true): Pr
     "administratr",
     "bartendr",
     "cater",
+    // Generic/vague terms
+    "helper",
+    "bearer",
+    "runner",
+    "serving",
+    "attender",
+    "servee",
+    // Unrelated jobs
+    "maid",
+    "servant",
+    "watchperson",
+    "storeperson",
+    "newsperson",
+    "farmer",
+    "bookkeeper",
+    "corsetiere",
+    "sewer",
+    "dancerette",
+    "ostler",
   ]);
 
+  // Job-specific relevance keywords (if the original job contains these, require results to also)
+  const getRelevanceKeywords = (job: string): Set<string> => {
+    const lower = job.toLowerCase();
+    const keywords = new Set<string>();
+
+    // Restaurant/food service
+    if (/(wait|serv|restaurant|bar|food|dining|cafe|coffee)/i.test(lower)) {
+      keywords.add("restaurant");
+      keywords.add("food-service");
+    }
+    // Medical
+    if (/(nurse|doctor|medical|health|hospital|clinic)/i.test(lower)) {
+      keywords.add("medical");
+    }
+    // Tech
+    if (/(engineer|developer|programmer|software|tech|code)/i.test(lower)) {
+      keywords.add("tech");
+    }
+    // Sales
+    if (/(sale|retail|shop|store|clerk)/i.test(lower)) {
+      keywords.add("sales");
+    }
+
+    return keywords;
+  };
+
+  // Check if term is relevant to the original job context
+  const isRelevantToJob = (term: string, originalJob: string): boolean => {
+    const keywords = getRelevanceKeywords(originalJob);
+    if (keywords.size === 0) return true; // No specific context, allow all
+
+    const lower = term.toLowerCase();
+
+    // Restaurant/food service jobs
+    if (keywords.has("restaurant") || keywords.has("food-service")) {
+      const foodServiceTerms =
+        /(wait|serv|bartend|host|somm|barista|caterer|restaurant|bar|dining|cafe|flight attendant|steward)/i;
+      return foodServiceTerms.test(lower);
+    }
+
+    // Medical jobs
+    if (keywords.has("medical")) {
+      const medicalTerms = /(nurse|doctor|physician|surgeon|medic|health|clinical|hospital|care)/i;
+      return medicalTerms.test(lower);
+    }
+
+    // Tech jobs
+    if (keywords.has("tech")) {
+      const techTerms = /(engineer|developer|programmer|coder|software|tech|architect|analyst)/i;
+      return techTerms.test(lower);
+    }
+
+    // Sales jobs
+    if (keywords.has("sales")) {
+      const salesTerms = /(sale|retail|clerk|cashier|assistant|shop)/i;
+      return salesTerms.test(lower);
+    }
+
+    return false;
+  };
+
   // Check if a term is a real job (not just gender/food/customer)
-  const isValidJobTerm = (term: string): boolean => {
+  const isValidJobTerm = (term: string, originalJob: string): boolean => {
     const lower = term.toLowerCase().trim();
 
     // Exclude empty or very short terms
@@ -108,11 +189,15 @@ export async function expandTerm(job: string, enableLogging: boolean = true): Pr
     const nonJobPatterns = [
       /goer$/i, // restaurantgoer, café-goer
       /^(pizza|stew|tea|wine|food)$/i,
+      /person$/i, // Generic "person" terms that aren't specific jobs
     ];
     if (nonJobPatterns.some((pattern) => pattern.test(lower))) return false;
 
     // Exclude malformed words (missing vowels in the middle)
     if (/^[a-z]+[bcdfghjklmnpqrstvwxyz]{3,}$/i.test(lower)) return false;
+
+    // Must be relevant to the original job context
+    if (!isRelevantToJob(term, originalJob)) return false;
 
     return true;
   };
@@ -263,7 +348,7 @@ export async function expandTerm(job: string, enableLogging: boolean = true): Pr
 
     // Filter out invalid terms
     const validTerms = processedTerms.filter((term: string) => {
-      const isValid = isValidJobTerm(term);
+      const isValid = isValidJobTerm(term, cleanJob);
       if (!isValid) {
         log("Filtered out", { term });
       }
