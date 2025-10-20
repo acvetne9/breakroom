@@ -1,11 +1,6 @@
-// smartSearch.js
-// Browser-safe synonym + fuzzy expansion for workforce search
-// Free + uses Datamuse API for semantic synonyms + Fuse.js for fuzzy
+// src/utils/smartSearch.ts
 
-// Import Fuse.js (browser-safe fuzzy search)
-import Fuse from "https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.esm.js";
-
-// Optional — preload a lightweight common job vocabulary for fuzzy matching
+// Optional: fallback job vocab
 const JOB_VOCAB = [
   "waiter",
   "waitress",
@@ -18,67 +13,44 @@ const JOB_VOCAB = [
   "cashier",
   "host",
   "hostess",
-  "barback",
   "dishwasher",
   "housekeeper",
   "receptionist",
-  "nurse",
-  "doctor",
   "teacher",
-  "professor",
-  "driver",
-  "mechanic",
-  "engineer",
   "developer",
-  "salesperson",
-  "accountant",
   "designer",
-  "artist",
-  "actor",
-  "writer",
-  "director",
-  "security",
-  "janitor",
-  "cleaner",
+  "driver",
+  "engineer",
   "technician",
-  "plumber",
-  "electrician",
-  "carpenter",
 ];
 
-// Fuzzy setup
-const fuse = new Fuse(JOB_VOCAB, {
-  includeScore: true,
-  threshold: 0.35, // controls how loose the fuzzy matching is
-});
+let fuse: any = null;
 
-/**
- * Expand a single search term using:
- *  1. Datamuse API (semantic synonyms)
- *  2. Fuzzy local similarity (Fuse.js)
- */
-export async function expandTerm(term) {
+/** Expand a search term with synonyms + fuzzy job matches */
+export async function expandTerm(term: string): Promise<string[]> {
   const baseTerm = term.trim().toLowerCase();
-  const expanded = new Set([baseTerm]);
+  const expanded = new Set<string>([baseTerm]);
 
-  // --- 1️⃣ Datamuse API: get synonyms / related words ---
+  // --- 1️⃣ Datamuse API synonyms ---
   try {
-    const response = await fetch(`https://api.datamuse.com/words?ml=${encodeURIComponent(baseTerm)}&max=6`);
-    const data = await response.json();
-    data.forEach((item) => expanded.add(item.word.toLowerCase()));
-  } catch (e) {
-    console.warn("[expandTerm] Datamuse API unavailable, skipping synonyms", e);
+    const res = await fetch(`https://api.datamuse.com/words?ml=${encodeURIComponent(baseTerm)}&max=6`);
+    const data = await res.json();
+    data.forEach((d: any) => expanded.add(d.word.toLowerCase()));
+  } catch (err) {
+    console.warn("[expandTerm] Datamuse unavailable", err);
   }
 
-  // --- 2️⃣ Fuzzy local expansion ---
-  const fuzzyMatches = fuse.search(baseTerm).map((result) => result.item);
-  fuzzyMatches.forEach((word) => expanded.add(word.toLowerCase()));
+  // --- 2️⃣ Lazy-load Fuse.js for fuzzy matching ---
+  if (!fuse) {
+    const FuseModule = await import("https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.esm.js");
+    const Fuse = (FuseModule as any).default;
+    fuse = new Fuse(JOB_VOCAB, { includeScore: true, threshold: 0.35 });
+  }
 
-  // --- 3️⃣ Clean + dedupe ---
-  const finalTerms = [...expanded].filter(
-    (w) => w.length > 2 && !/[^a-z]/.test(w), // remove junk or non-alpha
-  );
+  const fuzzyMatches = fuse.search(baseTerm).map((r: any) => r.item);
+  fuzzyMatches.forEach((w: string) => expanded.add(w.toLowerCase()));
 
+  const finalTerms = [...expanded].filter((w) => w.length > 2 && /^[a-z]+$/.test(w));
   console.log(`✨ [smartSearch] Expanded "${term}" → ${finalTerms.length}:`, finalTerms);
   return finalTerms;
 }
