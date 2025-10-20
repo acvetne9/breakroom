@@ -1,6 +1,6 @@
-// src/utils/smartSearch.ts
+import Fuse from "fuse.js";
 
-// Optional: fallback job vocab
+// Light job-related vocabulary for fuzzy similarity
 const JOB_VOCAB = [
   "waiter",
   "waitress",
@@ -22,35 +22,43 @@ const JOB_VOCAB = [
   "driver",
   "engineer",
   "technician",
+  "mechanic",
+  "salesperson",
+  "clerk",
+  "supervisor",
+  "plumber",
+  "electrician",
 ];
 
-let fuse: any = null;
+const fuse = new Fuse(JOB_VOCAB, { includeScore: true, threshold: 0.35 });
 
 /** Expand a search term with synonyms + fuzzy job matches */
 export async function expandTerm(term: string): Promise<string[]> {
   const baseTerm = term.trim().toLowerCase();
   const expanded = new Set<string>([baseTerm]);
 
-  // --- 1️⃣ Datamuse API synonyms ---
+  // 1️⃣ Pull conceptual synonyms from Datamuse API (free)
   try {
-    const res = await fetch(`https://api.datamuse.com/words?ml=${encodeURIComponent(baseTerm)}&max=6`);
+    const res = await fetch(`https://api.datamuse.com/words?ml=${encodeURIComponent(baseTerm)}&max=8`);
     const data = await res.json();
-    data.forEach((d: any) => expanded.add(d.word.toLowerCase()));
+    for (const item of data) {
+      const word = item.word.toLowerCase();
+      // Filter out gendered or irrelevant terms
+      if (!/girl|boy|maid|mistress|master|barmaid|hostess|man|woman/i.test(word)) {
+        expanded.add(word);
+      }
+    }
   } catch (err) {
     console.warn("[expandTerm] Datamuse unavailable", err);
   }
 
-  // --- 2️⃣ Lazy-load Fuse.js for fuzzy matching ---
-  if (!fuse) {
-    const FuseModule = await import("https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.esm.js");
-    const Fuse = (FuseModule as any).default;
-    fuse = new Fuse(JOB_VOCAB, { includeScore: true, threshold: 0.35 });
-  }
+  // 2️⃣ Add fuzzy matches from known job vocab
+  const fuzzyMatches = fuse.search(baseTerm).map((r) => r.item);
+  for (const match of fuzzyMatches) expanded.add(match.toLowerCase());
 
-  const fuzzyMatches = fuse.search(baseTerm).map((r: any) => r.item);
-  fuzzyMatches.forEach((w: string) => expanded.add(w.toLowerCase()));
+  // 3️⃣ Filter cleanup
+  const finalTerms = [...expanded].filter((w) => w.length > 2 && /^[a-z\s]+$/.test(w));
 
-  const finalTerms = [...expanded].filter((w) => w.length > 2 && /^[a-z]+$/.test(w));
   console.log(`✨ [smartSearch] Expanded "${term}" → ${finalTerms.length}:`, finalTerms);
   return finalTerms;
 }
