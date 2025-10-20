@@ -1,5 +1,3 @@
-import { pipeline } from "@huggingface/transformers";
-
 /* --- Seed vocabulary (lightweight, browser-friendly) --- */
 const SEED_VOCAB = [
   "waiter",
@@ -46,28 +44,6 @@ const SEED_VOCAB = [
   "driver",
   "delivery driver",
 ];
-
-/* --- Lazy-loaded semantic embedder --- */
-let embedder: any = null;
-async function getEmbedder() {
-  if (!embedder) {
-    embedder = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
-  }
-  return embedder;
-}
-
-/* --- Cosine similarity --- */
-function cosineSimilarity(vecA: number[], vecB: number[]): number {
-  let dot = 0,
-    normA = 0,
-    normB = 0;
-  for (let i = 0; i < vecA.length; i++) {
-    dot += vecA[i] * vecB[i];
-    normA += vecA[i] * vecA[i];
-    normB += vecB[i] * vecB[i];
-  }
-  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
-}
 
 /* --- Normalize text (gender, plural, suffixes) --- */
 function normalizeText(input: string): string {
@@ -137,24 +113,24 @@ function phoneticMatch(a: string, b: string) {
   return phoneticCode(a) === phoneticCode(b);
 }
 
-/* --- Embedding helper --- */
-async function getEmbedding(text: string): Promise<number[]> {
-  const model = await getEmbedder();
-  const words = text.toLowerCase().split(/\s+/).filter(Boolean);
-  const embeddings: number[][] = [];
-
-  for (const w of words) {
-    try {
-      const out = await model(w, { pooling: "mean", normalize: true });
-      embeddings.push(Array.from(out.data));
-    } catch {}
-  }
-  if (!embeddings.length) return [];
-  const dim = embeddings[0].length;
-  const avg = new Array(dim).fill(0);
-  for (const vec of embeddings) for (let i = 0; i < dim; i++) avg[i] += vec[i];
-  for (let i = 0; i < dim; i++) avg[i] /= embeddings.length;
-  return avg;
+/* --- Vocabulary similarity score --- */
+function vocabSimilarity(query: string, term: string): number {
+  const qNorm = normalizeText(query);
+  const tNorm = normalizeText(term);
+  
+  // Exact match
+  if (qNorm === tNorm) return 1.0;
+  
+  // Contains
+  if (tNorm.includes(qNorm) || qNorm.includes(tNorm)) return 0.8;
+  
+  // Word overlap
+  const qWords = new Set(qNorm.split(" "));
+  const tWords = new Set(tNorm.split(" "));
+  const intersection = [...qWords].filter(w => tWords.has(w)).length;
+  const union = new Set([...qWords, ...tWords]).size;
+  
+  return intersection / union;
 }
 
 /* --- Main expandTerm --- */
@@ -182,19 +158,17 @@ export async function expandTerm(query: string, options?: { maxResults?: number 
   const appendCommon = ["clerk", "assistant", "manager", "worker", "staff", "agent", "company", "firm", "business"];
   for (const g of grams) for (const a of appendCommon) candidates.add(`${g} ${a}`);
 
-  // Semantic similarity ranking
+  // Score all candidates using lightweight matching
   const candArray = Array.from(candidates);
-  const queryEmb = await getEmbedding(normQuery);
   const scored: { term: string; score: number }[] = [];
   for (const c of candArray) {
-    const cEmb = await getEmbedding(c);
-    const semantic = cEmb.length && queryEmb.length ? cosineSimilarity(queryEmb, cEmb) : 0;
+    const vocabScore = vocabSimilarity(normQuery, c);
     const fuzzy = Math.max(
       levenshteinRatio(normQuery, normalizeText(c)),
       ...grams.map((g) => levenshteinRatio(g, normalizeText(c))),
     );
     const phonetic = phoneticMatch(normQuery, normalizeText(c)) ? 1 : 0;
-    const score = 0.6 * semantic + 0.3 * fuzzy + 0.1 * phonetic;
+    const score = 0.5 * vocabScore + 0.4 * fuzzy + 0.1 * phonetic;
     scored.push({ term: c, score });
   }
 
