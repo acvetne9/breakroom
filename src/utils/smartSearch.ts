@@ -26,6 +26,97 @@ export async function expandTerm(job: string, enableLogging: boolean = true): Pr
     { from: "female", to: ["male"] },
   ];
 
+  // Words to exclude (gender terms, food, non-job related)
+  const excludeWords = new Set([
+    // Gender terms only
+    "man",
+    "woman",
+    "men",
+    "women",
+    "male",
+    "female",
+    "guy",
+    "gal",
+    "lady",
+    "ladies",
+    "gentleman",
+    "gentlemen",
+    "boy",
+    "girl",
+    "boys",
+    "girls",
+    "lad",
+    "lass",
+    "mister",
+    "mistress",
+    "miss",
+    "mrs",
+    "mr",
+    "ms",
+    "sir",
+    "madam",
+    "madame",
+    "mistr",
+    "mis",
+    "missy",
+    "mademoiselle",
+    "monsieur",
+    // Food items
+    "pizza",
+    "stew",
+    "tea",
+    "wine",
+    "food",
+    "meal",
+    "dish",
+    "dessert",
+    // Non-job customer/patron terms
+    "eater",
+    "diner",
+    "restaurantgoer",
+    "restaurant-goer",
+    "café-goer",
+    "patron",
+    // Partial/malformed words
+    "eatr",
+    "actr",
+    "operatr",
+    "decoratr",
+    "administratr",
+    "bartendr",
+    "cater",
+  ]);
+
+  // Check if a term is a real job (not just gender/food/customer)
+  const isValidJobTerm = (term: string): boolean => {
+    const lower = term.toLowerCase().trim();
+
+    // Exclude empty or very short terms
+    if (lower.length < 3) return false;
+
+    // Exclude if it's in the exclude list
+    if (excludeWords.has(lower)) return false;
+
+    // Exclude if it's ONLY a gender word with no other content
+    const genderOnlyPatterns = [
+      /^(man|woman|boy|girl|male|female|guy|gal|lady|ladies|gentleman)$/i,
+      /^(mis|mistr|mr|mrs|ms|sir|madam)$/i,
+    ];
+    if (genderOnlyPatterns.some((pattern) => pattern.test(lower))) return false;
+
+    // Exclude obvious non-job words (customers, food, etc.)
+    const nonJobPatterns = [
+      /goer$/i, // restaurantgoer, café-goer
+      /^(pizza|stew|tea|wine|food)$/i,
+    ];
+    if (nonJobPatterns.some((pattern) => pattern.test(lower))) return false;
+
+    // Exclude malformed words (missing vowels in the middle)
+    if (/^[a-z]+[bcdfghjklmnpqrstvwxyz]{3,}$/i.test(lower)) return false;
+
+    return true;
+  };
+
   // Common plural suffixes
   const pluralPatterns = [
     { pattern: /ies$/, replacement: "y" },
@@ -160,17 +251,33 @@ export async function expandTerm(job: string, enableLogging: boolean = true): Pr
     const resultsArrays = await Promise.all(fetchPromises);
     const allResults = resultsArrays.flat();
 
-    // Process terms: normalize gender, singularize, and deduplicate
+    log("Raw results before filtering", { count: allResults.length });
+
+    // Process terms: normalize gender, singularize, filter, and deduplicate
     const processedTerms = allResults
       .map((term: string) => normalizeGender(term))
       .map((term: string) => singularize(term))
-      .filter((term: string) => term.length > 0); // Remove empty strings
+      .filter((term: string) => term.length > 0);
+
+    log("After normalization", { count: processedTerms.length });
+
+    // Filter out invalid terms
+    const validTerms = processedTerms.filter((term: string) => {
+      const isValid = isValidJobTerm(term);
+      if (!isValid) {
+        log("Filtered out", { term });
+      }
+      return isValid;
+    });
+
+    log("After validation", { count: validTerms.length });
 
     // Remove duplicates (case-insensitive)
-    const uniqueTerms = Array.from(new Map(processedTerms.map((term: string) => [term.toLowerCase(), term])).values());
+    const uniqueTerms = Array.from(new Map(validTerms.map((term: string) => [term.toLowerCase(), term])).values());
 
     log("Term expansion complete", {
       totalFetched: allResults.length,
+      afterValidation: validTerms.length,
       uniqueCount: uniqueTerms.length,
       terms: uniqueTerms,
     });
