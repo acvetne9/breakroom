@@ -88,7 +88,7 @@ export const createBusinessScatterplotLayer = ({
     lineWidthMinPixels: 2,
     getPosition: (d: Business) => [d.position.lng, d.position.lat],
     getRadius: (_d: Business) => baseRadius,
-    getFillColor: (_d: Business) => searchActive ? [255, 215, 0, 255] : [250, 204, 21, 255], // Brighter gold when searching
+    getFillColor: (_d: Business) => [250, 204, 21, 255], // Consistent gold color
     getLineColor: (_d: Business) => [255, 255, 255, 255],
     onClick: onBusinessClick ? (info) => {
       console.log('🖱️ Deck.GL layer clicked:', info);
