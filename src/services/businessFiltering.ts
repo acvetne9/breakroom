@@ -1,6 +1,7 @@
 import { Business } from '@/types/business';
 import { findNeighborhoodBoundaryByName, nycNeighborhoodBoundaries, filterBusinessesByNeighborhood } from '@/utils/nyc_neighborhoods';
 import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods';
+import { expandTerm } from '@/utils/smartSearch';
 
 // Inline parseSearchTerms function
 function parseSearchTerms(query: string): { 
@@ -61,8 +62,6 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
   const neighborhood = findNeighborhoodBoundaryByName(searchQuery);
   if (neighborhood) {
     filters.neighborhoodFilter = neighborhood;
-
-    // Add center for map panning
     const lats = neighborhood.boundary.map(p => p.lat);
     const lons = neighborhood.boundary.map(p => p.lon);
     filters.neighborhoodFilter.center = {
@@ -72,10 +71,7 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
   }
   
   const { salaryQuery, textTerms } = parseSearchTerms(searchQuery);
-  console.log('🔍 [parseSearchFilters] Parsed terms - salaryQuery:', salaryQuery, 'textTerms:', textTerms);
   
-  // If we found a neighborhood, remove the neighborhood name from text terms
-  // so we don't require businesses to have the neighborhood name in their title
   let filteredTextTerms = textTerms;
   if (neighborhood && textTerms) {
     const neighborhoodNameLower = neighborhood.name.toLowerCase();
@@ -83,10 +79,8 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
       !neighborhoodNameLower.includes(term.toLowerCase()) && 
       !term.toLowerCase().includes(neighborhoodNameLower)
     );
-    console.log('🏙️ [parseSearchFilters] Removed neighborhood name from text terms:', textTerms, '->', filteredTextTerms);
   }
   
-  // Common role keywords - expanded list but more inclusive approach
   const commonRoles = [
     'barista','manager','cashier','server','cook','chef','waiter','waitress','host','hostess',
     'bartender','barback','line cook','dishwasher','assistant','supervisor','lead','team',
@@ -95,63 +89,39 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
     'back','house','floor','delivery','driver','cleaner','maintenance', 'intern', 'trainee'
   ];
   
-  console.log('🔍 [parseSearchFilters] Checking if any text terms match role keywords');
-  console.log('🔍 [parseSearchFilters] Text terms:', filteredTextTerms);
-  console.log('🔍 [parseSearchFilters] Available role keywords:', commonRoles.slice(0, 10), '...');
-  
-  // Business type keywords - expanded list
   const commonBusinessTypes = [
     'restaurant','restaurants','cafe','cafes','coffee','shop','shops','bar','bars','store','stores',
     'hotel','hotels','gym','gyms','salon','salons','bakery','bakeries','deli','delis','market',
     'office','clinic','hospital','bank','retail','fast','food','chain','franchise','boutique'
   ];
   
-  // Instead of only checking hardcoded lists, also include any term as potential role/business type
-  // This allows flexible matching while still prioritizing known terms
-  let roleFilter = filteredTextTerms.find(term => 
+  let roleFilter = filteredTextTerms?.find(term => 
     commonRoles.includes(term.toLowerCase())
   );
   
-  // Only use terms that explicitly match known roles
-  
-  let businessTypeFilter = filteredTextTerms.find(term =>
+  let businessTypeFilter = filteredTextTerms?.find(term =>
     commonBusinessTypes.includes(term.toLowerCase())
   );
 
-  console.log('🔍 [parseSearchFilters] Role filter found:', roleFilter);
-  console.log('🔍 [parseSearchFilters] Business type filter found:', businessTypeFilter);
-  if (neighborhood) {
-    console.log('🏙️ [parseSearchFilters] Neighborhood found:', neighborhood.name, 'in', neighborhood.borough);
-  }
-
-  // Only add optional filters if they have values (no undefined)
   if (salaryQuery) {
     filters.salaryQuery = salaryQuery;
   }
-  if (roleFilter && roleFilter.trim()) {
+  if (roleFilter?.trim()) {
     filters.roleFilter = roleFilter;
   }
-  if (businessTypeFilter && businessTypeFilter.trim()) {
+  if (businessTypeFilter?.trim()) {
     filters.businessTypeFilter = businessTypeFilter;
   }
   if (neighborhood) {
     filters.neighborhoodFilter = neighborhood;
   }
 
-  // ALWAYS include the original search terms for comprehensive search
-  // This ensures we search across ALL categories: name, type, roles, etc.
   const originalTerms = parseSearchTerms(searchQuery).textTerms || [];
-  if (originalTerms && originalTerms.length > 0) {
-    filters.textTerms = originalTerms; // Use original terms, not filtered ones
+  if (originalTerms.length > 0) {
+    filters.textTerms = originalTerms;
   }
 
-  console.log('🔍 [parseSearchFilters] Final filters (comprehensive search):', filters);
-
-  // Return null only if completely empty search
-  if (!searchQuery.trim()) {
-    console.log('🔍 [parseSearchFilters] Empty search, returning null');
-    return null;
-  }
+  console.log('🔍 [parseSearchFilters] Final filters:', filters);
 
   return filters;
 }

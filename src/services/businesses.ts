@@ -1,5 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Business, BusinessRole } from '@/types/business';
+import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods';
+import { searchBusinessesUnified, parseUnifiedSearchFilters } from './unifiedSearch';
 
 // Enhanced function using PostGIS spatial queries with user votes preloaded
 export async function getBusinessesNearPoint(
@@ -92,14 +94,11 @@ export const getBusinessesInViewport = async (
     // Use unified search if filters provided
     if (searchFilters) {
       console.log(`🔍 [getBusinessesInViewport] Using unified search with filters`);
-      const { searchBusinessesUnified, parseUnifiedSearchFilters } = await import('./unifiedSearch');
       
-      let unifiedFilters;
-      if (typeof searchFilters === 'string') {
-        unifiedFilters = parseUnifiedSearchFilters(searchFilters);
-      } else {
-        unifiedFilters = searchFilters;
-      }
+      // Always re-parse with semantic expansion, even if object is passed
+      const unifiedFilters = await parseUnifiedSearchFilters(
+        typeof searchFilters === 'string' ? searchFilters : JSON.stringify(searchFilters)
+      );
       
       if (!unifiedFilters) {
         console.log('🔍 No valid filters parsed');
@@ -189,7 +188,7 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
       .from('role_votes')
       .select('business_role_id, vote_type')
       .eq('user_id', currentUserId)
-      .in('business_role_id', roleIds);  // ✅ ONLY fetch votes for this business's roles!
+      .in('business_role_id', roleIds);
 
     console.log(`✅ Fetched votes for ${roleIds.length} roles in ${performance.now() - votesStartTime}ms`);
 
@@ -226,7 +225,6 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
   return fullBusiness;
 }
 
-// Add geocoding and business creation functionality
 export async function geocodeAndCreateBusiness(name: string, address?: string): Promise<{ id: string; lat: number; lng: number }> {
   if (!address) {
     throw new Error('Address is required for creating a new business');
@@ -234,7 +232,6 @@ export async function geocodeAndCreateBusiness(name: string, address?: string): 
 
   console.log(`🌍 Geocoding business: ${name} at ${address}`);
 
-  // Call the geocode edge function
   const { data: geocodeResult, error: geocodeError } = await supabase.functions.invoke('geocode-address', {
     body: { address }
   });
@@ -246,7 +243,6 @@ export async function geocodeAndCreateBusiness(name: string, address?: string): 
 
   console.log(`✅ Geocoded coordinates: ${geocodeResult.latitude}, ${geocodeResult.longitude}`);
 
-  // Create the business with geocoded coordinates
   const { data: newBusiness, error: createError } = await supabase
     .from('businesses')
     .insert({
@@ -269,7 +265,6 @@ export async function geocodeAndCreateBusiness(name: string, address?: string): 
 }
 
 export async function createOrUpdateBusinessRole(businessLocation: string, role: string, salary: string): Promise<void> {
-  // First, try to find an existing business by name (location)
   let businessId: string;
   
   const { data: existingBusiness, error: findError } = await supabase
@@ -285,11 +280,9 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
   if (existingBusiness) {
     businessId = existingBusiness.id;
   } else {
-    // Suggest using geocodeAndCreateBusiness instead
     throw new Error(`Business "${businessLocation}" not found. Use geocodeAndCreateBusiness() to create it with coordinates first.`);
   }
 
-  // Check if this exact role already exists for this business
   const { data: existingRole, error: roleCheckError } = await supabase
     .from('business_roles')
     .select('id')
@@ -303,7 +296,6 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
   }
 
   if (!existingRole) {
-    // Create new role if it doesn't exist - NO AUTH REQUIRED
     const { error: createRoleError } = await supabase
       .from('business_roles')
       .insert({
