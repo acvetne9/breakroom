@@ -5,7 +5,7 @@
  * @param enableLogging - Enable console logging (default: true)
  * @returns Array of normalized related job terms
  */
-export async function expandTerm(job: string, enableLogging: boolean = true): Promise<string[]> {
+async function expandTerm(job: string, enableLogging: boolean = true): Promise<string[]> {
   const log = (message: string, data: unknown = null) => {
     if (enableLogging) {
       const timestamp = new Date().toISOString();
@@ -181,11 +181,3 @@ export async function expandTerm(job: string, enableLogging: boolean = true): Pr
     throw error;
   }
 }
-
-// Example usage:
-// expandTerm('software engineer')
-//   .then(terms => console.log('Related terms:', terms))
-//   .catch(err => console.error('Error:', err));
-
-// expandTerm('nurse', false)
-//   .then(terms => console.log(terms));
