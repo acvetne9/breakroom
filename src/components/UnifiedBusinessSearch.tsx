@@ -252,18 +252,18 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         
         // Use businesses from the map (they're already filtered correctly)
         if (mapBusinesses && mapBusinesses.length > 0) {
-          console.log(`🔍 Dropdown showing ${mapBusinesses.length} businesses from map`);
+          console.log(`🔍 Dropdown showing ${Math.min(mapBusinesses.length, 30)} of ${mapBusinesses.length} businesses from map`);
           
-          // Map to EnhancedBusiness format
-          const enhancedResults = mapBusinesses.map(b => ({
-            ...b,
-            lat: b.position?.lat || b.lat,
-            lng: b.position?.lng || b.lng
-          })) as EnhancedBusiness[];
+          // Map to EnhancedBusiness format - limit to 30 for dropdown
+          const enhancedResults = mapBusinesses
+            .slice(0, 30)
+            .map(b => ({
+              ...b,
+              lat: b.position?.lat || b.lat,
+              lng: b.position?.lng || b.lng
+            })) as EnhancedBusiness[];
           
-          // Apply relevance scoring and limit
-          const relevantResults = getRelevantResults(enhancedResults, q, 30);
-          results.push(...relevantResults);
+          results.push(...enhancedResults);
         }
         
         if (seq !== searchSeqRef.current) return;
