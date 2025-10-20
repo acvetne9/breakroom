@@ -1,257 +1,136 @@
-import { pipeline } from "@huggingface/transformers";
-
-// Common hospitality terms for expansion
-const HOSPITALITY_TERMS = [
-  "barista",
-  "manager",
-  "cashier",
-  "server",
-  "cook",
-  "chef",
-  "waiter",
-  "waitress",
-  "host",
-  "hostess",
-  "bartender",
-  "barback",
-  "line cook",
-  "dishwasher",
-  "assistant",
-  "supervisor",
-  "lead",
-  "team",
-  "crew",
-  "staff",
-  "associate",
-  "representative",
-  "agent",
-  "coordinator",
-  "specialist",
-  "technician",
-  "receptionist",
-  "secretary",
-  "clerk",
-  "sales",
-  "service",
-  "customer",
-  "food",
-  "kitchen",
-  "front",
-  "back",
-  "house",
-  "floor",
-  "delivery",
-  "driver",
-  "cleaner",
-  "maintenance",
-  "intern",
-  "trainee",
-  "restaurant",
-  "cafe",
-  "coffee",
-  "bar",
-  "hotel",
-  "gym",
-  "salon",
-];
-
-// Embedder model (lazy loaded)
-let embedder: any = null;
+import natural from "natural";
+const { WordNet, PorterStemmer, LevenshteinDistance } = natural;
+const wordnet = new WordNet();
 
 /**
- * Get or load the semantic embedder model
+ * Normalize and stem multiword roles or business terms.
+ * Handles gender, plural, and word variants dynamically.
  */
-async function getEmbedder() {
-  if (!embedder) {
-    console.log("🚀 Loading semantic embedder model...");
-    embedder = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
-    console.log("✅ Embedder model loaded");
-  }
-  return embedder;
-}
+function normalizeRoleTerm(input: string): string {
+  let term = input.toLowerCase().trim();
 
-/**
- * Compute cosine similarity between two embedding vectors
- */
-function cosineSimilarity(vecA: number[], vecB: number[]): number {
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-
-  for (let i = 0; i < vecA.length; i++) {
-    dotProduct += vecA[i] * vecB[i];
-    normA += vecA[i] * vecA[i];
-    normB += vecB[i] * vecB[i];
-  }
-
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-}
-
-/**
- * Find semantically similar terms using Datamuse API fallback
- */
-async function getDatamuseSynonyms(query: string): Promise<string[]> {
-  try {
-    console.log(`🌐 Fetching Datamuse synonyms for "${query}"...`);
-    const response = await fetch(`https://api.datamuse.com/words?ml=${encodeURIComponent(query)}&max=10`);
-
-    if (!response.ok) {
-      console.warn("⚠️ Datamuse API error:", response.status);
-      return [];
-    }
-
-    const data = await response.json();
-    const synonyms = data.map((item: any) => item.word).slice(0, 5);
-    console.log(`✅ Datamuse found ${synonyms.length} synonyms:`, synonyms);
-    return synonyms;
-  } catch (error) {
-    console.warn("⚠️ Datamuse API failed:", error);
-    return [];
-  }
-}
-
-/**
- * Get semantic embedding for text.
- * If multi-word, averages embeddings for each word.
- */
-async function getEmbedding(text: string): Promise<number[]> {
-  const model = await getEmbedder();
-  const words = text
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((w) => w.length > 0);
-
-  if (words.length === 0) return [];
-
-  const embeddings: number[][] = [];
-
-  for (const word of words) {
-    try {
-      const output = await model(word, { pooling: "mean", normalize: true });
-      embeddings.push(Array.from(output.data));
-    } catch (err) {
-      console.warn(`⚠️ Failed to embed "${word}":`, err);
-    }
-  }
-
-  if (embeddings.length === 0) return [];
-
-  // Average all word embeddings
-  const dim = embeddings[0].length;
-  const meanEmbedding = new Array(dim).fill(0);
-  for (const vec of embeddings) {
-    for (let i = 0; i < dim; i++) meanEmbedding[i] += vec[i];
-  }
-  for (let i = 0; i < dim; i++) meanEmbedding[i] /= embeddings.length;
-
-  return meanEmbedding;
-}
-
-/**
- * Normalize gendered and plural terms to a neutral base form.
- */
-function normalizeRoleTerm(term: string): string {
-  term = term.toLowerCase().trim();
-
-  // Gender normalization
-  const genderMap: Record<string, string> = {
-    waitress: "waiter",
-    hostess: "host",
-    actress: "actor",
-    stewardess: "steward",
-    policeman: "police officer",
-    policewoman: "police officer",
-    fireman: "firefighter",
-    firewoman: "firefighter",
-    salesman: "salesperson",
-    saleswoman: "salesperson",
-    chairman: "chairperson",
-    chairwoman: "chairperson",
-  };
-  if (genderMap[term]) return genderMap[term];
+  // Gender-neutral replacements
+  term = term
+    // Replace gendered -man/-woman endings
+    .replace(/\b(\w*?)(wo)?man\b/g, "$1person")
+    // Feminine suffixes: waitress → waiter, actress → actor, hostess → host
+    .replace(/(ess|ette|euse|trix)\b/g, "")
+    // Maid → attendant
+    .replace(/\bmaid\b/g, "attendant")
+    // Contextual professions
+    .replace(/\bpolice\s?person\b/g, "police officer")
+    .replace(/\bfire\s?person\b/g, "firefighter");
 
   // Plural normalization
-  if (term.endsWith("ies")) return term.slice(0, -3) + "y"; // e.g. "ladies" → "lady"
-  if (term.endsWith("sses")) return term.slice(0, -2); // e.g. "waitresses" → "waitress"
-  if (term.endsWith("s") && !term.endsWith("ss")) return term.slice(0, -1); // e.g. "servers" → "server"
+  term = term
+    .replace(/\bmen\b/g, "man")
+    .replace(/\bwomen\b/g, "woman")
+    .replace(/ies\b/g, "y")
+    .replace(/s\b/g, "");
 
-  return term;
+  // Normalize spacing
+  term = term.replace(/\s+/g, " ").trim();
+
+  // Stem each word in multiword phrase
+  const stemmedWords = term
+    .split(" ")
+    .map((w) => PorterStemmer.stem(w))
+    .filter(Boolean);
+
+  return stemmedWords.join(" ");
 }
 
 /**
- * Expand a term with multi-word semantic and fuzzy logic.
+ * Create a bag-of-words frequency vector
  */
+function getVector(text: string): Record<string, number> {
+  const words = text.split(/\s+/);
+  const vec: Record<string, number> = {};
+  for (const w of words) vec[w] = (vec[w] || 0) + 1;
+  return vec;
+}
+
 /**
- * Expand a term by finding related or similar words (no imports, no cache).
- * Handles multi-word phrases too.
+ * Cosine similarity between bag-of-words vectors
  */
-export async function expandTerm(query, terms = HOSPITALITY_TERMS, threshold = 0.6) {
+function cosineSimilarity(a: Record<string, number>, b: Record<string, number>): number {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  let dot = 0,
+    normA = 0,
+    normB = 0;
+  for (const k of keys) {
+    const va = a[k] || 0;
+    const vb = b[k] || 0;
+    dot += va * vb;
+    normA += va * va;
+    normB += vb * vb;
+  }
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB) || 1);
+}
+
+/**
+ * Fuzzy similarity score based on Levenshtein ratio
+ */
+function similarityScore(a: string, b: string): number {
+  const dist = LevenshteinDistance(a, b);
+  const maxLen = Math.max(a.length, b.length);
+  return 1 - dist / maxLen;
+}
+
+/**
+ * Get WordNet synonyms (free, local)
+ */
+async function getWordnetSynonyms(term: string): Promise<string[]> {
+  return new Promise((resolve) => {
+    wordnet.lookup(term, (results) => {
+      const syns = new Set<string>();
+      for (const r of results) {
+        for (const s of r.synonyms) {
+          if (!s.includes("_")) syns.add(s.toLowerCase());
+        }
+      }
+      resolve([...syns]);
+    });
+  });
+}
+
+/**
+ * Expand a query phrase using normalization, multiword logic, and semantic similarity.
+ * Returns conceptually related roles or business titles.
+ */
+export async function expandTerm(query: string, threshold = 0.6): Promise<string[]> {
   if (!query) return [];
 
-  const normalizedQuery = normalizeRoleTerm(query);
-  const cleanQuery = normalizedQuery.toLowerCase().trim();
-  const results = new Set([cleanQuery]);
+  const normalized = normalizeRoleTerm(query);
+  console.log(`🔍 Expanding "${query}" → normalized: "${normalized}"`);
 
-  // Split query into words for partial / multi-word matching
-  const queryWords = cleanQuery.split(/\s+/);
+  const parts = normalized.split(" ");
+  const allSynonyms = new Set<string>();
 
-  for (const term of terms) {
-    const lowerTerm = term.toLowerCase();
+  // Expand each word and word-pair
+  for (let i = 0; i < parts.length; i++) {
+    const single = parts[i];
+    const syns = await getWordnetSynonyms(single);
+    syns.forEach((s) => allSynonyms.add(s));
 
-    // Exact or substring match
-    if (lowerTerm.includes(cleanQuery) || cleanQuery.includes(lowerTerm)) {
-      results.add(term);
-      continue;
-    }
-
-    // Word overlap (multi-word handling)
-    const termWords = lowerTerm.split(/\s+/);
-    const shared = queryWords.filter((w) => termWords.includes(w));
-    if (shared.length / Math.max(termWords.length, queryWords.length) > 0.4) {
-      results.add(term);
-      continue;
-    }
-
-    // Simple character-level similarity
-    const sim = similarityScore(cleanQuery, lowerTerm);
-    if (sim >= threshold) {
-      results.add(term);
+    // Pair with next word for short phrases
+    if (i < parts.length - 1) {
+      const phrase = `${parts[i]} ${parts[i + 1]}`;
+      const phraseSyns = await getWordnetSynonyms(phrase);
+      phraseSyns.forEach((s) => allSynonyms.add(s));
     }
   }
 
-  return Array.from(results);
-}
+  // Rank by conceptual similarity
+  const vecQ = getVector(normalized);
+  const scored = Array.from(allSynonyms).map((s) => {
+    const sim = 0.6 * cosineSimilarity(vecQ, getVector(normalizeRoleTerm(s))) + 0.4 * similarityScore(normalized, s);
+    return [s, sim] as [string, number];
+  });
 
-/**
- * Simple similarity function (Levenshtein ratio approximation)
- */
-function similarityScore(a, b) {
-  const longer = a.length > b.length ? a : b;
-  const shorter = a.length > b.length ? b : a;
-  const longerLength = longer.length;
-  if (longerLength === 0) return 1.0;
-  return (longerLength - editDistance(longer, shorter)) / longerLength;
-}
+  scored.sort((a, b) => b[1] - a[1]);
+  const results = [normalized, ...scored.filter(([_, sc]) => sc >= threshold).map(([w]) => w)];
 
-function editDistance(a, b) {
-  const dp = Array(b.length + 1)
-    .fill(null)
-    .map(() => Array(a.length + 1).fill(0));
-  for (let i = 0; i <= b.length; i++) dp[i][0] = i;
-  for (let j = 0; j <= a.length; j++) dp[0][j] = j;
-  for (let i = 1; i <= b.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      dp[i][j] =
-        b[i - 1] === a[j - 1] ? dp[i - 1][j - 1] : Math.min(dp[i - 1][j - 1] + 1, dp[i][j - 1] + 1, dp[i - 1][j] + 1);
-    }
-  }
-  return dp[b.length][a.length];
-}
-
-/**
- * Stub for precomputation - no longer needed without cache
- */
-export async function precomputeCommonTerms(): Promise<void> {
-  console.log("ℹ️ precomputeCommonTerms is deprecated (no cache), skipping");
-  return Promise.resolve();
+  console.log(`✅ Expanded "${query}" →`, results);
+  return Array.from(new Set(results)).slice(0, 10);
 }
