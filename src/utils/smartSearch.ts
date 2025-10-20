@@ -1,6 +1,10 @@
-/* --- Seed vocabulary (lightweight, browser-friendly) --- */
+// src/utils/smartSearch.ts
+import { pipeline } from "@xenova/transformers";
+
+/* --- Seed vocabulary for workforce/business terms --- */
 const SEED_VOCAB = [
   "waiter",
+  "waitress",
   "server",
   "barista",
   "bartender",
@@ -8,6 +12,7 @@ const SEED_VOCAB = [
   "cook",
   "line cook",
   "host",
+  "hostess",
   "receptionist",
   "manager",
   "supervisor",
@@ -45,31 +50,23 @@ const SEED_VOCAB = [
   "delivery driver",
 ];
 
-/* --- Normalize text (gender, plural, suffixes) --- */
+/* --- Utilities --- */
 function normalizeText(input: string): string {
   let t = input.toLowerCase().trim();
-
-  // split camelCase
-  t = t.replace(/([a-z])([A-Z])/g, "$1 $2");
-
-  // gender neutralization
-  t = t.replace(/\b(\w*?)(wo)?man\b/g, "$1person"); // salesman → salesperson
-  t = t.replace(/(ess|ette|euse|trix)\b/g, ""); // waitress → waitr → will match waiter
+  t = t.replace(/([a-z])([A-Z])/g, "$1 $2"); // camelCase -> space
+  t = t.replace(/\b(\w*?)(wo)?man\b/g, "$1person"); // salesman -> salesperson
+  t = t.replace(/(ess|ette|euse|trix)\b/g, ""); // waitress -> waitr
   t = t.replace(/\bmaid\b/g, "attendant");
   t = t.replace(/\bpolice\s?person\b/g, "police officer");
   t = t.replace(/\bfire\s?person\b/g, "firefighter");
-
-  // plurals
   t = t.replace(/\bmen\b/g, "man");
   t = t.replace(/\bwomen\b/g, "woman");
   t = t.replace(/ies\b/g, "y");
   t = t.replace(/([a-z])s\b/g, "$1");
-
   t = t.replace(/\s+/g, " ").trim();
   return t;
 }
 
-/* --- Ngrams --- */
 function ngrams(tokens: string[], maxN = 3): string[] {
   const out: string[] = [];
   for (let n = 1; n <= Math.min(maxN, tokens.length); n++) {
@@ -80,111 +77,141 @@ function ngrams(tokens: string[], maxN = 3): string[] {
   return out;
 }
 
-/* --- Levenshtein ratio --- */
+/* --- Levenshtein similarity --- */
 function levenshteinRatio(a: string, b: string): number {
-  const lenA = a.length,
-    lenB = b.length;
-  if (!lenA && !lenB) return 1;
-
-  const dp: number[][] = Array(lenB + 1)
-    .fill(0)
-    .map(() => Array(lenA + 1).fill(0));
-  for (let i = 0; i <= lenB; i++) dp[i][0] = i;
-  for (let j = 0; j <= lenA; j++) dp[0][j] = j;
-
-  for (let i = 1; i <= lenB; i++) {
-    for (let j = 1; j <= lenA; j++) {
-      dp[i][j] =
-        a[j - 1] === b[i - 1] ? dp[i - 1][j - 1] : Math.min(dp[i - 1][j - 1] + 1, dp[i][j - 1] + 1, dp[i - 1][j] + 1);
+  const dp: number[][] = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]) + 1;
     }
   }
-  return 1 - dp[lenB][lenA] / Math.max(lenA, lenB);
+  return 1 - dp[a.length][b.length] / Math.max(a.length, b.length);
 }
 
-/* --- Simple phonetic approximation for browser --- */
-function phoneticCode(word: string) {
-  return word
-    .toLowerCase()
-    .replace(/[aeiou]/g, "")
-    .replace(/(.)\1+/g, "$1");
+/* --- Cosine similarity for embeddings --- */
+function cosineSim(a: number[], b: number[]): number {
+  let dot = 0,
+    normA = 0,
+    normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB) || 1);
 }
 
-function phoneticMatch(a: string, b: string) {
-  return phoneticCode(a) === phoneticCode(b);
+/* --- Browser-compatible embeddings --- */
+let _embedder: any = null;
+async function getEmbedder() {
+  if (!_embedder) {
+    _embedder = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
+  }
+  return _embedder;
+}
+async function getEmbedding(text: string): Promise<number[]> {
+  const embedder = await getEmbedder();
+  const result = await embedder(text, { pooling: "mean", normalize: true });
+  return result[0]; // 1D embedding array
 }
 
-/* --- Vocabulary similarity score --- */
-function vocabSimilarity(query: string, term: string): number {
-  const qNorm = normalizeText(query);
-  const tNorm = normalizeText(term);
-  
-  // Exact match
-  if (qNorm === tNorm) return 1.0;
-  
-  // Contains
-  if (tNorm.includes(qNorm) || qNorm.includes(tNorm)) return 0.8;
-  
-  // Word overlap
-  const qWords = new Set(qNorm.split(" "));
-  const tWords = new Set(tNorm.split(" "));
-  const intersection = [...qWords].filter(w => tWords.has(w)).length;
-  const union = new Set([...qWords, ...tWords]).size;
-  
-  return intersection / union;
+/* --- TF-IDF-like helpers --- */
+function buildTF(tokens: string[]) {
+  const tf: Record<string, number> = {};
+  for (const t of tokens) tf[t] = (tf[t] || 0) + 1;
+  return tf;
+}
+function buildVocabulary(docs: string[][]) {
+  const vocab = new Set<string>();
+  for (const doc of docs) for (const token of doc) vocab.add(token);
+  return Array.from(vocab);
+}
+function tfidfVectors(docsTokens: string[][]) {
+  const N = docsTokens.length;
+  const df: Record<string, number> = {};
+  for (const doc of docsTokens) {
+    const seen = new Set<string>();
+    for (const t of doc) {
+      if (!seen.has(t)) {
+        df[t] = (df[t] || 0) + 1;
+        seen.add(t);
+      }
+    }
+  }
+  const vocab = buildVocabulary(docsTokens);
+  const idf: Record<string, number> = {};
+  for (const term of vocab) {
+    idf[term] = Math.log(1 + N / (1 + (df[term] || 0)));
+  }
+  const vecs: Record<string, number>[] = docsTokens.map((doc) => {
+    const tf = buildTF(doc);
+    const vec: Record<string, number> = {};
+    for (const t of vocab) vec[t] = tf[t] ? tf[t] * idf[t] : 0;
+    return vec;
+  });
+  return { vocab, idf, vecs };
+}
+function cosineVec(a: Record<string, number>, b: Record<string, number>) {
+  let dot = 0,
+    na = 0,
+    nb = 0;
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const k of keys) {
+    const av = a[k] || 0;
+    const bv = b[k] || 0;
+    dot += av * bv;
+    na += av * av;
+    nb += bv * bv;
+  }
+  return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
 }
 
-/* --- Main expandTerm --- */
+/* --- Main dynamic smart search --- */
 export async function expandTerm(query: string, options?: { maxResults?: number }) {
-  if (!query?.trim()) return [];
-
+  if (!query.trim()) return [];
   const maxResults = options?.maxResults ?? 8;
-  const normQuery = normalizeText(query);
-  const tokens = normQuery.split(" ").filter(Boolean);
+
+  const normalizedQuery = normalizeText(query);
+  const tokens = normalizedQuery.split(" ").filter(Boolean);
   const grams = ngrams(tokens, 3);
 
+  // Collect candidate pool: seed vocab + n-grams recombinations
   const candidates = new Set<string>();
   for (const g of grams) candidates.add(g);
-  for (const v of SEED_VOCAB) {
-    const vNorm = normalizeText(v);
-    if (levenshteinRatio(normQuery, vNorm) >= 0.7) candidates.add(v);
-    if (phoneticMatch(normQuery, vNorm)) candidates.add(v);
-    for (const g of grams) {
-      if (levenshteinRatio(g, vNorm) >= 0.75) candidates.add(v);
-      if (phoneticMatch(g, vNorm)) candidates.add(v);
-    }
-  }
+  for (const v of SEED_VOCAB) candidates.add(v);
 
-  // Append common workforce nouns for recompositions
+  // Morphological expansions (optional)
   const appendCommon = ["clerk", "assistant", "manager", "worker", "staff", "agent", "company", "firm", "business"];
   for (const g of grams) for (const a of appendCommon) candidates.add(`${g} ${a}`);
 
-  // Score all candidates using lightweight matching
   const candArray = Array.from(candidates);
-  const scored: { term: string; score: number }[] = [];
-  for (const c of candArray) {
-    const vocabScore = vocabSimilarity(normQuery, c);
-    const fuzzy = Math.max(
-      levenshteinRatio(normQuery, normalizeText(c)),
-      ...grams.map((g) => levenshteinRatio(g, normalizeText(c))),
-    );
-    const phonetic = phoneticMatch(normQuery, normalizeText(c)) ? 1 : 0;
-    const score = 0.5 * vocabScore + 0.4 * fuzzy + 0.1 * phonetic;
-    scored.push({ term: c, score });
-  }
+  const queryEmbedding = await getEmbedding(query);
+
+  // Compute semantic + fuzzy scores
+  const scored = await Promise.all(
+    candArray.map(async (cand) => {
+      const emb = await getEmbedding(cand);
+      const semantic = cosineSim(queryEmbedding, emb);
+      const fuzzy = levenshteinRatio(normalizedQuery, normalizeText(cand));
+      const score = 0.7 * semantic + 0.3 * fuzzy;
+      return { term: cand, score };
+    }),
+  );
 
   scored.sort((a, b) => b.score - a.score);
 
-  // Return top results
   const results: string[] = [];
-  const seen = new Set<string>();
-  results.push(query.toLowerCase());
-  seen.add(query.toLowerCase());
+  const unique = new Set<string>();
+  results.push(query); // always include original
+  unique.add(query);
 
-  for (const s of scored) {
+  for (const item of scored) {
     if (results.length >= maxResults) break;
-    if (!seen.has(s.term)) {
-      results.push(s.term);
-      seen.add(s.term);
+    if (!unique.has(item.term)) {
+      results.push(item.term);
+      unique.add(item.term);
     }
   }
 
