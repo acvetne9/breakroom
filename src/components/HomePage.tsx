@@ -219,6 +219,7 @@ const HomePage: React.FC<HomePageProps> = ({
   const handleClearSearch = useCallback(() => {
     console.log('🧹 Clearing search from X button');
     setSearchValue('');
+    setDebouncedSearchValue('');
     setNeighborhoodCenter(null);
     setSearchCompleted(false);
   }, []);
