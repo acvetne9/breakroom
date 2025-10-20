@@ -530,7 +530,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     } catch (err) {
       console.error("❌ Error loading businesses:", err);
     }
-  }, [mapLoaded]);
+  }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport]);
 
   useEffect(() => {
     const initializeMap = async () => {
