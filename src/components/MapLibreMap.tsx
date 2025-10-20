@@ -774,7 +774,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, [mapLoaded, handleViewportChange]);
 
-  // Removed auto-load timeout to prevent infinite re-render loop
+  // One-time initial business load when map is ready
+  const hasInitialLoadRef = useRef(false);
+  useEffect(() => {
+    if (mapLoaded && !hasInitialLoadRef.current) {
+      hasInitialLoadRef.current = true;
+      handleViewportChange();
+    }
+  }, [mapLoaded, handleViewportChange]);
 
   const isUserInteractingRef = useRef(false);
   useEffect(() => {
