@@ -105,9 +105,9 @@ function levenshteinRatio(a: string, b: string): number {
 }
 
 function doubleMetaphoneMatches(a: string, b: string): boolean {
-  const dm = DoubleMetaphone;
-  const [a1, a2] = dm.process(a);
-  const [b1, b2] = dm.process(b);
+  const dm = new DoubleMetaphone();
+  const [a1, a2] = dm.doubleMetaphone(a);
+  const [b1, b2] = dm.doubleMetaphone(b);
   return (!!a1 && a1 === b1) || (!!a2 && a2 === b2);
 }
 
