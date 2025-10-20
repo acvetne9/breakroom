@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { searchBusinessesEnhanced, EnhancedBusiness } from '@/services/enhancedBusinessSearch';
+import { EnhancedBusiness } from '@/types/search';
 import { parseSearchFilters, applyBusinessFilters } from '@/services/businessFiltering';
 import { findNeighborhoodBoundaryByName } from '@/utils/nyc_neighborhoods';
 import { isProfane } from '@/utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 import { Search } from 'lucide-react';
 import { calculateBusinessFuzzyScore } from '@/utils/fuzzySearch';
-import { expandTerm } from '@/utils/smartSearch';
 
 interface UnifiedBusinessSearchProps {
   value: string;

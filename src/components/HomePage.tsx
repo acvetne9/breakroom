@@ -4,7 +4,7 @@ import BusinessPreview from './BusinessPreview';
 import BusinessDetails from './BusinessDetails';
 import BreakroomLoading from './BreakroomLoading';
 import UnifiedBusinessSearch from './UnifiedBusinessSearch';
-import { EnhancedBusiness } from '@/services/enhancedBusinessSearch';
+import { EnhancedBusiness } from '@/types/search';
 import { parseSearchFilters } from '@/services/businessFiltering';
 import { useToast } from '@/hooks/use-toast';
 
