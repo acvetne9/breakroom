@@ -206,7 +206,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     };
   }, []);
 
-  // Enhanced debounced suggestions with relevance scoring
+  // Show businesses from map in dropdown
   useEffect(() => {
     const q = value.trim();
     
@@ -250,26 +250,20 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           });
         }
         
-        // Parse filters and call the SAME search function the map uses
-        const filters = parseSearchFilters(q);
-        
-        if (filters) {
-          // Import and call searchBusinessesUnified - same function map uses!
-          const { searchBusinessesUnified } = await import('@/services/unifiedSearch');
+        // Use businesses from the map (they're already filtered correctly)
+        if (mapBusinesses && mapBusinesses.length > 0) {
+          console.log(`🔍 Dropdown showing ${mapBusinesses.length} businesses from map`);
           
-          // Call with no bounds for dropdown (show all matching businesses)
-          const businessResults = await searchBusinessesUnified(filters, undefined, 30);
-          
-          console.log(`🔍 Dropdown search for "${q}" returned ${businessResults.length} results`);
-          
-          // Map Business to EnhancedBusiness format (flatten position)
-          const enhancedResults = businessResults.map(b => ({
+          // Map to EnhancedBusiness format
+          const enhancedResults = mapBusinesses.map(b => ({
             ...b,
-            lat: b.position.lat,
-            lng: b.position.lng
+            lat: b.position?.lat || b.lat,
+            lng: b.position?.lng || b.lng
           })) as EnhancedBusiness[];
           
-          results.push(...enhancedResults);
+          // Apply relevance scoring and limit
+          const relevantResults = getRelevantResults(enhancedResults, q, 30);
+          results.push(...relevantResults);
         }
         
         if (seq !== searchSeqRef.current) return;
@@ -315,7 +309,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     }, 300);
     
     return () => clearTimeout(timer);
-  }, [value, onChange]);
+  }, [value, onChange, mapBusinesses]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
