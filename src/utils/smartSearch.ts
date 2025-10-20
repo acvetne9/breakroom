@@ -1,5 +1,4 @@
 // src/utils/smartSearch.ts
-import { pipeline } from "@xenova/transformers";
 
 /* --- Seed vocabulary for workforce/business terms --- */
 const SEED_VOCAB = [
@@ -90,31 +89,34 @@ function levenshteinRatio(a: string, b: string): number {
   return 1 - dp[a.length][b.length] / Math.max(a.length, b.length);
 }
 
-/* --- Cosine similarity for embeddings --- */
-function cosineSim(a: number[], b: number[]): number {
-  let dot = 0,
-    normA = 0,
-    normB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-  return dot / (Math.sqrt(normA) * Math.sqrt(normB) || 1);
+/* --- Vocabulary similarity (word overlap + containment) --- */
+function vocabSimilarity(a: string, b: string): number {
+  const tokensA = new Set(a.toLowerCase().split(/\s+/));
+  const tokensB = new Set(b.toLowerCase().split(/\s+/));
+  const intersection = new Set([...tokensA].filter(x => tokensB.has(x)));
+  const union = new Set([...tokensA, ...tokensB]);
+  const jaccard = intersection.size / union.size;
+  const containment = Math.max(
+    intersection.size / tokensA.size,
+    intersection.size / tokensB.size
+  );
+  return 0.5 * jaccard + 0.5 * containment;
 }
 
-/* --- Browser-compatible embeddings --- */
-let _embedder: any = null;
-async function getEmbedder() {
-  if (!_embedder) {
-    _embedder = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
-  }
-  return _embedder;
-}
-async function getEmbedding(text: string): Promise<number[]> {
-  const embedder = await getEmbedder();
-  const result = await embedder(text, { pooling: "mean", normalize: true });
-  return result[0]; // 1D embedding array
+/* --- Phonetic similarity helper --- */
+function soundex(s: string): string {
+  const code = s.toUpperCase().replace(/[^A-Z]/g, '');
+  if (!code) return '0000';
+  const first = code[0];
+  const mapped = code.slice(1).replace(/[AEIOUYHW]/g, '0')
+    .replace(/[BFPV]/g, '1')
+    .replace(/[CGJKQSXZ]/g, '2')
+    .replace(/[DT]/g, '3')
+    .replace(/[L]/g, '4')
+    .replace(/[MN]/g, '5')
+    .replace(/[R]/g, '6');
+  const filtered = mapped.split('').filter((c, i, arr) => i === 0 || c !== arr[i - 1]).join('');
+  return (first + filtered + '0000').slice(0, 4);
 }
 
 /* --- TF-IDF-like helpers --- */
@@ -187,18 +189,16 @@ export async function expandTerm(query: string, options?: { maxResults?: number 
   for (const g of grams) for (const a of appendCommon) candidates.add(`${g} ${a}`);
 
   const candArray = Array.from(candidates);
-  const queryEmbedding = await getEmbedding(query);
+  const querySound = soundex(normalizedQuery);
 
-  // Compute semantic + fuzzy scores
-  const scored = await Promise.all(
-    candArray.map(async (cand) => {
-      const emb = await getEmbedding(cand);
-      const semantic = cosineSim(queryEmbedding, emb);
-      const fuzzy = levenshteinRatio(normalizedQuery, normalizeText(cand));
-      const score = 0.7 * semantic + 0.3 * fuzzy;
-      return { term: cand, score };
-    }),
-  );
+  // Compute vocab + fuzzy + phonetic scores
+  const scored = candArray.map((cand) => {
+    const vocab = vocabSimilarity(normalizedQuery, normalizeText(cand));
+    const fuzzy = levenshteinRatio(normalizedQuery, normalizeText(cand));
+    const phonetic = soundex(normalizeText(cand)) === querySound ? 0.3 : 0;
+    const score = 0.5 * vocab + 0.3 * fuzzy + 0.2 * phonetic;
+    return { term: cand, score };
+  });
 
   scored.sort((a, b) => b.score - a.score);
 
