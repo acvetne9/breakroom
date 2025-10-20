@@ -67,7 +67,7 @@ async function fetchDatamuseWords(term: string, type: "ml" | "sp", limit = 6): P
  * Expands a search term with synonyms and fuzzy matches.
  * Filters out gendered and irrelevant terms.
  */
-export async function expandSearchTerms(input: string): Promise<string[]> {
+export async function expandTerm(input: string): Promise<string[]> {
   console.log("🔍 [smartSearch] Expanding search for:", input);
 
   const baseTerms = input.toLowerCase().split(/\s+/).filter(Boolean);
