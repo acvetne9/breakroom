@@ -1,6 +1,6 @@
 /**
  * Expands job terms into related words using the DataMuse API
- * Generates gender variants and removes plurality for precision
+ * Treats multi-word phrases as single units and focuses on job-relevant terms
  * @param job - The job term to expand
  * @param enableLogging - Enable console logging (default: true)
  * @returns Array of normalized related job terms
@@ -17,190 +17,10 @@ export async function expandTerm(job: string, enableLogging: boolean = true): Pr
   const genderTransforms = [
     { from: "man", to: ["woman", "person"] },
     { from: "woman", to: ["man", "person"] },
-    { from: "boy", to: ["girl"] },
-    { from: "girl", to: ["boy"] },
     { from: "ess", to: [""] }, // actress -> actor
     { from: "or", to: ["ress"] }, // actor -> actress
     { from: "er", to: ["ress"] }, // waiter -> waitress
-    { from: "male", to: ["female"] },
-    { from: "female", to: ["male"] },
   ];
-
-  // Words to exclude (gender terms, food, non-job related)
-  const excludeWords = new Set([
-    // Gender terms only
-    "man",
-    "woman",
-    "men",
-    "women",
-    "male",
-    "female",
-    "guy",
-    "gal",
-    "lady",
-    "ladies",
-    "gentleman",
-    "gentlemen",
-    "boy",
-    "girl",
-    "boys",
-    "girls",
-    "lad",
-    "lass",
-    "mister",
-    "mistress",
-    "miss",
-    "mrs",
-    "mr",
-    "ms",
-    "sir",
-    "madam",
-    "madame",
-    "mistr",
-    "mis",
-    "missy",
-    "mademoiselle",
-    "monsieur",
-    "wench",
-    // Food items
-    "pizza",
-    "stew",
-    "tea",
-    "wine",
-    "food",
-    "meal",
-    "dish",
-    "dessert",
-    // Non-job customer/patron terms
-    "eater",
-    "diner",
-    "restaurantgoer",
-    "restaurant-goer",
-    "café-goer",
-    "patron",
-    // Partial/malformed words
-    "eatr",
-    "actr",
-    "operatr",
-    "decoratr",
-    "administratr",
-    "bartendr",
-    "cater",
-    // Generic/vague terms
-    "helper",
-    "bearer",
-    "runner",
-    "serving",
-    "attender",
-    "servee",
-    // Unrelated jobs
-    "maid",
-    "servant",
-    "watchperson",
-    "storeperson",
-    "newsperson",
-    "farmer",
-    "bookkeeper",
-    "corsetiere",
-    "sewer",
-    "dancerette",
-    "ostler",
-  ]);
-
-  // Job-specific relevance keywords (if the original job contains these, require results to also)
-  const getRelevanceKeywords = (job: string): Set<string> => {
-    const lower = job.toLowerCase();
-    const keywords = new Set<string>();
-
-    // Restaurant/food service
-    if (/(wait|serv|restaurant|bar|food|dining|cafe|coffee)/i.test(lower)) {
-      keywords.add("restaurant");
-      keywords.add("food-service");
-    }
-    // Medical
-    if (/(nurse|doctor|medical|health|hospital|clinic)/i.test(lower)) {
-      keywords.add("medical");
-    }
-    // Tech
-    if (/(engineer|developer|programmer|software|tech|code)/i.test(lower)) {
-      keywords.add("tech");
-    }
-    // Sales
-    if (/(sale|retail|shop|store|clerk)/i.test(lower)) {
-      keywords.add("sales");
-    }
-
-    return keywords;
-  };
-
-  // Check if term is relevant to the original job context
-  const isRelevantToJob = (term: string, originalJob: string): boolean => {
-    const keywords = getRelevanceKeywords(originalJob);
-    if (keywords.size === 0) return true; // No specific context, allow all
-
-    const lower = term.toLowerCase();
-
-    // Restaurant/food service jobs
-    if (keywords.has("restaurant") || keywords.has("food-service")) {
-      const foodServiceTerms =
-        /(wait|serv|bartend|host|somm|barista|caterer|restaurant|bar|dining|cafe|flight attendant|steward)/i;
-      return foodServiceTerms.test(lower);
-    }
-
-    // Medical jobs
-    if (keywords.has("medical")) {
-      const medicalTerms = /(nurse|doctor|physician|surgeon|medic|health|clinical|hospital|care)/i;
-      return medicalTerms.test(lower);
-    }
-
-    // Tech jobs
-    if (keywords.has("tech")) {
-      const techTerms = /(engineer|developer|programmer|coder|software|tech|architect|analyst)/i;
-      return techTerms.test(lower);
-    }
-
-    // Sales jobs
-    if (keywords.has("sales")) {
-      const salesTerms = /(sale|retail|clerk|cashier|assistant|shop)/i;
-      return salesTerms.test(lower);
-    }
-
-    return false;
-  };
-
-  // Check if a term is a real job (not just gender/food/customer)
-  const isValidJobTerm = (term: string, originalJob: string): boolean => {
-    const lower = term.toLowerCase().trim();
-
-    // Exclude empty or very short terms
-    if (lower.length < 3) return false;
-
-    // Exclude if it's in the exclude list
-    if (excludeWords.has(lower)) return false;
-
-    // Exclude if it's ONLY a gender word with no other content
-    const genderOnlyPatterns = [
-      /^(man|woman|boy|girl|male|female|guy|gal|lady|ladies|gentleman)$/i,
-      /^(mis|mistr|mr|mrs|ms|sir|madam)$/i,
-    ];
-    if (genderOnlyPatterns.some((pattern) => pattern.test(lower))) return false;
-
-    // Exclude obvious non-job words (customers, food, etc.)
-    const nonJobPatterns = [
-      /goer$/i, // restaurantgoer, café-goer
-      /^(pizza|stew|tea|wine|food)$/i,
-      /person$/i, // Generic "person" terms that aren't specific jobs
-    ];
-    if (nonJobPatterns.some((pattern) => pattern.test(lower))) return false;
-
-    // Exclude malformed words (missing vowels in the middle)
-    if (/^[a-z]+[bcdfghjklmnpqrstvwxyz]{3,}$/i.test(lower)) return false;
-
-    // Must be relevant to the original job context
-    if (!isRelevantToJob(term, originalJob)) return false;
-
-    return true;
-  };
 
   // Common plural suffixes
   const pluralPatterns = [
@@ -223,25 +43,19 @@ export async function expandTerm(job: string, enableLogging: boolean = true): Pr
     return word;
   };
 
-  // Generate gender variants of a term
+  // Generate gender variants of a term (only for complete phrases)
   const generateGenderVariants = (term: string): string[] => {
     const variants = new Set([term]);
     const lowerTerm = term.toLowerCase();
 
     for (const { from, to } of genderTransforms) {
-      // Check if the term contains the gender pattern
-      if (lowerTerm.includes(from)) {
+      // Only match at word boundaries for complete words
+      const wordBoundaryRegex = new RegExp(`\\b${from}\\b`, "i");
+      if (wordBoundaryRegex.test(lowerTerm)) {
         to.forEach((replacement) => {
-          // Replace at word boundaries
-          const variant = term.replace(new RegExp(`\\b${from}\\b`, "gi"), replacement);
-          if (variant !== term) {
+          const variant = term.replace(wordBoundaryRegex, replacement);
+          if (variant !== term && variant.trim()) {
             variants.add(variant);
-          }
-
-          // Also try replacing within compound words
-          const compoundVariant = term.replace(new RegExp(from, "gi"), replacement);
-          if (compoundVariant !== term) {
-            variants.add(compoundVariant);
           }
         });
       }
@@ -254,14 +68,10 @@ export async function expandTerm(job: string, enableLogging: boolean = true): Pr
   const normalizeGender = (term: string): string => {
     let normalized = term;
 
-    // Remove gendered suffixes
+    // Remove gendered suffixes at word boundaries only
+    normalized = normalized.replace(/\bwoman\b/gi, "person");
+    normalized = normalized.replace(/\bman\b/gi, "person");
     normalized = normalized.replace(/ess$/i, ""); // actress -> actor
-    normalized = normalized.replace(/woman$/i, "person"); // businesswoman -> businessperson
-    normalized = normalized.replace(/man$/i, "person"); // businessman -> businessperson
-    normalized = normalized.replace(/\bfemale\b/gi, ""); // female engineer -> engineer
-    normalized = normalized.replace(/\bmale\b/gi, ""); // male nurse -> nurse
-    normalized = normalized.replace(/\bgirl\b/gi, ""); // girl scout -> scout
-    normalized = normalized.replace(/\bboy\b/gi, ""); // boy scout -> scout
 
     // Clean up extra spaces
     normalized = normalized.replace(/\s+/g, " ").trim();
@@ -269,20 +79,36 @@ export async function expandTerm(job: string, enableLogging: boolean = true): Pr
     return normalized;
   };
 
-  // Get conceptual synonyms for a term
-  const getConceptualSynonyms = async (term: string): Promise<string[]> => {
-    const url = `https://api.datamuse.com/words?rel_syn=${encodeURIComponent(term)}`;
+  // Strict job relevance filter
+  const isJobRelevant = (term: string, originalJob: string): boolean => {
+    const lower = term.toLowerCase();
+    const originalLower = originalJob.toLowerCase();
 
-    try {
-      const response = await fetch(url);
-      if (!response.ok) return [];
+    // Must be at least 3 characters
+    if (lower.length < 3) return false;
 
-      const data = await response.json();
-      return data.slice(0, 5).map((item: { word: string }) => item.word); // Top 5 synonyms
-    } catch (error) {
-      log("Synonym fetch error", { term, error: (error as Error).message });
-      return [];
+    // Exclude pure anatomical/botanical terms
+    const excludePatterns = [
+      /^(hair|fur|wool|silk|fiber|thread|strand)$/i,
+      /tomentum|cilium|trichome|follicle|phyton|meristem|tegmen/i,
+      /^(chest|drawer|bureau|cabinet|closet|wardrobe)$/i,
+      /^(escape|danger|blur|bull|pig|cop|chicken|detective)$/i,
+      /^(office|bureau|department|council|committee|desk|table)$/i,
+    ];
+
+    if (excludePatterns.some((p) => p.test(lower))) return false;
+
+    // For hair-related jobs, require hair/salon/style/cut/barber in term
+    if (/hair|barber|salon|style/i.test(originalLower)) {
+      return /hair|salon|style|cut|barber|stylist|dresser|coiffure|barbershop/i.test(lower);
     }
+
+    // For restaurant jobs, require food service terms
+    if (/wait|serv|restaurant|bar|food/i.test(originalLower)) {
+      return /wait|serv|bartend|host|steward|barista|somm|caterer|restaurant|bar|dining|cafe|flight/i.test(lower);
+    }
+
+    return true;
   };
 
   try {
@@ -294,25 +120,13 @@ export async function expandTerm(job: string, enableLogging: boolean = true): Pr
       throw new Error("Job term cannot be empty");
     }
 
-    // Step 1: Get conceptual synonyms of the original term
-    const conceptualSynonyms = await getConceptualSynonyms(cleanJob);
-    log("Found conceptual synonyms", { synonyms: conceptualSynonyms });
-
-    // Step 2: Generate all search terms (original + synonyms + gender variants of all)
-    const allSearchTerms = new Set([cleanJob, ...conceptualSynonyms]);
-    const searchVariants: string[] = [];
-
-    for (const term of allSearchTerms) {
-      const genderVariants = generateGenderVariants(term);
-      searchVariants.push(...genderVariants);
-    }
-
-    const uniqueSearchVariants = Array.from(new Set(searchVariants));
-    log("Generated search variants", { count: uniqueSearchVariants.length, variants: uniqueSearchVariants });
+    // CRITICAL: Use the full phrase as a single unit for API calls
+    const searchVariants = generateGenderVariants(cleanJob);
+    log("Generated search variants", { variants: searchVariants });
 
     // Fetch results for all variants in parallel
-    const fetchPromises = uniqueSearchVariants.map(async (variant) => {
-      const url = `https://api.datamuse.com/words?ml=${encodeURIComponent(variant)}`;
+    const fetchPromises = searchVariants.map(async (variant) => {
+      const url = `https://api.datamuse.com/words?ml=${encodeURIComponent(variant)}&max=30`;
       log("Fetching from API", { variant });
 
       try {
@@ -338,7 +152,7 @@ export async function expandTerm(job: string, enableLogging: boolean = true): Pr
 
     log("Raw results before filtering", { count: allResults.length });
 
-    // Process terms: normalize gender, singularize, filter, and deduplicate
+    // Process terms: normalize gender, singularize, filter
     const processedTerms = allResults
       .map((term: string) => normalizeGender(term))
       .map((term: string) => singularize(term))
@@ -346,10 +160,10 @@ export async function expandTerm(job: string, enableLogging: boolean = true): Pr
 
     log("After normalization", { count: processedTerms.length });
 
-    // Filter out invalid terms
+    // Filter for job relevance
     const validTerms = processedTerms.filter((term: string) => {
-      const isValid = isValidJobTerm(term, cleanJob);
-      if (!isValid) {
+      const isValid = isJobRelevant(term, cleanJob);
+      if (!isValid && enableLogging) {
         log("Filtered out", { term });
       }
       return isValid;
@@ -375,9 +189,9 @@ export async function expandTerm(job: string, enableLogging: boolean = true): Pr
 }
 
 // Example usage:
-// expandTerm('software engineer')
+// expandTerm('hair dresser')
 //   .then(terms => console.log('Related terms:', terms))
 //   .catch(err => console.error('Error:', err));
 
-// expandTerm('nurse', false)
+// expandTerm('waitress', false)
 //   .then(terms => console.log(terms));
