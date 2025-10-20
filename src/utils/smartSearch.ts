@@ -1,7 +1,10 @@
 import { pipeline } from "@huggingface/transformers";
 
-// Common hospitality terms for expansion
-const HOSPITALITY_TERMS = [
+/**
+ * Common work-related and hospitality terms used for broad semantic expansion.
+ * You can extend this list freely — it acts as your base search vocabulary.
+ */
+const BASE_TERMS = [
   "barista",
   "manager",
   "cashier",
@@ -53,13 +56,21 @@ const HOSPITALITY_TERMS = [
   "hotel",
   "gym",
   "salon",
+  "business",
+  "work",
+  "office",
+  "team member",
+  "customer service",
+  "assistant manager",
+  "service worker",
+  "retail associate",
 ];
 
-// Embedder model (lazy loaded)
+/** Lazy-loaded embedder model */
 let embedder: any = null;
 
 /**
- * Get or load the semantic embedder model
+ * Get or load the HuggingFace embedder
  */
 async function getEmbedder() {
   if (!embedder) {
@@ -71,60 +82,44 @@ async function getEmbedder() {
 }
 
 /**
+ * Normalize words: remove gendered, plural, or role suffixes for broader matching
+ */
+function normalize(word: string): string {
+  return word
+    .toLowerCase()
+    .replace(/(ess|ette|trix|man|men|woman|women|s)$/gi, "")
+    .replace(/[^a-z\s]/g, "")
+    .trim();
+}
+
+/**
  * Compute cosine similarity between two embedding vectors
  */
 function cosineSimilarity(vecA: number[], vecB: number[]): number {
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-
+  let dot = 0,
+    na = 0,
+    nb = 0;
   for (let i = 0; i < vecA.length; i++) {
-    dotProduct += vecA[i] * vecB[i];
-    normA += vecA[i] * vecA[i];
-    normB += vecB[i] * vecB[i];
+    dot += vecA[i] * vecB[i];
+    na += vecA[i] * vecA[i];
+    nb += vecB[i] * vecB[i];
   }
-
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+  return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
 /**
- * Find semantically similar terms using Datamuse API fallback
- */
-async function getDatamuseSynonyms(query: string): Promise<string[]> {
-  try {
-    console.log(`🌐 Fetching Datamuse synonyms for "${query}"...`);
-    const response = await fetch(`https://api.datamuse.com/words?ml=${encodeURIComponent(query)}&max=10`);
-
-    if (!response.ok) {
-      console.warn("⚠️ Datamuse API error:", response.status);
-      return [];
-    }
-
-    const data = await response.json();
-    const synonyms = data.map((item: any) => item.word).slice(0, 5);
-    console.log(`✅ Datamuse found ${synonyms.length} synonyms:`, synonyms);
-    return synonyms;
-  } catch (error) {
-    console.warn("⚠️ Datamuse API failed:", error);
-    return [];
-  }
-}
-
-/**
- * Get semantic embedding for text.
- * If multi-word, averages embeddings for each word.
+ * Get a semantic embedding for a text or phrase
  */
 async function getEmbedding(text: string): Promise<number[]> {
   const model = await getEmbedder();
   const words = text
-    .toLowerCase()
     .split(/\s+/)
+    .map((w) => normalize(w))
     .filter((w) => w.length > 0);
 
   if (words.length === 0) return [];
 
   const embeddings: number[][] = [];
-
   for (const word of words) {
     try {
       const output = await model(word, { pooling: "mean", normalize: true });
@@ -134,66 +129,21 @@ async function getEmbedding(text: string): Promise<number[]> {
     }
   }
 
+  // Average embeddings for multi-word phrases
   if (embeddings.length === 0) return [];
-
-  // Average all word embeddings
   const dim = embeddings[0].length;
   const meanEmbedding = new Array(dim).fill(0);
   for (const vec of embeddings) {
     for (let i = 0; i < dim; i++) meanEmbedding[i] += vec[i];
   }
   for (let i = 0; i < dim; i++) meanEmbedding[i] /= embeddings.length;
-
   return meanEmbedding;
 }
 
 /**
- * Expand a term with multi-word semantic and fuzzy logic.
+ * Fallback fuzzy matching using character-level similarity (Levenshtein ratio)
  */
-/**
- * Expand a term by finding related or similar words (no imports, no cache).
- * Handles multi-word phrases too.
- */
-export async function expandTerm(query, terms = HOSPITALITY_TERMS, threshold = 0.6) {
-  if (!query) return [];
-
-  const cleanQuery = query.toLowerCase().trim();
-  const results = new Set([cleanQuery]);
-
-  // Split query into words for partial / multi-word matching
-  const queryWords = cleanQuery.split(/\s+/);
-
-  for (const term of terms) {
-    const lowerTerm = term.toLowerCase();
-
-    // Exact or substring match
-    if (lowerTerm.includes(cleanQuery) || cleanQuery.includes(lowerTerm)) {
-      results.add(term);
-      continue;
-    }
-
-    // Word overlap (multi-word handling)
-    const termWords = lowerTerm.split(/\s+/);
-    const shared = queryWords.filter((w) => termWords.includes(w));
-    if (shared.length / Math.max(termWords.length, queryWords.length) > 0.4) {
-      results.add(term);
-      continue;
-    }
-
-    // Simple character-level similarity
-    const sim = similarityScore(cleanQuery, lowerTerm);
-    if (sim >= threshold) {
-      results.add(term);
-    }
-  }
-
-  return Array.from(results);
-}
-
-/**
- * Simple similarity function (Levenshtein ratio approximation)
- */
-function similarityScore(a, b) {
+function similarityScore(a: string, b: string): number {
   const longer = a.length > b.length ? a : b;
   const shorter = a.length > b.length ? b : a;
   const longerLength = longer.length;
@@ -201,7 +151,7 @@ function similarityScore(a, b) {
   return (longerLength - editDistance(longer, shorter)) / longerLength;
 }
 
-function editDistance(a, b) {
+function editDistance(a: string, b: string): number {
   const dp = Array(b.length + 1)
     .fill(null)
     .map(() => Array(a.length + 1).fill(0));
@@ -217,9 +167,55 @@ function editDistance(a, b) {
 }
 
 /**
- * Stub for precomputation - no longer needed without cache
+ * Expand a search term by semantic similarity and fuzzy matching.
+ * Works offline and handles multi-word inputs.
+ */
+export async function expandTerm(query: string, terms: string[] = BASE_TERMS, threshold = 0.6): Promise<string[]> {
+  if (!query) return [];
+  const normalizedQuery = normalize(query);
+  const results = new Set<string>([normalizedQuery]);
+
+  console.log(`\n🔍 Expanding term: "${query}" → normalized: "${normalizedQuery}"`);
+
+  try {
+    const queryEmbedding = await getEmbedding(normalizedQuery);
+    if (queryEmbedding.length === 0) throw new Error("No embedding for query");
+
+    const similarities: Array<{ term: string; score: number }> = [];
+
+    for (const term of terms) {
+      const normTerm = normalize(term);
+      const termEmbedding = await getEmbedding(normTerm);
+      if (termEmbedding.length === 0) continue;
+
+      const score = cosineSimilarity(queryEmbedding, termEmbedding);
+      similarities.push({ term, score });
+    }
+
+    similarities
+      .sort((a, b) => b.score - a.score)
+      .filter((s) => s.score >= threshold)
+      .forEach((s) => results.add(s.term));
+
+    console.log(`✅ Semantic matches for "${query}":`, Array.from(results));
+  } catch (err) {
+    console.warn("⚠️ Semantic model failed, falling back to fuzzy matching:", err);
+
+    for (const term of terms) {
+      const normTerm = normalize(term);
+      if (similarityScore(normalizedQuery, normTerm) > threshold) {
+        results.add(term);
+      }
+    }
+  }
+
+  return Array.from(results);
+}
+
+/**
+ * Deprecated: precompute cache (not needed anymore)
  */
 export async function precomputeCommonTerms(): Promise<void> {
-  console.log("ℹ️ precomputeCommonTerms is deprecated (no cache), skipping");
+  console.log("ℹ️ precomputeCommonTerms is deprecated — no cache used");
   return Promise.resolve();
 }
