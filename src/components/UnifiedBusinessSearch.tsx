@@ -6,6 +6,7 @@ import { isProfane } from '@/utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 import { Search } from 'lucide-react';
 import { calculateBusinessFuzzyScore } from '@/utils/fuzzySearch';
+import { searchBusinessesByQuery } from '@/services/unifiedSearch';
 
 interface UnifiedBusinessSearchProps {
   value: string;
@@ -250,21 +251,22 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           });
         }
         
-        // Use businesses from the map (they're already filtered correctly)
-        if (mapBusinesses && mapBusinesses.length > 0) {
-          console.log(`🔍 Dropdown showing ${Math.min(mapBusinesses.length, 30)} of ${mapBusinesses.length} businesses from map`);
-          
-          // Map to EnhancedBusiness format - limit to 30 for dropdown
-          const enhancedResults = mapBusinesses
-            .slice(0, 30)
-            .map(b => ({
-              ...b,
-              lat: b.position?.lat || b.lat,
-              lng: b.position?.lng || b.lng
-            })) as EnhancedBusiness[];
-          
-          results.push(...enhancedResults);
-        }
+        // Perform immediate search for dropdown (independent of map's debounced search)
+        console.log(`🔍 [Dropdown] Performing immediate search for: "${q}"`);
+        const searchResults = await searchBusinessesByQuery(q, undefined, 30);
+        
+        if (seq !== searchSeqRef.current) return;
+        
+        console.log(`✅ [Dropdown] Found ${searchResults.length} immediate results`);
+        
+        // Convert to EnhancedBusiness format
+        const enhancedResults = searchResults.map(b => ({
+          ...b,
+          lat: b.position.lat,
+          lng: b.position.lng
+        })) as EnhancedBusiness[];
+        
+        results.push(...enhancedResults);
         
         if (seq !== searchSeqRef.current) return;
         
