@@ -150,78 +150,70 @@ async function getEmbedding(text: string): Promise<number[]> {
 /**
  * Expand a term with multi-word semantic and fuzzy logic.
  */
-export async function expandTerm(
-  query: string,
-  terms: string[] = HOSPITALITY_TERMS,
-  threshold: number = 0.6,
-): Promise<string[]> {
+/**
+ * Expand a term by finding related or similar words (no imports, no cache).
+ * Handles multi-word phrases too.
+ */
+export async function expandTerm(query, terms = HOSPITALITY_TERMS, threshold = 0.6) {
+  if (!query) return [];
+
   const cleanQuery = query.toLowerCase().trim();
+  const results = new Set([cleanQuery]);
 
-  if (!cleanQuery) {
-    console.log("⚠️ Empty query, returning []");
-    return [];
-  }
+  // Split query into words for partial / multi-word matching
+  const queryWords = cleanQuery.split(/\s+/);
 
-  console.log(`\n==============================`);
-  console.log(`🔍 [expandTerm] Expanding: "${cleanQuery}"`);
-  console.log(`🧠 Threshold: ${threshold}, Comparing against ${terms.length} terms`);
-  console.log(`==============================\n`);
+  for (const term of terms) {
+    const lowerTerm = term.toLowerCase();
 
-  const results = new Set<string>([cleanQuery]);
-
-  try {
-    console.log(`🤖 [embedder] Getting embedding for "${cleanQuery}"...`);
-    const queryEmbedding = await getEmbedding(cleanQuery);
-
-    if (queryEmbedding.length === 0) {
-      console.warn("⚠️ No embedding produced for query.");
-      return [cleanQuery];
+    // Exact or substring match
+    if (lowerTerm.includes(cleanQuery) || cleanQuery.includes(lowerTerm)) {
+      results.add(term);
+      continue;
     }
 
-    const similarities: Array<{ term: string; score: number }> = [];
-
-    for (const term of terms) {
-      const termEmbedding = await getEmbedding(term);
-      if (termEmbedding.length === 0) continue;
-
-      const similarity = cosineSimilarity(queryEmbedding, termEmbedding);
-      similarities.push({ term, score: similarity });
-
-      // Detailed per-term logging
-      if (similarity >= threshold) {
-        console.log(`  🟩 "${term}" → ${similarity.toFixed(3)} ✅`);
-      } else if (similarity >= threshold * 0.8) {
-        console.log(`  🟨 "${term}" → ${similarity.toFixed(3)} (close)`);
-      } else {
-        console.log(`  ⬜ "${term}" → ${similarity.toFixed(3)}`);
-      }
+    // Word overlap (multi-word handling)
+    const termWords = lowerTerm.split(/\s+/);
+    const shared = queryWords.filter((w) => termWords.includes(w));
+    if (shared.length / Math.max(termWords.length, queryWords.length) > 0.4) {
+      results.add(term);
+      continue;
     }
 
-    similarities.sort((a, b) => b.score - a.score);
-
-    const expandedTerms = similarities.filter((s) => s.score >= threshold).map((s) => s.term);
-
-    expandedTerms.forEach((t) => results.add(t));
-
-    console.log(`\n✅ [expandTerm] Semantic expansion found ${expandedTerms.length} terms:`, expandedTerms);
-  } catch (error) {
-    console.warn(`⚠️ [expandTerm] Transformer failed, using Datamuse fallback...`, error);
-
-    const apiSynonyms = await getDatamuseSynonyms(cleanQuery);
-    if (apiSynonyms.length > 0) {
-      apiSynonyms.forEach((t) => results.add(t));
-      console.log(`✅ [expandTerm] Datamuse added ${apiSynonyms.length} terms`);
-    } else {
-      console.log(`⚠️ [expandTerm] No terms from fallback.`);
+    // Simple character-level similarity
+    const sim = similarityScore(cleanQuery, lowerTerm);
+    if (sim >= threshold) {
+      results.add(term);
     }
   }
 
-  const finalResults = Array.from(results);
-  console.log(`\n🎯 [expandTerm] Final expanded terms for "${cleanQuery}":`);
-  finalResults.forEach((r, i) => console.log(`   ${i + 1}. ${r}`));
-  console.log(`==============================\n`);
+  return Array.from(results);
+}
 
-  return finalResults;
+/**
+ * Simple similarity function (Levenshtein ratio approximation)
+ */
+function similarityScore(a, b) {
+  const longer = a.length > b.length ? a : b;
+  const shorter = a.length > b.length ? b : a;
+  const longerLength = longer.length;
+  if (longerLength === 0) return 1.0;
+  return (longerLength - editDistance(longer, shorter)) / longerLength;
+}
+
+function editDistance(a, b) {
+  const dp = Array(b.length + 1)
+    .fill(null)
+    .map(() => Array(a.length + 1).fill(0));
+  for (let i = 0; i <= b.length; i++) dp[i][0] = i;
+  for (let j = 0; j <= a.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      dp[i][j] =
+        b[i - 1] === a[j - 1] ? dp[i - 1][j - 1] : Math.min(dp[i - 1][j - 1] + 1, dp[i][j - 1] + 1, dp[i - 1][j] + 1);
+    }
+  }
+  return dp[b.length][a.length];
 }
 
 /**
