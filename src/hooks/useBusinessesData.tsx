@@ -49,11 +49,6 @@ export const useBusinessesData = () => {
         const totalRoles = basicBusinesses.reduce((sum, b) => sum + (b.roles?.length || 0), 0);
         console.log(`📋 Loaded ${totalRoles} total roles across all businesses`);
         
-        // Build search index with all roles and business names
-        const { buildSearchIndex } = await import('@/utils/businessSearchIndex');
-        buildSearchIndex(basicBusinesses);
-        console.log(`🔍 Built search index with roles and business names`);
-        
         // Cache all business coordinates
         const newCache: Record<string, { lat: number; lng: number; name: string }> = {};
         basicBusinesses.forEach(b => {

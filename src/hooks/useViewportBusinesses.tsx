@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Business } from '@/types/business';
 import { getBusinessesInViewport, getFullBusinessDetails as getFullBusinessDetailsService } from '@/services/businesses';
-import { progressiveSearch } from '@/services/progressiveSearch';
 import { isPointInPolygon } from '@/utils/nyc_neighborhoods'
 import { useTileCache } from './useTileCache';
 import { useMapWorker } from './useMapWorker';
@@ -148,7 +147,6 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
     }, 1000);
   }, [getCachedBusinesses, setCachedBusinesses, searchFilters, zoom]);
 
-  // ----------------- Main Loading -----------------
   const loadBusinessesInViewport = useCallback(async (viewportBounds: MapBounds, limit = 8000, isMoving = false) => {
     let searchPolygon: MapPoint[] | null = null;
 
@@ -158,6 +156,12 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
     }
 
     const isNewSearch = JSON.stringify(searchFilters) !== JSON.stringify(lastSearchFilters);
+
+    // Clear businesses when transitioning from search to no search
+    if (isNewSearch && lastSearchFilters && !searchFilters) {
+      console.log('🧹 Clearing search results, restoring full viewport');
+      setBusinesses([]);
+    }
 
     // Only block if it's the exact same request (not just any loading)
     if (loading && !isNewSearch && !isMoving) {
@@ -263,7 +267,6 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
 
   // Cleanup on filter changes
   useEffect(() => {
-    progressiveSearch.abort();
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
     if (preloadTimeoutRef.current) clearTimeout(preloadTimeoutRef.current);
   }, [searchFilters]);

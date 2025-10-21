@@ -1,233 +1,197 @@
-import { pipeline } from "@huggingface/transformers";
-
-// Common hospitality terms for expansion
-const HOSPITALITY_TERMS = [
-  "barista",
-  "manager",
-  "cashier",
-  "server",
-  "cook",
-  "chef",
-  "waiter",
-  "waitress",
-  "host",
-  "hostess",
-  "bartender",
-  "barback",
-  "line cook",
-  "dishwasher",
-  "assistant",
-  "supervisor",
-  "lead",
-  "team",
-  "crew",
-  "staff",
-  "associate",
-  "representative",
-  "agent",
-  "coordinator",
-  "specialist",
-  "technician",
-  "receptionist",
-  "secretary",
-  "clerk",
-  "sales",
-  "service",
-  "customer",
-  "food",
-  "kitchen",
-  "front",
-  "back",
-  "house",
-  "floor",
-  "delivery",
-  "driver",
-  "cleaner",
-  "maintenance",
-  "intern",
-  "trainee",
-  "restaurant",
-  "cafe",
-  "coffee",
-  "bar",
-  "hotel",
-  "gym",
-  "salon",
-];
-
-// Embedder model (lazy loaded)
-let embedder: any = null;
-
 /**
- * Get or load the semantic embedder model
+ * Expands job terms into related words using the DataMuse API
+ * Treats multi-word phrases as single units and focuses on job-relevant terms
+ * @param job - The job term to expand
+ * @param enableLogging - Enable console logging (default: true)
+ * @returns Array of normalized related job terms
  */
-async function getEmbedder() {
-  if (!embedder) {
-    console.log("🚀 Loading semantic embedder model...");
-    embedder = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
-    console.log("✅ Embedder model loaded");
-  }
-  return embedder;
-}
-
-/**
- * Compute cosine similarity between two embedding vectors
- */
-function cosineSimilarity(vecA: number[], vecB: number[]): number {
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-
-  for (let i = 0; i < vecA.length; i++) {
-    dotProduct += vecA[i] * vecB[i];
-    normA += vecA[i] * vecA[i];
-    normB += vecB[i] * vecB[i];
-  }
-
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-}
-
-/**
- * Find semantically similar terms using Datamuse API fallback
- */
-async function getDatamuseSynonyms(query: string): Promise<string[]> {
-  try {
-    console.log(`🌐 Fetching Datamuse synonyms for "${query}"...`);
-    const response = await fetch(`https://api.datamuse.com/words?ml=${encodeURIComponent(query)}&max=10`);
-
-    if (!response.ok) {
-      console.warn("⚠️ Datamuse API error:", response.status);
-      return [];
+export async function expandTerm(job: string, enableLogging: boolean = true): Promise<string[]> {
+  const log = (message: string, data: unknown = null) => {
+    if (enableLogging) {
+      const timestamp = new Date().toISOString();
+      console.log(`[${timestamp}] expandTerm:`, message, data || "");
     }
+  };
 
-    const data = await response.json();
-    const synonyms = data.map((item: any) => item.word).slice(0, 5);
-    console.log(`✅ Datamuse found ${synonyms.length} synonyms:`, synonyms);
-    return synonyms;
-  } catch (error) {
-    console.warn("⚠️ Datamuse API failed:", error);
-    return [];
-  }
-}
+  // Gender suffixes and patterns to transform
+  const genderTransforms = [
+    { from: "man", to: ["woman", "person"] },
+    { from: "woman", to: ["man", "person"] },
+    { from: "ess", to: [""] }, // actress -> actor
+    { from: "or", to: ["ress"] }, // actor -> actress
+    { from: "er", to: ["ress"] }, // waiter -> waitress
+  ];
 
-/**
- * Get semantic embedding for text.
- * If multi-word, averages embeddings for each word.
- */
-async function getEmbedding(text: string): Promise<number[]> {
-  const model = await getEmbedder();
-  const words = text
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((w) => w.length > 0);
+  // Common plural suffixes
+  const pluralPatterns = [
+    { pattern: /ies$/, replacement: "y" },
+    { pattern: /ves$/, replacement: "f" },
+    { pattern: /ses$/, replacement: "s" },
+    { pattern: /ches$/, replacement: "ch" },
+    { pattern: /shes$/, replacement: "sh" },
+    { pattern: /xes$/, replacement: "x" },
+    { pattern: /zes$/, replacement: "z" },
+    { pattern: /s$/, replacement: "" },
+  ];
 
-  if (words.length === 0) return [];
-
-  const embeddings: number[][] = [];
-
-  for (const word of words) {
-    try {
-      const output = await model(word, { pooling: "mean", normalize: true });
-      embeddings.push(Array.from(output.data));
-    } catch (err) {
-      console.warn(`⚠️ Failed to embed "${word}":`, err);
+  const singularize = (word: string): string => {
+    for (const { pattern, replacement } of pluralPatterns) {
+      if (pattern.test(word)) {
+        return word.replace(pattern, replacement);
+      }
     }
-  }
+    return word;
+  };
 
-  if (embeddings.length === 0) return [];
+  // Generate gender variants of a term (only for complete phrases)
+  const generateGenderVariants = (term: string): string[] => {
+    const variants = new Set([term]);
+    const lowerTerm = term.toLowerCase();
 
-  // Average all word embeddings
-  const dim = embeddings[0].length;
-  const meanEmbedding = new Array(dim).fill(0);
-  for (const vec of embeddings) {
-    for (let i = 0; i < dim; i++) meanEmbedding[i] += vec[i];
-  }
-  for (let i = 0; i < dim; i++) meanEmbedding[i] /= embeddings.length;
-
-  return meanEmbedding;
-}
-
-/**
- * Expand a term with multi-word semantic and fuzzy logic.
- */
-export async function expandTerm(
-  query: string,
-  terms: string[] = HOSPITALITY_TERMS,
-  threshold: number = 0.6,
-): Promise<string[]> {
-  const cleanQuery = query.toLowerCase().trim();
-
-  if (!cleanQuery) {
-    console.log("⚠️ Empty query, returning []");
-    return [];
-  }
-
-  console.log(`\n==============================`);
-  console.log(`🔍 [expandTerm] Expanding: "${cleanQuery}"`);
-  console.log(`🧠 Threshold: ${threshold}, Comparing against ${terms.length} terms`);
-  console.log(`==============================\n`);
-
-  const results = new Set<string>([cleanQuery]);
-
-  try {
-    console.log(`🤖 [embedder] Getting embedding for "${cleanQuery}"...`);
-    const queryEmbedding = await getEmbedding(cleanQuery);
-
-    if (queryEmbedding.length === 0) {
-      console.warn("⚠️ No embedding produced for query.");
-      return [cleanQuery];
-    }
-
-    const similarities: Array<{ term: string; score: number }> = [];
-
-    for (const term of terms) {
-      const termEmbedding = await getEmbedding(term);
-      if (termEmbedding.length === 0) continue;
-
-      const similarity = cosineSimilarity(queryEmbedding, termEmbedding);
-      similarities.push({ term, score: similarity });
-
-      // Detailed per-term logging
-      if (similarity >= threshold) {
-        console.log(`  🟩 "${term}" → ${similarity.toFixed(3)} ✅`);
-      } else if (similarity >= threshold * 0.8) {
-        console.log(`  🟨 "${term}" → ${similarity.toFixed(3)} (close)`);
-      } else {
-        console.log(`  ⬜ "${term}" → ${similarity.toFixed(3)}`);
+    for (const { from, to } of genderTransforms) {
+      // Only match at word boundaries for complete words
+      const wordBoundaryRegex = new RegExp(`\\b${from}\\b`, "i");
+      if (wordBoundaryRegex.test(lowerTerm)) {
+        to.forEach((replacement) => {
+          const variant = term.replace(wordBoundaryRegex, replacement);
+          if (variant !== term && variant.trim()) {
+            variants.add(variant);
+          }
+        });
       }
     }
 
-    similarities.sort((a, b) => b.score - a.score);
+    return Array.from(variants);
+  };
 
-    const expandedTerms = similarities.filter((s) => s.score >= threshold).map((s) => s.term);
+  // Normalize a term by removing gender markers
+  const normalizeGender = (term: string): string => {
+    let normalized = term;
 
-    expandedTerms.forEach((t) => results.add(t));
+    // Remove gendered suffixes at word boundaries only
+    normalized = normalized.replace(/\bwoman\b/gi, "person");
+    normalized = normalized.replace(/\bman\b/gi, "person");
+    normalized = normalized.replace(/ess$/i, ""); // actress -> actor
 
-    console.log(`\n✅ [expandTerm] Semantic expansion found ${expandedTerms.length} terms:`, expandedTerms);
-  } catch (error) {
-    console.warn(`⚠️ [expandTerm] Transformer failed, using Datamuse fallback...`, error);
+    // Clean up extra spaces
+    normalized = normalized.replace(/\s+/g, " ").trim();
 
-    const apiSynonyms = await getDatamuseSynonyms(cleanQuery);
-    if (apiSynonyms.length > 0) {
-      apiSynonyms.forEach((t) => results.add(t));
-      console.log(`✅ [expandTerm] Datamuse added ${apiSynonyms.length} terms`);
-    } else {
-      console.log(`⚠️ [expandTerm] No terms from fallback.`);
+    return normalized;
+  };
+
+  // Strict job relevance filter
+  const isJobRelevant = (term: string, originalJob: string): boolean => {
+    const lower = term.toLowerCase();
+    const originalLower = originalJob.toLowerCase();
+
+    // Must be at least 3 characters
+    if (lower.length < 3) return false;
+
+    // Exclude pure anatomical/botanical terms
+    const excludePatterns = [
+      /^(hair|fur|wool|silk|fiber|thread|strand)$/i,
+      /tomentum|cilium|trichome|follicle|phyton|meristem|tegmen/i,
+      /^(chest|drawer|bureau|cabinet|closet|wardrobe)$/i,
+      /^(escape|danger|blur|bull|pig|cop|chicken|detective)$/i,
+      /^(office|bureau|department|council|committee|desk|table)$/i,
+    ];
+
+    if (excludePatterns.some((p) => p.test(lower))) return false;
+
+    // For hair-related jobs, require hair/salon/style/cut/barber in term
+    if (/hair|barber|salon|style/i.test(originalLower)) {
+      return /hair|salon|style|cut|barber|stylist|dresser|coiffure|barbershop/i.test(lower);
     }
+
+    // For restaurant jobs, require food service terms
+    if (/wait|serv|restaurant|bar|food/i.test(originalLower)) {
+      return /wait|serv|bartend|host|steward|barista|somm|caterer|restaurant|bar|dining|cafe|flight/i.test(lower);
+    }
+
+    return true;
+  };
+
+  try {
+    log("Starting term expansion", { job });
+
+    const cleanJob = job.trim();
+    if (!cleanJob) {
+      log("Error: Empty job term provided");
+      throw new Error("Job term cannot be empty");
+    }
+
+    // CRITICAL: Use the full phrase as a single unit for API calls
+    const searchVariants = generateGenderVariants(cleanJob);
+    log("Generated search variants", { variants: searchVariants });
+
+    // Fetch results for all variants in parallel
+    const fetchPromises = searchVariants.map(async (variant) => {
+      const url = `https://api.datamuse.com/words?ml=${encodeURIComponent(variant)}&max=30`;
+      log("Fetching from API", { variant });
+
+      try {
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          log("API request failed", { variant, status: response.status });
+          return [];
+        }
+
+        const data = await response.json();
+        log("API response received", { variant, resultCount: data.length });
+
+        return data.map((item: { word: string }) => item.word);
+      } catch (error) {
+        log("Fetch error for variant", { variant, error: (error as Error).message });
+        return [];
+      }
+    });
+
+    const resultsArrays = await Promise.all(fetchPromises);
+    const allResults = resultsArrays.flat();
+
+    log("Raw results before filtering", { count: allResults.length });
+
+    // Process terms: normalize gender, singularize, filter
+    const processedTerms = allResults
+      .map((term: string) => normalizeGender(term))
+      .map((term: string) => singularize(term))
+      .filter((term: string) => term.length > 0);
+
+    log("After normalization", { count: processedTerms.length });
+
+    // Filter for job relevance
+    const validTerms = processedTerms.filter((term: string) => {
+      const isValid = isJobRelevant(term, cleanJob);
+      if (!isValid && enableLogging) {
+        log("Filtered out", { term });
+      }
+      return isValid;
+    });
+
+    log("After validation", { count: validTerms.length });
+
+    // Remove duplicates (case-insensitive)
+    const uniqueTerms = Array.from(new Map(validTerms.map((term: string) => [term.toLowerCase(), term])).values());
+
+    log("Term expansion complete", {
+      totalFetched: allResults.length,
+      afterValidation: validTerms.length,
+      uniqueCount: uniqueTerms.length,
+      terms: uniqueTerms,
+    });
+
+    return uniqueTerms;
+  } catch (error) {
+    log("Error occurred", { error: (error as Error).message });
+    throw error;
   }
-
-  const finalResults = Array.from(results);
-  console.log(`\n🎯 [expandTerm] Final expanded terms for "${cleanQuery}":`);
-  finalResults.forEach((r, i) => console.log(`   ${i + 1}. ${r}`));
-  console.log(`==============================\n`);
-
-  return finalResults;
 }
 
-/**
- * Stub for precomputation - no longer needed without cache
- */
-export async function precomputeCommonTerms(): Promise<void> {
-  console.log("ℹ️ precomputeCommonTerms is deprecated (no cache), skipping");
-  return Promise.resolve();
-}
+// Example usage:
+// expandTerm('hair dresser')
+//   .then(terms => console.log('Related terms:', terms))
+//   .catch(err => console.error('Error:', err));
+
+// expandTerm('waitress', false)
+//   .then(terms => console.log(terms));

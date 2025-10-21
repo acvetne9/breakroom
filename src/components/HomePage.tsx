@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import MapLibreMap from './MapLibreMap';
 import BusinessPreview from './BusinessPreview';
 import BusinessDetails from './BusinessDetails';
 import BreakroomLoading from './BreakroomLoading';
 import UnifiedBusinessSearch from './UnifiedBusinessSearch';
-import { EnhancedBusiness } from '@/services/enhancedBusinessSearch';
+import { EnhancedBusiness } from '@/types/search';
 import { parseSearchFilters } from '@/services/businessFiltering';
 import { useToast } from '@/hooks/use-toast';
+import { clearSearchCache } from '@/services/unifiedSearch';
 
-// Move landmarks outside component to prevent recreation on every render
 const LANDMARKS = [
   {lat: 40.690331, lng: -74.045414, emoji: "🗽"},
   {lat: 40.75266, lng: -73.97729, emoji: "🚃"},
@@ -71,55 +71,66 @@ const HomePage: React.FC<HomePageProps> = ({
   votingRoles
 }) => {
   const [searchValue, setSearchValue] = useState('');
-  const [searchFilters, setSearchFilters] = useState<any>(null);
+  const [debouncedSearchValue, setDebouncedSearchValue] = useState('');
   const [neighborhoodCenter, setNeighborhoodCenter] = useState<{ lat: number; lon: number } | null>(null);
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
   const [showLoading, setShowLoading] = useState(true);
-  const [searchCompleted, setSearchCompleted] = useState(false); // Track if a search has been completed
-  const [mapBusinesses, setMapBusinesses] = useState<any[]>([]); // Track businesses from the map
-
-  // 👇 state for welcome banner
+  const [searchCompleted, setSearchCompleted] = useState(false);
+  const [mapBusinesses, setMapBusinesses] = useState<any[]>([]);
   const [showWelcome, setShowWelcome] = useState(false);
+
+  // Debounce search value updates (2 seconds as requested)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchValue(searchValue);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [searchValue]);
+
+  // Handle Enter key to trigger immediate search
+  const handleSearchKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      setDebouncedSearchValue(searchValue);
+    }
+  }, [searchValue]);
+
+  // Memoize searchFilters to prevent recreation on every render
+  const searchFilters = useMemo(() => {
+    if (!debouncedSearchValue.trim()) return null;
+    const filters = parseSearchFilters(debouncedSearchValue);
+    
+    if (filters?.neighborhoodFilter?.center) {
+      setNeighborhoodCenter(filters.neighborhoodFilter.center);
+    }
+    
+    return filters;
+  }, [debouncedSearchValue]);
 
   // Listen for search triggers from other pages
   useEffect(() => {
     const handleSearchTrigger = (event: CustomEvent) => {
       const searchTerm = event.detail;
       console.log('🔍 [triggerSearch] Received search trigger:', searchTerm);
+      clearSearchCache();
       setSearchValue(searchTerm);
-      
-      const filters = parseSearchFilters(searchTerm);
-      console.log('🔍 [triggerSearch] Parsed filters:', filters);
-      
-      if (filters?.neighborhoodFilter) {
-        const neighborhoodCoords = {
-          lat: filters.neighborhoodFilter.center.lat,
-          lon: filters.neighborhoodFilter.center.lon
-        };
-        setNeighborhoodCenter(neighborhoodCoords);
-
-      }
-      setSearchFilters(filters);
-      setSearchCompleted(true); // Mark search as completed
+      setSearchCompleted(true);
     };
 
     window.addEventListener('triggerSearch', handleSearchTrigger as EventListener);
     return () => window.removeEventListener('triggerSearch', handleSearchTrigger as EventListener);
   }, []);
 
-  // 👇 when loading completes, mark it closed
   const handleLoadingComplete = () => {
     setShowLoading(false);
   };
 
-  // 👇 Show welcome banner ONLY after initiation card closes
   useEffect(() => {
     if (!showLoading && currentView === 'main') {
       const timer1 = setTimeout(() => {
         setShowWelcome(true);
         const timer2 = setTimeout(() => setShowWelcome(false), 6000);
         return () => clearTimeout(timer2);
-      }, 500); // small delay to avoid overlap
+      }, 500);
       return () => clearTimeout(timer1);
     }
   }, [showLoading, currentView]);
@@ -127,41 +138,31 @@ const HomePage: React.FC<HomePageProps> = ({
   const selectedBusiness = propSelectedBusiness;
   const { toast } = useToast();
 
-  const handleSearchChange = (
+  const handleSearchChange = useCallback((
     value: string,
     business?: EnhancedBusiness,
     filters?: any,
     neighborhoodCoords?: { lat: number; lon: number }
   ) => {
-    console.log("🔍 Search change in HomePage:", { value, filters });
-  
-    setSearchValue(value);
-  
-    // Always re-parse if filters weren’t passed from child
-    const parsedFilters = filters || parseSearchFilters(value);
-  
-    setSearchFilters(parsedFilters);
-  
-    if (parsedFilters?.neighborhoodFilter?.center) {
-      setNeighborhoodCenter(parsedFilters.neighborhoodFilter.center);
-    } else {
-      setNeighborhoodCenter(null);
+    console.log("🔍 Search change in HomePage:", { value });
+    
+    if (value.trim()) {
+      clearSearchCache();
     }
+    
+    setSearchValue(value);
+    setSearchCompleted(!!value.trim());
   
-    setSearchCompleted(!!value.trim() || parsedFilters !== null);
-  
-    if (!value && !parsedFilters) {
-      console.log("🧹 Search explicitly cleared - removing filters");
-      setSearchFilters(null);
+    if (!value.trim()) {
+      console.log("🧹 Search cleared");
       setNeighborhoodCenter(null);
       setSearchCompleted(false);
     }
-  };
-
+  }, []);
 
   const handleSearchBusinessSelect = (business: EnhancedBusiness) => {
     console.log('🔍 DEBUG: handleSearchBusinessSelect deps check', { 
-      searchFilters: typeof searchFilters 
+      hasSearchFilters: !!searchFilters 
     });
     const mapBusiness = {
       ...business,
@@ -169,7 +170,6 @@ const HomePage: React.FC<HomePageProps> = ({
       formatted_address: business.formatted_address || business.vicinity || business.name
     };
     
-    // Dispatch custom event to trigger map flyTo
     if (business?.position?.lat && business?.position?.lng) {
       window.dispatchEvent(new CustomEvent('flyToBusiness', {
         detail: {
@@ -216,18 +216,14 @@ const HomePage: React.FC<HomePageProps> = ({
     setShowBusinessDetails(false);
   };
 
-  // 👇 New function to clear search
-  const handleClearSearch = () => {
+  const handleClearSearch = useCallback(() => {
     console.log('🧹 Clearing search from X button');
     setSearchValue('');
-    setSearchFilters(null);
+    setDebouncedSearchValue('');
     setNeighborhoodCenter(null);
-    setSearchCompleted(false); // Reset search completed state
-    // Also trigger the onChange to ensure UnifiedBusinessSearch is updated
-    handleSearchChange('', undefined, null, undefined);
-  };
+    setSearchCompleted(false);
+  }, []);
 
-  // Check if we have an active search (either value or filters) AND search has been completed
   const hasActiveSearch = searchValue.trim() !== '' || searchFilters !== null;
   const showClearButton = searchCompleted && hasActiveSearch;
 
@@ -235,7 +231,6 @@ const HomePage: React.FC<HomePageProps> = ({
     const handleResize = () => {
       const mapContainer = document.querySelector('.maplibregl-map') as HTMLElement;
       if (mapContainer) {
-        // MapLibre attaches the map instance to the container
         // @ts-ignore
         const map = mapContainer?.__map__ || mapContainer?.map;
         if (map && typeof map.resize === 'function') {
@@ -256,7 +251,6 @@ const HomePage: React.FC<HomePageProps> = ({
         <BreakroomLoading onComplete={handleLoadingComplete} />
       )}
 
-      {/* 👇 Welcome banner only appears AFTER initiation card closes */}
       {showWelcome && (
         <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-30 w-[90%] max-w-lg transition-opacity duration-700">
           <div className="bg-white rounded-2xl shadow-md px-4 py-3 text-center text-sm font-medium border border-gray-200">
@@ -266,10 +260,8 @@ const HomePage: React.FC<HomePageProps> = ({
         </div>
       )}
 
-      {/* Only show map content after loading completes */}
       {!showLoading && (
         <div>
-          {/* MapLibre with OpenStreetMap base layer */}
           <MapLibreMap
             onBusinessClick={handleBusinessClick}
             selectedBusiness={selectedBusiness}
@@ -279,7 +271,6 @@ const HomePage: React.FC<HomePageProps> = ({
             onBusinessesUpdate={setMapBusinesses}
           />
         
-          {/* Business Preview Popup */}
           {selectedBusiness && !showBusinessDetails && (
             <BusinessPreview 
               business={selectedBusiness}
@@ -290,7 +281,6 @@ const HomePage: React.FC<HomePageProps> = ({
             />
           )}
     
-          {/* Business Details Card */}
           {selectedBusiness && showBusinessDetails && (
             <BusinessDetails 
               business={selectedBusiness}
@@ -304,7 +294,6 @@ const HomePage: React.FC<HomePageProps> = ({
             />
           )}
 
-          {/* Search input bar at bottom */}
           {currentSlide === 1 && currentView === 'main' && (
             <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
               <div className="relative">
@@ -314,12 +303,11 @@ const HomePage: React.FC<HomePageProps> = ({
                   onBusinessSelect={handleSearchBusinessSelect}
                   placeholder="Find that next gig!"
                   variant="search-bar"
-                  showIcon={!showClearButton} // Hide search icon when clear button should show
+                  showIcon={!showClearButton}
                   onLocationSave={onLocationSave}
                   mapBusinesses={mapBusinesses}
                 />
                 
-                {/* Clear search button (X) that replaces the search icon */}
                 {showClearButton && (
                   <button
                     onClick={handleClearSearch}

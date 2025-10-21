@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { searchBusinessesEnhanced, EnhancedBusiness } from '@/services/enhancedBusinessSearch';
+import { EnhancedBusiness } from '@/types/search';
 import { parseSearchFilters, applyBusinessFilters } from '@/services/businessFiltering';
 import { findNeighborhoodBoundaryByName } from '@/utils/nyc_neighborhoods';
 import { isProfane } from '@/utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 import { Search } from 'lucide-react';
 import { calculateBusinessFuzzyScore } from '@/utils/fuzzySearch';
-import { expandTerm } from '@/utils/smartSearch';
+import { searchBusinessesByQuery } from '@/services/unifiedSearch';
 
 interface UnifiedBusinessSearchProps {
   value: string;
@@ -207,7 +207,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     };
   }, []);
 
-  // Enhanced debounced suggestions with relevance scoring
+  // Show businesses from map in dropdown
   useEffect(() => {
     const q = value.trim();
     
@@ -251,27 +251,22 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           });
         }
         
-        // Parse filters and call the SAME search function the map uses
-        const filters = parseSearchFilters(q);
+        // Perform immediate search for dropdown (independent of map's debounced search)
+        console.log(`🔍 [Dropdown] Performing immediate search for: "${q}"`);
+        const searchResults = await searchBusinessesByQuery(q, undefined, 30);
         
-        if (filters) {
-          // Import and call searchBusinessesUnified - same function map uses!
-          const { searchBusinessesUnified } = await import('@/services/unifiedSearch');
-          
-          // Call with no bounds for dropdown (show all matching businesses)
-          const businessResults = await searchBusinessesUnified(filters, undefined, 30);
-          
-          console.log(`🔍 Dropdown search for "${q}" returned ${businessResults.length} results`);
-          
-          // Map Business to EnhancedBusiness format (flatten position)
-          const enhancedResults = businessResults.map(b => ({
-            ...b,
-            lat: b.position.lat,
-            lng: b.position.lng
-          })) as EnhancedBusiness[];
-          
-          results.push(...enhancedResults);
-        }
+        if (seq !== searchSeqRef.current) return;
+        
+        console.log(`✅ [Dropdown] Found ${searchResults.length} immediate results`);
+        
+        // Convert to EnhancedBusiness format
+        const enhancedResults = searchResults.map(b => ({
+          ...b,
+          lat: b.position.lat,
+          lng: b.position.lng
+        })) as EnhancedBusiness[];
+        
+        results.push(...enhancedResults);
         
         if (seq !== searchSeqRef.current) return;
         
@@ -316,7 +311,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     }, 300);
     
     return () => clearTimeout(timer);
-  }, [value, onChange]);
+  }, [value, onChange, mapBusinesses]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;

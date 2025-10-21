@@ -419,22 +419,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     [fetchFullBusinessDetails],
   );
 
-  useEffect(() => {
-    if (mapLoaded && mapRef.current && searchFilters) {
-      const timeout = setTimeout(() => {
-        const map = mapRef.current!;
-        const bounds = map.getBounds();
-        const viewportBounds = {
-          north: bounds.getNorth(),
-          south: bounds.getSouth(),
-          east: bounds.getEast(),
-          west: bounds.getWest(),
-        };
-        loadBusinessesInViewport?.(viewportBounds, 8000);
-      }, 500);
-      return () => clearTimeout(timeout);
-    }
-  }, [searchFilters, mapLoaded, loadBusinessesInViewport]);
+  // Search filters are now handled via handleViewportChange effect
+  // This prevents duplicate loads and infinite loops
 
   const deckGLLayers = useMemo(() => {
     const layers: any[] = [];
@@ -774,12 +760,54 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
   }, [mapLoaded, handleViewportChange]);
 
+  // One-time initial business load when map is ready
+  const hasInitialLoadRef = useRef(false);
   useEffect(() => {
-    if (mapLoaded && !businesses?.length && !loading) {
-      const timeout = setTimeout(() => handleViewportChange(), 2000);
-      return () => clearTimeout(timeout);
+    if (mapLoaded && !hasInitialLoadRef.current && mapRef.current) {
+      hasInitialLoadRef.current = true;
+      const map = mapRef.current;
+      const zoom = map.getZoom();
+      const bounds = map.getBounds();
+      const viewportBounds = {
+        north: bounds.getNorth(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        west: bounds.getWest(),
+      };
+      const limit = getBusinessLimitForViewport(zoom);
+      loadBusinessesInViewport?.(viewportBounds, limit, true);
     }
-  }, [mapLoaded, handleViewportChange]);
+  }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport]);
+
+  // Reload businesses when search filters change
+  const prevSearchFiltersRef = useRef(searchFilters);
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return;
+    
+    // Only reload if searchFilters actually changed (not just reference)
+    const prevFilters = prevSearchFiltersRef.current;
+    const filtersChanged = JSON.stringify(prevFilters) !== JSON.stringify(searchFilters);
+    
+    if (filtersChanged && hasInitialLoadRef.current) {
+      console.log('🔍 Search filters changed, reloading businesses');
+      prevSearchFiltersRef.current = searchFilters;
+      
+      // Reset bounds check to force reload
+      lastBoundsRef.current = "";
+      
+      const map = mapRef.current;
+      const zoom = map.getZoom();
+      const bounds = map.getBounds();
+      const viewportBounds = {
+        north: bounds.getNorth(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        west: bounds.getWest(),
+      };
+      const limit = getBusinessLimitForViewport(zoom);
+      loadBusinessesInViewport?.(viewportBounds, limit, true);
+    }
+  }, [searchFilters, mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport]);
 
   const isUserInteractingRef = useRef(false);
   useEffect(() => {

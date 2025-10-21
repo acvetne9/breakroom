@@ -1,5 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Business, BusinessRole } from '@/types/business';
+import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods';
+import { searchBusinessesUnified, parseUnifiedSearchFilters } from './unifiedSearch';
+import { expandTerm } from '@/utils/smartSearch';
 
 // Enhanced function using PostGIS spatial queries with user votes preloaded
 export async function getBusinessesNearPoint(
@@ -92,13 +95,29 @@ export const getBusinessesInViewport = async (
     // Use unified search if filters provided
     if (searchFilters) {
       console.log(`🔍 [getBusinessesInViewport] Using unified search with filters`);
-      const { searchBusinessesUnified, parseUnifiedSearchFilters } = await import('./unifiedSearch');
       
-      let unifiedFilters;
-      if (typeof searchFilters === 'string') {
-        unifiedFilters = parseUnifiedSearchFilters(searchFilters);
-      } else {
-        unifiedFilters = searchFilters;
+      let unifiedFilters: any;
+      
+      // If filters are already parsed as an object, expand the terms
+      if (typeof searchFilters === 'object' && searchFilters !== null) {
+        // Expand textTerms if they exist
+        if (searchFilters.textTerms && Array.isArray(searchFilters.textTerms)) {
+          const expandedTerms = await Promise.all(
+            searchFilters.textTerms.map((term: string) => expandTerm(term))
+          );
+          // Flatten and deduplicate
+          const allExpandedTerms = [...new Set(expandedTerms.flat())];
+          unifiedFilters = {
+            ...searchFilters,
+            textTerms: allExpandedTerms
+          };
+          console.log(`🔍 [getBusinessesInViewport] Expanded ${searchFilters.textTerms.length} terms to ${allExpandedTerms.length} terms`);
+        } else {
+          unifiedFilters = searchFilters;
+        }
+      } else if (typeof searchFilters === 'string') {
+        // Parse string filters with semantic expansion
+        unifiedFilters = await parseUnifiedSearchFilters(searchFilters);
       }
       
       if (!unifiedFilters) {
@@ -116,24 +135,30 @@ export const getBusinessesInViewport = async (
       return results;
     }
 
-    // Regular viewport load without search - use enhanced progressive search
-    const { progressiveSearch } = await import('./progressiveSearch');
+    // Regular viewport load without search - simple database query
+    const { data: businesses, error } = await supabase
+      .from('businesses')
+      .select('id, name, lat, lng, business_type, atmosphere')
+      .gte('lat', bounds.south)
+      .lte('lat', bounds.north)
+      .gte('lng', bounds.west)
+      .lte('lng', bounds.east)
+      .limit(limit);
     
-    const onProgressWrapper = onProgress ? (businesses: Business[], isComplete: boolean) => {
-      console.log(`📍 Progressive load progress: ${businesses.length} businesses loaded`);
-      onProgress(businesses, isComplete);
-    } : undefined;
-    
-    const businesses = await progressiveSearch.searchBusinesses(
-      bounds,
-      null, // No search filters
-      onProgressWrapper || (() => {}),
-      limit,
-      zoom
-    );
+    if (error) {
+      console.error('Error loading businesses:', error);
+      return [];
+    }
 
-    console.log(`✅ Enhanced viewport load completed with ${businesses.length} businesses`);
-    return businesses;
+    // Transform to Business type with position object
+    const transformedBusinesses: Business[] = (businesses || []).map(b => ({
+      ...b,
+      position: { lat: b.lat, lng: b.lng },
+      businessType: b.business_type
+    }));
+
+    console.log(`✅ Viewport load completed with ${transformedBusinesses.length} businesses`);
+    return transformedBusinesses;
 
   } catch (error) {
     console.error('❌ Critical error in getBusinessesInViewport:', error);
@@ -183,7 +208,7 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
       .from('role_votes')
       .select('business_role_id, vote_type')
       .eq('user_id', currentUserId)
-      .in('business_role_id', roleIds);  // ✅ ONLY fetch votes for this business's roles!
+      .in('business_role_id', roleIds);
 
     console.log(`✅ Fetched votes for ${roleIds.length} roles in ${performance.now() - votesStartTime}ms`);
 
@@ -220,7 +245,6 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
   return fullBusiness;
 }
 
-// Add geocoding and business creation functionality
 export async function geocodeAndCreateBusiness(name: string, address?: string): Promise<{ id: string; lat: number; lng: number }> {
   if (!address) {
     throw new Error('Address is required for creating a new business');
@@ -228,7 +252,6 @@ export async function geocodeAndCreateBusiness(name: string, address?: string): 
 
   console.log(`🌍 Geocoding business: ${name} at ${address}`);
 
-  // Call the geocode edge function
   const { data: geocodeResult, error: geocodeError } = await supabase.functions.invoke('geocode-address', {
     body: { address }
   });
@@ -240,7 +263,6 @@ export async function geocodeAndCreateBusiness(name: string, address?: string): 
 
   console.log(`✅ Geocoded coordinates: ${geocodeResult.latitude}, ${geocodeResult.longitude}`);
 
-  // Create the business with geocoded coordinates
   const { data: newBusiness, error: createError } = await supabase
     .from('businesses')
     .insert({
@@ -263,7 +285,6 @@ export async function geocodeAndCreateBusiness(name: string, address?: string): 
 }
 
 export async function createOrUpdateBusinessRole(businessLocation: string, role: string, salary: string): Promise<void> {
-  // First, try to find an existing business by name (location)
   let businessId: string;
   
   const { data: existingBusiness, error: findError } = await supabase
@@ -279,11 +300,9 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
   if (existingBusiness) {
     businessId = existingBusiness.id;
   } else {
-    // Suggest using geocodeAndCreateBusiness instead
     throw new Error(`Business "${businessLocation}" not found. Use geocodeAndCreateBusiness() to create it with coordinates first.`);
   }
 
-  // Check if this exact role already exists for this business
   const { data: existingRole, error: roleCheckError } = await supabase
     .from('business_roles')
     .select('id')
@@ -297,7 +316,6 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
   }
 
   if (!existingRole) {
-    // Create new role if it doesn't exist - NO AUTH REQUIRED
     const { error: createRoleError } = await supabase
       .from('business_roles')
       .insert({
