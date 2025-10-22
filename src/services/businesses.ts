@@ -188,12 +188,14 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
 
   console.log(`✅ Got user profile in ${performance.now() - startTime}ms`);
 
-  // Fetch roles
+  // Fetch roles with consistent ordering
   const rolesStartTime = performance.now();
   const { data: rolesData, error: rolesError } = await supabase
     .from('business_roles')
     .select('*')
-    .eq('business_id', businessId);
+    .eq('business_id', businessId)
+    .order('votes_total', { ascending: false })
+    .order('created_at', { ascending: true });
 
   if (rolesError) throw rolesError;
   console.log(`✅ Fetched ${rolesData?.length || 0} roles in ${performance.now() - rolesStartTime}ms`);

@@ -277,7 +277,9 @@ export const searchBusinessesUnified = async (
         const { data, error } = await supabase
           .from('business_roles')
           .select('business_id, id, role, salary, votes_total')
-          .in('business_id', ids);
+          .in('business_id', ids)
+          .order('votes_total', { ascending: false })
+          .order('created_at', { ascending: true });
         if (error) {
           console.error('❌ Roles batch error:', error);
           return [] as any[];
