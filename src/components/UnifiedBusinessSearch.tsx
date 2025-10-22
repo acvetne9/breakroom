@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { EnhancedBusiness } from '@/types/search';
-import { parseSearchFilters, applyBusinessFilters } from '@/services/businessFiltering';
+import { parseSearchFilters } from '@/services/businessFiltering';
 import { findNeighborhoodBoundaryByName } from '@/utils/nyc_neighborhoods';
 import { isProfane } from '@/utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 import { Search } from 'lucide-react';
-import { calculateBusinessFuzzyScore } from '@/utils/fuzzySearch';
 import { searchBusinessesByQuery } from '@/services/unifiedSearch';
 
 interface UnifiedBusinessSearchProps {
@@ -30,120 +29,6 @@ interface NeighborhoodResult {
 
 type SearchResult = EnhancedBusiness | NeighborhoodResult;
 
-// Enhanced relevance scoring function with tie-breaking
-const calculateRelevanceScore = (business: EnhancedBusiness, query: string, index: number = 0): number => {
-  const queryLower = query.toLowerCase().trim();
-  const nameLower = business.name.toLowerCase();
-  const businessType = business.businessType?.toLowerCase() || '';
-  const roles = business.roles?.map(r => r.role.toLowerCase()) || [];
-  
-  let score = 0;
-  
-  // Exact match (highest priority)
-  if (nameLower === queryLower) {
-    score += 100;
-  }
-  
-  // Starts with query (very high priority)
-  else if (nameLower.startsWith(queryLower)) {
-    score += 80;
-  }
-  
-  // Contains query as whole word (high priority)
-  else if (new RegExp(`\\b${queryLower}\\b`).test(nameLower)) {
-    score += 60;
-  }
-  
-  // Contains query as substring (medium priority)
-  else if (nameLower.includes(queryLower)) {
-    score += 40;
-  }
-  
-  // Check business type relevance
-  if (businessType.includes(queryLower)) {
-    score += 30;
-  }
-  
-  // Check roles relevance
-  roles.forEach(role => {
-    if (role.includes(queryLower)) {
-      score += 25;
-    }
-  });
-  
-  // Fuzzy matching with Fuse.js (replaces simple edit distance)
-  const fuzzyScore = calculateBusinessFuzzyScore(
-    business.name, 
-    business.businessType || '', 
-    business.roles?.map(r => r.role) || [],
-    queryLower
-  );
-  if (fuzzyScore > 0.6) {
-    score += Math.floor(fuzzyScore * 30); // 0-30 points based on fuzzy match quality
-  }
-  
-  // Bonus for shorter names (more likely to be relevant)
-  if (business.name.length <= 50) {
-    score += 5;
-  }
-  
-  // Tie-breaking: add small fractional value based on original order
-  // This ensures consistent ordering for items with same score
-  score += (1000 - index) / 100000; // Adds 0.01 to 0.00001 based on original position
-  
-  return score;
-};
-
-// Levenshtein distance for fuzzy matching
-const calculateEditDistance = (str1: string, str2: string): number => {
-  const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
-  
-  for (let i = 0; i <= str1.length; i += 1) {
-    matrix[0][i] = i;
-  }
-  
-  for (let j = 0; j <= str2.length; j += 1) {
-    matrix[j][0] = j;
-  }
-  
-  for (let j = 1; j <= str2.length; j += 1) {
-    for (let i = 1; i <= str1.length; i += 1) {
-      const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
-      matrix[j][i] = Math.min(
-        matrix[j][i - 1] + 1, // deletion
-        matrix[j - 1][i] + 1, // insertion
-        matrix[j - 1][i - 1] + indicator, // substitution
-      );
-    }
-  }
-  
-  return matrix[str2.length][str1.length];
-};
-
-// Filter and sort results by relevance with proper tie-breaking
-const getRelevantResults = (businesses: EnhancedBusiness[], query: string, maxResults: number = 10): EnhancedBusiness[] => {
-  if (!query.trim()) return [];
-  
-  const scoredResults = businesses
-    .map((business, index) => ({
-      business,
-      score: calculateRelevanceScore(business, query, index),
-      originalIndex: index // Preserve original order for additional tie-breaking
-    }))
-    .sort((a, b) => {
-      // Primary sort: by score (descending)
-      if (a.score !== b.score) {
-        return b.score - a.score;
-      }
-      // Secondary sort: by original index (ascending) for consistent ordering
-      return a.originalIndex - b.originalIndex;
-    })
-    .slice(0, maxResults) // Limit results
-    .map(result => result.business);
-    
-  return scoredResults;
-};
-
 const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   value,
   onChange,
@@ -160,6 +45,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   const [showDropdown, setShowDropdown] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const { toast } = useToast();
+  const isScrolling = useRef(false);
   
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -168,7 +54,6 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   const lastFiltersRef = useRef<string | null>(null);
   const committedQueryRef = useRef<string>('');
   const resultsCache = useRef<Map<string, SearchResult[]>>(new Map());
-  const isScrolling = useRef(false);
   const lastExecutedQuery = useRef<string>('');
 
   useEffect(() => {
@@ -225,7 +110,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     
     // Check cache first
     const cachedResults = resultsCache.current.get(q);
-    if (cachedResults && Array.isArray(cachedResults)) {
+    if (cachedResults) {
       setSearchResults(cachedResults);
       setShowDropdown(true);
       setIsSearching(false);
@@ -255,11 +140,12 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         console.log(`🔍 [Dropdown] Performing immediate search for: "${q}"`);
         const searchResults = await searchBusinessesByQuery(q, undefined, 30);
         
+        // Check if this search is still current
         if (seq !== searchSeqRef.current) return;
         
         console.log(`✅ [Dropdown] Found ${searchResults.length} immediate results`);
         
-        // Convert to EnhancedBusiness format
+        // Convert to EnhancedBusiness format and add to results
         const enhancedResults = searchResults.map(b => ({
           ...b,
           lat: b.position.lat,
@@ -268,16 +154,14 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         
         results.push(...enhancedResults);
         
-        if (seq !== searchSeqRef.current) return;
-        
-        // Cache results
+        // Cache results (limit cache size to prevent memory issues)
         resultsCache.current.set(q, results);
         if (resultsCache.current.size > 50) {
           const firstKey = resultsCache.current.keys().next().value;
-          resultsCache.current.delete(firstKey);
+          if (firstKey) resultsCache.current.delete(firstKey);
         }
         
-        setSearchResults(Array.isArray(results) ? results : []);
+        setSearchResults(results);
         
         // Update parent with filters
         try {
@@ -483,7 +367,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       </div>
 
       {/* Search Results Dropdown */}
-      {showDropdown && (Array.isArray(searchResults) && searchResults.length > 0 || isSearching || (value.trim() && !isSearching && Array.isArray(searchResults) && searchResults.length === 0)) && (
+      {showDropdown && (searchResults.length > 0 || isSearching || value.trim()) && (
         <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 z-[9999]`}>
           <div 
             className="bg-card shadow-xl border border-border max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
@@ -497,13 +381,13 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
               <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
                 Searching...
               </div>
-            ) : Array.isArray(searchResults) && searchResults.length === 0 && value.trim() ? (
+            ) : searchResults.length === 0 ? (
               <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
                 No relevant businesses found
               </div>
             ) : (
               <div className="p-3">
-                {Array.isArray(searchResults) && searchResults.map((result, index) => (
+                {searchResults.map((result, index) => (
                   <div key={result.id}>
                     <div
                       className="cursor-pointer py-1.5 px-0 rounded transition-colors hover:bg-accent/20"
@@ -537,7 +421,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                     </div>
                 
                     {/* Divider between results */}
-                    {index < (Array.isArray(searchResults) ? searchResults.length - 1 : -1) && (
+                    {index < searchResults.length - 1 && (
                       <div className="h-px bg-border/30 my-1.5"></div>
                     )}
                   </div>
