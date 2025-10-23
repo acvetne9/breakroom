@@ -334,7 +334,7 @@ export const searchBusinessesUnified = async (
           id: role.id,
           role: role.role,
           salary: role.salary,
-          votesTotal: Number(role.votes_total) || 0,
+          votesTotal: isNaN(Number(role.votes_total)) ? 0 : Number(role.votes_total),
           userVote: null
         }))
     }));
