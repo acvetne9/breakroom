@@ -334,7 +334,7 @@ export const searchBusinessesUnified = async (
           id: role.id,
           role: role.role,
           salary: role.salary,
-          votesTotal: role.votes_total || 0,
+          votesTotal: Number(role.votes_total) || 0,
           userVote: null
         }))
     }));

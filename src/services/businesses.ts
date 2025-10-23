@@ -227,7 +227,7 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
       id: role.id,
       role: role.role,
       salary: role.salary,
-      votesTotal: role.votes_total || 0,
+      votesTotal: Number(role.votes_total) || 0,
       userVote: userVote === 'upvote' ? 'up' : userVote === 'downvote' ? 'down' : null,
     };
   });

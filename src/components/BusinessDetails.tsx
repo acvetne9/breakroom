@@ -132,7 +132,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(
 
         if (role) {
           const currentVote = role.userVote;
-          const currentTotal = role.votesTotal || 0;
+          const currentTotal = Number(role.votesTotal) || 0;
 
           // Calculate new vote total
           let newTotal = currentTotal;
@@ -248,7 +248,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(
                       </span>
 
                       <VotingComponent
-                        votesTotal={role.votesTotal || 0}
+                        votesTotal={Number(role.votesTotal) || 0}
                         userVote={role.userVote}
                         onVote={(voteType) => handleRoleVote(index, voteType)}
                         isVoting={votingRoles.has(`${business.id}-${index}`)}
