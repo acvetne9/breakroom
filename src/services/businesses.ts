@@ -3,6 +3,7 @@ import type { Business, BusinessRole } from '@/types/business';
 import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods';
 import { searchBusinessesUnified, parseUnifiedSearchFilters } from './unifiedSearch';
 import { expandTerm } from '@/utils/smartSearch';
+import { sanitizeVoteTotal } from '@/utils/voteCalculations';
 
 // Enhanced function using PostGIS spatial queries with user votes preloaded
 export async function getBusinessesNearPoint(
@@ -227,7 +228,7 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
       id: role.id,
       role: role.role,
       salary: role.salary,
-      votesTotal: isNaN(Number(role.votes_total)) ? 0 : Number(role.votes_total),
+      votesTotal: sanitizeVoteTotal(role.votes_total),
       userVote: userVote === 'upvote' ? 'up' : userVote === 'downvote' ? 'down' : null,
     };
   });

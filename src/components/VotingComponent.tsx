@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
+import { sanitizeVoteTotal } from '@/utils/voteCalculations';
 
 interface VotingComponentProps {
   votesTotal: number;
@@ -22,6 +23,8 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
   onDelete,
   isVoting = false
 }) => {
+  // Safety net: ensure votesTotal is always a valid number
+  const safeVotesTotal = sanitizeVoteTotal(votesTotal);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({});
   const deleteButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -190,14 +193,14 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
 
           <AnimatePresence mode="wait">
             <motion.span
-              key={votesTotal}
+              key={safeVotesTotal}
               initial={{ y: -5, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 5, opacity: 0 }}
               transition={{ duration: 0.1 }}
               className="font-medium text-app-black min-w-[16px] text-center px-1 text-xs"
             >
-              {votesTotal}
+              {safeVotesTotal}
             </motion.span>
           </AnimatePresence>
 
@@ -223,7 +226,7 @@ const VotingComponent: React.FC<VotingComponentProps> = ({
       ) : (
         <div className={`flex items-center gap-0.5 text-sm ${className}`}>
           <span className="font-medium text-app-black min-w-[16px] text-center text-xs">
-            {votesTotal}
+            {safeVotesTotal}
           </span>
 
           <button

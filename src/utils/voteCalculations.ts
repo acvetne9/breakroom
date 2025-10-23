@@ -11,6 +11,15 @@ export interface VoteChangeResult {
 }
 
 /**
+ * Safely convert a vote total to a number, defaulting to 0 for invalid values
+ * Handles NaN, null, undefined, and non-numeric strings
+ */
+export function sanitizeVoteTotal(value: any): number {
+  const num = Number(value);
+  return isNaN(num) ? 0 : num;
+}
+
+/**
  * Calculate the new vote state when a user clicks a vote button
  * 
  * Logic:

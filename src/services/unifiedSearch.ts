@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Business } from '@/types/business';
 import { applyBusinessFilters, SearchFilters } from './businessFiltering';
 import { expandTerm } from '@/utils/smartSearch';
+import { sanitizeVoteTotal } from '@/utils/voteCalculations';
 
 // Search results cache to prevent repeated queries
 const searchCache = new Map<string, { results: Business[]; timestamp: number }>();
@@ -334,7 +335,7 @@ export const searchBusinessesUnified = async (
           id: role.id,
           role: role.role,
           salary: role.salary,
-          votesTotal: isNaN(Number(role.votes_total)) ? 0 : Number(role.votes_total),
+          votesTotal: sanitizeVoteTotal(role.votes_total),
           userVote: null
         }))
     }));

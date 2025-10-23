@@ -3,6 +3,8 @@ import { Compass } from "lucide-react";
 import VotingComponent from "./VotingComponent";
 import { formatTimeAgo } from "../utils/timeAgo";
 import { TranslatedText } from "./TranslatedText";
+import { calculateVoteChange, sanitizeVoteTotal } from "@/utils/voteCalculations";
+import { persistVote } from "@/services/voting";
 
 interface Post {
   id: string;
@@ -131,26 +133,15 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(
         const role = newRoles[roleIndex];
 
         if (role) {
+          const currentTotal = sanitizeVoteTotal(role.votesTotal);
           const currentVote = role.userVote;
-          const currentTotal = isNaN(Number(role.votesTotal)) ? 0 : Number(role.votesTotal);
 
-          // Calculate new vote total
-          let newTotal = currentTotal;
-          let newUserVote: "up" | "down" | null = voteType;
-
-          if (currentVote === voteType) {
-            // Removing vote
-            newTotal = currentTotal - (voteType === "up" ? 1 : -1);
-            newUserVote = null;
-          } else if (currentVote) {
-            // Changing vote
-            newTotal = currentTotal + (voteType === "up" ? 2 : -2);
-            newUserVote = voteType;
-          } else {
-            // New vote
-            newTotal = currentTotal + (voteType === "up" ? 1 : -1);
-            newUserVote = voteType;
-          }
+          // Use centralized vote calculation logic
+          const { newUserVote, newTotal } = calculateVoteChange(
+            currentVote,
+            voteType,
+            currentTotal
+          );
 
           newRoles[roleIndex] = {
             ...role,
@@ -248,7 +239,7 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(
                       </span>
 
                       <VotingComponent
-                        votesTotal={isNaN(Number(role.votesTotal)) ? 0 : Number(role.votesTotal)}
+                        votesTotal={sanitizeVoteTotal(role.votesTotal)}
                         userVote={role.userVote}
                         onVote={(voteType) => handleRoleVote(index, voteType)}
                         isVoting={votingRoles.has(`${business.id}-${index}`)}

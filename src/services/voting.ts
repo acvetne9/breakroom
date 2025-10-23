@@ -22,6 +22,12 @@ export async function persistVote(
   itemId: string,
   voteType: 'upvote' | 'downvote' | null
 ): Promise<{ success: boolean; error?: any }> {
+  // Input validation
+  if (!itemId || typeof itemId !== 'string') {
+    console.error('❌ Invalid itemId provided to persistVote');
+    return { success: false, error: new Error('Invalid itemId') };
+  }
+
   try {
     const { profileId: userId } = await getUserProfile();
 
