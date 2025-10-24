@@ -3,6 +3,7 @@ import type { Business, BusinessRole } from '@/types/business';
 import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods';
 import { searchBusinessesUnified, parseUnifiedSearchFilters } from './unifiedSearch';
 import { expandTerm } from '@/utils/smartSearch';
+import { sanitizeVoteTotal } from '@/utils/voteCalculations';
 
 // Enhanced function using PostGIS spatial queries with user votes preloaded
 export async function getBusinessesNearPoint(
@@ -188,12 +189,14 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
 
   console.log(`✅ Got user profile in ${performance.now() - startTime}ms`);
 
-  // Fetch roles
+  // Fetch roles with consistent ordering
   const rolesStartTime = performance.now();
   const { data: rolesData, error: rolesError } = await supabase
     .from('business_roles')
     .select('*')
-    .eq('business_id', businessId);
+    .eq('business_id', businessId)
+    .order('votes_total', { ascending: false })
+    .order('created_at', { ascending: true });
 
   if (rolesError) throw rolesError;
   console.log(`✅ Fetched ${rolesData?.length || 0} roles in ${performance.now() - rolesStartTime}ms`);
@@ -225,7 +228,7 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
       id: role.id,
       role: role.role,
       salary: role.salary,
-      votesTotal: role.votes_total || 0,
+      votesTotal: sanitizeVoteTotal(role.votes_total),
       userVote: userVote === 'upvote' ? 'up' : userVote === 'downvote' ? 'down' : null,
     };
   });

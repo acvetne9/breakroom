@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Business } from '@/types/business';
 import { applyBusinessFilters, SearchFilters } from './businessFiltering';
 import { expandTerm } from '@/utils/smartSearch';
+import { sanitizeVoteTotal } from '@/utils/voteCalculations';
 
 // Search results cache to prevent repeated queries
 const searchCache = new Map<string, { results: Business[]; timestamp: number }>();
@@ -277,7 +278,9 @@ export const searchBusinessesUnified = async (
         const { data, error } = await supabase
           .from('business_roles')
           .select('business_id, id, role, salary, votes_total')
-          .in('business_id', ids);
+          .in('business_id', ids)
+          .order('votes_total', { ascending: false })
+          .order('created_at', { ascending: true });
         if (error) {
           console.error('❌ Roles batch error:', error);
           return [] as any[];
@@ -332,7 +335,7 @@ export const searchBusinessesUnified = async (
           id: role.id,
           role: role.role,
           salary: role.salary,
-          votesTotal: role.votes_total || 0,
+          votesTotal: sanitizeVoteTotal(role.votes_total),
           userVote: null
         }))
     }));

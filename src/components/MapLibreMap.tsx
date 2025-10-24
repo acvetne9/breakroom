@@ -425,6 +425,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const deckGLLayers = useMemo(() => {
     const layers: any[] = [];
 
+    // Add emoji landmarks first so they render underneath
     if (landmarks && landmarks.length > 0) {
       try {
         const emojiLayer = createEmojiLandmarkLayer({ landmarks });
@@ -435,6 +436,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
     }
 
+    // Add business dots last so they render on top
     if (businesses && businesses.length > 0) {
       let validBusinesses = businesses.filter((b) => b?.position?.lat != null && b?.position?.lng != null);
 
