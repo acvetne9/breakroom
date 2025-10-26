@@ -53,7 +53,7 @@ const filterBusinessesInPolygon = (
 };
 
 /**
- * Scatterplot layer for individual businesses
+ * Scatterplot layer for individual businesses - renders ON TOP of emoji landmarks
  */
 export const createBusinessScatterplotLayer = ({
   businesses,
@@ -63,12 +63,10 @@ export const createBusinessScatterplotLayer = ({
   neighborhoodBoundary,
   searchActive = false
 }: DeckGLBusinessLayerProps) => {
-  // Filter businesses inside the polygon
   const filteredBusinesses = filterBusinessesInPolygon(businesses, neighborhoodBoundary);
 
   console.log(`🎯 Creating scatterplot layer with ${filteredBusinesses.length} businesses inside polygon`);
   
-  // Consistent marker size (no change during search)
   const radiusMin = 8;
   const radiusMax = 12;
   const baseRadius = 15;
@@ -78,7 +76,7 @@ export const createBusinessScatterplotLayer = ({
     data: filteredBusinesses,
     pickable: true,
     parameters: {
-      depthTest: false // ensures labels/symbols aren't hidden
+      depthTest: false // Render in layer order (on top of emojis)
     },
     stroked: true,
     filled: true,
@@ -88,8 +86,8 @@ export const createBusinessScatterplotLayer = ({
     lineWidthMinPixels: 2,
     getPosition: (d: Business) => [d.position.lng, d.position.lat],
     getRadius: (_d: Business) => baseRadius,
-    getFillColor: (_d: Business) => [250, 204, 21, 255], // Consistent gold color
-    getLineColor: (_d: Business) => [255, 255, 255, 255],
+    getFillColor: (_d: Business) => [250, 204, 21, 255], // Gold color
+    getLineColor: (_d: Business) => [255, 255, 255, 255], // White border
     onClick: onBusinessClick ? (info) => {
       console.log('🖱️ Deck.GL layer clicked:', info);
       if (info.object) {
@@ -108,7 +106,7 @@ export const createBusinessScatterplotLayer = ({
 };
 
 /**
- * Emoji layer for landmarks - renders behind business scatterplot
+ * Emoji layer for landmarks - renders BEHIND business scatterplot
  */
 export const createEmojiLandmarkLayer = ({
   landmarks
@@ -116,15 +114,15 @@ export const createEmojiLandmarkLayer = ({
   return new TextLayer({
     id: 'emoji-landmarks',
     data: landmarks,
-    pickable: false,
+    pickable: false, // Non-interactive, always behind business dots
     getPosition: (d: { lat: number; lng: number; emoji: string }) => [d.lng, d.lat],
     getText: (d: { lat: number; lng: number; emoji: string }) => d.emoji,
-    getSize: 32,
+    getSize: 28, // Slightly smaller to be less prominent than business dots
     getAngle: 0,
     getTextAnchor: 'middle',
     getAlignmentBaseline: 'center',
     parameters: {
-      depthTest: false
+      depthTest: false // Render in layer order (behind business dots)
     },
     updateTriggers: {
       getPosition: landmarks.length,
