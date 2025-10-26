@@ -72,7 +72,7 @@ const MAP_DEFAULTS = {
   CENTER: [-73.986104, 40.715245] as [number, number],
   ZOOM: 12.77,
   MAX_ZOOM: 16,
-  MIN_ZOOM: 9,
+  MIN_ZOOM: 8,
   BOUNDS: [
     [-74.25909, 40.494399] as [number, number],
     [-73.700272, 40.917] as [number, number],
