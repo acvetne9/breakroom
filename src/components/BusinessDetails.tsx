@@ -104,7 +104,8 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(
     };
 
     const businessStories = Array.isArray(posts)
-      ? posts.filter((post) => post.businessId === business.id && post.isStory)
+      ? posts.filter((post) => post.businessId === business.id)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       : [];
 
     const handleCardClick = (e: React.MouseEvent) => {

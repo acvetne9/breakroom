@@ -37,15 +37,51 @@ interface Bounds {
   west: number;
 }
 
-interface ViewportState {
-  bounds: Bounds;
-  zoom: number;
-  timestamp: number;
-}
+// Performance constants
+const VIEWPORT_THROTTLE = {
+  HIGH_ZOOM: 500,  // zoom >= 15
+  MID_ZOOM: 350,   // zoom >= 13
+  LOW_ZOOM: 250,   // zoom < 13
+} as const;
+
+const BUSINESS_LIMITS = {
+  SEARCH: {
+    ZOOM_10: 20000,
+    ZOOM_12: 35000,
+    ZOOM_14: 50000,
+    DEFAULT: 80000,
+  },
+  NORMAL: {
+    ZOOM_10: 5000,
+    ZOOM_12: 15000,
+    ZOOM_14: 40000,
+    ZOOM_16: 80000,
+    ZOOM_18: 150000,
+    DEFAULT: 200000,
+  },
+} as const;
+
+const DISPLAY_LIMITS_BY_ZOOM = {
+  ZOOM_12: 500,
+  ZOOM_13: 1000,
+  ZOOM_14: 2000,
+  ZOOM_15: 5000,
+} as const;
+
+const MAP_DEFAULTS = {
+  CENTER: [-73.986104, 40.715245] as [number, number],
+  ZOOM: 12.77,
+  MAX_ZOOM: 16,
+  MIN_ZOOM: 8,
+  BOUNDS: [
+    [-74.25909, 40.494399] as [number, number],
+    [-73.700272, 40.917] as [number, number],
+  ] as [readonly [number, number], readonly [number, number]],
+} as const;
 
 let overlayInstance: MapboxOverlay | null = null;
 
-// Debounce utility function
+// Debounce utility
 const debounce = (func: Function, wait: number) => {
   let timeout: NodeJS.Timeout;
   return function executedFunction(...args: any[]) {
@@ -206,11 +242,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [deckOverlay, setDeckOverlay] = useState<MapboxOverlay | null>(null);
   const [overlayReady, setOverlayReady] = useState(false);
-  const [currentZoom, setCurrentZoom] = useState(12.77);
+  const [currentZoom, setCurrentZoom] = useState<number>(MAP_DEFAULTS.ZOOM);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
-  const landmarkMarkersRef = useRef<maplibregl.Marker[]>([]);
   const layersAddedRef = useRef(false);
   const lastBoundsRef = useRef<string>("");
 
@@ -367,17 +402,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const getBusinessLimitForViewport = useCallback(
     (zoom: number) => {
       if (searchFilters) {
-        if (zoom < 10) return 20000;
-        if (zoom < 12) return 35000;
-        if (zoom < 14) return 50000;
-        return 80000;
+        if (zoom < 10) return BUSINESS_LIMITS.SEARCH.ZOOM_10;
+        if (zoom < 12) return BUSINESS_LIMITS.SEARCH.ZOOM_12;
+        if (zoom < 14) return BUSINESS_LIMITS.SEARCH.ZOOM_14;
+        return BUSINESS_LIMITS.SEARCH.DEFAULT;
       }
-      if (zoom < 10) return 5000;
-      if (zoom < 12) return 15000;
-      if (zoom < 14) return 40000;
-      if (zoom < 16) return 80000;
-      if (zoom < 18) return 150000;
-      return 200000;
+      
+      if (zoom < 10) return BUSINESS_LIMITS.NORMAL.ZOOM_10;
+      if (zoom < 12) return BUSINESS_LIMITS.NORMAL.ZOOM_12;
+      if (zoom < 14) return BUSINESS_LIMITS.NORMAL.ZOOM_14;
+      if (zoom < 16) return BUSINESS_LIMITS.NORMAL.ZOOM_16;
+      if (zoom < 18) return BUSINESS_LIMITS.NORMAL.ZOOM_18;
+      return BUSINESS_LIMITS.NORMAL.DEFAULT;
     },
     [searchFilters],
   );
@@ -425,64 +461,65 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const deckGLLayers = useMemo(() => {
     const layers: any[] = [];
 
-    // Add emoji landmarks first so they render underneath
-    if (landmarks && landmarks.length > 0) {
+    // CRITICAL: Layer order determines render order
+    // 1. Emojis FIRST (render behind)
+    if (landmarks?.length > 0) {
       try {
-        const emojiLayer = createEmojiLandmarkLayer({ landmarks });
-        layers.push(emojiLayer);
-        console.log("✅ Created emoji landmarks layer");
+        layers.push(createEmojiLandmarkLayer({ landmarks }));
+        console.log("✅ Emoji layer added (renders behind business dots)");
       } catch (err) {
         console.error("❌ Failed to create emoji layer", err);
       }
     }
 
-    // Add business dots last so they render on top
-    if (businesses && businesses.length > 0) {
+    // 2. Business dots LAST (render on top)
+    if (businesses?.length > 0) {
       let validBusinesses = businesses.filter((b) => b?.position?.lat != null && b?.position?.lng != null);
 
+      // Filter by neighborhood boundary
+      if (searchFilters?.neighborhoodFilter?.boundary?.length) {
+        const coords = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
+        if (coords.length) {
+          const polygon = turf.polygon([coords.map((p) => [p.lon, p.lat])]);
+          validBusinesses = validBusinesses.filter((b) => 
+            turf.booleanPointInPolygon(turf.point([b.position.lng, b.position.lat]), polygon)
+          );
+        }
+      }
+
+      // Apply zoom-based display limits for performance
+      if (currentZoom < 15 && validBusinesses.length > 0 && mapRef.current) {
+        const maxDisplay = 
+          currentZoom < 12 ? DISPLAY_LIMITS_BY_ZOOM.ZOOM_12 :
+          currentZoom < 13 ? DISPLAY_LIMITS_BY_ZOOM.ZOOM_13 :
+          currentZoom < 14 ? DISPLAY_LIMITS_BY_ZOOM.ZOOM_14 :
+          DISPLAY_LIMITS_BY_ZOOM.ZOOM_15;
+        
+        if (validBusinesses.length > maxDisplay) {
+          const bounds = mapRef.current.getBounds();
+          const viewportBounds = {
+            north: bounds.getNorth(),
+            south: bounds.getSouth(),
+            east: bounds.getEast(),
+            west: bounds.getWest(),
+          };
+          validBusinesses = createOptimizedGridSampling(viewportBounds, validBusinesses, maxDisplay, true);
+          console.log(`📊 Zoom ${currentZoom.toFixed(1)}: ${validBusinesses.length}/${businesses.length} businesses`);
+        }
+      }
+
       if (validBusinesses.length > 0) {
-        if (searchFilters?.neighborhoodFilter?.boundary?.length) {
-          const neighborhoodCoords = searchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
-          if (neighborhoodCoords.length) {
-            const turfPolygon = turf.polygon([neighborhoodCoords.map((p) => [p.lon, p.lat])]);
-            validBusinesses = validBusinesses.filter((b) => {
-              const point = turf.point([b.position.lng, b.position.lat]);
-              return turf.booleanPointInPolygon(point, turfPolygon);
-            });
-          }
-        }
-
-        // Limit displayed businesses based on zoom to improve performance
-        if (currentZoom < 15 && validBusinesses.length > 0) {
-          const maxDisplay = currentZoom < 12 ? 500 : currentZoom < 13 ? 1000 : currentZoom < 14 ? 2000 : 5000;
-          
-          if (validBusinesses.length > maxDisplay && mapRef.current) {
-            const bounds = mapRef.current.getBounds();
-            const viewportBounds = {
-              north: bounds.getNorth(),
-              south: bounds.getSouth(),
-              east: bounds.getEast(),
-              west: bounds.getWest(),
-            };
-            validBusinesses = createOptimizedGridSampling(viewportBounds, validBusinesses, maxDisplay, true);
-            console.log(`📊 Zoom ${currentZoom.toFixed(1)}: Displaying ${validBusinesses.length}/${businesses.length} businesses`);
-          }
-        }
-
-        if (validBusinesses.length > 0) {
-          try {
-            const businessLayer = createBusinessScatterplotLayer({
-              businesses: validBusinesses,
-              selectedBusinessId: selectedBusiness?.id,
-              onBusinessClick: handleBusinessClick,
-              neighborhoodBoundary: searchFilters?.neighborhoodFilter?.boundary || null,
-              searchActive: !!searchFilters,
-            });
-            layers.push(businessLayer);
-            console.log("✅ Created scatterplot layer with", validBusinesses.length, "businesses");
-          } catch (err) {
-            console.error("❌ Failed to create scatterplot layer", err);
-          }
+        try {
+          layers.push(createBusinessScatterplotLayer({
+            businesses: validBusinesses,
+            selectedBusinessId: selectedBusiness?.id,
+            onBusinessClick: handleBusinessClick,
+            neighborhoodBoundary: searchFilters?.neighborhoodFilter?.boundary || null,
+            searchActive: !!searchFilters,
+          }));
+          console.log("✅ Business layer added with", validBusinesses.length, "businesses (renders on top)");
+        } catch (err) {
+          console.error("❌ Failed to create scatterplot layer", err);
         }
       }
     }
@@ -509,8 +546,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     const boundsKey = `${viewportBounds.north.toFixed(4)}-${viewportBounds.south.toFixed(4)}-${viewportBounds.east.toFixed(4)}-${viewportBounds.west.toFixed(4)}`;
 
-    // Adaptive throttling: higher zooms need more throttling for performance
-    const throttleMs = zoom >= 15 ? 500 : zoom >= 13 ? 350 : 250;
+    // Adaptive throttling based on zoom level
+    const throttleMs = 
+      zoom >= 15 ? VIEWPORT_THROTTLE.HIGH_ZOOM : 
+      zoom >= 13 ? VIEWPORT_THROTTLE.MID_ZOOM : 
+      VIEWPORT_THROTTLE.LOW_ZOOM;
     
     const now = Date.now();
     if (lastBoundsRef.current === boundsKey && now - lastLoadTimeRef.current < throttleMs) {
@@ -603,18 +643,15 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const mapInstance = new maplibregl.Map({
         container: mapContainerRef.current!,
         style,
-        center: [-73.986104, 40.715245],
-        zoom: 12.77,
-        maxZoom: 16,
-        minZoom: 9,
+        center: MAP_DEFAULTS.CENTER,
+        zoom: MAP_DEFAULTS.ZOOM,
+        maxZoom: MAP_DEFAULTS.MAX_ZOOM,
+        minZoom: MAP_DEFAULTS.MIN_ZOOM,
         renderWorldCopies: false,
         attributionControl: false,
       } as any);
 
-      mapInstance.setMaxBounds([
-        [-74.25909, 40.494399],
-        [-73.700272, 40.917],
-      ]);
+      mapInstance.setMaxBounds(MAP_DEFAULTS.BOUNDS as any);
 
       try {
         const canvas = mapInstance.getCanvas();
@@ -924,57 +961,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
   }, [mapLoaded, searchFilters?.neighborhoodFilter, handleViewportChange]);
 
-  useEffect(() => {
-    if (!mapLoaded || !Array.isArray(landmarks) || landmarks.length === 0 || !mapRef.current) return;
-
-    landmarkMarkersRef.current.forEach((marker) => {
-      try {
-        marker.remove();
-      } catch {}
-    });
-    landmarkMarkersRef.current = [];
-
-    const zoom = mapRef.current.getZoom();
-    const size = Math.max(12, Math.min(32, 16 * Math.pow(1.15, zoom - 10)));
-
-    const markers = landmarks
-      .map((landmark) => {
-        const el = document.createElement("div");
-        el.textContent = landmark.emoji;
-        el.style.cssText = `font-size:${size}px;line-height:${size}px;width:${size}px;height:${size}px;user-select:none;pointer-events:none;display:flex;align-items:center;justify-content:center;`;
-        try {
-          return new maplibregl.Marker({ element: el, anchor: "center" })
-            .setLngLat([landmark.lng, landmark.lat])
-            .addTo(mapRef.current!);
-        } catch (err) {
-          console.error("marker error", err);
-          return null;
-        }
-      })
-      .filter(Boolean) as maplibregl.Marker[];
-
-    landmarkMarkersRef.current = markers;
-
-    const onZoom = () => {
-      const z = mapRef.current!.getZoom();
-      const newSize = Math.max(12, Math.min(32, 16 * Math.pow(1.15, z - 10)));
-      markers.forEach((m) => {
-        const el = m.getElement();
-        if (el) {
-          el.style.fontSize = `${newSize}px`;
-          el.style.lineHeight = `${newSize}px`;
-          el.style.width = `${newSize}px`;
-          el.style.height = `${newSize}px`;
-        }
-      });
-    };
-    mapRef.current.on("zoom", onZoom);
-    return () => {
-      try {
-        mapRef.current?.off("zoom", onZoom);
-      } catch {}
-    };
-  }, [mapLoaded, landmarks]);
+  // Landmarks are now rendered via DeckGL TextLayer (more efficient than MapLibre markers)
+  // No separate marker system needed - DeckGL handles emoji rendering
 
   return (
     <div
