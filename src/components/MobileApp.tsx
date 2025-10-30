@@ -255,12 +255,32 @@ const MobileApp: React.FC = () => {
     // Change slide immediately
     setCurrentSlide(1);
     
+    // Find business in local state
+    let business = businesses.find((b) => b.id === businessId);
+    
+    // Check if business needs full details loaded
+    const needsFullDetails = !business?.roles?.length || 
+                            !business?.atmosphere?.length ||
+                            (business?.roles && business.roles.length > 0 && !business.roles[0]?.id);
+    
+    // Start loading full details IMMEDIATELY in background if needed
+    let detailsPromise: Promise<any> | null = null;
+    if (needsFullDetails) {
+      console.log('🔄 Starting background load of business details during fly...');
+      detailsPromise = fetchFullBusinessDetails(businessId).then(fullBusiness => {
+        if (fullBusiness) {
+          console.log('✅ Background load completed, updating business');
+          setSelectedBusiness(fullBusiness);
+        }
+        return fullBusiness;
+      });
+    }
+    
     // Fast path: Use coordinates from post if available
     if (post?.businessLat && post?.businessLng) {
       console.log(`⚡ Fast fly-to using post coordinates in ${performance.now() - startTime}ms`);
       
       // Set business immediately if available in state
-      let business = businesses.find((b) => b.id === businessId);
       if (business) {
         setSelectedBusiness(business);
         setShowBusinessDetails(true);
@@ -274,17 +294,10 @@ const MobileApp: React.FC = () => {
         }
       }));
       
-      // Fetch full details in background (don't await)
-      fetchFullBusinessDetails(businessId).then(fullBusiness => {
-        if (fullBusiness) {
-          setSelectedBusiness(fullBusiness);
-        }
-      });
+      // Details are loading in background already
       return;
     }
     
-    // Find business in local state
-    let business = businesses.find((b) => b.id === businessId);
     console.log('📍 Found business in state:', { 
       found: !!business, 
       hasPosition: !!business?.position,
@@ -304,6 +317,8 @@ const MobileApp: React.FC = () => {
           businessId: businessId
         }
       }));
+      
+      // Details are loading in background already
       return;
     }
     
