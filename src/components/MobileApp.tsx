@@ -50,6 +50,7 @@ const MobileApp: React.FC = () => {
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [comments, setComments] = useState<{ [postId: string]: string[] }>({});
   const [selectedBusiness, setSelectedBusiness] = useState<any>(null);
+  const [showBusinessDetails, setShowBusinessDetails] = useState(false);
   const [previouslySelectedBusiness, setPreviouslySelectedBusiness] = useState<any>(null);
   const [filteredBusinessId, setFilteredBusinessId] = useState<string | null>(null);
   const [filteredUserStories, setFilteredUserStories] = useState(false);
@@ -199,6 +200,7 @@ const MobileApp: React.FC = () => {
     if (!business) {
       setSelectedBusiness(null);
       setFilteredBusinessId(null);
+      setShowBusinessDetails(false);
       return;
     }
 
@@ -261,6 +263,7 @@ const MobileApp: React.FC = () => {
       let business = businesses.find((b) => b.id === businessId);
       if (business) {
         setSelectedBusiness(business);
+        setShowBusinessDetails(true);
       }
       
       window.dispatchEvent(new CustomEvent('flyToBusiness', {
@@ -293,6 +296,7 @@ const MobileApp: React.FC = () => {
     if (business?.position?.lat && business?.position?.lng) {
       console.log('✅ Using cached business coordinates', performance.now() - startTime, 'ms');
       setSelectedBusiness(business);
+      setShowBusinessDetails(true);
       window.dispatchEvent(new CustomEvent('flyToBusiness', {
         detail: {
           lat: business.position.lat,
@@ -336,6 +340,7 @@ const MobileApp: React.FC = () => {
       
       console.log('✅ Successfully fetched details, dispatching flyTo', performance.now() - startTime, 'ms');
       setSelectedBusiness(fullBusiness);
+      setShowBusinessDetails(true);
       window.dispatchEvent(new CustomEvent('flyToBusiness', {
         detail: {
           lat: fullBusiness.position.lat,
@@ -582,6 +587,8 @@ const MobileApp: React.FC = () => {
           onRoleVote={handleRoleVote}
           onLocationSave={handleLocationSave}
           votingRoles={votingRoles}
+          showBusinessDetails={showBusinessDetails}
+          onShowBusinessDetails={() => setShowBusinessDetails(true)}
         />
       </Suspense>
 

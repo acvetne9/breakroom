@@ -56,6 +56,8 @@ interface HomePageProps {
   onRoleVote?: (businessId: string, roleIndex: number, voteType: 'up' | 'down') => void;
   onLocationSave?: (location: string, fullLocation: string) => void;
   votingRoles?: Set<string>;
+  showBusinessDetails?: boolean;
+  onShowBusinessDetails?: () => void;
 }
 
 const HomePage: React.FC<HomePageProps> = ({ 
@@ -68,12 +70,13 @@ const HomePage: React.FC<HomePageProps> = ({
   onPostClick,
   onRoleVote,
   onLocationSave,
-  votingRoles
+  votingRoles,
+  showBusinessDetails: propShowBusinessDetails = false,
+  onShowBusinessDetails
 }) => {
   const [searchValue, setSearchValue] = useState('');
   const [debouncedSearchValue, setDebouncedSearchValue] = useState('');
   const [neighborhoodCenter, setNeighborhoodCenter] = useState<{ lat: number; lon: number } | null>(null);
-  const [showBusinessDetails, setShowBusinessDetails] = useState(false);
   const [showLoading, setShowLoading] = useState(true);
   const [searchCompleted, setSearchCompleted] = useState(false);
   const [mapBusinesses, setMapBusinesses] = useState<any[]>([]);
@@ -191,7 +194,6 @@ const HomePage: React.FC<HomePageProps> = ({
       onLocationSave: typeof onLocationSave 
     });
     onBusinessSelect?.(business);
-    setShowBusinessDetails(false);
     
     if (onLocationSave && business.name) {
       const fullLocation = business.formatted_address || business.vicinity || business.name;
@@ -200,7 +202,7 @@ const HomePage: React.FC<HomePageProps> = ({
   };
 
   const handleShowBusinessDetails = () => {
-    setShowBusinessDetails(true);
+    onShowBusinessDetails?.();
   };
 
   const handleBusinessStoriesClick = () => {
@@ -209,12 +211,13 @@ const HomePage: React.FC<HomePageProps> = ({
 
   const handleClosePreview = () => {
     onBusinessSelect?.(null);
-    setShowBusinessDetails(false);
   };
 
   const handleBackToPreview = () => {
-    setShowBusinessDetails(false);
+    // No longer managing internal state
   };
+  
+  const showBusinessDetails = propShowBusinessDetails;
 
   const handleClearSearch = useCallback(() => {
     console.log('🧹 Clearing search from X button');

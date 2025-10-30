@@ -171,35 +171,39 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
   console.log('🔍 Fetching full business details for:', businessId);
   const startTime = performance.now();
   
-  // Fetch base business
-  const { data: businessData, error: businessError } = await supabase
-    .from('businesses')
-    .select('*')
-    .eq('id', businessId)
-    .maybeSingle();
+  // Fetch business data, user profile, and roles in PARALLEL
+  const [businessResult, userProfileResult, rolesResult] = await Promise.all([
+    // Business data
+    supabase
+      .from('businesses')
+      .select('*')
+      .eq('id', businessId)
+      .maybeSingle(),
+    
+    // User profile (for votes)
+    (async () => {
+      const { getUserProfile } = await import('./posts');
+      return getUserProfile();
+    })(),
+    
+    // Roles data
+    supabase
+      .from('business_roles')
+      .select('*')
+      .eq('business_id', businessId)
+      .order('votes_total', { ascending: false })
+      .order('created_at', { ascending: true })
+  ]);
 
+  const { data: businessData, error: businessError } = businessResult;
   if (businessError) throw businessError;
   if (!businessData) return null;
 
-  console.log(`✅ Fetched business data in ${performance.now() - startTime}ms`);
-
-  // Get current user profile ID
-  const { getUserProfile } = await import('./posts');
-  const { profileId: currentUserId } = await getUserProfile();
-
-  console.log(`✅ Got user profile in ${performance.now() - startTime}ms`);
-
-  // Fetch roles with consistent ordering
-  const rolesStartTime = performance.now();
-  const { data: rolesData, error: rolesError } = await supabase
-    .from('business_roles')
-    .select('*')
-    .eq('business_id', businessId)
-    .order('votes_total', { ascending: false })
-    .order('created_at', { ascending: true });
-
+  const { profileId: currentUserId } = userProfileResult;
+  const { data: rolesData, error: rolesError } = rolesResult;
   if (rolesError) throw rolesError;
-  console.log(`✅ Fetched ${rolesData?.length || 0} roles in ${performance.now() - rolesStartTime}ms`);
+
+  console.log(`✅ Fetched business + roles in ${performance.now() - startTime}ms (parallel)`);
 
   // Fetch user role votes ONLY for this business's roles
   let userVotesData: any[] = [];
