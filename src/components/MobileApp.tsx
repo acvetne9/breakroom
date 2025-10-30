@@ -275,7 +275,18 @@ const MobileApp: React.FC = () => {
     if (post?.businessLat && post?.businessLng) {
       console.log(`⚡ Fast fly-to using post coordinates in ${performance.now() - startTime}ms`);
       
-      // Set business immediately if available in state
+      // Create minimal business object from post if not in state
+      if (!business && post.businessName) {
+        business = {
+          id: businessId,
+          name: post.businessName,
+          position: { lat: post.businessLat, lng: post.businessLng },
+          atmosphere: [],
+          roles: []
+        };
+      }
+      
+      // Set business immediately to show preview right away
       if (business) {
         setSelectedBusiness(business);
         setShowBusinessDetails(true);
