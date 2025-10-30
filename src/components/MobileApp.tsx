@@ -256,6 +256,13 @@ const MobileApp: React.FC = () => {
     // Fast path: Use coordinates from post if available
     if (post?.businessLat && post?.businessLng) {
       console.log(`⚡ Fast fly-to using post coordinates in ${performance.now() - startTime}ms`);
+      
+      // Set business immediately if available in state
+      let business = businesses.find((b) => b.id === businessId);
+      if (business) {
+        setSelectedBusiness(business);
+      }
+      
       window.dispatchEvent(new CustomEvent('flyToBusiness', {
         detail: {
           lat: post.businessLat,
@@ -285,6 +292,7 @@ const MobileApp: React.FC = () => {
     
     if (business?.position?.lat && business?.position?.lng) {
       console.log('✅ Using cached business coordinates', performance.now() - startTime, 'ms');
+      setSelectedBusiness(business);
       window.dispatchEvent(new CustomEvent('flyToBusiness', {
         detail: {
           lat: business.position.lat,
@@ -292,12 +300,17 @@ const MobileApp: React.FC = () => {
           businessId: businessId
         }
       }));
-      setSelectedBusiness(business);
       return;
     }
     
     // Coordinates missing - try to fetch full details
     console.log('⏳ Coordinates missing, fetching full business details...', performance.now() - startTime, 'ms');
+    
+    // Set partial business immediately if available
+    if (business) {
+      setSelectedBusiness(business);
+    }
+    
     try {
       const fullBusiness = await fetchFullBusinessDetails(businessId);
       
@@ -322,6 +335,7 @@ const MobileApp: React.FC = () => {
       }
       
       console.log('✅ Successfully fetched details, dispatching flyTo', performance.now() - startTime, 'ms');
+      setSelectedBusiness(fullBusiness);
       window.dispatchEvent(new CustomEvent('flyToBusiness', {
         detail: {
           lat: fullBusiness.position.lat,
@@ -329,7 +343,6 @@ const MobileApp: React.FC = () => {
           businessId: businessId
         }
       }));
-      setSelectedBusiness(fullBusiness);
       
     } catch (error) {
       console.error('❌ Error in handleFlyToBusiness:', error, performance.now() - startTime, 'ms');
