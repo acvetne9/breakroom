@@ -204,32 +204,27 @@ const MobileApp: React.FC = () => {
       return;
     }
 
+    // Set business IMMEDIATELY to show preview right away
+    setSelectedBusiness(business);
+    setFilteredBusinessId(null);
+
+    // Save the clicked business location
+    if (business.name) {
+      handleLocationSave(business.name, business.name);
+    }
+
     // Check if we need full details: missing atmosphere, missing roles, OR roles without IDs
     const needsFullDetails = !business.atmosphere?.length || 
                              !business.roles?.length ||
                              (business.roles && business.roles.length > 0 && !business.roles[0]?.id);
 
+    // Fetch full details in background if needed
     if (needsFullDetails) {
-      const fullBusiness = await fetchFullBusinessDetails(business.id);
-      if (fullBusiness) {
-        setSelectedBusiness(fullBusiness);
-        // When selecting a business, we're not filtering posts by business
-        setFilteredBusinessId(null);
-
-        // Save the clicked business location
-        if (fullBusiness.name) {
-          handleLocationSave(fullBusiness.name, fullBusiness.name);
+      fetchFullBusinessDetails(business.id).then(fullBusiness => {
+        if (fullBusiness) {
+          setSelectedBusiness(fullBusiness);
         }
-      }
-    } else {
-      setSelectedBusiness(business);
-      // When selecting a business, we're not filtering posts by business
-      setFilteredBusinessId(null);
-
-      // Save the clicked business location
-      if (business.name) {
-        handleLocationSave(business.name, business.name);
-      }
+      });
     }
   };
 
