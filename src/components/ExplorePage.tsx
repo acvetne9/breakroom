@@ -8,7 +8,7 @@ import { TranslatedText } from './TranslatedText';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CommenterBadge } from './CommenterBadge';
-import { getRandomCommenterIdentity } from '@/utils/commenterIdentity';
+import { getCommenterIdentity } from '@/utils/commenterIdentity';
 
 interface Post {
   id: string;
@@ -424,15 +424,18 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                         );
                       }
                 
+                      // Track used combinations for this post's comment thread
+                      const usedCombinations = new Set<string>();
+                      
                       return orderedComments.map(comment => {
-                        // Generate random identity for THIS render
-                        const identity = getRandomCommenterIdentity(comment.author === post.author);
+                        // Generate unique deterministic identity based on comment ID
+                        const identity = getCommenterIdentity(comment.id, comment.author === post.author, usedCombinations);
                         
                         return (
                           <div key={comment.id} className="flex items-center gap-2 py-2">
-                            {/* Random icon badge or OP badge */}
+                            {/* Unique emoji badge or OP badge */}
                             <CommenterBadge
-                              iconName={identity.iconName}
+                              label={identity.label}
                               color={identity.color}
                               isOP={identity.isOP}
                             />

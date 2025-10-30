@@ -1,15 +1,12 @@
 import React from 'react';
-import * as Icons from 'lucide-react';
 
 interface CommenterBadgeProps {
-  iconName: string;  // Either Lucide icon name or "OP"
+  label: string;  // Either emoji or "OP"
   color: string;
   isOP: boolean;
 }
 
-export const CommenterBadge: React.FC<CommenterBadgeProps> = ({ iconName, color, isOP }) => {
-  const Icon = isOP ? null : Icons[iconName as keyof typeof Icons] as React.ComponentType<{ size?: number; strokeWidth?: number }>;
-  
+export const CommenterBadge: React.FC<CommenterBadgeProps> = ({ label, color, isOP }) => {
   return (
     <div
       className="flex items-center justify-center flex-shrink-0"
@@ -23,7 +20,7 @@ export const CommenterBadge: React.FC<CommenterBadgeProps> = ({ iconName, color,
       {isOP ? (
         <span className="text-[10px] font-bold">OP</span>
       ) : (
-        Icon && <Icon size={16} strokeWidth={2} />
+        <span className="text-base">{label}</span>
       )}
     </div>
   );
