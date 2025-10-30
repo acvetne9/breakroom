@@ -610,6 +610,7 @@ const MobileApp: React.FC = () => {
           votingRoles={votingRoles}
           showBusinessDetails={showBusinessDetails}
           onShowBusinessDetails={() => setShowBusinessDetails(true)}
+          onBackToPreview={() => setShowBusinessDetails(false)}
         />
       </Suspense>
 

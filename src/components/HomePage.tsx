@@ -58,11 +58,13 @@ interface HomePageProps {
   votingRoles?: Set<string>;
   showBusinessDetails?: boolean;
   onShowBusinessDetails?: () => void;
+  onBackToPreview?: () => void;
 }
 
 const HomePage: React.FC<HomePageProps> = ({ 
   currentSlide = 1,
   currentView = 'main',
+  onBackToPreview,
   selectedBusiness: propSelectedBusiness,
   onBusinessSelect,
   posts = [],
@@ -214,7 +216,7 @@ const HomePage: React.FC<HomePageProps> = ({
   };
 
   const handleBackToPreview = () => {
-    // No longer managing internal state
+    onBackToPreview?.();
   };
   
   const showBusinessDetails = propShowBusinessDetails;
