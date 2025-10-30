@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.192.0/http/server.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,6 +13,9 @@ const LIBRETRANSLATE_INSTANCES = [
 ]
 
 let currentInstanceIndex = 0
+
+// Request timeout in milliseconds
+const REQUEST_TIMEOUT = 5000
 
 interface TranslationRequest {
   text: string
@@ -30,6 +33,9 @@ async function detectLanguage(text: string): Promise<string> {
   for (let i = 0; i < LIBRETRANSLATE_INSTANCES.length; i++) {
     const instanceUrl = LIBRETRANSLATE_INSTANCES[(currentInstanceIndex + i) % LIBRETRANSLATE_INSTANCES.length]
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT)
+
       const response = await fetch(`${instanceUrl}/detect`, {
         method: 'POST',
         headers: {
@@ -37,8 +43,11 @@ async function detectLanguage(text: string): Promise<string> {
         },
         body: JSON.stringify({
           q: text
-        })
+        }),
+        signal: controller.signal
       })
+
+      clearTimeout(timeoutId)
 
       if (!response.ok) {
         throw new Error(`Detection failed: ${response.status}`)
@@ -55,7 +64,8 @@ async function detectLanguage(text: string): Promise<string> {
       // LibreTranslate returns an array of detected languages with confidence scores
       return result[0]?.language || 'en'
     } catch (error) {
-      console.error(`Language detection error with ${instanceUrl}:`, error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.error(`Language detection error with ${instanceUrl}:`, errorMessage)
       continue
     }
   }
@@ -74,6 +84,9 @@ async function translateText(text: string, sourceLanguage: string, targetLanguag
   for (let i = 0; i < LIBRETRANSLATE_INSTANCES.length; i++) {
     const instanceUrl = LIBRETRANSLATE_INSTANCES[(currentInstanceIndex + i) % LIBRETRANSLATE_INSTANCES.length]
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT)
+
       const response = await fetch(`${instanceUrl}/translate`, {
         method: 'POST',
         headers: {
@@ -84,8 +97,11 @@ async function translateText(text: string, sourceLanguage: string, targetLanguag
           source: sourceLanguage,
           target: targetLanguage,
           format: 'text'
-        })
+        }),
+        signal: controller.signal
       })
+
+      clearTimeout(timeoutId)
 
       if (!response.ok) {
         throw new Error(`Translation failed: ${response.status}`)
@@ -104,7 +120,8 @@ async function translateText(text: string, sourceLanguage: string, targetLanguag
       
       return result.translatedText || text
     } catch (error) {
-      console.error(`Translation error with ${instanceUrl}:`, error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.error(`Translation error with ${instanceUrl}:`, errorMessage)
       continue
     }
   }
