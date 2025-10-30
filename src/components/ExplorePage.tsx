@@ -430,9 +430,9 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                         
                         return (
                           <div key={comment.id} className="flex items-center gap-2 py-2">
-                            {/* Random emoji badge or OP badge */}
+                            {/* Random icon badge or OP badge */}
                             <CommenterBadge
-                              label={identity.label}
+                              iconName={identity.iconName}
                               color={identity.color}
                               isOP={identity.isOP}
                             />
