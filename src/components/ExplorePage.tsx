@@ -429,7 +429,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                         const identity = getRandomCommenterIdentity(comment.author === post.author);
                         
                         return (
-                          <div key={comment.id} className="flex items-start gap-2 py-2">
+                          <div key={comment.id} className="flex items-center gap-2 py-2">
                             {/* Random emoji badge or OP badge */}
                             <CommenterBadge
                               label={identity.label}
@@ -438,7 +438,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                             />
                             
                             {/* Comment content and voting */}
-                            <div className="flex-1 flex items-start justify-between gap-2">
+                            <div className="flex-1 flex items-center justify-between gap-2">
                               <TranslatedText 
                                 text={comment.text} 
                                 className="text-sm text-app-gray-dark flex-1" 
