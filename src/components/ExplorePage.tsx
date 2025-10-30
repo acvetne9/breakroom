@@ -7,6 +7,8 @@ import { formatTimeAgo } from '../utils/timeAgo';
 import { TranslatedText } from './TranslatedText';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { CommenterBadge } from './CommenterBadge';
+import { getRandomCommenterIdentity } from '@/utils/commenterIdentity';
 
 interface Post {
   id: string;
@@ -422,20 +424,38 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                         );
                       }
                 
-                      return orderedComments.map(comment => (
-                        <div key={comment.id} className="flex items-center justify-between py-1">
-                          <TranslatedText text={comment.text} className="text-sm text-app-gray-dark pr-2" />
-                          <div className="flex-shrink-0">
-                            <VotingComponent
-                              votesTotal={comment.votesTotal}
-                              userVote={comment.userVote}
-                              onVote={(voteType) => handlePostVote(comment.id, voteType)}
-                              isOwner={comment.author === 'You'}
-                              onDelete={() => removePost(comment.id)}
+                      return orderedComments.map(comment => {
+                        // Generate random identity for THIS render
+                        const identity = getRandomCommenterIdentity(comment.author === post.author);
+                        
+                        return (
+                          <div key={comment.id} className="flex items-start gap-2 py-2">
+                            {/* Random emoji badge or OP badge */}
+                            <CommenterBadge
+                              label={identity.label}
+                              color={identity.color}
+                              isOP={identity.isOP}
                             />
+                            
+                            {/* Comment content and voting */}
+                            <div className="flex-1 flex items-start justify-between gap-2">
+                              <TranslatedText 
+                                text={comment.text} 
+                                className="text-sm text-app-gray-dark flex-1" 
+                              />
+                              <div className="flex-shrink-0">
+                                <VotingComponent
+                                  votesTotal={comment.votesTotal}
+                                  userVote={comment.userVote}
+                                  onVote={(voteType) => handlePostVote(comment.id, voteType)}
+                                  isOwner={comment.author === 'You'}
+                                  onDelete={() => removePost(comment.id)}
+                                />
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      ));
+                        );
+                      });
                     })()}
                   </div>
                 )}
