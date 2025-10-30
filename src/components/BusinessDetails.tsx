@@ -266,7 +266,10 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(
                       <div
                         key={story.id}
                         className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded relative"
-                        onClick={(e) => handleStoryClick(story, e)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onStoriesClick?.();
+                        }}
                       >
                         <TranslatedText
                           text={
