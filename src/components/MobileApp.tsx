@@ -14,6 +14,7 @@ const ExplorePage = React.lazy(() => import("./ExplorePage"));
 
 import { useBusinessesData } from "../hooks/useBusinessesData";
 import { Business } from "@/types/business";
+import { usePostsContext } from "./PostsProvider";
 
 interface UserData {
   salary: string;
@@ -56,6 +57,7 @@ const MobileApp: React.FC = () => {
 
   const constraintsRef = useRef(null);
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
+  const { posts } = usePostsContext();
 
   // Ref to prevent double initialization in React 18 StrictMode
   const hasInitialized = useRef(false);
@@ -559,6 +561,7 @@ const MobileApp: React.FC = () => {
           currentView={currentView}
           selectedBusiness={selectedBusiness}
           onBusinessSelect={handleBusinessClick}
+          posts={posts}
           onBusinessStoriesClick={handleBusinessStoriesClick}
           onPostClick={(post) => {
             setExpandedPost(post.id);
