@@ -1,7 +1,12 @@
 import MobileApp from '../components/MobileApp';
+import { PostsProvider } from '../components/PostsProvider';
 
 const Index = () => {
-  return <MobileApp />;
+  return (
+    <PostsProvider>
+      <MobileApp />
+    </PostsProvider>
+  );
 };
 
 export default Index;
