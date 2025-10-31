@@ -14,6 +14,7 @@ const ExplorePage = React.lazy(() => import("./ExplorePage"));
 
 import { useBusinessesData } from "../hooks/useBusinessesData";
 import { Business } from "@/types/business";
+import { usePostsContext } from "./PostsProvider";
 
 interface UserData {
   salary: string;
@@ -49,6 +50,7 @@ const MobileApp: React.FC = () => {
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [comments, setComments] = useState<{ [postId: string]: string[] }>({});
   const [selectedBusiness, setSelectedBusiness] = useState<any>(null);
+  const [showBusinessDetails, setShowBusinessDetails] = useState(false);
   const [previouslySelectedBusiness, setPreviouslySelectedBusiness] = useState<any>(null);
   const [filteredBusinessId, setFilteredBusinessId] = useState<string | null>(null);
   const [filteredUserStories, setFilteredUserStories] = useState(false);
@@ -56,6 +58,7 @@ const MobileApp: React.FC = () => {
 
   const constraintsRef = useRef(null);
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
+  const { posts } = usePostsContext();
 
   // Ref to prevent double initialization in React 18 StrictMode
   const hasInitialized = useRef(false);
@@ -197,7 +200,17 @@ const MobileApp: React.FC = () => {
     if (!business) {
       setSelectedBusiness(null);
       setFilteredBusinessId(null);
+      setShowBusinessDetails(false);
       return;
+    }
+
+    // Set business IMMEDIATELY to show preview right away
+    setSelectedBusiness(business);
+    setFilteredBusinessId(null);
+
+    // Save the clicked business location
+    if (business.name) {
+      handleLocationSave(business.name, business.name);
     }
 
     // Check if we need full details: missing atmosphere, missing roles, OR roles without IDs
@@ -205,27 +218,13 @@ const MobileApp: React.FC = () => {
                              !business.roles?.length ||
                              (business.roles && business.roles.length > 0 && !business.roles[0]?.id);
 
+    // Fetch full details in background if needed
     if (needsFullDetails) {
-      const fullBusiness = await fetchFullBusinessDetails(business.id);
-      if (fullBusiness) {
-        setSelectedBusiness(fullBusiness);
-        // When selecting a business, we're not filtering posts by business
-        setFilteredBusinessId(null);
-
-        // Save the clicked business location
-        if (fullBusiness.name) {
-          handleLocationSave(fullBusiness.name, fullBusiness.name);
+      fetchFullBusinessDetails(business.id).then(fullBusiness => {
+        if (fullBusiness) {
+          setSelectedBusiness(fullBusiness);
         }
-      }
-    } else {
-      setSelectedBusiness(business);
-      // When selecting a business, we're not filtering posts by business
-      setFilteredBusinessId(null);
-
-      // Save the clicked business location
-      if (business.name) {
-        handleLocationSave(business.name, business.name);
-      }
+      });
     }
   };
 
@@ -251,9 +250,48 @@ const MobileApp: React.FC = () => {
     // Change slide immediately
     setCurrentSlide(1);
     
+    // Find business in local state
+    let business = businesses.find((b) => b.id === businessId);
+    
+    // Check if business needs full details loaded
+    const needsFullDetails = !business?.roles?.length || 
+                            !business?.atmosphere?.length ||
+                            (business?.roles && business.roles.length > 0 && !business.roles[0]?.id);
+    
+    // Start loading full details IMMEDIATELY in background if needed
+    let detailsPromise: Promise<any> | null = null;
+    if (needsFullDetails) {
+      console.log('🔄 Starting background load of business details during fly...');
+      detailsPromise = fetchFullBusinessDetails(businessId).then(fullBusiness => {
+        if (fullBusiness) {
+          console.log('✅ Background load completed, updating business');
+          setSelectedBusiness(fullBusiness);
+        }
+        return fullBusiness;
+      });
+    }
+    
     // Fast path: Use coordinates from post if available
     if (post?.businessLat && post?.businessLng) {
       console.log(`⚡ Fast fly-to using post coordinates in ${performance.now() - startTime}ms`);
+      
+      // Create minimal business object from post if not in state
+      if (!business && post.businessName) {
+        business = {
+          id: businessId,
+          name: post.businessName,
+          position: { lat: post.businessLat, lng: post.businessLng },
+          atmosphere: [],
+          roles: []
+        };
+      }
+      
+      // Set business immediately to show preview right away
+      if (business) {
+        setSelectedBusiness(business);
+        setShowBusinessDetails(true);
+      }
+      
       window.dispatchEvent(new CustomEvent('flyToBusiness', {
         detail: {
           lat: post.businessLat,
@@ -262,17 +300,10 @@ const MobileApp: React.FC = () => {
         }
       }));
       
-      // Fetch full details in background (don't await)
-      fetchFullBusinessDetails(businessId).then(fullBusiness => {
-        if (fullBusiness) {
-          setSelectedBusiness(fullBusiness);
-        }
-      });
+      // Details are loading in background already
       return;
     }
     
-    // Find business in local state
-    let business = businesses.find((b) => b.id === businessId);
     console.log('📍 Found business in state:', { 
       found: !!business, 
       hasPosition: !!business?.position,
@@ -283,6 +314,8 @@ const MobileApp: React.FC = () => {
     
     if (business?.position?.lat && business?.position?.lng) {
       console.log('✅ Using cached business coordinates', performance.now() - startTime, 'ms');
+      setSelectedBusiness(business);
+      setShowBusinessDetails(true);
       window.dispatchEvent(new CustomEvent('flyToBusiness', {
         detail: {
           lat: business.position.lat,
@@ -290,12 +323,19 @@ const MobileApp: React.FC = () => {
           businessId: businessId
         }
       }));
-      setSelectedBusiness(business);
+      
+      // Details are loading in background already
       return;
     }
     
     // Coordinates missing - try to fetch full details
     console.log('⏳ Coordinates missing, fetching full business details...', performance.now() - startTime, 'ms');
+    
+    // Set partial business immediately if available
+    if (business) {
+      setSelectedBusiness(business);
+    }
+    
     try {
       const fullBusiness = await fetchFullBusinessDetails(businessId);
       
@@ -320,6 +360,8 @@ const MobileApp: React.FC = () => {
       }
       
       console.log('✅ Successfully fetched details, dispatching flyTo', performance.now() - startTime, 'ms');
+      setSelectedBusiness(fullBusiness);
+      setShowBusinessDetails(true);
       window.dispatchEvent(new CustomEvent('flyToBusiness', {
         detail: {
           lat: fullBusiness.position.lat,
@@ -327,7 +369,6 @@ const MobileApp: React.FC = () => {
           businessId: businessId
         }
       }));
-      setSelectedBusiness(fullBusiness);
       
     } catch (error) {
       console.error('❌ Error in handleFlyToBusiness:', error, performance.now() - startTime, 'ms');
@@ -559,6 +600,7 @@ const MobileApp: React.FC = () => {
           currentView={currentView}
           selectedBusiness={selectedBusiness}
           onBusinessSelect={handleBusinessClick}
+          posts={posts}
           onBusinessStoriesClick={handleBusinessStoriesClick}
           onPostClick={(post) => {
             setExpandedPost(post.id);
@@ -566,6 +608,9 @@ const MobileApp: React.FC = () => {
           onRoleVote={handleRoleVote}
           onLocationSave={handleLocationSave}
           votingRoles={votingRoles}
+          showBusinessDetails={showBusinessDetails}
+          onShowBusinessDetails={() => setShowBusinessDetails(true)}
+          onBackToPreview={() => setShowBusinessDetails(false)}
         />
       </Suspense>
 

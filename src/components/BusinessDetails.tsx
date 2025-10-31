@@ -266,7 +266,12 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(
                       <div
                         key={story.id}
                         className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded relative"
-                        onClick={(e) => handleStoryClick(story, e)}
+                        onClick={(e) => {
+                          if (onStoriesClick) {
+                            e.stopPropagation();
+                            onStoriesClick();
+                          }
+                        }}
                       >
                         <TranslatedText
                           text={
@@ -285,8 +290,10 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(
                     {Array.isArray(businessStories) && businessStories.length > 5 && (
                       <button
                         onClick={(e) => {
-                          e.stopPropagation();
-                          onStoriesClick?.();
+                          if (onStoriesClick) {
+                            e.stopPropagation();
+                            onStoriesClick();
+                          }
                         }}
                         className="w-full mt-3 px-4 py-2 bg-app-yellow text-app-black rounded hover:bg-app-yellow/90 transition-colors"
                       >
@@ -298,8 +305,10 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(
                   <div
                     className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded"
                     onClick={(e) => {
-                      e.stopPropagation();
-                      onStoriesClick?.();
+                      if (onStoriesClick) {
+                        e.stopPropagation();
+                        onStoriesClick();
+                      }
                     }}
                   >
                     <p className="text-app-gray-dark text-sm font-medium">Be the first to post! 🚀</p>
