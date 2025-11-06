@@ -44,7 +44,7 @@ const MobileApp: React.FC = () => {
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [currentView, setCurrentView] = useState<"initiation" | "main">("main");
+  const [currentView, setCurrentView] = useState<"initiation" | "main" | "loading">("loading");
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
   const [userData, setUserData] = useState<UserData | null>(null);
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
@@ -102,9 +102,11 @@ const MobileApp: React.FC = () => {
           }
           console.log("Job found - going to main view");
           setCurrentView("main");
+        } else if (isFirstSession) {
+          console.log("First session, no job - going to main view");
+          setCurrentView("main");
         } else {
-          // No job exists - show initiation page regardless of session status
-          console.log("No job found - showing initiation page");
+          console.log("Not first session, no job - showing initiation page");
           setCurrentView("initiation");
         }
       } catch (error) {
@@ -591,11 +593,18 @@ const MobileApp: React.FC = () => {
 
   return (
     <div className="fixed inset-0 overflow-hidden">
+      {/* Show loading state while initializing */}
+      {currentView === "loading" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
+          <Skeleton className="w-full h-full" />
+        </div>
+      )}
+      
       {/* Map is always the background */}
       <Suspense fallback={<Skeleton className="w-full h-full" />}>
         <HomePage
           currentSlide={currentSlide}
-          currentView={currentView}
+          currentView={currentView === "loading" ? "main" : currentView}
           selectedBusiness={selectedBusiness}
           onBusinessSelect={handleBusinessClick}
           posts={posts}
