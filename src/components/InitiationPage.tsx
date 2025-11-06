@@ -64,6 +64,8 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   const [newBusinessAddress, setNewBusinessAddress] = useState('');
   const [isCreatingBusiness, setIsCreatingBusiness] = useState(false);
   const [addressError, setAddressError] = useState('');
+  const [hasSearchResults, setHasSearchResults] = useState(false);
+  const [lastSearchValue, setLastSearchValue] = useState('');
   const {
     toast
   } = useToast();
@@ -119,6 +121,11 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       }, 300);
     }
   };
+  const handleSearchResultsChange = (hasResults: boolean, searchValue: string) => {
+    setHasSearchResults(hasResults);
+    setLastSearchValue(searchValue);
+  };
+
   const handleRoleChange = (value: string) => {
     const isPredefinedOption = JOB_OPTIONS.includes(value);
     if (!isPredefinedOption && value && isProfane(value)) {
@@ -135,8 +142,17 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     setLocation(value);
     setFullLocation(fullLocation || value);
 
-    // Only show "new business form" if user typed free text (not from dropdown)
-    setShowNewBusinessForm(!fullLocation && value.length > 2);
+    // Only show new business form if:
+    // 1. User typed something (> 2 chars)
+    // 2. No business selected from dropdown (!fullLocation)
+    // 3. No search results found (!hasSearchResults)
+    // 4. User finished typing (value matches last search)
+    const shouldShowForm = !fullLocation && 
+                          value.length > 2 && 
+                          !hasSearchResults && 
+                          value === lastSearchValue;
+    
+    setShowNewBusinessForm(shouldShowForm);
   };
   const handleLocationBlur = () => {
     const value = location.trim();
@@ -235,7 +251,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
         
           {/* Business (Location) */}
           <div>
-            <BusinessSearchDropdown value={location} onChange={handleLocationChange} onBlur={handleLocationBlur} placeholder="Where do you work?..." className="app-input" salary={salary} role={role} timePeriod={timePeriod} />
+            <BusinessSearchDropdown value={location} onChange={handleLocationChange} onBlur={handleLocationBlur} onSearchResultsChange={handleSearchResultsChange} placeholder="Where do you work?..." className="app-input" salary={salary} role={role} timePeriod={timePeriod} />
           </div>
         
           <div className="text-center">

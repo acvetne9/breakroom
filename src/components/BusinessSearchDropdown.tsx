@@ -19,6 +19,7 @@ interface BusinessSearchDropdownProps {
   onCreateBusiness?: () => void;
   isCreatingBusiness?: boolean;
   onSelect?: (business: any) => void;
+  onSearchResultsChange?: (hasResults: boolean, searchValue: string) => void;
 }
 
 const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
@@ -35,7 +36,8 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
   onAddressChange,
   onCreateBusiness: externalCreateBusiness,
   isCreatingBusiness: externalIsCreating = false,
-  onSelect
+  onSelect,
+  onSearchResultsChange
 }) => {
   const { businesses, setBusinesses } = useBusinessesData();
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -95,6 +97,7 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
 
     if (inputValue.length === 0) {
       setSearchResults([]);
+      onSearchResultsChange?.(false, inputValue);
       setShowDropdown(false);
       setInternalShowAddForm(false);
       return;
@@ -141,6 +144,7 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
       }
       
       setSearchResults(results);
+      onSearchResultsChange?.(results.length > 0, inputValue);
       setShowDropdown(true);
       setInternalShowAddForm(false);
     } else {
