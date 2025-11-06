@@ -102,11 +102,9 @@ const MobileApp: React.FC = () => {
           }
           console.log("Job found - going to main view");
           setCurrentView("main");
-        } else if (isFirstSession) {
-          console.log("First session - going to main");
-          setCurrentView("main");
         } else {
-          console.log("Not first session, no job - showing initiation");
+          // No job exists - show initiation page regardless of session status
+          console.log("No job found - showing initiation page");
           setCurrentView("initiation");
         }
       } catch (error) {
