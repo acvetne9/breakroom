@@ -168,7 +168,8 @@ export const getBusinessesInViewport = async (
 };
 
 export async function getFullBusinessDetails(businessId: string): Promise<Business | null> {
-  console.log('🔍 Fetching full business details for:', businessId);
+  console.log('🔍🔍🔍 FETCHING FULL BUSINESS DETAILS FOR:', businessId);
+  console.trace('Call stack:');
   const startTime = performance.now();
   
   // Fetch business data, user profile, and roles in PARALLEL
@@ -248,7 +249,8 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
     website: businessData.website,
   };
 
-  console.log(`✅ getFullBusinessDetails completed in ${performance.now() - startTime}ms`);
+  console.log(`✅✅✅ getFullBusinessDetails completed in ${performance.now() - startTime}ms`);
+  console.log(`✅✅✅ Returning ${businessRoles.length} roles for business:`, businessData.name);
   return fullBusiness;
 }
 
