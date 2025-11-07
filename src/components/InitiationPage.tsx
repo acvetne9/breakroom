@@ -250,7 +250,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
           </div>
         
           {/* Business (Location) */}
-          <div className="relative">
+          <div>
             <BusinessSearchDropdown value={location} onChange={handleLocationChange} onBlur={handleLocationBlur} onSearchResultsChange={handleSearchResultsChange} placeholder="Where do you work?..." className="app-input" salary={salary} role={role} timePeriod={timePeriod} />
           </div>
         

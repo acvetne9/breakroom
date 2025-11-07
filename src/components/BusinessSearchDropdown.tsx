@@ -328,56 +328,66 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
       )} */}
 
       {/* Search Results Dropdown */}
-      {showDropdown && searchResults.length > 0 && (
+      {showDropdown && (searchResults.length > 0 || value.trim()) && (
         <div className="absolute top-full left-0 right-0 mt-1 z-[9999]">
           <div 
             className="bg-card shadow-xl border border-border max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
             style={{ borderRadius: '8px' }}
+            onScroll={() => {
+              isScrolling.current = true;
+              setTimeout(() => { isScrolling.current = false; }, 200);
+            }}
           >
-            <div className="p-3">
-              {searchResults.map((business, index) => (
-                <div key={business.id}>
-                  <div
-                    className="cursor-pointer py-1.5 px-0 rounded transition-colors hover:bg-accent/20"
-                    onClick={() => handleBusinessSelect(business)}
-                  >
-                    <div className="flex flex-col">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">{business.name}</span>
-                        {business.businessType && business.businessType !== "Other" && (
-                          <span className="text-sm opacity-70">
-                            {business.businessType}
+            {searchResults.length === 0 ? (
+              <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+                No businesses found
+              </div>
+            ) : (
+              <div className="p-3">
+                {searchResults.map((business, index) => (
+                  <div key={business.id}>
+                    <div
+                      className="cursor-pointer py-1.5 px-0 rounded transition-colors hover:bg-accent/20"
+                      onClick={() => handleBusinessSelect(business)}
+                    >
+                      <div className="flex flex-col">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">{business.name}</span>
+                          {business.businessType && business.businessType !== "Other" && (
+                            <span className="text-sm opacity-70">
+                              {business.businessType}
+                            </span>
+                          )}
+                        </div>
+                        
+                        {/* Address display */}
+                        {business.address && (
+                          <span className="text-xs text-muted-foreground truncate mt-0.5">
+                            {business.address}
                           </span>
                         )}
+                        
+                        {/* Optional: Show roles */}
+                        {business.roles && business.roles.length > 0 && (
+                          <div className="flex gap-2 mt-1">
+                            {business.roles.slice(0, 2).map((role: any, idx: number) => (
+                              <span key={idx} className="text-xs text-muted-foreground">
+                                {role.role}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      
-                      {/* Address display */}
-                      {business.address && (
-                        <span className="text-xs text-muted-foreground truncate mt-0.5">
-                          {business.address}
-                        </span>
-                      )}
-                      
-                      {/* Optional: Show roles */}
-                      {business.roles && business.roles.length > 0 && (
-                        <div className="flex gap-2 mt-1">
-                          {business.roles.slice(0, 2).map((role: any, idx: number) => (
-                            <span key={idx} className="text-xs text-muted-foreground">
-                              {role.role}
-                            </span>
-                          ))}
-                        </div>
-                      )}
                     </div>
+                    
+                    {/* Divider between results */}
+                    {index < searchResults.length - 1 && (
+                      <div className="h-px bg-border/30 my-1.5"></div>
+                    )}
                   </div>
-                  
-                  {/* Divider between results */}
-                  {index < searchResults.length - 1 && (
-                    <div className="h-px bg-border/30 my-1.5"></div>
-                  )}
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
