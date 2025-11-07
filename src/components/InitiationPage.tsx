@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import JobSearchDropdown from './JobSearchDropdown';
-import BusinessSearchDropdown from './BusinessSearchDropdown';
+import UnifiedBusinessSearch from './UnifiedBusinessSearch';
 import { isProfane } from '@/utils/profanityFilter';
 import { useToast } from '@/hooks/use-toast';
 
@@ -251,7 +251,26 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
         
           {/* Business (Location) */}
           <div>
-            <BusinessSearchDropdown value={location} onChange={handleLocationChange} onBlur={handleLocationBlur} onSearchResultsChange={handleSearchResultsChange} placeholder="Where do you work?..." className="app-input" salary={salary} role={role} timePeriod={timePeriod} />
+            <UnifiedBusinessSearch
+              value={location}
+              onChange={(value, business, filters, neighborhoodCoords) => {
+                handleLocationChange(value, business?.name);
+                if (business) {
+                  handleSearchResultsChange(true, value);
+                } else {
+                  handleSearchResultsChange(false, value);
+                }
+              }}
+              onBusinessSelect={(business) => {
+                setLocation(business.name);
+                setFullLocation(business.name);
+                handleSearchResultsChange(true, business.name);
+                checkForCompletion();
+              }}
+              placeholder="Where do you work?..."
+              className="app-input"
+              variant="dropdown"
+            />
           </div>
         
           <div className="text-center">
