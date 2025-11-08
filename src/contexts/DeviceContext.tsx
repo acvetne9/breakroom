@@ -54,7 +54,7 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
         
         let storedDeviceId = localStorage.getItem('device_id');
         
-        if (storedDeviceId && storedDeviceId.split('_').length > 2) {
+        if (storedDeviceId && storedDeviceId.split('_').length < 3) {
           console.log('Clearing old device ID format:', storedDeviceId);
           localStorage.removeItem('device_id');
           storedDeviceId = null;

@@ -3,6 +3,7 @@ import { Business } from '@/types/business';
 import { applyBusinessFilters, SearchFilters } from './businessFiltering';
 import { expandTerm } from '@/utils/smartSearch';
 import { sanitizeVoteTotal } from '@/utils/voteCalculations';
+import { findNeighborhoodBoundaryByName } from '@/utils/nyc_neighborhoods';
 
 // Search results cache to prevent repeated queries
 const searchCache = new Map<string, { results: Business[]; timestamp: number }>();
@@ -88,16 +89,29 @@ export const parseUnifiedSearchFilters = async (searchQuery: string): Promise<Un
   
   console.log(`🔍 [parseSearchFilters] Original terms: ${textTerms.join(', ')}`);
   
-  // Expand text terms with synonyms - NOW ASYNC with API calls
+  // Expand text terms with synonyms - skip neighborhoods
   const expandedTermsArrays = await Promise.all(
-    textTerms.map(term => expandTerm(term))
+    textTerms.map(async term => {
+      // Skip expansion for neighborhood names
+      const isNeighborhood = findNeighborhoodBoundaryByName(term);
+      if (isNeighborhood) {
+        console.log(`⏭️ Skipping expansion for neighborhood: ${term}`);
+        return [term]; // Return original term only
+      }
+      
+      // Expand all other terms (will expand job roles AND other terms)
+      return await expandTerm(term);
+    })
   );
   const expandedTextTerms = expandedTermsArrays.flat();
   const uniqueExpandedTerms = [...new Set(expandedTextTerms)];
   
   console.log(`🔍 [parseSearchFilters] Expanded to: ${uniqueExpandedTerms.join(', ')}`);
   
-  const filters: UnifiedSearchFilters = { textTerms: uniqueExpandedTerms };
+  const filters: UnifiedSearchFilters = { 
+    textTerms: uniqueExpandedTerms,  // Expanded terms for role matching
+    originalTerms: textTerms          // Original terms for name/type matching
+  };
   
   if (salaryQuery) filters.salaryQuery = salaryQuery;
   

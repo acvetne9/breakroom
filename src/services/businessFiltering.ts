@@ -39,6 +39,7 @@ function parseSearchTerms(query: string): {
 
 export interface SearchFilters {
   textTerms: string[];
+  originalTerms?: string[]; // Original search terms (for name/type matching)
   salaryQuery?: {
     min?: number;
     max?: number;
@@ -179,26 +180,32 @@ export function applyBusinessFilters(businesses: Business[], filters: SearchFilt
     const type = business.businessType || '';
     const roles = business.roles || [];
 
-    // COMPREHENSIVE SEARCH: Check ALL text terms across ALL searchable fields
-    // Any term matching ANY field (name, type, roles) will include the business
     let hasMatch = false;
     
     if (filters.textTerms && filters.textTerms.length > 0) {
-      hasMatch = filters.textTerms.some(term => {
-        // Check business name
+      // Use ORIGINAL terms for matching name and type (if available)
+      // Use EXPANDED terms for matching roles
+      const termsForNameType = filters.originalTerms || filters.textTerms;
+      const termsForRoles = filters.textTerms; // Always use expanded for roles
+
+      hasMatch = termsForNameType.some(term => {
+        // Check business name with ORIGINAL term
         if (variantsOf(term).some(v => name.toLowerCase().includes(v))) {
           return true;
         }
-        // Check business type
+        // Check business type with ORIGINAL term
         if (variantsOf(term).some(v => type.toLowerCase().includes(v))) {
-          return true;
-        }
-        // Check roles
-        if (roles.some(r => variantsOf(term).some(v => (r.role || '').toLowerCase().includes(v)))) {
           return true;
         }
         return false;
       });
+
+      // If name/type didn't match, check roles with EXPANDED terms
+      if (!hasMatch) {
+        hasMatch = termsForRoles.some(term => {
+          return roles.some(r => variantsOf(term).some(v => (r.role || '').toLowerCase().includes(v)));
+        });
+      }
     }
 
     // INCLUSIVE OR-based matching for specific filters when they overlap with text terms

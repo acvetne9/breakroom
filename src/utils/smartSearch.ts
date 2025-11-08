@@ -87,6 +87,23 @@ export async function expandTerm(job: string, enableLogging: boolean = true): Pr
     // Must be at least 3 characters
     if (lower.length < 3) return false;
 
+    // Exclude place names and geographic terms
+    const geographicPatterns = [
+      /ville$/i,        // Brownsville, Williamstown
+      /town$/i,         // Williamstown, Jamestown
+      /burg$/i,         // Williamsburg, Pittsburgh
+      /port$/i,         // Newport, Bridgeport
+      /^(new|old|south|north|east|west)\s/i,
+      /\s(city|county|state|village|borough)$/i,
+      /^mount\s/i,
+      /^(brooklyn|manhattan|queens|bronx|staten)/i,
+    ];
+
+    if (geographicPatterns.some((p) => p.test(lower))) {
+      console.log(`⏭️ Excluding geographic term: ${term}`);
+      return false;
+    }
+
     // Exclude pure anatomical/botanical terms
     const excludePatterns = [
       /^(hair|fur|wool|silk|fiber|thread|strand)$/i,

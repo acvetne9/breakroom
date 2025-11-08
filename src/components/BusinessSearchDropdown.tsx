@@ -19,6 +19,7 @@ interface BusinessSearchDropdownProps {
   onCreateBusiness?: () => void;
   isCreatingBusiness?: boolean;
   onSelect?: (business: any) => void;
+  onSearchResultsChange?: (hasResults: boolean, searchValue: string) => void;
 }
 
 const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
@@ -35,7 +36,8 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
   onAddressChange,
   onCreateBusiness: externalCreateBusiness,
   isCreatingBusiness: externalIsCreating = false,
-  onSelect
+  onSelect,
+  onSearchResultsChange
 }) => {
   const { businesses, setBusinesses } = useBusinessesData();
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -95,6 +97,7 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
 
     if (inputValue.length === 0) {
       setSearchResults([]);
+      onSearchResultsChange?.(false, inputValue);
       setShowDropdown(false);
       setInternalShowAddForm(false);
       return;
@@ -141,6 +144,7 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
       }
       
       setSearchResults(results);
+      onSearchResultsChange?.(results.length > 0, inputValue);
       setShowDropdown(true);
       setInternalShowAddForm(false);
     } else {
@@ -324,29 +328,67 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
       )} */}
 
       {/* Search Results Dropdown */}
-      {showDropdown && searchResults.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-[60] max-h-60 overflow-y-auto">
-          {searchResults.map(business => (
-            <div
-              key={business.id}
-              className="flex flex-col py-2 px-3 cursor-pointer hover:bg-accent border-b border-border last:border-b-0"
-              onClick={() => handleBusinessSelect(business)}
-            >
-              <div className="flex justify-between items-center">
-                <span className="font-medium">{business.name}</span>
+      {showDropdown && (searchResults.length > 0 || value.trim()) && (
+        <div className="absolute top-full left-0 right-0 mt-1 z-[9999]">
+          <div 
+            className="bg-card shadow-xl border border-border max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
+            style={{ borderRadius: '8px' }}
+            onScroll={() => {
+              isScrolling.current = true;
+              setTimeout(() => { isScrolling.current = false; }, 200);
+            }}
+          >
+            {searchResults.length === 0 ? (
+              <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+                No businesses found
               </div>
-              <div className="flex gap-2 mt-1">
-                <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                  {business.businessType || 'Business'}
-                </span>
-                {business.roles?.slice(0, 2).map((role: any, index: number) => (
-                  <span key={index} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                    {role.role}
-                  </span>
+            ) : (
+              <div className="p-3">
+                {searchResults.map((business, index) => (
+                  <div key={business.id}>
+                    <div
+                      className="cursor-pointer py-1.5 px-0 rounded transition-colors hover:bg-accent/20"
+                      onClick={() => handleBusinessSelect(business)}
+                    >
+                      <div className="flex flex-col">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">{business.name}</span>
+                          {business.businessType && business.businessType !== "Other" && (
+                            <span className="text-sm opacity-70">
+                              {business.businessType}
+                            </span>
+                          )}
+                        </div>
+                        
+                        {/* Address display */}
+                        {business.address && (
+                          <span className="text-xs text-muted-foreground truncate mt-0.5">
+                            {business.address}
+                          </span>
+                        )}
+                        
+                        {/* Optional: Show roles */}
+                        {business.roles && business.roles.length > 0 && (
+                          <div className="flex gap-2 mt-1">
+                            {business.roles.slice(0, 2).map((role: any, idx: number) => (
+                              <span key={idx} className="text-xs text-muted-foreground">
+                                {role.role}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Divider between results */}
+                    {index < searchResults.length - 1 && (
+                      <div className="h-px bg-border/30 my-1.5"></div>
+                    )}
+                  </div>
                 ))}
               </div>
-            </div>
-          ))}
+            )}
+          </div>
         </div>
       )}
 
