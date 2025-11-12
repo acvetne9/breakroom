@@ -232,10 +232,10 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       // Handle business click
       const business = result as EnhancedBusiness;
       
-      // Perform search with current value
-      performSearch();
+      // Update input to show the selected business name
+      onChange(business.name);
       
-      // Still call the business select callback for any other handling needed
+      // Call the business select callback so parent can handle the selection
       onBusinessSelect?.(business);
       
       // Save the clicked business location
