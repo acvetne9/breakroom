@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Plus, Minus } from "lucide-react";
 import JobSearchDropdown from "./JobSearchDropdown";
-import BusinessSearchDropdown from "./BusinessSearchDropdown";
+import UnifiedBusinessSearch from "./UnifiedBusinessSearch";
 import { isProfane } from "../utils/profanityFilter";
 import { useToast } from "@/hooks/use-toast";
 import { useDevice } from "@/contexts/DeviceContext";
@@ -662,16 +662,16 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             <div className="space-y-4">
               {/* Business Location */}
               <div>
-                <BusinessSearchDropdown
+                <UnifiedBusinessSearch
                   value={currentJobBusinessInput}
-                  onChange={handleCurrentJobBusinessInputChange}
-                  onSelect={handleCurrentJobBusinessSelect}
+                  onChange={(value, business, filters, neighborhoodCoords) => {
+                    handleCurrentJobBusinessInputChange(value);
+                  }}
+                  onBusinessSelect={handleCurrentJobBusinessSelect}
                   onBlur={handleCurrentJobBusinessBlur}
                   className={`app-input w-full ${currentJobShowAddressInput && !currentJobBusinessSelected ? "border-red-500" : ""}`}
                   placeholder="Where do you work?..."
-                  salary={currentJob.salary}
-                  role={currentJob.role}
-                  timePeriod={currentTimePeriod}
+                  variant="dropdown"
                 />
 
                 {/* Address input for current job */}
@@ -749,16 +749,16 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 <div key={job.id} className="space-y-3 w-full">
                   {/* Business Location */}
                   <div>
-                    <BusinessSearchDropdown
+                    <UnifiedBusinessSearch
                       value={pastJobBusinessInputs[job.id] || ""}
-                      onChange={(value) => handlePastJobBusinessInputChange(job.id, value)}
-                      onSelect={(business) => handlePastJobBusinessSelect(job.id, business)}
+                      onChange={(value, business, filters, neighborhoodCoords) => {
+                        handlePastJobBusinessInputChange(job.id, value);
+                      }}
+                      onBusinessSelect={(business) => handlePastJobBusinessSelect(job.id, business)}
                       onBlur={() => handlePastJobBusinessBlur(job.id)}
                       className={`app-input w-full ${pastJobShowAddressInputs[job.id] && !pastJobBusinessSelected[job.id] ? "border-red-500" : ""}`}
                       placeholder="Where did you work?..."
-                      salary={job.salary}
-                      role={job.role}
-                      timePeriod={pastJobTimePeriods[job.id]}
+                      variant="dropdown"
                     />
 
                     {/* Address input for past job */}
