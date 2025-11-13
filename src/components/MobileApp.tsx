@@ -117,6 +117,7 @@ const MobileApp: React.FC = () => {
   }, [isFirstSession, deviceLoading]);
 
   const handleInitiationComplete = async (data: UserData) => {
+    console.log('🎯 handleInitiationComplete called with:', data);
     setUserData(data);
     setCurrentView("main");
 
@@ -175,6 +176,7 @@ const MobileApp: React.FC = () => {
   };
 
   const handleJobUpdate = async (jobData: { salary: string; role: string; location: string; timePeriod: string }) => {
+    console.log('🎯 handleJobUpdate called with:', jobData);
     try {
       const { saveCurrentJob } = await import("../services/currentJobs");
       const salary = parseInt(jobData.salary.replace(/[^0-9]/g, "")) || 0;

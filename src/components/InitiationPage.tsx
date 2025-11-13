@@ -65,6 +65,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   const [addressError, setAddressError] = useState('');
   const [hasSearchResults, setHasSearchResults] = useState(false);
   const [lastSearchValue, setLastSearchValue] = useState('');
+  const [isManualAddressValidated, setIsManualAddressValidated] = useState(false);
 
   /** Format salary as $123.00 */
   const formatSalary = (input: string) => {
@@ -96,10 +97,20 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
     const isValidRole = JOB_OPTIONS.includes(role.trim()) || role.trim() === 'Other';
     
-    // Business validation: either selected from dropdown OR new business with valid address
+    // Business validation: either selected from dropdown OR new business with valid address OR manual address validated
     const businessValidFromDropdown = fullLocation && fullLocation !== location;
     const businessValidNewBusiness = showNewBusinessForm && newBusinessAddress.trim() !== '' && isValidAddress(newBusinessAddress);
-    const businessValid = businessValidFromDropdown || businessValidNewBusiness;
+    const businessValid = businessValidFromDropdown || businessValidNewBusiness || isManualAddressValidated;
+    
+    console.log('🔍 InitiationPage validation:', {
+      allFilled,
+      isValidRole,
+      businessValidFromDropdown,
+      businessValidNewBusiness,
+      isManualAddressValidated,
+      businessValid,
+      willComplete: allFilled && isValidRole && businessValid && !isComplete
+    });
     
     if (allFilled && isValidRole && businessValid && !isComplete) {
       setIsComplete(true);
@@ -132,6 +143,11 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   const handleLocationChange = (value: string, fullLocation?: string) => {
     setLocation(value);
     setFullLocation(fullLocation || value);
+
+    // Reset manual address flag if a database business is selected
+    if (fullLocation) {
+      setIsManualAddressValidated(false);
+    }
 
     // Only show new business form if:
     // 1. User typed something (> 2 chars)
@@ -193,6 +209,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       // Set the full address as both location and fullLocation
       setLocation(address);
       setFullLocation(address);
+      setIsManualAddressValidated(true);
       setShowNewBusinessForm(false);
       setNewBusinessAddress('');
       setAddressError('');
