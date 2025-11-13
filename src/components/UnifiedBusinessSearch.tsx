@@ -354,7 +354,15 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           onBlur={handleInputBlur}
           onKeyDown={handleKeyDown}
           onFocus={() => {
-            if (value.length > 2) {
+            const trimmedValue = value.trim();
+            // Show dropdown if we have a value and either:
+            // 1. We have current search results to display
+            // 2. We have cached results for this value
+            // 3. We're currently searching
+            if (trimmedValue.length > 2 && 
+                (searchResults.length > 0 || 
+                 resultsCache.current.has(trimmedValue) || 
+                 isSearching)) {
               setShowDropdown(true);
             }
           }}
