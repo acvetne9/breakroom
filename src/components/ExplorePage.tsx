@@ -5,7 +5,6 @@ import { usePosts } from '@/hooks/usePosts';
 import VotingComponent from './VotingComponent';
 import { formatTimeAgo } from '../utils/timeAgo';
 import { TranslatedText } from './TranslatedText';
-import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CommenterBadge } from './CommenterBadge';
 import { getCommenterIdentity } from '@/utils/commenterIdentity';
@@ -95,7 +94,6 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   const [postText, setPostText] = useState('');
   const [commentText, setCommentText] = useState('');
   const [commentPlaceholder, setCommentPlaceholder] = useState("Leave a comment!");
-  const { toast } = useToast();
 
   // Check if we need to fade out the system post when real posts are added
   const realPosts = useMemo(() => {
@@ -195,25 +193,13 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   };
 
   const handlePostVote = async (postId: string, voteType: 'up' | 'down') => {
-    const success = await votePost(postId, voteType);
-    if (!success) {
-      toast({
-        title: "Error",
-        description: "Failed to vote. Please try again.",
-        variant: "destructive"
-      });
-    }
+    await votePost(postId, voteType);
   };
 
   const handlePostDelete = async (postId: string) => {
     const success = await removePost(postId);
   
     if (!success) {
-      toast({
-        title: "Error",
-        description: "Failed to delete post. Please try again.",
-        variant: "destructive"
-      });
       return;
     }
   

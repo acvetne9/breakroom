@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useBusinessesData } from '@/hooks/useBusinessesData';
 import { isProfane } from '@/utils/profanityFilter';
-import { useToast } from '@/hooks/use-toast';
 import { createOrUpdateBusinessRole } from '@/services/businesses';
 
 interface BusinessSearchDropdownProps {
@@ -45,7 +44,6 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
   const [internalShowAddForm, setInternalShowAddForm] = useState(false);
   const [internalAddress, setInternalAddress] = useState('');
   const [internalIsCreating, setInternalIsCreating] = useState(false);
-  const { toast } = useToast();
   
   // Use external props if provided, otherwise use internal state
   const showAddForm = externalShowAddForm || internalShowAddForm;
@@ -221,29 +219,14 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
     }
 
     if (!newBusinessAddress.trim()) {
-      toast({
-        title: "Address required",
-        description: "Please enter the business address",
-        variant: "destructive"
-      });
       return;
     }
 
     if (isProfane(newBusinessAddress)) {
-      toast({
-        title: "Invalid address", 
-        description: "Inappropriate content detected in address",
-        variant: "destructive"
-      });
       return;
     }
 
     if (!salary || !role) {
-      toast({
-        title: "Missing information",
-        description: "Please fill in salary and role first",
-        variant: "destructive"
-      });
       return;
     }
 
@@ -254,11 +237,6 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
       const coordinates = await geocodeAddress(newBusinessAddress);
       
       if (!coordinates) {
-        toast({
-          title: "Address not found",
-          description: "Could not find coordinates for this address",
-          variant: "destructive"
-        });
         return;
       }
 
@@ -285,11 +263,6 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
       setInternalAddress('');
     } catch (error) {
       console.error('Error creating business:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create business. Please try again.",
-        variant: "destructive"
-      });
     } finally {
       setInternalIsCreating(false);
     }

@@ -1,6 +1,5 @@
 import React from 'react';
 import { isProfane } from '../utils/profanityFilter';
-import { useToast } from '@/hooks/use-toast';
 
 interface LocationSearchInputProps {
   value: string;
@@ -17,8 +16,6 @@ const LocationSearchInput: React.FC<LocationSearchInputProps> = ({
   placeholder = "Enter NYC location...",
   className = "app-input"
 }) => {
-  const { toast } = useToast();
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     onChange(newValue);
@@ -26,11 +23,6 @@ const LocationSearchInput: React.FC<LocationSearchInputProps> = ({
 
   const handleBlur = () => {
     if (isProfane(value)) {
-      toast({
-        title: "Inappropriate content detected",
-        description: "Please use appropriate language in your location.",
-        variant: "destructive",
-      });
       onChange(''); // Clear the input
       return;
     }

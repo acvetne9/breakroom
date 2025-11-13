@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, Suspense } from "react";
 import { motion, PanInfo } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useToast } from "@/hooks/use-toast";
 import InitiationPage from "./InitiationPage";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -43,7 +42,6 @@ const MobileApp: React.FC = () => {
   console.log("🚀 MobileApp component rendering");
   const isMobile = useIsMobile();
   const { user } = useAuth();
-  const { toast } = useToast();
   const [currentView, setCurrentView] = useState<"initiation" | "main" | "loading">("loading");
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -122,59 +120,112 @@ const MobileApp: React.FC = () => {
     setUserData(data);
     setCurrentView("main");
 
-    // Save job data to database
     try {
-      // Save current job
       const { saveCurrentJob } = await import("../services/currentJobs");
       const salary = parseInt(data.salary.replace(/[^0-9]/g, "")) || 0;
+      
+      // STEP 1: Always save current job to database
       await saveCurrentJob({
         role: data.role,
         salary: salary,
         location: data.location,
         time_period: data.timePeriod || "HR",
       });
+      console.log("✅ Current job saved to database");
 
-      // Save business role
-      const { createOrUpdateBusinessRole } = await import("../services/businesses");
-      await createOrUpdateBusinessRole(data.location, data.role, data.salary);
-      console.log("Job saved to database:", { location: data.location, role: data.role, salary: data.salary });
+      let businessId: string | undefined;
 
-      // Create job update post
+      // STEP 2: Check if business exists (don't create if missing)
+      try {
+        const { data: existingBusiness } = await supabase
+          .from('businesses')
+          .select('id')
+          .ilike('name', data.location)
+          .maybeSingle();
+
+        if (existingBusiness) {
+          businessId = existingBusiness.id;
+          
+          // STEP 3: Create business role only if business exists
+          const { createOrUpdateBusinessRole } = await import("../services/businesses");
+          await createOrUpdateBusinessRole(data.location, data.role, data.salary);
+          console.log("✅ Business role created");
+        } else {
+          console.log("ℹ️ Business not in database, skipping role creation");
+        }
+      } catch (roleError) {
+        console.error("Error with business role:", roleError);
+      }
+
+      // STEP 4: Always create post
       const { createPost } = await import("../services/posts");
       await createPost(
         `New Job Update! ${data.salary}/${data.timePeriod || "HR"} for ${data.role} 😳`,
         "job_update",
-        undefined,
+        businessId,
         data.role,
         data.timePeriod,
         salary,
       );
+      console.log("✅ Post created");
+      
     } catch (error) {
       console.error("Error saving job data:", error);
-      // Continue to main view even if save fails
     }
   };
 
   const handleJobUpdate = async (jobData: { salary: string; role: string; location: string; timePeriod: string }) => {
-    // Save job data to database
     try {
-      const { createOrUpdateBusinessRole } = await import("../services/businesses");
-      await createOrUpdateBusinessRole(jobData.location, jobData.role, jobData.salary);
-      console.log("Job role updated in database:", jobData);
-
-      // Create job update post in backend
-      const { createPost } = await import("../services/posts");
+      const { saveCurrentJob } = await import("../services/currentJobs");
       const salary = parseInt(jobData.salary.replace(/[^0-9]/g, "")) || 0;
+      
+      // STEP 1: Always save current job
+      await saveCurrentJob({
+        role: jobData.role,
+        salary: salary,
+        location: jobData.location,
+        time_period: jobData.timePeriod,
+      });
+      console.log("✅ Current job updated in database");
+
+      let businessId: string | undefined;
+
+      // STEP 2: Check if business exists
+      try {
+        const { data: existingBusiness } = await supabase
+          .from('businesses')
+          .select('id')
+          .ilike('name', jobData.location)
+          .maybeSingle();
+
+        if (existingBusiness) {
+          businessId = existingBusiness.id;
+          
+          // STEP 3: Create business role only if business exists
+          const { createOrUpdateBusinessRole } = await import("../services/businesses");
+          await createOrUpdateBusinessRole(jobData.location, jobData.role, jobData.salary);
+          console.log("✅ Business role updated");
+        } else {
+          console.log("ℹ️ Business not in database, skipping role creation");
+        }
+      } catch (roleError) {
+        console.error("Error with business role:", roleError);
+      }
+
+      // STEP 4: Always create post
+      const { createPost } = await import("../services/posts");
       await createPost(
         `New Job Update! ${jobData.salary}/${jobData.timePeriod} for ${jobData.role} 😳`,
         "job_update",
-        undefined,
+        businessId,
         jobData.role,
         jobData.timePeriod,
         salary,
       );
+      console.log("✅ Post created");
+      
     } catch (error) {
-      console.error("Error updating job role in database:", error);
+      console.error("Error updating job:", error);
     }
   };
 
@@ -341,21 +392,11 @@ const MobileApp: React.FC = () => {
       
       if (!fullBusiness) {
         console.error('❌ Failed to fetch business details (returned null)', performance.now() - startTime, 'ms');
-        toast({
-          title: "Unable to locate business",
-          description: "Could not load business location. Please try again.",
-          variant: "destructive",
-        });
         return;
       }
       
       if (!fullBusiness.position?.lat || !fullBusiness.position?.lng) {
         console.error('❌ Business details missing coordinates', performance.now() - startTime, 'ms');
-        toast({
-          title: "Location unavailable",
-          description: "This business doesn't have location data.",
-          variant: "destructive",
-        });
         return;
       }
       
@@ -372,11 +413,6 @@ const MobileApp: React.FC = () => {
       
     } catch (error) {
       console.error('❌ Error in handleFlyToBusiness:', error, performance.now() - startTime, 'ms');
-      toast({
-        title: "Error loading business",
-        description: "Network error. Please check your connection and try again.",
-        variant: "destructive",
-      });
     }
   };
 

@@ -6,7 +6,6 @@ import BreakroomLoading from "./BreakroomLoading";
 import UnifiedBusinessSearch from "./UnifiedBusinessSearch";
 import { EnhancedBusiness } from "@/types/search";
 import { parseSearchFilters } from "@/services/businessFiltering";
-import { useToast } from "@/hooks/use-toast";
 import { clearSearchCache } from "@/services/unifiedSearch";
 
 const LANDMARKS = [
@@ -144,7 +143,6 @@ const HomePage: React.FC<HomePageProps> = ({
   }, [showLoading, currentView]);
 
   const selectedBusiness = propSelectedBusiness;
-  const { toast } = useToast();
 
   const handleSearchChange = useCallback(
     (value: string, business?: EnhancedBusiness, filters?: any, neighborhoodCoords?: { lat: number; lon: number }) => {

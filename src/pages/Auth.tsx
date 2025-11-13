@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
 
 export default function Auth() {
   const [email, setEmail] = useState('');
@@ -14,7 +13,6 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
-  const { toast } = useToast();
 
   useEffect(() => {
     // Check if user is already authenticated
@@ -50,31 +48,10 @@ export default function Auth() {
       });
 
       if (error) {
-        if (error.message.includes('User already registered')) {
-          toast({
-            title: "Account exists",
-            description: "This email is already registered. Please sign in instead.",
-            variant: "destructive"
-          });
-        } else {
-          toast({
-            title: "Sign up failed",
-            description: error.message,
-            variant: "destructive"
-          });
-        }
-      } else {
-        toast({
-          title: "Check your email",
-          description: "We've sent you a confirmation link to complete your registration.",
-        });
+        console.error('Sign up error:', error);
       }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred",
-        variant: "destructive"
-      });
+      console.error('Sign up error:', error);
     } finally {
       setLoading(false);
     }
@@ -91,32 +68,12 @@ export default function Auth() {
       });
 
       if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          toast({
-            title: "Invalid credentials",
-            description: "Please check your email and password and try again.",
-            variant: "destructive"
-          });
-        } else {
-          toast({
-            title: "Sign in failed",
-            description: error.message,
-            variant: "destructive"
-          });
-        }
+        console.error('Sign in error:', error);
       } else {
-        toast({
-          title: "Welcome back!",
-          description: "You have successfully signed in.",
-        });
         navigate('/');
       }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred",
-        variant: "destructive"
-      });
+      console.error('Sign in error:', error);
     } finally {
       setLoading(false);
     }
