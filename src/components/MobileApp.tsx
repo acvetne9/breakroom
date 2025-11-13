@@ -190,6 +190,16 @@ const MobileApp: React.FC = () => {
       });
       console.log("✅ Current job updated in database");
 
+      // Update userData state to reflect changes
+      setUserData(prev => prev ? {
+        ...prev,
+        salary: jobData.salary,
+        role: jobData.role,
+        location: jobData.location,
+        timePeriod: jobData.timePeriod,
+      } : null);
+      console.log("✅ userData state updated");
+
       let businessId: string | undefined;
 
       // STEP 2: Check if business exists
