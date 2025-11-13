@@ -191,6 +191,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       setLocation('');
       setFullLocation('');
       setShowNewBusinessForm(false);
+      setHasSearchResults(false);
       return;
     }
     if (value && isProfane(value)) {
@@ -200,14 +201,15 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       return;
     }
     
-    // Maintain form visibility if no business was selected and no results found
-    const shouldKeepFormVisible = !fullLocation && 
-                                   value.length > 2 && 
-                                   !hasSearchResults;
-    
-    if (shouldKeepFormVisible) {
-      setShowNewBusinessForm(true);
-    }
+    // Reset search results state when dropdown closes without selection
+    // This allows the form to show after dropdown closes
+    setTimeout(() => {
+      if (!fullLocation && value.length > 2) {
+        // If no business was selected, reset the hasSearchResults flag
+        setHasSearchResults(false);
+        setShowNewBusinessForm(true);
+      }
+    }, 200); // Small delay to allow click events to complete
     
     setTimeout(() => checkForCompletion(), 10);
   };
