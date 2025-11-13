@@ -94,6 +94,19 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     const formatted = raw ? `$${raw}` : '';
     setSalary(formatted);
   };
+  
+  const handleSalaryBlur = () => {
+    if (salary) {
+      const value = salary.replace(/[^0-9.]/g, "");
+      if (value.includes('.')) {
+        const parts = value.split('.');
+        // Add trailing 0 if only 1 decimal place
+        const formatted = parts[1]?.length === 1 ? `${parts[0]}.${parts[1]}0` : value;
+        setSalary(`$${formatted}`);
+      }
+    }
+    checkForCompletion();
+  };
   const checkForCompletion = () => {
     const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
     const isValidRole = JOB_OPTIONS.includes(role.trim()) || role.trim() === 'Other';
@@ -297,7 +310,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
           {/* Salary + Time Period */}
           <div>
             <div className="flex items-center space-x-3">
-              <input type="text" inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*" value={salary} onChange={handleSalaryChange} onBlur={checkForCompletion} placeholder="Pay Est. ($)" className="app-input text-left text-lg flex-1 !py-0 h-12" />
+              <input type="text" inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*" value={salary} onChange={handleSalaryChange} onBlur={handleSalaryBlur} placeholder="Pay Est. ($)" className="app-input text-left text-lg flex-1 !py-0 h-12" />
               <select value={timePeriod} onChange={e => setTimePeriod(e.target.value)} className="app-input text-lg w-auto !py-0 h-12">
                 <option value="HR">HR</option>
                 <option value="MO">MO</option>
