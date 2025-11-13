@@ -65,6 +65,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   const [addressError, setAddressError] = useState('');
   const [hasSearchResults, setHasSearchResults] = useState(false);
   const [lastSearchValue, setLastSearchValue] = useState('');
+  const [hasBlurred, setHasBlurred] = useState(false);
   const [isManualAddressValidated, setIsManualAddressValidated] = useState(false);
   const [debouncedLocation, setDebouncedLocation] = useState('');
 
@@ -168,25 +169,31 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     setLocation(value);
     setFullLocation(fullLocation || value);
 
+    // Reset blur flag when user starts typing again
+    setHasBlurred(false);
+
     // Reset manual address flag if a database business is selected
     if (fullLocation) {
       setIsManualAddressValidated(false);
     }
 
-    // Only show new business form if:
-    // 1. User typed something (> 2 chars)
-    // 2. No business selected from dropdown (!fullLocation)
-    // 3. No search results found (!hasSearchResults)
-    // 4. User finished typing (use debounced value to prevent flickering)
-    const shouldShowForm = !fullLocation && 
-                          debouncedLocation.length > 2 && 
-                          !hasSearchResults && 
-                          debouncedLocation === lastSearchValue;
-    
-    setShowNewBusinessForm(shouldShowForm);
+    // Only evaluate shouldShowForm if user hasn't blurred yet
+    // Once blurred, handleLocationBlur is authoritative
+    if (!hasBlurred) {
+      const shouldShowForm = !fullLocation && 
+                            debouncedLocation.length > 2 && 
+                            !hasSearchResults && 
+                            debouncedLocation === lastSearchValue;
+      
+      setShowNewBusinessForm(shouldShowForm);
+    }
   };
   const handleLocationBlur = () => {
     const value = location.trim();
+    
+    // Mark that user has finished interacting with search
+    setHasBlurred(true);
+    
     if (!value) {
       setLocation('');
       setFullLocation('');
@@ -296,6 +303,8 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
                 // Only update after search completes with definitive no results
                 handleSearchResultsChange(false, query);
               }}
+              onBlur={handleLocationBlur}
+              onFocus={() => setHasBlurred(false)}
               placeholder="Where do you work?..."
               className="app-input"
               variant="dropdown"

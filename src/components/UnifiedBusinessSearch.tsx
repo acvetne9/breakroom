@@ -12,6 +12,7 @@ interface UnifiedBusinessSearchProps {
   onBusinessSelect?: (business: EnhancedBusiness) => void;
   onNoResults?: (query: string) => void;
   onBlur?: () => void;
+  onFocus?: () => void;
   placeholder?: string;
   className?: string;
   variant?: 'dropdown' | 'search-bar';
@@ -35,6 +36,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   onBusinessSelect,
   onNoResults,
   onBlur,
+  onFocus,
   placeholder = "Search businesses, roles, salary...",
   className = "",
   variant = 'dropdown',
@@ -432,6 +434,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                  isSearching)) {
               setShowDropdown(true);
             }
+            // Call parent onFocus handler
+            onFocus?.();
           }}
           placeholder={placeholder}
           className={`${baseInputClasses} ${className}`}
