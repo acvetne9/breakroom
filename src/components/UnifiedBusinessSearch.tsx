@@ -355,7 +355,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       : "w-full px-3 py-2 border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring";
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative">
       <div className="relative">
         <input
           ref={inputRef}
@@ -394,6 +394,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       {showDropdown && (searchResults.length > 0 || isSearching || value.trim()) && (
         <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 z-[9999]`}>
           <div 
+            ref={dropdownRef}
             className="bg-card shadow-xl border border-border max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
             style={{ borderRadius: '8px' }}
             onScroll={() => {

@@ -144,12 +144,26 @@ export const searchBusinessesUnified = async (
     if (filters.textTerms && filters.textTerms.length > 0) {
       console.log(`🔍 [searchBusinessesUnified] Starting universal search for ${filters.textTerms.length} expanded terms: ${filters.textTerms.join(', ')}`);
       
-      // Build search conditions for ALL business fields
+      // Build search conditions - prioritize original terms for name/type/address
       const searchConditions: string[] = [];
+      
+      // First, search with original terms (exact intent - e.g., "amazon" for business name)
+      if (filters.originalTerms && filters.originalTerms.length > 0) {
+        filters.originalTerms.forEach(term => {
+          searchConditions.push(`name.ilike.%${term}%`);
+          searchConditions.push(`business_type.ilike.%${term}%`);
+          searchConditions.push(`address.ilike.%${term}%`);
+        });
+      }
+      
+      // Then add expanded terms for additional matches (e.g., synonyms for roles)
       filters.textTerms.forEach(term => {
-        searchConditions.push(`name.ilike.%${term}%`);
-        searchConditions.push(`business_type.ilike.%${term}%`);
-        searchConditions.push(`address.ilike.%${term}%`);
+        // Skip if already covered by original terms
+        if (!filters.originalTerms || !filters.originalTerms.includes(term)) {
+          searchConditions.push(`name.ilike.%${term}%`);
+          searchConditions.push(`business_type.ilike.%${term}%`);
+          searchConditions.push(`address.ilike.%${term}%`);
+        }
       });
       
       console.log(`🔍 [searchBusinessesUnified] SQL conditions: ${searchConditions.join(' OR ')}`);
