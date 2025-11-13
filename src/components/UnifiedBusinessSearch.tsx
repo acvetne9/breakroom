@@ -55,6 +55,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   const committedQueryRef = useRef<string>('');
   const resultsCache = useRef<Map<string, SearchResult[]>>(new Map());
   const lastExecutedQuery = useRef<string>('');
+  const wasClosedIntentionally = useRef(false);
 
   // Handle clicks outside to close dropdown
   useEffect(() => {
@@ -82,6 +83,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       }
       
       console.log('✅ Closing dropdown');
+      wasClosedIntentionally.current = true;
       setShowDropdown(false);
     };
 
@@ -134,13 +136,19 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     const cachedResults = resultsCache.current.get(q);
     if (cachedResults) {
       setSearchResults(cachedResults);
-      setShowDropdown(true);
+      // Only show dropdown if not intentionally closed
+      if (!wasClosedIntentionally.current) {
+        setShowDropdown(true);
+      }
       setIsSearching(false);
       return;
     }
     
     setIsSearching(true);
-    setShowDropdown(true);
+    // Only show dropdown if not intentionally closed
+    if (!wasClosedIntentionally.current) {
+      setShowDropdown(true);
+    }
     const seq = ++searchSeqRef.current;
     
     const timer = setTimeout(async () => {
@@ -221,6 +229,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
+    wasClosedIntentionally.current = false; // Clear flag when user types
     onChange(newValue);
     if (!newValue.trim()) {
       setSearchResults([]);
@@ -267,6 +276,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       }
     }
     
+    wasClosedIntentionally.current = true; // Mark as intentionally closed
     setShowDropdown(false);
     setSearchResults([]);
   };
@@ -357,6 +367,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     
     // Close immediately
     console.log('✅ Closing dropdown on blur');
+    wasClosedIntentionally.current = true; // Mark as intentionally closed
     setShowDropdown(false);
     onBlur?.();
   };
@@ -381,6 +392,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           onBlur={handleInputBlur}
           onKeyDown={handleKeyDown}
           onFocus={() => {
+            wasClosedIntentionally.current = false; // Clear flag on focus
             const trimmedValue = value.trim();
             // Show dropdown if we have a value and either:
             // 1. We have current search results to display
