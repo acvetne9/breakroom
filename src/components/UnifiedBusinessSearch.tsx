@@ -10,6 +10,7 @@ interface UnifiedBusinessSearchProps {
   value: string;
   onChange: (value: string, business?: EnhancedBusiness, filters?: any, neighborhoodCoords?: { lat: number; lon: number }) => void;
   onBusinessSelect?: (business: EnhancedBusiness) => void;
+  onNoResults?: (query: string) => void;
   onBlur?: () => void;
   placeholder?: string;
   className?: string;
@@ -32,6 +33,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   value,
   onChange,
   onBusinessSelect,
+  onNoResults,
   onBlur,
   placeholder = "Search businesses, roles, salary...",
   className = "",
@@ -54,6 +56,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   const resultsCache = useRef<Map<string, SearchResult[]>>(new Map());
   const lastExecutedQuery = useRef<string>('');
   const wasClosedIntentionally = useRef(false);
+  const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Handle clicks outside to close dropdown
   useEffect(() => {
@@ -113,6 +116,15 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       };
     }
   }, [showDropdown]);
+
+  // Cleanup blur timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Show businesses from map in dropdown
   useEffect(() => {
@@ -190,6 +202,12 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         }
         
         setSearchResults(results);
+        
+        // Notify parent if no business results found (only neighborhood or empty)
+        const hasBusinessResults = results.some(r => !('isNeighborhood' in r));
+        if (!hasBusinessResults && onNoResults) {
+          onNoResults(q);
+        }
         
         // Update parent with filters
         try {
@@ -358,11 +376,17 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       return;
     }
     
-    // Close immediately
-    console.log('✅ Closing dropdown on blur');
-    wasClosedIntentionally.current = true; // Mark as intentionally closed
-    setShowDropdown(false);
-    onBlur?.();
+    // Delay closing to prevent premature closure during rapid typing
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+    }
+    
+    blurTimeoutRef.current = setTimeout(() => {
+      console.log('✅ Closing dropdown on blur (delayed)');
+      wasClosedIntentionally.current = true;
+      setShowDropdown(false);
+      onBlur?.();
+    }, 150);
   };
 
   // Check if parent is passing app-input class (used in InitiationPage)
@@ -385,7 +409,12 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           onBlur={handleInputBlur}
           onKeyDown={handleKeyDown}
           onFocus={() => {
-            wasClosedIntentionally.current = false; // Clear flag on focus
+            // Cancel any pending blur closure
+            if (blurTimeoutRef.current) {
+              clearTimeout(blurTimeoutRef.current);
+              blurTimeoutRef.current = null;
+            }
+            wasClosedIntentionally.current = false;
             const trimmedValue = value.trim();
             // Show dropdown if we have a value and either:
             // 1. We have current search results to display

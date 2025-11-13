@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import JobSearchDropdown from './JobSearchDropdown';
 import UnifiedBusinessSearch from './UnifiedBusinessSearch';
 import { isProfane } from '@/utils/profanityFilter';
@@ -66,6 +66,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   const [hasSearchResults, setHasSearchResults] = useState(false);
   const [lastSearchValue, setLastSearchValue] = useState('');
   const [isManualAddressValidated, setIsManualAddressValidated] = useState(false);
+  const [debouncedLocation, setDebouncedLocation] = useState('');
 
   /** Format salary as $123.00 */
   const formatSalary = (input: string) => {
@@ -128,6 +129,16 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       }, 300);
     }
   };
+
+  // Debounce location changes to prevent rapid form toggling
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedLocation(location);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [location]);
+
   const handleSearchResultsChange = (hasResults: boolean, searchValue: string) => {
     setHasSearchResults(hasResults);
     setLastSearchValue(searchValue);
@@ -153,11 +164,11 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     // 1. User typed something (> 2 chars)
     // 2. No business selected from dropdown (!fullLocation)
     // 3. No search results found (!hasSearchResults)
-    // 4. User finished typing (value matches last search)
+    // 4. User finished typing (use debounced value to prevent flickering)
     const shouldShowForm = !fullLocation && 
-                          value.length > 2 && 
+                          debouncedLocation.length > 2 && 
                           !hasSearchResults && 
-                          value === lastSearchValue;
+                          debouncedLocation === lastSearchValue;
     
     setShowNewBusinessForm(shouldShowForm);
   };
@@ -239,17 +250,22 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
               value={location}
               onChange={(value, business, filters, neighborhoodCoords) => {
                 handleLocationChange(value, business?.name);
+                // Only set hasSearchResults when we have a definitive answer
                 if (business) {
                   handleSearchResultsChange(true, value);
-                } else {
-                  handleSearchResultsChange(false, value);
                 }
+                // Don't immediately set to false here - let onNoResults handle it
               }}
               onBusinessSelect={(business) => {
                 setLocation(business.name);
                 setFullLocation(business.name);
+                setIsManualAddressValidated(false);
                 handleSearchResultsChange(true, business.name);
                 checkForCompletion();
+              }}
+              onNoResults={(query) => {
+                // Only update after search completes with definitive no results
+                handleSearchResultsChange(false, query);
               }}
               placeholder="Where do you work?..."
               className="app-input"
