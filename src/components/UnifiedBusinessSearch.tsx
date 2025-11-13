@@ -60,11 +60,13 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     let scrollTimeout: NodeJS.Timeout;
     
     const handleClickOutside = (event: MouseEvent) => {
-      // Don't close dropdown if we're scrolling within it
-      if (isScrolling.current) return;
+      // Close dropdown when clicking outside of both input and dropdown
+      const clickedOutsideDropdown = dropdownRef.current && !dropdownRef.current.contains(event.target as Node);
+      const clickedOutsideInput = inputRef.current && !inputRef.current.contains(event.target as Node);
       
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (clickedOutsideDropdown && clickedOutsideInput) {
         setShowDropdown(false);
+        isScrolling.current = false; // Reset scroll state
       }
     };
 
@@ -321,17 +323,21 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     }
   };
 
-  const handleInputBlur = () => {
-    // Don't blur if we're scrolling in the dropdown
-    if (isScrolling.current) return;
+  const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    // Check if focus is moving to the dropdown
+    const focusMovingToDropdown = dropdownRef.current && dropdownRef.current.contains(e.relatedTarget as Node);
     
-    // Delay blur to allow dropdown clicks and scrolling
+    if (focusMovingToDropdown) {
+      return; // Keep dropdown open
+    }
+    
+    // Delay to allow dropdown clicks
     setTimeout(() => {
       if (!isScrolling.current) {
         setShowDropdown(false);
         onBlur?.();
       }
-    }, 200);
+    }, 150);
   };
 
   // Check if parent is passing app-input class (used in InitiationPage)
