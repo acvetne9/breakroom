@@ -141,7 +141,7 @@ export const searchBusinessesUnified = async (
     let businesses: any[] = [];
     
     // Universal search across ALL fields (name, type, address, roles)
-    if (filters.textTerms && filters.textTerms.length > 0) {
+    if ((filters.textTerms && filters.textTerms.length > 0) || (filters.originalTerms && filters.originalTerms.length > 0)) {
       console.log(`🔍 [searchBusinessesUnified] Starting universal search for ${filters.textTerms.length} expanded terms: ${filters.textTerms.join(', ')}`);
       
       // Build search conditions - prioritize original terms for name/type/address
