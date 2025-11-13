@@ -448,12 +448,39 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   // Current job handlers
   const handleSalaryChange = (value: string) => {
-    const cleanValue = value.replace(/[^0-9.]/g, "");
+    let cleanValue = value.replace(/[^0-9.]/g, "");
+    
+    // Ensure only one decimal point
+    const parts = cleanValue.split('.');
+    if (parts.length > 2) {
+      cleanValue = parts[0] + '.' + parts.slice(1).join('');
+    }
+    
+    // Limit to 2 decimal places
+    if (parts[1] && parts[1].length > 2) {
+      cleanValue = parts[0] + '.' + parts[1].substring(0, 2);
+    }
+    
     setCurrentJob({
       ...currentJob,
       salary: cleanValue ? `$${cleanValue}` : "",
     });
     setCurrentJobChanged(true);
+  };
+  
+  const handleSalaryBlur = () => {
+    if (currentJob.salary) {
+      const value = currentJob.salary.replace(/[^0-9.]/g, "");
+      if (value.includes('.')) {
+        const parts = value.split('.');
+        // Add trailing 0 if only 1 decimal place
+        const formatted = parts[1]?.length === 1 ? `${parts[0]}.${parts[1]}0` : value;
+        setCurrentJob({
+          ...currentJob,
+          salary: `$${formatted}`,
+        });
+      }
+    }
   };
   const handleCurrentJobRoleChange = (value: string) => {
     setCurrentJob({
@@ -707,6 +734,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   inputMode="numeric"
                   value={currentJob.salary}
                   onChange={(e) => handleSalaryChange(e.target.value)}
+                  onBlur={handleSalaryBlur}
                   className="app-input flex-1"
                   placeholder="$14"
                 />
