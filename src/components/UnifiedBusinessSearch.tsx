@@ -247,7 +247,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     }, 300);
     
     return () => clearTimeout(timer);
-  }, [value, mapBusinesses]);
+  }, [value]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
