@@ -334,6 +334,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         currentJobRef.current.location &&
         currentTimePeriodRef.current;
       if (currentJobChangedRef.current && hasCurrentJobChangedFromRefs() && isCurrentJobCompleteFromRefs()) {
+        console.log('🚪 SettingsPage cleanup: calling onJobUpdate for current job');
         onJobUpdate({
           salary: currentJobRef.current.salary,
           role: currentJobRef.current.role,
