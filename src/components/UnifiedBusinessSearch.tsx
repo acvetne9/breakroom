@@ -3,7 +3,6 @@ import { EnhancedBusiness } from '@/types/search';
 import { parseSearchFilters } from '@/services/businessFiltering';
 import { findNeighborhoodBoundaryByName } from '@/utils/nyc_neighborhoods';
 import { isProfane } from '@/utils/profanityFilter';
-import { useToast } from '@/hooks/use-toast';
 import { Search } from 'lucide-react';
 import { searchBusinessesByQuery } from '@/services/unifiedSearch';
 
@@ -44,7 +43,6 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
-  const { toast } = useToast();
   const isScrolling = useRef(false);
   
   const inputRef = useRef<HTMLInputElement>(null);
@@ -303,11 +301,6 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     
     // Check for profanity in search terms
     if (isProfane(trimmedValue)) {
-      toast({
-        title: "Search blocked",
-        description: "Inappropriate search terms detected",
-        variant: "destructive"
-      });
       onChange(''); // Clear the search input
       return;
     }
