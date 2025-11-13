@@ -56,47 +56,63 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   const resultsCache = useRef<Map<string, SearchResult[]>>(new Map());
   const lastExecutedQuery = useRef<string>('');
 
+  // Handle clicks outside to close dropdown
   useEffect(() => {
-    let scrollTimeout: NodeJS.Timeout;
-    
     const handleClickOutside = (event: MouseEvent) => {
+      console.log('🖱️ Click outside detected', {
+        isScrolling: isScrolling.current,
+        targetElement: event.target,
+        isInputClick: inputRef.current?.contains(event.target as Node),
+        isDropdownClick: dropdownRef.current?.contains(event.target as Node)
+      });
+      
       // Don't close dropdown if we're scrolling within it
-      if (isScrolling.current) return;
+      if (isScrolling.current) {
+        console.log('⏸️ Click ignored - scrolling');
+        return;
+      }
       
       // Don't close if clicking on the input or dropdown
       if (
         (inputRef.current && inputRef.current.contains(event.target as Node)) ||
         (dropdownRef.current && dropdownRef.current.contains(event.target as Node))
       ) {
+        console.log('⏸️ Click ignored - inside component');
         return;
       }
       
+      console.log('✅ Closing dropdown');
       setShowDropdown(false);
     };
-
-    const handleScroll = () => {
-      isScrolling.current = true;
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        isScrolling.current = false;
-      }, 150);
-    };
-
-    // Add scroll listener to the dropdown
-    const dropdown = dropdownRef.current;
-    if (dropdown) {
-      dropdown.addEventListener('scroll', handleScroll);
-    }
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
-      if (dropdown) {
-        dropdown.removeEventListener('scroll', handleScroll);
-      }
-      clearTimeout(scrollTimeout);
     };
   }, []);
+
+  // Handle scroll within dropdown
+  useEffect(() => {
+    let scrollTimeout: NodeJS.Timeout;
+    const dropdown = dropdownRef.current;
+    
+    if (showDropdown && dropdown) {
+      const handleScroll = () => {
+        isScrolling.current = true;
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+          isScrolling.current = false;
+          console.log('🔄 Scroll state reset');
+        }, 150);
+      };
+      
+      dropdown.addEventListener('scroll', handleScroll);
+      return () => {
+        dropdown.removeEventListener('scroll', handleScroll);
+        clearTimeout(scrollTimeout);
+      };
+    }
+  }, [showDropdown]);
 
   // Show businesses from map in dropdown
   useEffect(() => {
@@ -328,21 +344,21 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   };
 
   const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    // Don't blur if we're scrolling in the dropdown
-    if (isScrolling.current) return;
+    console.log('👋 Blur event', {
+      relatedTarget: e.relatedTarget,
+      isDropdownFocus: dropdownRef.current?.contains(e.relatedTarget as Node)
+    });
     
     // Don't close if focusing within the dropdown
     if (dropdownRef.current && e.relatedTarget && dropdownRef.current.contains(e.relatedTarget as Node)) {
+      console.log('⏸️ Blur ignored - focusing dropdown');
       return;
     }
     
-    // Delay blur to allow dropdown clicks
-    setTimeout(() => {
-      if (!isScrolling.current) {
-        setShowDropdown(false);
-        onBlur?.();
-      }
-    }, 250);
+    // Close immediately
+    console.log('✅ Closing dropdown on blur');
+    setShowDropdown(false);
+    onBlur?.();
   };
 
   // Check if parent is passing app-input class (used in InitiationPage)
