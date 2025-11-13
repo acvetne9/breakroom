@@ -190,13 +190,25 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     if (!value) {
       setLocation('');
       setFullLocation('');
+      setShowNewBusinessForm(false);
       return;
     }
     if (value && isProfane(value)) {
       setLocation('');
       setFullLocation('');
+      setShowNewBusinessForm(false);
       return;
     }
+    
+    // Maintain form visibility if no business was selected and no results found
+    const shouldKeepFormVisible = !fullLocation && 
+                                   value.length > 2 && 
+                                   !hasSearchResults;
+    
+    if (shouldKeepFormVisible) {
+      setShowNewBusinessForm(true);
+    }
+    
     setTimeout(() => checkForCompletion(), 10);
   };
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
