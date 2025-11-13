@@ -128,7 +128,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
       for (const area of adjacentAreas) {
         if (!getCachedBusinesses(area)) {
           // Skip preloading at far zooms to prioritize viewport
-          if (zoom <= 11 && requestQueue.active > 0) {
+          if (zoom <= 12 && requestQueue.active > 0) {
             console.log('⏭️ Skipping preload at far zoom - prioritizing viewport');
             continue;
           }

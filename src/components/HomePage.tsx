@@ -1,37 +1,37 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import MapLibreMap from './MapLibreMap';
-import BusinessPreview from './BusinessPreview';
-import BusinessDetails from './BusinessDetails';
-import BreakroomLoading from './BreakroomLoading';
-import UnifiedBusinessSearch from './UnifiedBusinessSearch';
-import { EnhancedBusiness } from '@/types/search';
-import { parseSearchFilters } from '@/services/businessFiltering';
-import { useToast } from '@/hooks/use-toast';
-import { clearSearchCache } from '@/services/unifiedSearch';
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import MapLibreMap from "./MapLibreMap";
+import BusinessPreview from "./BusinessPreview";
+import BusinessDetails from "./BusinessDetails";
+import BreakroomLoading from "./BreakroomLoading";
+import UnifiedBusinessSearch from "./UnifiedBusinessSearch";
+import { EnhancedBusiness } from "@/types/search";
+import { parseSearchFilters } from "@/services/businessFiltering";
+import { useToast } from "@/hooks/use-toast";
+import { clearSearchCache } from "@/services/unifiedSearch";
 
 const LANDMARKS = [
-  {lat: 40.690331, lng: -74.045414, emoji: "🗽"},
-  {lat: 40.75266, lng: -73.97729, emoji: "🚃"},
-  {lat: 40.75058, lng: -73.99358, emoji: "🚃"},
-  {lat: 40.548575, lng: -74.0321778, emoji: "🐬"},
-  {lat: 40.547303, lng: -73.794261, emoji: "🦈"},
-  {lat: 40.869180, lng: -73.755437, emoji: "🐠"},
-  {lat: 40.781713, lng: -73.966566, emoji: "🪁"},
-  {lat: 40.641540, lng: -73.772358, emoji: "✈️"},
-  {lat: 40.777721, lng: -73.875939, emoji: "✈️"},
-  {lat: 40.756317, lng: -73.847403, emoji: "🏟️"},
-  {lat: 40.830000, lng: -73.926208, emoji: "🏟️"},
-  {lat: 40.45022, lng: -73.59364, emoji: "🏟️"},
-  {lat: 40.683047, lng: -73.975912, emoji: "🏟️"},
-  {lat: 40.759111, lng: -73.985294, emoji: "🎼"},
-  {lat: 40.669823, lng: -73.965892, emoji: "🌼"},
-  {lat: 40.572445, lng: -73.983244, emoji: "🎡"},
-  {lat: 40.577249, lng: -73.837034, emoji: "🏖️"},
-  {lat: 40.574829, lng: -73.959530, emoji: "🏖️"},
-  {lat: 40.573527, lng: -74.082761, emoji: "🏖️"},
-  {lat: 40.708890, lng: -74.008396, emoji: "🏦"},
-  {lat: 40.850103, lng: -73.876716, emoji: "🐾"},
-  {lat: 40.625569, lng: -74.115425, emoji: "🐾"},
+  { lat: 40.690331, lng: -74.045414, emoji: "🗽" },
+  { lat: 40.75266, lng: -73.97729, emoji: "🚃" },
+  { lat: 40.75058, lng: -73.99358, emoji: "🚃" },
+  { lat: 40.548575, lng: -74.0321778, emoji: "🐬" },
+  { lat: 40.547303, lng: -73.794261, emoji: "🦈" },
+  { lat: 40.86918, lng: -73.755437, emoji: "🐠" },
+  { lat: 40.781713, lng: -73.966566, emoji: "🪁" },
+  { lat: 40.64154, lng: -73.772358, emoji: "✈️" },
+  { lat: 40.777721, lng: -73.875939, emoji: "✈️" },
+  { lat: 40.756317, lng: -73.847403, emoji: "🏟️" },
+  { lat: 40.83, lng: -73.926208, emoji: "🏟️" },
+  { lat: 40.45022, lng: -73.59364, emoji: "🏟️" },
+  { lat: 40.683047, lng: -73.975912, emoji: "🏟️" },
+  { lat: 40.759111, lng: -73.985294, emoji: "🎼" },
+  { lat: 40.669823, lng: -73.965892, emoji: "🌼" },
+  { lat: 40.572445, lng: -73.983244, emoji: "🎡" },
+  { lat: 40.577249, lng: -73.837034, emoji: "🏖️" },
+  { lat: 40.574829, lng: -73.95953, emoji: "🏖️" },
+  { lat: 40.573527, lng: -74.082761, emoji: "🏖️" },
+  { lat: 40.70889, lng: -74.008396, emoji: "🏦" },
+  { lat: 40.850103, lng: -73.876716, emoji: "🐾" },
+  { lat: 40.625569, lng: -74.115425, emoji: "🐾" },
 ];
 
 interface Post {
@@ -47,13 +47,13 @@ interface Post {
 
 interface HomePageProps {
   currentSlide?: number;
-  currentView?: 'initiation' | 'main';
+  currentView?: "initiation" | "main";
   selectedBusiness?: any;
   onBusinessSelect?: (business: any) => void;
   posts?: Post[];
   onBusinessStoriesClick?: (businessId: string) => void;
   onPostClick?: (post: Post) => void;
-  onRoleVote?: (businessId: string, roleIndex: number, voteType: 'up' | 'down') => void;
+  onRoleVote?: (businessId: string, roleIndex: number, voteType: "up" | "down") => void;
   onLocationSave?: (location: string, fullLocation: string) => void;
   votingRoles?: Set<string>;
   showBusinessDetails?: boolean;
@@ -61,9 +61,9 @@ interface HomePageProps {
   onBackToPreview?: () => void;
 }
 
-const HomePage: React.FC<HomePageProps> = ({ 
+const HomePage: React.FC<HomePageProps> = ({
   currentSlide = 1,
-  currentView = 'main',
+  currentView = "main",
   onBackToPreview,
   selectedBusiness: propSelectedBusiness,
   onBusinessSelect,
@@ -74,10 +74,10 @@ const HomePage: React.FC<HomePageProps> = ({
   onLocationSave,
   votingRoles,
   showBusinessDetails: propShowBusinessDetails = false,
-  onShowBusinessDetails
+  onShowBusinessDetails,
 }) => {
-  const [searchValue, setSearchValue] = useState('');
-  const [debouncedSearchValue, setDebouncedSearchValue] = useState('');
+  const [searchValue, setSearchValue] = useState("");
+  const [debouncedSearchValue, setDebouncedSearchValue] = useState("");
   const [neighborhoodCenter, setNeighborhoodCenter] = useState<{ lat: number; lon: number } | null>(null);
   const [showLoading, setShowLoading] = useState(true);
   const [searchCompleted, setSearchCompleted] = useState(false);
@@ -93,21 +93,24 @@ const HomePage: React.FC<HomePageProps> = ({
   }, [searchValue]);
 
   // Handle Enter key to trigger immediate search
-  const handleSearchKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      setDebouncedSearchValue(searchValue);
-    }
-  }, [searchValue]);
+  const handleSearchKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter") {
+        setDebouncedSearchValue(searchValue);
+      }
+    },
+    [searchValue],
+  );
 
   // Memoize searchFilters to prevent recreation on every render
   const searchFilters = useMemo(() => {
     if (!debouncedSearchValue.trim()) return null;
     const filters = parseSearchFilters(debouncedSearchValue);
-    
+
     if (filters?.neighborhoodFilter?.center) {
       setNeighborhoodCenter(filters.neighborhoodFilter.center);
     }
-    
+
     return filters;
   }, [debouncedSearchValue]);
 
@@ -115,14 +118,14 @@ const HomePage: React.FC<HomePageProps> = ({
   useEffect(() => {
     const handleSearchTrigger = (event: CustomEvent) => {
       const searchTerm = event.detail;
-      console.log('🔍 [triggerSearch] Received search trigger:', searchTerm);
+      console.log("🔍 [triggerSearch] Received search trigger:", searchTerm);
       clearSearchCache();
       setSearchValue(searchTerm);
       setSearchCompleted(true);
     };
 
-    window.addEventListener('triggerSearch', handleSearchTrigger as EventListener);
-    return () => window.removeEventListener('triggerSearch', handleSearchTrigger as EventListener);
+    window.addEventListener("triggerSearch", handleSearchTrigger as EventListener);
+    return () => window.removeEventListener("triggerSearch", handleSearchTrigger as EventListener);
   }, []);
 
   const handleLoadingComplete = () => {
@@ -130,7 +133,7 @@ const HomePage: React.FC<HomePageProps> = ({
   };
 
   useEffect(() => {
-    if (!showLoading && currentView === 'main') {
+    if (!showLoading && currentView === "main") {
       const timer1 = setTimeout(() => {
         setShowWelcome(true);
         const timer2 = setTimeout(() => setShowWelcome(false), 6000);
@@ -139,64 +142,64 @@ const HomePage: React.FC<HomePageProps> = ({
       return () => clearTimeout(timer1);
     }
   }, [showLoading, currentView]);
-  
+
   const selectedBusiness = propSelectedBusiness;
   const { toast } = useToast();
 
-  const handleSearchChange = useCallback((
-    value: string,
-    business?: EnhancedBusiness,
-    filters?: any,
-    neighborhoodCoords?: { lat: number; lon: number }
-  ) => {
-    console.log("🔍 Search change in HomePage:", { value });
-    
-    if (value.trim()) {
-      clearSearchCache();
-    }
-    
-    setSearchValue(value);
-    setSearchCompleted(!!value.trim());
-  
-    if (!value.trim()) {
-      console.log("🧹 Search cleared");
-      setNeighborhoodCenter(null);
-      setSearchCompleted(false);
-    }
-  }, []);
+  const handleSearchChange = useCallback(
+    (value: string, business?: EnhancedBusiness, filters?: any, neighborhoodCoords?: { lat: number; lon: number }) => {
+      console.log("🔍 Search change in HomePage:", { value });
+
+      if (value.trim()) {
+        clearSearchCache();
+      }
+
+      setSearchValue(value);
+      setSearchCompleted(!!value.trim());
+
+      if (!value.trim()) {
+        console.log("🧹 Search cleared");
+        setNeighborhoodCenter(null);
+        setSearchCompleted(false);
+      }
+    },
+    [],
+  );
 
   const handleSearchBusinessSelect = (business: EnhancedBusiness) => {
-    console.log('🔍 DEBUG: handleSearchBusinessSelect deps check', { 
-      hasSearchFilters: !!searchFilters 
+    console.log("🔍 DEBUG: handleSearchBusinessSelect deps check", {
+      hasSearchFilters: !!searchFilters,
     });
     const mapBusiness = {
       ...business,
       businessType: business.businessType || business.business_type,
-      formatted_address: business.formatted_address || business.vicinity || business.name
+      formatted_address: business.formatted_address || business.vicinity || business.name,
     };
-    
+
     if (business?.position?.lat && business?.position?.lng) {
-      window.dispatchEvent(new CustomEvent('flyToBusiness', {
-        detail: {
-          lat: business.position.lat,
-          lng: business.position.lng,
-          business: mapBusiness
-        }
-      }));
+      window.dispatchEvent(
+        new CustomEvent("flyToBusiness", {
+          detail: {
+            lat: business.position.lat,
+            lng: business.position.lng,
+            business: mapBusiness,
+          },
+        }),
+      );
     }
-    
+
     handleBusinessClick(mapBusiness);
-    console.log('🔍 Business selected from search - keeping filters active:', searchFilters);
+    console.log("🔍 Business selected from search - keeping filters active:", searchFilters);
   };
 
   const handleBusinessClick = (business: any) => {
-    console.log('🏠 HomePage handleBusinessClick called:', business?.name);
-    console.log('🔍 DEBUG: handleBusinessClick deps check', { 
+    console.log("🏠 HomePage handleBusinessClick called:", business?.name);
+    console.log("🔍 DEBUG: handleBusinessClick deps check", {
       onBusinessSelect: typeof onBusinessSelect,
-      onLocationSave: typeof onLocationSave 
+      onLocationSave: typeof onLocationSave,
     });
     onBusinessSelect?.(business);
-    
+
     if (onLocationSave && business.name) {
       const fullLocation = business.formatted_address || business.vicinity || business.name;
       onLocationSave(fullLocation, fullLocation);
@@ -218,49 +221,47 @@ const HomePage: React.FC<HomePageProps> = ({
   const handleBackToPreview = () => {
     onBackToPreview?.();
   };
-  
+
   const showBusinessDetails = propShowBusinessDetails;
 
   const handleClearSearch = useCallback(() => {
-    console.log('🧹 Clearing search from X button');
-    setSearchValue('');
-    setDebouncedSearchValue('');
+    console.log("🧹 Clearing search from X button");
+    setSearchValue("");
+    setDebouncedSearchValue("");
     setNeighborhoodCenter(null);
     setSearchCompleted(false);
   }, []);
 
-  const hasActiveSearch = searchValue.trim() !== '' || searchFilters !== null;
+  const hasActiveSearch = searchValue.trim() !== "" || searchFilters !== null;
   const showClearButton = searchCompleted && hasActiveSearch;
 
   useEffect(() => {
     const handleResize = () => {
-      const mapContainer = document.querySelector('.maplibregl-map') as HTMLElement;
+      const mapContainer = document.querySelector(".maplibregl-map") as HTMLElement;
       if (mapContainer) {
         // @ts-ignore
         const map = mapContainer?.__map__ || mapContainer?.map;
-        if (map && typeof map.resize === 'function') {
+        if (map && typeof map.resize === "function") {
           map.resize();
         }
       }
     };
-  
-    window.addEventListener('resize', handleResize);
+
+    window.addEventListener("resize", handleResize);
     handleResize();
-  
-    return () => window.removeEventListener('resize', handleResize);
+
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
-  
+
   return (
     <div className="absolute inset-0 w-full h-full min-w-[200px] min-h-[200px]">
-      {showLoading && (
-        <BreakroomLoading onComplete={handleLoadingComplete} />
-      )}
+      {showLoading && <BreakroomLoading onComplete={handleLoadingComplete} />}
 
       {showWelcome && (
         <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-30 w-[90%] max-w-lg transition-opacity duration-700">
           <div className="bg-white rounded-2xl shadow-md px-4 py-3 text-center text-sm font-medium border border-gray-200">
             <p>Welcome to breakroom!</p>
-            <p>Click on one a yellow dot to discover one of 54k businesses</p>
+            <p>Click on a yellow dot to discover one of 54k businesses</p>
           </div>
         </div>
       )}
@@ -275,9 +276,9 @@ const HomePage: React.FC<HomePageProps> = ({
             neighborhoodCenter={neighborhoodCenter}
             onBusinessesUpdate={setMapBusinesses}
           />
-        
+
           {selectedBusiness && !showBusinessDetails && (
-            <BusinessPreview 
+            <BusinessPreview
               business={selectedBusiness}
               posts={posts}
               onClose={handleClosePreview}
@@ -285,9 +286,9 @@ const HomePage: React.FC<HomePageProps> = ({
               onStoriesClick={handleBusinessStoriesClick}
             />
           )}
-    
+
           {selectedBusiness && showBusinessDetails && (
-            <BusinessDetails 
+            <BusinessDetails
               business={selectedBusiness}
               posts={posts}
               onClose={handleClosePreview}
@@ -299,7 +300,7 @@ const HomePage: React.FC<HomePageProps> = ({
             />
           )}
 
-          {currentSlide === 1 && currentView === 'main' && (
+          {currentSlide === 1 && currentView === "main" && (
             <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
               <div className="relative">
                 <UnifiedBusinessSearch
@@ -312,7 +313,7 @@ const HomePage: React.FC<HomePageProps> = ({
                   onLocationSave={onLocationSave}
                   mapBusinesses={mapBusinesses}
                 />
-                
+
                 {showClearButton && (
                   <button
                     onClick={handleClearSearch}

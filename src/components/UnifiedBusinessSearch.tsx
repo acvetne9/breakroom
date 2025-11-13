@@ -232,10 +232,10 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       // Handle business click
       const business = result as EnhancedBusiness;
       
-      // Perform search with current value
-      performSearch();
+      // Update input to show the selected business name
+      onChange(business.name);
       
-      // Still call the business select callback for any other handling needed
+      // Call the business select callback so parent can handle the selection
       onBusinessSelect?.(business);
       
       // Save the clicked business location
@@ -334,9 +334,14 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     }, 200);
   };
 
+  // Check if parent is passing app-input class (used in InitiationPage)
+  const isAppInputStyle = className.includes('app-input');
+
   const baseInputClasses = variant === 'search-bar' 
     ? "search-bar pr-12" 
-    : "w-full px-3 py-2 border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring";
+    : isAppInputStyle
+      ? "" // Don't add base classes if app-input is specified
+      : "w-full px-3 py-2 border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring";
 
   return (
     <div className="relative" ref={dropdownRef}>

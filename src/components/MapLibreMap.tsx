@@ -37,27 +37,28 @@ interface Bounds {
   west: number;
 }
 
-// Performance constants
+// Performance constants - REVERSED: slower updates at far zooms
 const VIEWPORT_THROTTLE = {
-  HIGH_ZOOM: 500,  // zoom >= 15
-  MID_ZOOM: 350,   // zoom >= 13
-  LOW_ZOOM: 250,   // zoom < 13
+  VERY_FAR_ZOOM: 1500,  // zoom < 10 - slow updates when zoomed way out
+  FAR_ZOOM: 1000,       // zoom < 12 - moderate updates
+  MID_ZOOM: 500,        // zoom < 14 - faster updates
+  CLOSE_ZOOM: 300,      // zoom >= 14 - fastest updates when zoomed in
 } as const;
 
 const BUSINESS_LIMITS = {
   SEARCH: {
-    ZOOM_10: 20000,
-    ZOOM_12: 35000,
-    ZOOM_14: 50000,
-    DEFAULT: 80000,
+    ZOOM_10: 10000,    // Reduced from 20000
+    ZOOM_12: 20000,    // Reduced from 35000
+    ZOOM_14: 35000,    // Reduced from 50000
+    DEFAULT: 60000,    // Reduced from 80000
   },
   NORMAL: {
-    ZOOM_10: 5000,
-    ZOOM_12: 15000,
-    ZOOM_14: 40000,
-    ZOOM_16: 80000,
-    ZOOM_18: 150000,
-    DEFAULT: 200000,
+    ZOOM_10: 2000,     // Reduced from 5000 - still loads for cache, just fewer
+    ZOOM_12: 8000,     // Reduced from 15000
+    ZOOM_14: 25000,    // Reduced from 40000
+    ZOOM_16: 60000,    // Reduced from 80000
+    ZOOM_18: 100000,   // Reduced from 150000
+    DEFAULT: 150000,   // Reduced from 200000
   },
 } as const;
 
@@ -473,7 +474,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
 
     // 2. Business dots LAST (render on top)
-    if (businesses?.length > 0) {
+    // Skip rendering at very far zooms (< 11) unless searching - but still cache
+    const shouldRenderBusinesses = currentZoom >= 11 || !!searchFilters;
+    
+    if (businesses?.length > 0 && shouldRenderBusinesses) {
       let validBusinesses = businesses.filter((b) => b?.position?.lat != null && b?.position?.lng != null);
 
       // Filter by neighborhood boundary
@@ -546,11 +550,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     const boundsKey = `${viewportBounds.north.toFixed(4)}-${viewportBounds.south.toFixed(4)}-${viewportBounds.east.toFixed(4)}-${viewportBounds.west.toFixed(4)}`;
 
-    // Adaptive throttling based on zoom level
+    // Adaptive throttling - much slower at far zooms for smoother swiping
     const throttleMs = 
-      zoom >= 15 ? VIEWPORT_THROTTLE.HIGH_ZOOM : 
-      zoom >= 13 ? VIEWPORT_THROTTLE.MID_ZOOM : 
-      VIEWPORT_THROTTLE.LOW_ZOOM;
+      zoom < 10 ? VIEWPORT_THROTTLE.VERY_FAR_ZOOM :
+      zoom < 12 ? VIEWPORT_THROTTLE.FAR_ZOOM : 
+      zoom < 14 ? VIEWPORT_THROTTLE.MID_ZOOM : 
+      VIEWPORT_THROTTLE.CLOSE_ZOOM;
     
     const now = Date.now();
     if (lastBoundsRef.current === boundsKey && now - lastLoadTimeRef.current < throttleMs) {
