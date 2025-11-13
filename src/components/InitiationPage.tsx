@@ -197,6 +197,8 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   };
   const validateAndCreateBusiness = async () => {
     const address = newBusinessAddress.trim();
+    const businessName = location.trim(); // Preserve the business name
+    
     if (!address) {
       setAddressError('Please enter a business address');
       return;
@@ -217,9 +219,9 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Set the full address as both location and fullLocation
-      setLocation(address);
-      setFullLocation(address);
+      // Keep business name in location, store combined info in fullLocation
+      setLocation(businessName);
+      setFullLocation(`${businessName}, ${address}`);
       setIsManualAddressValidated(true);
       setShowNewBusinessForm(false);
       setNewBusinessAddress('');
