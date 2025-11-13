@@ -202,11 +202,17 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         }
         
         setSearchResults(results);
-        
-        // Notify parent if no business results found (only neighborhood or empty)
+
+        // Notify parent if no business results found (only after user stops typing)
         const hasBusinessResults = results.some(r => !('isNeighborhood' in r));
         if (!hasBusinessResults && onNoResults) {
-          onNoResults(q);
+          // Delay callback to avoid interrupting ongoing typing
+          setTimeout(() => {
+            // Check if search is still current
+            if (seq === searchSeqRef.current && value.trim() === q) {
+              onNoResults(q);
+            }
+          }, 800);
         }
         
         // Update parent with filters
@@ -319,8 +325,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     
     // Check for profanity in search terms
     if (isProfane(trimmedValue)) {
-      onChange(''); // Clear the search input
-      return;
+      console.log('❌ Profanity detected, blocking search');
+      return; // Just prevent search, don't clear input
     }
     
     // Commit the query and apply filters immediately (require 3+ characters for meaningful search)

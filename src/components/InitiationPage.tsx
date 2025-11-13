@@ -134,7 +134,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedLocation(location);
-    }, 500);
+    }, 1200); // Increased delay to ensure user finished typing
     
     return () => clearTimeout(timer);
   }, [location]);
