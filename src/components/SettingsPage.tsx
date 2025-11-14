@@ -174,7 +174,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         if (jobs.length > 0) {
           const formattedJobs: PastJob[] = jobs.map(job => ({
             id: job.id,
-            salary: job.salary.toString(),
+            salary: job.salary ? `$${job.salary.toFixed(2)}` : '',
             role: job.role,
             location: job.location,
             business_name: job.business_name,
@@ -237,11 +237,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       [id: string]: string;
     } = {};
     pastJobs.forEach((job) => {
-      newInputs[job.id || ''] = job.business_name || job.location || "";
-      newSelected[job.id || ''] = !!(job.business_name || job.location);
-      newShowAddress[job.id || ''] = false;
-      newAddresses[job.id || ''] = "";
-      newAddressErrors[job.id || ''] = "";
+      const jobId = job.id || '';
+      newInputs[jobId] = job.business_name || job.location || "";
+      newSelected[jobId] = !!job.location; // Mark as selected if has location
+      newShowAddress[jobId] = false;
+      newAddresses[jobId] = "";
+      newAddressErrors[jobId] = "";
     });
     setPastJobBusinessInputs(newInputs);
     setPastJobBusinessSelected(newSelected);
@@ -360,14 +361,17 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   };
   const isPastJobComplete = (job: PastJob, timePeriod: string) => {
     const jobId = job.id || '';
-    return (
-      job.salary &&
-      job.role &&
-      job.location &&
-      timePeriod &&
-      pastJobBusinessSelected[jobId] &&
-      (!pastJobShowAddressInputs[jobId] || isValidAddress(pastJobAddresses[jobId]))
-    );
+    
+    // Must have all basic fields (like current job)
+    const hasBasicFields = job.salary && job.role && job.location && timePeriod;
+    
+    // Must have business selected (like current job)
+    const hasValidBusiness = pastJobBusinessSelected[jobId];
+    
+    // If address input is shown, address must be valid (like current job)
+    const hasValidAddress = !pastJobShowAddressInputs[jobId] || isValidAddress(pastJobAddresses[jobId]);
+    
+    return hasBasicFields && hasValidBusiness && hasValidAddress;
   };
   const isCurrentJobComplete = () => {
     return (
@@ -407,12 +411,20 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       const completePastJobs = pastJobsRef.current
         .filter((job) => {
           const timePeriod = pastJobTimePeriodsRef.current[job.id || ''];
-          return isPastJobComplete(job, timePeriod);
+          const isComplete = isPastJobComplete(job, timePeriod);
+          console.log(`🔍 Past job "${job.role || 'empty'}" complete:`, isComplete, {
+            salary: job.salary,
+            role: job.role,
+            location: job.location,
+            timePeriod,
+            businessSelected: pastJobBusinessSelected[job.id || ''],
+          });
+          return isComplete;
         })
         .map((job): PastJobData => ({
           id: job.id,
           role: job.role,
-          salary: parseFloat(job.salary),
+          salary: parseFloat(job.salary.replace(/[^0-9.]/g, '')),
           location: job.location,
           business_name: job.business_name || job.location,
           time_period: pastJobTimePeriodsRef.current[job.id || ''] || 'HR',
@@ -929,7 +941,27 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                       type="text"
                       inputMode="numeric"
                       value={job.salary}
-                      onChange={(e) => updatePastJob(job.id, "salary", e.target.value)}
+                      onChange={(e) => {
+                        let cleanValue = e.target.value.replace(/[^0-9.]/g, "");
+                        const parts = cleanValue.split('.');
+                        if (parts.length > 2) {
+                          cleanValue = parts[0] + '.' + parts.slice(1).join('');
+                        }
+                        if (parts[1] && parts[1].length > 2) {
+                          cleanValue = parts[0] + '.' + parts[1].substring(0, 2);
+                        }
+                        updatePastJob(job.id, "salary", cleanValue ? `$${cleanValue}` : "");
+                      }}
+                      onBlur={() => {
+                        if (job.salary) {
+                          const value = job.salary.replace(/[^0-9.]/g, "");
+                          if (value.includes('.')) {
+                            const parts = value.split('.');
+                            const formatted = parts[1]?.length === 1 ? `${parts[0]}.${parts[1]}0` : value;
+                            updatePastJob(job.id, "salary", `$${formatted}`);
+                          }
+                        }
+                      }}
                       className="app-input flex-1"
                       placeholder="$17"
                     />
