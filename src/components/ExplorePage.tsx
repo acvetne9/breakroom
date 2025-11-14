@@ -8,6 +8,7 @@ import { TranslatedText } from './TranslatedText';
 import { supabase } from '@/integrations/supabase/client';
 import { CommenterBadge } from './CommenterBadge';
 import { getCommenterIdentity } from '@/utils/commenterIdentity';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Post {
   id: string;
@@ -309,8 +310,11 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     );
   }
 
+  const isMobile = useIsMobile();
+
   return (
-    <div className="relative w-full h-full">
+    <div className="w-full h-full flex items-center bg-transparent">
+      <div className="app-card h-full w-full relative">
       {/* Posts list */}
       <div className={`h-full overflow-y-auto pb-20 ${filteredBusinessId || filteredUserStories ? 'pt-20' : 'pt-20'}`}>
         <div className="space-y-4 px-4">
@@ -506,6 +510,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
             </button>
           </div>
         )}
+      </div>
       </div>
     </div>
   );
