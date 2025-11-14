@@ -53,9 +53,14 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
           console.log('Profile was created in a different session (or not at all)');
         }
         
-        // Generate browser fingerprint for recovery
+        // Generate browser fingerprints for recovery
         const browserFingerprint = generateBrowserFingerprint();
-        console.log('Browser fingerprint:', browserFingerprint);
+        const legacyFingerprint = generateLegacyBrowserFingerprint();
+        console.log('🔍 FINGERPRINT DEBUG:', {
+          current: browserFingerprint,
+          legacy: legacyFingerprint,
+          timestamp: new Date().toISOString()
+        });
         
         let storedDeviceId = localStorage.getItem('device_id');
         
@@ -67,92 +72,85 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
         
         // If no device_id in localStorage, try to recover from fingerprint
         if (!storedDeviceId) {
-          console.log('No device_id in localStorage, attempting fingerprint recovery...');
+          console.log('❌ No device_id in localStorage, attempting fingerprint recovery...');
           
           // Try new fingerprint format first
+          console.log('🔍 Query 1: Looking for profile with current fingerprint:', browserFingerprint);
           let existingProfile = await supabase
             .from('profiles')
-            .select('temp_user_id')
+            .select('temp_user_id, browser_fingerprint, id')
             .eq('browser_fingerprint', browserFingerprint)
             .eq('is_authenticated', false)
             .maybeSingle();
           
           // If not found, try legacy fingerprint format for backward compatibility
           if (!existingProfile?.data) {
-            const legacyFingerprint = generateLegacyBrowserFingerprint();
-            console.log('Trying legacy fingerprint for recovery...', legacyFingerprint);
+            console.log('❌ No profile found with current fingerprint');
+            console.log('🔍 Query 2: Looking for profile with legacy fingerprint:', legacyFingerprint);
             
             existingProfile = await supabase
               .from('profiles')
-              .select('temp_user_id')
+              .select('temp_user_id, browser_fingerprint, id')
               .eq('browser_fingerprint', legacyFingerprint)
               .eq('is_authenticated', false)
               .maybeSingle();
             
             // If found with old fingerprint, migrate it to new format
             if (existingProfile?.data?.temp_user_id) {
-              console.log('Found profile with legacy fingerprint, migrating to new format');
+              console.log('✅ RECOVERY PATH 1: Found profile with legacy fingerprint:', existingProfile.data);
+              console.log('🔄 Migrating to new fingerprint format...');
               await supabase
                 .from('profiles')
                 .update({ browser_fingerprint: browserFingerprint })
                 .eq('temp_user_id', existingProfile.data.temp_user_id);
+            } else {
+              console.log('❌ No profile found with legacy fingerprint');
             }
+          } else {
+            console.log('✅ RECOVERY PATH 2: Found profile with current fingerprint:', existingProfile.data);
           }
           
           if (existingProfile?.error) {
-            console.error('Error looking up profile by fingerprint:', existingProfile.error);
+            console.error('❌ Error looking up profile by fingerprint:', existingProfile.error);
           } else if (existingProfile?.data?.temp_user_id) {
             // Recovered device_id from fingerprint!
             storedDeviceId = existingProfile.data.temp_user_id;
             localStorage.setItem('device_id', storedDeviceId);
-            console.log('Recovered device_id from fingerprint:', storedDeviceId);
+            console.log('✅ Recovered device_id from fingerprint:', storedDeviceId);
+          } else {
+            console.log('⚠️ No profile found with either fingerprint');
           }
+        } else {
+          console.log('✅ RECOVERY PATH 3: Found device_id in localStorage:', storedDeviceId);
         }
         
-        // Fallback 1: If fingerprint recovery failed but we have old device_id patterns, try direct lookup
+        // Fallback: Try to find most recent unauthenticated profile without fingerprint
         if (!storedDeviceId) {
-          const tempDeviceId = localStorage.getItem('device_id');
-          if (tempDeviceId) {
-            console.log('Attempting direct device_id lookup as fallback...');
-            const { data: directProfile } = await supabase
-              .from('profiles')
-              .select('temp_user_id')
-              .eq('temp_user_id', tempDeviceId)
-              .eq('is_authenticated', false)
-              .maybeSingle();
-            
-            if (directProfile) {
-              storedDeviceId = directProfile.temp_user_id;
-              console.log('Recovered device_id from direct lookup:', storedDeviceId);
-            }
-          }
-        }
-        
-        // Fallback 2: Find the most recent unauthenticated profile without a fingerprint
-        // This handles old profiles created before fingerprinting was implemented
-        if (!storedDeviceId) {
-          console.log('Attempting to recover most recent profile without fingerprint...');
-          const { data: recentProfile } = await supabase
+          console.log('🔍 Query 3: Looking for recent unauthenticated profile without fingerprint...');
+          const { data: recentProfile, error: recentError } = await supabase
             .from('profiles')
-            .select('temp_user_id')
-            .is('browser_fingerprint', null)
+            .select('temp_user_id, id, created_at, browser_fingerprint')
             .eq('is_authenticated', false)
-            .not('temp_user_id', 'is', null)
+            .is('browser_fingerprint', null)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
-          
+            
+          if (recentError) {
+            console.error('❌ Error querying recent profile:', recentError);
+          }
+            
           if (recentProfile?.temp_user_id) {
+            console.log('✅ RECOVERY PATH 4: Found recent unauthenticated profile:', recentProfile);
             storedDeviceId = recentProfile.temp_user_id;
             localStorage.setItem('device_id', storedDeviceId);
-            console.log('Recovered most recent profile without fingerprint:', storedDeviceId);
-            
-            // Update it with current fingerprint for future recovery
+            console.log('🔄 Updating profile with current fingerprint...');
             await supabase
               .from('profiles')
               .update({ browser_fingerprint: browserFingerprint })
               .eq('temp_user_id', storedDeviceId);
-            console.log('Updated recovered profile with current fingerprint');
+          } else {
+            console.log('❌ No recent unauthenticated profile found');
           }
         }
         
