@@ -80,10 +80,6 @@ const MobileApp: React.FC = () => {
 
     const initializeApp = async () => {
       try {
-        // Clear profile cache to ensure fresh data
-        const { clearProfileCache } = await import("../services/posts");
-        clearProfileCache();
-        
         console.log("Debug - isFirstSession:", isFirstSession);
 
         const { hasCurrentJob, getCurrentJob } = await import("../services/currentJobs");
@@ -129,7 +125,10 @@ const MobileApp: React.FC = () => {
 
     try {
       const { saveCurrentJob } = await import("../services/currentJobs");
+      const { toast } = await import("@/hooks/use-toast");
       const salary = parseFloat(data.salary.replace(/[^0-9.]/g, "")) || 0;
+      
+      console.log('💾 Attempting to save current job...');
       
       // STEP 1: Always save current job to database
       await saveCurrentJob({
@@ -139,7 +138,12 @@ const MobileApp: React.FC = () => {
         business_name: data.businessName || data.location,
         time_period: data.timePeriod || "HR",
       });
-      console.log("✅ Current job saved to database");
+      console.log("✅ Current job saved to database successfully");
+      
+      toast({
+        title: "Job saved!",
+        description: "Your current job has been saved successfully.",
+      });
 
       let businessId: string | undefined;
 
@@ -178,7 +182,13 @@ const MobileApp: React.FC = () => {
       console.log("✅ Post created");
       
     } catch (error) {
-      console.error("Error saving job data:", error);
+      console.error("❌ Error saving job data:", error);
+      const { toast } = await import("@/hooks/use-toast");
+      toast({
+        variant: "destructive",
+        title: "Failed to save job",
+        description: error instanceof Error ? error.message : "Please try again",
+      });
     }
   };
 
@@ -186,7 +196,10 @@ const MobileApp: React.FC = () => {
     console.log('🎯 handleJobUpdate called with:', jobData);
     try {
       const { saveCurrentJob } = await import("../services/currentJobs");
+      const { toast } = await import("@/hooks/use-toast");
       const salary = parseFloat(jobData.salary.replace(/[^0-9.]/g, "")) || 0;
+      
+      console.log('💾 Attempting to update current job...');
       
       // STEP 1: Always save current job
       await saveCurrentJob({
@@ -196,7 +209,12 @@ const MobileApp: React.FC = () => {
         business_name: jobData.businessName || jobData.location,
         time_period: jobData.timePeriod,
       });
-      console.log("✅ Current job updated in database");
+      console.log("✅ Current job updated in database successfully");
+      
+      toast({
+        title: "Job updated!",
+        description: "Your current job has been updated successfully.",
+      });
 
       // Update userData state to reflect changes
       setUserData(prev => prev ? {
