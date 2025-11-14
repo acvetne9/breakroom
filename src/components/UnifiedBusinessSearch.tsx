@@ -205,45 +205,51 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         // Convert to EnhancedBusiness format and add to results
         const enhancedResults = searchResults.map(b => ({
           ...b,
-          id: b.id,
-          name: b.name,
           lat: b.position.lat,
-          lng: b.position.lng,
-          position: b.position,
-          address: b.address || '',
-          roles: b.roles || [],
-          atmosphere: b.atmosphere || [],
-          businessType: b.businessType || '',
-          website: b.website || ''
+          lng: b.position.lng
         })) as EnhancedBusiness[];
         
         results.push(...enhancedResults);
         
-        // Check again if this search is still current before updating
-        if (seq !== searchSeqRef.current) return;
+        // Cache results (limit cache size to prevent memory issues)
+        resultsCache.current.set(q, results);
+        if (resultsCache.current.size > 50) {
+          const firstKey = resultsCache.current.keys().next().value;
+          if (firstKey) resultsCache.current.delete(firstKey);
+        }
         
         setSearchResults(results);
-        
-        // Cache results with size limit
-        if (resultsCache.current.size > 20) {
-          const firstKey = resultsCache.current.keys().next().value;
-          resultsCache.current.delete(firstKey);
+
+        // Notify parent if no business results found (only after user stops typing)
+        const hasBusinessResults = results.some(r => !('isNeighborhood' in r));
+        if (!hasBusinessResults && onNoResults) {
+          // Delay callback to avoid interrupting ongoing typing
+          setTimeout(() => {
+            // Check if search is still current
+            if (seq === searchSeqRef.current && value.trim() === q) {
+              onNoResults(q);
+            }
+          }, 800);
         }
-        resultsCache.current.set(q, results);
         
-        // Notify parent if no business results
-        if (enhancedResults.length === 0 && onNoResults) {
-          onNoResults(q);
-        }
-        
-        // Parse filters from query for the parent
-        const filters = await parseSearchFilters(q);
-        if (filters && JSON.stringify(filters) !== lastFiltersRef.current) {
-          lastFiltersRef.current = JSON.stringify(filters);
-          onChange(value, undefined, filters);
-        } else if (!filters && lastFiltersRef.current !== null) {
-          lastFiltersRef.current = null;
-          onChange(value, undefined, null);
+        // Update parent with filters
+        try {
+          const parsed = parseSearchFilters(q);
+          const filtersKey = parsed ? JSON.stringify(parsed) : null;
+          if (lastFiltersRef.current !== filtersKey) {
+            lastFiltersRef.current = filtersKey;
+            if (parsed?.neighborhoodFilter) {
+              const neighborhoodCoords = {
+                lat: parsed.neighborhoodFilter.center.lat,
+                lon: parsed.neighborhoodFilter.center.lon
+              };
+              onChange(q, undefined, parsed, neighborhoodCoords);
+            } else {
+              onChange(q, undefined, parsed || null);
+            }
+          }
+        } catch (e) {
+          console.warn('Filter parse failed:', e);
         }
       } catch (error) {
         console.error('Search error:', error);
@@ -258,12 +264,12 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     }, 300);
     
     return () => clearTimeout(timer);
-  }, [value, mapBusinesses, onChange, onNoResults, variant]);
+  }, [value]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     hasUserInteracted.current = true;
-    wasClosedIntentionally.current = false;
+    wasClosedIntentionally.current = false; // Clear flag when user types
     onChange(newValue);
     if (!newValue.trim()) {
       setSearchResults([]);
@@ -280,80 +286,103 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       // Update the search input with just the neighborhood name
       onChange(neighborhoodName);
       
-      // Close dropdown and trigger search
-      setShowDropdown(false);
-      wasClosedIntentionally.current = true;
-      
-      // Trigger a fresh search for businesses in this neighborhood
-      const neighborhood = findNeighborhoodBoundaryByName(neighborhoodName);
-      if (neighborhood && neighborhood.boundary) {
-        // Calculate center from boundary coordinates
-        const lats = neighborhood.boundary.map((p: { lat: number; lon: number }) => p.lat);
-        const lons = neighborhood.boundary.map((p: { lat: number; lon: number }) => p.lon);
-        const centerCoords = {
-          lat: (Math.max(...lats) + Math.min(...lats)) / 2,
-          lon: (Math.max(...lons) + Math.min(...lons)) / 2
+      // Trigger neighborhood search with coordinates
+      const filters = parseSearchFilters(neighborhoodName);
+      if (filters?.neighborhoodFilter) {
+        const neighborhoodCoords = {
+          lat: filters.neighborhoodFilter.center.lat,
+          lon: filters.neighborhoodFilter.center.lon
         };
-        onChange(neighborhoodName, undefined, undefined, centerCoords);
+        
+        committedQueryRef.current = neighborhoodName;
+        lastExecutedQuery.current = neighborhoodName;
+        lastFiltersRef.current = JSON.stringify(filters);
+        onChange(neighborhoodName, undefined, filters, neighborhoodCoords);
       }
     } else {
-      // It's a business result
+      // Handle business click
       const business = result as EnhancedBusiness;
+      
+      // Update input to show the selected business name
       onChange(business.name);
       
-      if (onBusinessSelect) {
-        onBusinessSelect(business);
-      }
+      // Call the business select callback so parent can handle the selection
+      onBusinessSelect?.(business);
       
-      // Save location if callback provided
-      if (onLocationSave && business.address) {
-        onLocationSave(business.address, `${business.name}, ${business.address}`);
+      // Save the clicked business location
+      if (onLocationSave && business.name) {
+        const fullLocation = business.formatted_address || business.vicinity || business.name;
+        onLocationSave(fullLocation, fullLocation);
       }
-      
+    }
+    
+    wasClosedIntentionally.current = true; // Mark as intentionally closed
+    setShowDropdown(false);
+    setSearchResults([]);
+  };
+
+  const performSearch = () => {
+    const trimmedValue = value.trim();
+    
+    // Check if this is the same query we just executed
+    if (trimmedValue === lastExecutedQuery.current && trimmedValue.length >= 3) {
       setShowDropdown(false);
-      wasClosedIntentionally.current = true;
+      return;
     }
+    
+    if (!trimmedValue) {
+      // Clear search - commit empty query to clear filters
+      if (committedQueryRef.current !== '') {
+        committedQueryRef.current = '';
+        lastFiltersRef.current = null;
+        lastExecutedQuery.current = '';
+        onChange(value, undefined, null);
+      }
+      return;
+    }
+    
+    // Check for profanity in search terms
+    if (isProfane(trimmedValue)) {
+      console.log('❌ Profanity detected, blocking search');
+      return; // Just prevent search, don't clear input
+    }
+    
+    // Commit the query and apply filters immediately (require 3+ characters for meaningful search)
+    if (trimmedValue.length >= 3 && committedQueryRef.current !== trimmedValue) {
+      committedQueryRef.current = trimmedValue;
+      lastExecutedQuery.current = trimmedValue;
+      const filters = parseSearchFilters(trimmedValue);
+      
+      // Only proceed if filters have meaningful content
+      if (filters && (
+        (filters.textTerms && Array.isArray(filters.textTerms) && filters.textTerms.length > 0) ||
+        filters.salaryQuery ||
+        filters.roleFilter ||
+        filters.businessTypeFilter ||
+        filters.neighborhoodFilter
+      )) {
+        const filtersKey = JSON.stringify(filters);
+        lastFiltersRef.current = filtersKey;
+        onChange(value, undefined, filters);
+      } else {
+        if (lastFiltersRef.current !== null) {
+          lastFiltersRef.current = null;
+          committedQueryRef.current = '';
+          lastExecutedQuery.current = '';
+          onChange(value, undefined, null);
+        }
+      }
+    } else if (trimmedValue.length < 3 && lastFiltersRef.current !== null) {
+      // Clear filters if search is too short
+      lastFiltersRef.current = null;
+      committedQueryRef.current = '';
+      lastExecutedQuery.current = '';
+      onChange(value, undefined, null);
+    }
+    setShowDropdown(false);
   };
 
-  const performSearch = async () => {
-    const query = value.trim();
-    
-    // Don't search if query is profane
-    if (isProfane(query)) {
-      console.log('🚫 Profane query detected, not searching');
-      return;
-    }
-    
-    // Don't search if query is too short
-    if (query.length < 3) {
-      console.log('⚠️ Query too short, not searching');
-      return;
-    }
-    
-    // Don't re-run the same search
-    if (query === committedQueryRef.current) {
-      console.log('⏭️ Skipping duplicate search');
-      return;
-    }
-    
-    // Only perform search if we have filters in the query
-    const filters = await parseSearchFilters(query);
-    if (!filters || (!filters.roleFilter && !filters.salaryQuery)) {
-      console.log('⚠️ No filters detected in query, not performing search');
-      return;
-    }
-    
-    console.log('🔍 [SearchBar] Committing search query:', query);
-    
-    // Mark this query as committed
-    committedQueryRef.current = query;
-    lastExecutedQuery.current = query;
-    
-    // Notify parent with filters
-    onChange(query, undefined, filters);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       performSearch();
     }
@@ -386,15 +415,15 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
 
   // Check if parent is passing app-input class (used in InitiationPage)
   const isAppInputStyle = className.includes('app-input');
-  
-  const baseInputClasses = isAppInputStyle 
-    ? "" // Don't override app-input styles
-    : variant === 'search-bar'
-      ? "w-full px-4 py-3 bg-card text-foreground border-2 border-border rounded-lg focus:outline-none focus:border-primary transition-colors"
-      : "w-full px-3 py-2 bg-background text-foreground border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary";
+
+  const baseInputClasses = variant === 'search-bar' 
+    ? "search-bar pr-12" 
+    : isAppInputStyle
+      ? "" // Don't add base classes if app-input is specified
+      : "w-full px-3 py-2 border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring";
 
   return (
-    <div className="relative w-full">
+    <div className="relative">
       <div className="relative">
         <input
           ref={inputRef}
@@ -459,32 +488,47 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                 No relevant businesses found
               </div>
             ) : (
-              searchResults.map((result, index) => (
-                <React.Fragment key={result.id}>
-                  {'isNeighborhood' in result && result.isNeighborhood ? (
+              <div className="p-3">
+                {searchResults.map((result, index) => (
+                  <div key={result.id}>
                     <div
-                      className="px-4 py-3 hover:bg-accent cursor-pointer transition-colors"
+                      className="cursor-pointer py-1.5 px-0 rounded transition-colors hover:bg-accent/20"
                       onClick={() => handleResultClick(result)}
                     >
-                      <div className="font-medium text-foreground">{result.name}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{result.borough}</div>
+                      {'isNeighborhood' in result && result.isNeighborhood ? (
+                        // Neighborhood result
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">{result.name}</span>
+                          <span className="text-xs opacity-70">{result.borough}</span>
+                        </div>
+                      ) : (
+                        // Business result
+                        <div className="flex flex-col">
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">{(result as EnhancedBusiness).name}</span>
+                            <span className="text-sm opacity-70">
+                              {(result as EnhancedBusiness).businessType === "Other"
+                                ? ""
+                                : (result as EnhancedBusiness).businessType || "Business"}
+                            </span>
+                          </div>
+                           {/* Show Supabase address if it exists, otherwise nothing */}
+                           {(result as EnhancedBusiness).address && (
+                             <span className="text-xs text-gray-500 truncate mt-0.5">
+                               {(result as EnhancedBusiness).address}
+                             </span>
+                           )}
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div
-                      className="px-4 py-3 hover:bg-accent cursor-pointer transition-colors"
-                      onClick={() => handleResultClick(result)}
-                    >
-                      <div className="font-medium text-foreground">{result.name}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {'address' in result ? result.address : ''}
-                      </div>
-                    </div>
-                  )}
-                  {index < searchResults.length - 1 && (
-                    <div className="border-t border-border" />
-                  )}
-                </React.Fragment>
-              ))
+                
+                    {/* Divider between results */}
+                    {index < searchResults.length - 1 && (
+                      <div className="h-px bg-border/30 my-1.5"></div>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>
