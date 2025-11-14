@@ -86,6 +86,25 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
           }
         }
         
+        // Fallback: If fingerprint recovery failed but we have old device_id patterns, try direct lookup
+        if (!storedDeviceId) {
+          const tempDeviceId = localStorage.getItem('device_id');
+          if (tempDeviceId) {
+            console.log('Attempting direct device_id lookup as fallback...');
+            const { data: directProfile } = await supabase
+              .from('profiles')
+              .select('temp_user_id')
+              .eq('temp_user_id', tempDeviceId)
+              .eq('is_authenticated', false)
+              .maybeSingle();
+            
+            if (directProfile) {
+              storedDeviceId = directProfile.temp_user_id;
+              console.log('Recovered device_id from direct lookup:', storedDeviceId);
+            }
+          }
+        }
+        
         if (!storedDeviceId) {
           storedDeviceId = generateDeviceId();
           localStorage.setItem('device_id', storedDeviceId);

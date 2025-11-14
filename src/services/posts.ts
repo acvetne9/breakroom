@@ -7,6 +7,13 @@ let profilePromise: Promise<{ profileId: string; wasCreated: boolean }> | null =
 // Global flag to ensure single initialization across the app
 let isInitializing = false;
 
+// Clear cached profile data (useful when device context changes)
+export const clearProfileCache = () => {
+  console.log('🧹 Clearing profile cache');
+  cachedProfileId = null;
+  profilePromise = null;
+};
+
 // Get user profile (fetch only, doesn't create)
 export const getUserProfile = async (): Promise<{ profileId: string; wasCreated: boolean }> => {
   console.log('🔐 getUserProfile called - cached:', !!cachedProfileId);

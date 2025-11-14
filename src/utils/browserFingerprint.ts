@@ -5,8 +5,8 @@
 export function generateBrowserFingerprint(): string {
   const components: string[] = [];
   
-  // Screen resolution
-  components.push(`${window.screen.width}x${window.screen.height}`);
+  // Screen resolution (using availWidth/availHeight for better stability on mobile)
+  components.push(`${window.screen.availWidth}x${window.screen.availHeight}`);
   
   // Color depth
   components.push(`${window.screen.colorDepth}`);
