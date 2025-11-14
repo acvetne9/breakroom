@@ -810,13 +810,20 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 <UnifiedBusinessSearch
                   value={currentJobBusinessInput}
                   onChange={(value, business, filters, neighborhoodCoords) => {
-                    handleCurrentJobBusinessInputChange(value);
+                    if (!currentJobShowAddressInput) {
+                      handleCurrentJobBusinessInputChange(value);
+                    }
                   }}
-                  onBusinessSelect={handleCurrentJobBusinessSelect}
+                  onBusinessSelect={(business) => {
+                    if (!currentJobShowAddressInput) {
+                      handleCurrentJobBusinessSelect(business);
+                    }
+                  }}
                   onBlur={handleCurrentJobBusinessBlur}
                   className={`app-input w-full ${currentJobShowAddressInput && !currentJobBusinessSelected ? "border-red-500" : ""}`}
                   placeholder="Where do you work?..."
                   variant="dropdown"
+                  disabled={currentJobShowAddressInput}
                 />
 
                 {/* Address input for current job */}
@@ -898,13 +905,20 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     <UnifiedBusinessSearch
                       value={pastJobBusinessInputs[job.id] || ""}
                       onChange={(value, business, filters, neighborhoodCoords) => {
-                        handlePastJobBusinessInputChange(job.id, value);
+                        if (!pastJobShowAddressInputs[job.id]) {
+                          handlePastJobBusinessInputChange(job.id, value);
+                        }
                       }}
-                      onBusinessSelect={(business) => handlePastJobBusinessSelect(job.id, business)}
+                      onBusinessSelect={(business) => {
+                        if (!pastJobShowAddressInputs[job.id]) {
+                          handlePastJobBusinessSelect(job.id, business);
+                        }
+                      }}
                       onBlur={() => handlePastJobBusinessBlur(job.id)}
                       className={`app-input w-full ${pastJobShowAddressInputs[job.id] && !pastJobBusinessSelected[job.id] ? "border-red-500" : ""}`}
                       placeholder="Where did you work?..."
                       variant="dropdown"
+                      disabled={pastJobShowAddressInputs[job.id]}
                     />
 
                     {/* Address input for past job */}
