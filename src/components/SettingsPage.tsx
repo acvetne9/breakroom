@@ -6,7 +6,6 @@ import { isProfane } from "../utils/profanityFilter";
 import { useDevice } from "@/contexts/DeviceContext";
 import { nycNeighborhoods } from "../utils/nyc_neighborhoods";
 import { usePosts } from "@/hooks/usePosts";
-import { getCurrentJob } from "@/services/currentJobs";
 import { getPastJobs, savePastJobs, deletePastJob, PastJobData } from "@/services/pastJobs";
 interface UserInfo {
   salary: string;
