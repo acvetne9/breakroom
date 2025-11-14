@@ -139,6 +139,33 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     currentJobChangedRef.current = currentJobChanged;
   }, [currentJobChanged]);
 
+  // Load current job from database on mount
+  useEffect(() => {
+    const loadCurrentJob = async () => {
+      try {
+        const jobData = await getCurrentJob();
+        if (jobData) {
+          // Update all current job states with loaded data
+          setCurrentJob({
+            salary: jobData.salary?.toString() || '',
+            role: jobData.role || '',
+            location: jobData.location || '',
+            isHiring: false,
+          });
+          setCurrentJobFullLocation(jobData.location || '');
+          setCurrentJobBusinessName(jobData.business_name || jobData.location || '');
+          setCurrentJobBusinessInput(jobData.business_name || jobData.location || '');
+          setCurrentTimePeriod(jobData.time_period || "HR");
+          setCurrentJobBusinessSelected(!!jobData.location);
+        }
+      } catch (error) {
+        console.error('Failed to load current job:', error);
+      }
+    };
+
+    loadCurrentJob();
+  }, []); // Empty dependency array - only run on mount
+
   // Load past jobs from database on mount
   useEffect(() => {
     const loadPastJobs = async () => {
