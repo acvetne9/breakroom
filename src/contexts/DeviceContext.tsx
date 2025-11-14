@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from "@/integrations/supabase/client";
-import { generateBrowserFingerprint } from "@/utils/browserFingerprint";
+import { generateBrowserFingerprint, generateLegacyBrowserFingerprint } from "@/utils/browserFingerprint";
 
 interface DeviceContextType {
   deviceId: string;
@@ -69,18 +69,41 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
         if (!storedDeviceId) {
           console.log('No device_id in localStorage, attempting fingerprint recovery...');
           
-          const { data: existingProfile, error: lookupError } = await supabase
+          // Try new fingerprint format first
+          let existingProfile = await supabase
             .from('profiles')
             .select('temp_user_id')
             .eq('browser_fingerprint', browserFingerprint)
             .eq('is_authenticated', false)
             .maybeSingle();
           
-          if (lookupError) {
-            console.error('Error looking up profile by fingerprint:', lookupError);
-          } else if (existingProfile?.temp_user_id) {
+          // If not found, try legacy fingerprint format for backward compatibility
+          if (!existingProfile?.data) {
+            const legacyFingerprint = generateLegacyBrowserFingerprint();
+            console.log('Trying legacy fingerprint for recovery...', legacyFingerprint);
+            
+            existingProfile = await supabase
+              .from('profiles')
+              .select('temp_user_id')
+              .eq('browser_fingerprint', legacyFingerprint)
+              .eq('is_authenticated', false)
+              .maybeSingle();
+            
+            // If found with old fingerprint, migrate it to new format
+            if (existingProfile?.data?.temp_user_id) {
+              console.log('Found profile with legacy fingerprint, migrating to new format');
+              await supabase
+                .from('profiles')
+                .update({ browser_fingerprint: browserFingerprint })
+                .eq('temp_user_id', existingProfile.data.temp_user_id);
+            }
+          }
+          
+          if (existingProfile?.error) {
+            console.error('Error looking up profile by fingerprint:', existingProfile.error);
+          } else if (existingProfile?.data?.temp_user_id) {
             // Recovered device_id from fingerprint!
-            storedDeviceId = existingProfile.temp_user_id;
+            storedDeviceId = existingProfile.data.temp_user_id;
             localStorage.setItem('device_id', storedDeviceId);
             console.log('Recovered device_id from fingerprint:', storedDeviceId);
           }
