@@ -141,13 +141,11 @@
     transform: translateZ(0);
   }
 
-  /* Make card full-width on mobile for proper peeking */
+  /* Remove auto margins on mobile for proper peeking alignment */
   @media (max-width: 768px) {
     .app-card {
-      @apply w-full h-full rounded-none;
-      max-width: none;
-      border-left: none;
-      border-right: none;
+      margin-left: 0;
+      margin-right: 0;
     }
   }
 
