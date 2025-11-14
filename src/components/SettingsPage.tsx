@@ -139,33 +139,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     currentJobChangedRef.current = currentJobChanged;
   }, [currentJobChanged]);
 
-  // Load current job from database on mount
-  useEffect(() => {
-    const loadCurrentJob = async () => {
-      try {
-        const jobData = await getCurrentJob();
-        if (jobData) {
-          // Update all current job states with loaded data
-          setCurrentJob({
-            salary: jobData.salary ? `$${jobData.salary.toFixed(2)}` : '',
-            role: jobData.role || '',
-            location: jobData.location || '',
-            isHiring: false,
-          });
-          setCurrentJobFullLocation(jobData.location || '');
-          setCurrentJobBusinessName(jobData.business_name || jobData.location || '');
-          setCurrentJobBusinessInput(jobData.business_name || jobData.location || '');
-          setCurrentTimePeriod(jobData.time_period || "HR");
-          setCurrentJobBusinessSelected(!!jobData.location);
-        }
-      } catch (error) {
-        console.error('Failed to load current job:', error);
-      }
-    };
-
-    loadCurrentJob();
-  }, []); // Empty dependency array - only run on mount
-
   // Load past jobs from database on mount
   useEffect(() => {
     const loadPastJobs = async () => {
@@ -191,7 +164,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           setPastJobTimePeriods(periods);
         } else {
           // No past jobs in database - start with one empty job
-          const newJobId = Date.now().toString();
+          const newJobId = `temp_${Date.now()}`;
           setPastJobs([{
             id: newJobId,
             salary: "",
@@ -203,7 +176,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       } catch (error) {
         console.error('Failed to load past jobs:', error);
         // On error, still show one empty job
-        const newJobId = Date.now().toString();
+        const newJobId = `temp_${Date.now()}`;
         setPastJobs([{
           id: newJobId,
           salary: "",
@@ -359,6 +332,15 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     }
     return true;
   };
+  
+  // Helper to check if job ID is from database (not a temp ID)
+  const isJobFromDatabase = (jobId?: string): boolean => {
+    if (!jobId) return false;
+    if (jobId.startsWith('temp_')) return false;
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidPattern.test(jobId);
+  };
+  
   const isPastJobComplete = (job: PastJob, timePeriod: string) => {
     const jobId = job.id || '';
     
@@ -431,16 +413,31 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         }));
 
       if (completePastJobs.length > 0) {
-        savePastJobs(completePastJobs).catch((error) => {
-          console.error('Failed to save past jobs:', error);
-        });
+        savePastJobs(completePastJobs)
+          .then(async () => {
+            // Reload past jobs to get real database IDs
+            const freshJobs = await getPastJobs();
+            if (freshJobs.length > 0) {
+              const formattedJobs: PastJob[] = freshJobs.map(job => ({
+                id: job.id,
+                salary: job.salary ? `$${job.salary.toFixed(2)}` : '',
+                role: job.role,
+                location: job.location,
+                business_name: job.business_name,
+              }));
+              setPastJobs(formattedJobs);
+            }
+          })
+          .catch((error) => {
+            console.error('Failed to save past jobs:', error);
+          });
       }
 
       onPageLeave?.();
     };
   }, []);
   const addPastJob = () => {
-    const newJobId = Date.now().toString();
+    const newJobId = `temp_${Date.now()}`;
     const newJob: PastJob = {
       id: newJobId,
       salary: "",

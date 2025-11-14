@@ -113,11 +113,23 @@ export const savePastJobs = async (jobs: PastJobData[]): Promise<void> => {
   try {
     const { profileId } = await getUserProfile();
     
-    // Separate new jobs (no id) from existing jobs (has id)
-    const newJobs = jobs.filter(job => !job.id);
-    const existingJobs = jobs.filter(job => job.id);
+    // Helper function to check if ID is a real database UUID
+    const isRealDatabaseId = (id?: string): boolean => {
+      if (!id) return false;
+      // Temp IDs start with "temp_"
+      if (id.startsWith('temp_')) return false;
+      // Real UUIDs match this pattern
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      return uuidPattern.test(id);
+    };
     
-    // Insert new jobs
+    // Separate new jobs (no id OR temp id) from existing jobs (real UUID)
+    const newJobs = jobs.filter(job => !isRealDatabaseId(job.id));
+    const existingJobs = jobs.filter(job => isRealDatabaseId(job.id));
+    
+    console.log(`📊 Saving past jobs: ${newJobs.length} new, ${existingJobs.length} existing`);
+    
+    // Insert new jobs (don't include the temp id)
     if (newJobs.length > 0) {
       const { error: insertError } = await supabase
         .from('past_jobs')
@@ -129,13 +141,14 @@ export const savePastJobs = async (jobs: PastJobData[]): Promise<void> => {
             location: job.location,
             business_name: job.business_name,
             time_period: job.time_period
+            // NOTE: Do NOT include job.id here - let database generate UUID
           }))
         );
       
       if (insertError) throw insertError;
     }
     
-    // Update existing jobs one by one
+    // Update existing jobs one by one (only real database records)
     for (const job of existingJobs) {
       await savePastJob(job);
     }
