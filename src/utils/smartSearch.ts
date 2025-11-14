@@ -13,6 +13,22 @@ export async function expandTerm(job: string, enableLogging: boolean = true): Pr
     }
   };
 
+  // Don't expand very short terms (likely initials or abbreviations)
+  if (job.length <= 2) {
+    log(`⏭️ Skipping expansion for short term: ${job}`);
+    return [job];
+  }
+  
+  // Don't expand if it looks like a name (capitalized, not in common job list)
+  const isLikelyName = /^[A-Z][a-z]+$/.test(job);
+  const commonJobTerms = ['server', 'cook', 'chef', 'manager', 'cashier', 'driver', 'barista', 'bartender'];
+  const isCommonJob = commonJobTerms.some(term => job.toLowerCase().includes(term) || term.includes(job.toLowerCase()));
+  
+  if (isLikelyName && !isCommonJob) {
+    log(`⏭️ Skipping expansion for likely name: ${job}`);
+    return [job];
+  }
+
   // Gender suffixes and patterns to transform
   const genderTransforms = [
     { from: "man", to: ["woman", "person"] },
