@@ -59,6 +59,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   const lastExecutedQuery = useRef<string>('');
   const wasClosedIntentionally = useRef(false);
   const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasUserInteracted = useRef(false);
 
   // Handle clicks outside to close dropdown
   useEffect(() => {
@@ -119,6 +120,13 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     }
   }, [showDropdown]);
 
+  // Reset interaction flag on unmount
+  useEffect(() => {
+    return () => {
+      hasUserInteracted.current = false;
+    };
+  }, []);
+
   // Cleanup blur timeout on unmount
   useEffect(() => {
     return () => {
@@ -141,6 +149,13 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         committedQueryRef.current = '';
         onChange(value, undefined, null);
       }
+      return;
+    }
+
+    // Don't auto-search on mount with initial value for dropdown variant
+    // Only search if user has interacted OR if it's the search-bar variant
+    if (!hasUserInteracted.current && variant === 'dropdown') {
+      console.log('⏸️ Skipping auto-search on mount - waiting for user interaction');
       return;
     }
     
@@ -253,6 +268,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
+    hasUserInteracted.current = true;
     wasClosedIntentionally.current = false; // Clear flag when user types
     onChange(newValue);
     if (!newValue.trim()) {
@@ -422,6 +438,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
               clearTimeout(blurTimeoutRef.current);
               blurTimeoutRef.current = null;
             }
+            hasUserInteracted.current = true;
             wasClosedIntentionally.current = false;
             const trimmedValue = value.trim();
             // Show dropdown if we have a value and either:
