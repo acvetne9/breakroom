@@ -2,385 +2,120 @@ import React, { useState, useEffect } from 'react';
 import JobSearchDropdown from './JobSearchDropdown';
 import UnifiedBusinessSearch from './UnifiedBusinessSearch';
 import { isProfane } from '@/utils/profanityFilter';
+import { JOB_OPTIONS } from './JobSearchDropdown';
 
-// Import the predefined job options to check against
-const JOB_OPTIONS = ["Software Engineer", "Frontend Developer", "Backend Developer", "Full Stack Developer", "Mobile App Developer", "Web Developer", "UI Designer", "UX Designer", "Data Scientist", "Machine Learning Engineer", "AI Researcher", "Cloud Architect", "DevOps Engineer", "Systems Administrator", "Network Engineer", "Database Administrator", "Cybersecurity Analyst", "QA Engineer", "Game Developer", "Embedded Systems Engineer", "Technical Writer", "Product Manager", "Scrum Master", "IT Support Specialist", "Help Desk Technician", "Doctor", "Nurse", "Licensed Practical Nurse", "Certified Nursing Assistant", "Pharmacist", "Pharmacy Technician", "Paramedic", "Emergency Medical Technician", "Dentist", "Dental Hygienist", "Dental Assistant", "Veterinarian", "Veterinary Technician", "Physical Therapist", "Occupational Therapist", "Radiologic Technologist", "Medical Assistant", "Surgical Technologist", "Respiratory Therapist", "Home Health Aide", "Barista", "Server", "Cook", "Line Cook", "Prep Cook", "Sous Chef", "Chef", "Pastry Chef", "Food Service Worker", "Waiter", "Waitress", "Host", "Hostess", "Busser", "Dishwasher", "Caterer", "Food Runner", "Fast Food Worker", "Drive-Thru Operator", "Bartender", "Barback", "Delivery Driver", "Pizza Delivery Driver", "Hotel Housekeeper", "Front Desk Clerk", "Hotel Concierge", "Bellhop", "Room Service Attendant", "Valet Attendant", "Casino Dealer", "Casino Host", "Event Coordinator", "Wedding Planner", "Banquet Server", "Club Promoter", "Tour Guide", "Cashier", "Retail Associate", "Sales Associate", "Stock Associate", "Customer Service Representative", "Customer Service", "Inventory Clerk", "Shelf Stocker", "Store Manager", "Assistant Store Manager", "Greeter", "Bagging Clerk", "Mall Security Guard", "Merchandiser", "Personal Shopper", "Gift Wrapper", "Loss Prevention Specialist", "Taxi Driver", "Ride-share Driver", "Driver", "Bus Driver", "School Bus Driver", "Truck Driver", "Delivery Driver", "Courier", "Bicycle Messenger", "Forklift Operator", "Warehouse Worker", "Order Picker", "Package Handler", "Logistics Coordinator", "Dock Worker", "Shipping Clerk", "Nanny", "Babysitter", "Daycare Worker", "Preschool Teacher", "Childcare Assistant", "Elder Caregiver", "Home Health Aide", "Housekeeper", "Cleaner", "Janitor", "Maid", "Pet Sitter", "Dog Walker", "Pet Groomer", "Landscaper", "Gardener", "Pool Cleaner", "Electrician", "Plumber", "Carpenter", "Welder", "HVAC Technician", "Auto Mechanic", "Diesel Mechanic", "Machinist", "Construction Worker", "General Laborer", "Roofing Specialist", "Painter", "Drywall Installer", "Flooring Installer", "Bricklayer", "Receptionist", "Administrative Assistant", "Office Clerk", "Data Entry Clerk", "File Clerk", "Executive Assistant", "Secretary", "Office Manager", "Virtual Assistant", "Call Center Representative", "Collections Agent", "Telemarketer", "Appointment Setter", "Mailroom Clerk", "Switchboard Operator", "Accountant", "Auditor", "Bookkeeper", "Tax Preparer", "Financial Analyst", "Budget Analyst", "Loan Officer", "Insurance Agent", "Claims Adjuster", "Bank Teller", "Mortgage Broker", "Investment Analyst", "Payroll Specialist", "Real Estate Agent", "Property Manager", "Teacher", "Teaching Assistant", "Substitute Teacher", "School Counselor", "Principal", "Tutor", "Librarian", "Library Assistant", "Academic Advisor", "Professor", "Lawyer", "Paralegal", "Legal Assistant", "Court Clerk", "Judge", "Security Guard", "Private Investigator", "Police Officer", "Corrections Officer", "Firefighter", "Manager", "Assistant Manager", "Shift Leader", "Supervisor", "Team Lead", "Freelance Writer", "Graphic Designer", "Illustrator", "Photographer", "Video Editor", "Voice Actor", "Music Producer", "Social Media Influencer", "Virtual Tutor", "Translator", "Maintenance Worker", "Facilities Technician", "Groundskeeper", "Building Superintendent", "Handyman", "Lifeguard", "Camp Counselor", "Amusement Park Worker", "Theme Park Attendant", "Carnival Worker", "Tour Bus Driver", "Street Performer", "Festival Staff", "Farm Worker", "Fruit Picker", "City Planner", "Urban Planner", "Building Inspector", "City Clerk", "City Council Member", "Mayor's Assistant", "Public Works Laborer", "Water Treatment Plant Operator", "Waste Management Worker", "Sanitation Worker", "Street Sweeper Operator", "Parking Enforcement Officer", "Meter Reader", "Building Maintenance Worker", "Parks and Recreation Worker", "Recreation Coordinator", "Community Outreach Specialist", "City Bus Driver", "Transit Operator", "Traffic Engineer", "Civil Engineer (Municipal)", "City Electrician", "Zoning Officer", "Public Safety Officer", "Emergency Management Coordinator", "City Attorney", "Planning and Zoning Coordinator", "City Engineer", "City Project Manager", "Permit Technician", "Code Enforcement Officer", "Neighborhood Services Coordinator", "City Grant Writer", "Community Development Specialist", "Animal Control Officer", "Public Health Inspector", "City Auditor", "Budget Officer", "City Finance Director", "Environmental Compliance Specialist", "City Surveyor", "Municipal Court Clerk", "Recycling Program Coordinator", "Water Quality Technician", "Traffic Signal Technician", "Road Maintenance Worker", "City Arborist", "Crew Member", "Associate", "Team Member", "Helper", "Laborer", "Worker", "Staff Member", "General Worker", "Operator", "Technician", "Specialist", "Coordinator", "Agent", "Assistant", "Personal Trainer", "Psychiatrist", "Consultant"];
 interface InitiationPageProps {
   onComplete: (data: {
     salary: string;
     role: string;
     location: string;
     fullLocation?: string;
+    businessName?: string;
     timePeriod: string;
   }) => void;
 }
 
-// Address validation function
 const isValidAddress = (address: string): boolean => {
   const trimmedAddress = address.trim();
-
-  // Check minimum length
-  if (trimmedAddress.length < 10) {
-    return false;
-  }
-
-  // Check for basic address components
-  const hasNumbers = /\d/.test(trimmedAddress);
-  const hasLetters = /[a-zA-Z]/.test(trimmedAddress);
-  const hasSpaces = /\s/.test(trimmedAddress);
-
-  // Must have numbers (street number), letters, and spaces
-  if (!hasNumbers || !hasLetters || !hasSpaces) {
-    return false;
-  }
-
-  // Common street types/suffixes
-  const streetTypes = ['street', 'st', 'avenue', 'ave', 'road', 'rd', 'drive', 'dr', 'lane', 'ln', 'boulevard', 'blvd', 'court', 'ct', 'place', 'pl', 'way', 'circle', 'cir', 'plaza', 'square', 'sq', 'parkway', 'pkwy', 'trail', 'tr', 'terrace', 'ter', 'highway', 'hwy', 'loop', 'row', 'walk', 'alley', 'crescent', 'cres', 'grove', 'heights', 'hill', 'park', 'ridge', 'view', 'crossing', 'xing'];
-  const addressLower = trimmedAddress.toLowerCase();
-  const hasStreetType = streetTypes.some(type => addressLower.includes(' ' + type + ' ') || addressLower.endsWith(' ' + type) || addressLower.includes(' ' + type + ','));
-
-  // Check for common address patterns
-  const addressPatterns = [
-  // Pattern: number + street name + type (e.g., "123 Main St")
-  /^\d+\s+[a-zA-Z\s]+\s+(street|st|avenue|ave|road|rd|drive|dr|lane|ln|boulevard|blvd|court|ct|place|pl|way|circle|cir|plaza|square|sq|parkway|pkwy|trail|tr|terrace|ter|highway|hwy|loop|row|walk|alley|crescent|cres|grove|heights|hill|park|ridge|view|crossing|xing)\b/i,
-  // Pattern with apartment/unit numbers
-  /^\d+\s+[a-zA-Z\s]+\s+(street|st|avenue|ave|road|rd|drive|dr|lane|ln|boulevard|blvd|court|ct|place|pl|way|circle|cir|plaza|square|sq|parkway|pkwy|trail|tr|terrace|ter|highway|hwy|loop|row|walk|alley|crescent|cres|grove|heights|hill|park|ridge|view|crossing|xing)\b.*?(apt|apartment|unit|suite|ste)?\s*\#?\d*$/i];
-  const matchesPattern = addressPatterns.some(pattern => pattern.test(trimmedAddress));
-
-  // Address is valid if it has street type or matches common patterns
-  return hasStreetType || matchesPattern;
+  if (trimmedAddress.length < 10) return false;
+  const hasNumber = /\d/.test(trimmedAddress);
+  const hasStreetType = /\b(st|street|ave|avenue|rd|road|blvd|boulevard|dr|drive|ln|lane|ct|court|pl|place|way|pkwy|parkway)\b/i.test(trimmedAddress);
+  const hasComma = trimmedAddress.includes(',');
+  return hasNumber && hasStreetType && hasComma;
 };
-const InitiationPage: React.FC<InitiationPageProps> = ({
-  onComplete
-}) => {
+
+const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   const [salary, setSalary] = useState('');
   const [role, setRole] = useState('');
   const [location, setLocation] = useState('');
   const [fullLocation, setFullLocation] = useState('');
+  const [businessName, setBusinessName] = useState('');
   const [timePeriod, setTimePeriod] = useState('HR');
   const [isComplete, setIsComplete] = useState(false);
-  const [showNewBusinessForm, setShowNewBusinessForm] = useState(false);
-  const [newBusinessAddress, setNewBusinessAddress] = useState('');
-  const [isCreatingBusiness, setIsCreatingBusiness] = useState(false);
+  const [businessSelected, setBusinessSelected] = useState(false);
+  const [showAddressInput, setShowAddressInput] = useState(false);
+  const [manualAddress, setManualAddress] = useState('');
   const [addressError, setAddressError] = useState('');
-  const [hasSearchResults, setHasSearchResults] = useState(false);
-  const [lastSearchValue, setLastSearchValue] = useState('');
-  const [hasBlurred, setHasBlurred] = useState(false);
-  const [isManualAddressValidated, setIsManualAddressValidated] = useState(false);
-  const [debouncedLocation, setDebouncedLocation] = useState('');
+  const [isManualAddress, setIsManualAddress] = useState(false);
 
-  /** Format salary as $123.00 */
-  const formatSalary = (input: string) => {
-    const cleanValue = input.replace(/[^0-9.]/g, '');
-    const number = parseFloat(cleanValue);
-    if (isNaN(number)) return '';
-    return `$${number.toFixed(2)}`;
-  };
   const handleSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Remove non-numeric characters except decimal point
-    let raw = e.target.value.replace(/[^0-9.]/g, "");
-
-    // Ensure only one decimal point
-    const parts = raw.split('.');
-    if (parts.length > 2) {
-      raw = parts[0] + '.' + parts.slice(1).join('');
+    let value = e.target.value.replace(/[^0-9.]/g, '');
+    if (value.includes('.')) {
+      const parts = value.split('.');
+      if (parts.length > 2) value = parts[0] + '.' + parts.slice(1).join('');
+      if (parts[1]?.length > 2) value = parts[0] + '.' + parts[1].substring(0, 2);
     }
-
-    // Limit to 2 decimal places
-    if (parts[1] && parts[1].length > 2) {
-      raw = parts[0] + '.' + parts[1].substring(0, 2);
-    }
-
-    // Format with $ prefix for display
-    const formatted = raw ? `$${raw}` : '';
-    setSalary(formatted);
+    setSalary(value ? `$${value}` : '');
   };
-  
-  const handleSalaryBlur = () => {
-    if (salary) {
-      const value = salary.replace(/[^0-9.]/g, "");
-      if (value.includes('.')) {
-        const parts = value.split('.');
-        // Add trailing 0 if only 1 decimal place
-        const formatted = parts[1]?.length === 1 ? `${parts[0]}.${parts[1]}0` : value;
-        setSalary(`$${formatted}`);
-      }
-    }
-    checkForCompletion();
-  };
+
   const checkForCompletion = () => {
-    const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
+    const allFilled = salary.trim() && role.trim() && location.trim();
     const isValidRole = JOB_OPTIONS.includes(role.trim()) || role.trim() === 'Other';
-    
-    // Business validation: either selected from dropdown OR new business with valid address OR manual address validated
-    const businessValidFromDropdown = fullLocation && fullLocation !== location;
-    const businessValidNewBusiness = showNewBusinessForm && newBusinessAddress.trim() !== '' && isValidAddress(newBusinessAddress);
-    const businessValid = businessValidFromDropdown || businessValidNewBusiness || isManualAddressValidated;
-    
-    console.log('🔍 InitiationPage validation:', {
-      allFilled,
-      isValidRole,
-      businessValidFromDropdown,
-      businessValidNewBusiness,
-      isManualAddressValidated,
-      businessValid,
-      willComplete: allFilled && isValidRole && businessValid && !isComplete
-    });
-    
-    if (allFilled && isValidRole && businessValid && !isComplete) {
-      setIsComplete(true);
-
-      // Delay to allow for UI animations if needed
-      setTimeout(() => {
-        const dataToPass = {
-          salary,
-          role,
-          location,
-          fullLocation: fullLocation || location,
-          timePeriod
-        };
-        onComplete(dataToPass);
-      }, 300);
+    const businessValid = businessSelected && (!showAddressInput || isValidAddress(manualAddress));
+    const complete = allFilled && isValidRole && businessValid;
+    setIsComplete(complete);
+    if (complete) {
+      const finalLocation = isManualAddress ? manualAddress : (fullLocation || location);
+      onComplete({ salary, role, location: finalLocation, fullLocation: finalLocation, businessName: businessName || '', timePeriod });
     }
   };
 
-  // Debounce location changes to prevent rapid form toggling
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedLocation(location);
-    }, 1200); // Increased delay to ensure user finished typing
-    
-    return () => clearTimeout(timer);
-  }, [location]);
+  useEffect(() => { checkForCompletion(); }, [salary, role, location, fullLocation, timePeriod, businessSelected, manualAddress]);
 
-  const handleSearchResultsChange = (hasResults: boolean, searchValue: string) => {
-    setHasSearchResults(hasResults);
-    setLastSearchValue(searchValue);
+  const handleBusinessSelect = (business: any) => {
+    setBusinessSelected(true);
+    setShowAddressInput(false);
+    setIsManualAddress(false);
+    setLocation(business.name || business.location);
+    setFullLocation(business.fullLocation || business.name || business.location);
+    setBusinessName(business.name || '');
   };
 
-  const handleRoleChange = (value: string) => {
-    const isPredefinedOption = JOB_OPTIONS.includes(value);
-    if (!isPredefinedOption && value && isProfane(value)) {
-      return;
-    }
-    setRole(value);
+  const handleAddressBlur = () => {
+    const address = manualAddress.trim();
+    if (!address) { setAddressError('Please enter a business address'); return; }
+    if (isProfane(address)) { setAddressError('Invalid address content'); return; }
+    if (!isValidAddress(address)) { setAddressError('Please enter a valid street address (e.g., "123 Main St, City, State")'); return; }
+    setFullLocation(address);
+    setLocation(address);
+    setBusinessName('');
+    setBusinessSelected(true);
+    setIsManualAddress(true);
+    setAddressError('');
   };
-  const handleLocationChange = (value: string, fullLocation?: string) => {
-    setLocation(value);
-    setFullLocation(fullLocation || value);
 
-    // Reset blur flag when user starts typing again
-    setHasBlurred(false);
-
-    // Reset manual address flag if a database business is selected
-    if (fullLocation) {
-      setIsManualAddressValidated(false);
-    }
-
-    // Only evaluate shouldShowForm if user hasn't blurred yet
-    // Once blurred, handleLocationBlur is authoritative
-    if (!hasBlurred) {
-      const shouldShowForm = !fullLocation && 
-                            debouncedLocation.length > 2 && 
-                            !hasSearchResults && 
-                            debouncedLocation === lastSearchValue;
-      
-      setShowNewBusinessForm(shouldShowForm);
-    }
-  };
-  const handleLocationBlur = () => {
-    const value = location.trim();
-    
-    // Mark that user has finished interacting with search
-    setHasBlurred(true);
-    
-    if (!value) {
-      setLocation('');
-      setFullLocation('');
-      setShowNewBusinessForm(false);
-      setHasSearchResults(false);
-      return;
-    }
-    if (value && isProfane(value)) {
-      setLocation('');
-      setFullLocation('');
-      setShowNewBusinessForm(false);
-      return;
-    }
-    
-    // Reset search results state when dropdown closes without selection
-    // This allows the form to show after dropdown closes
-    setTimeout(() => {
-      if (!fullLocation && value.length > 2) {
-        // If no business was selected, reset the hasSearchResults flag
-        setHasSearchResults(false);
-        setShowNewBusinessForm(true);
-      }
-    }, 200); // Small delay to allow click events to complete
-    
-    setTimeout(() => checkForCompletion(), 10);
-  };
-  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setNewBusinessAddress(value);
-
-    // Clear previous error when user starts typing
-    if (addressError) {
-      setAddressError('');
-    }
-  };
-  const validateAndCreateBusiness = async () => {
-    const address = newBusinessAddress.trim();
-    const businessName = location.trim(); // Preserve the business name
-    
-    if (!address) {
-      setAddressError('Please enter a business address');
-      return;
-    }
-    if (isProfane(address)) {
-      setAddressError('Invalid address content');
-      return;
-    }
-    if (!isValidAddress(address)) {
-      setAddressError('Please enter a valid street address (e.g., "123 Main St, City, State")');
-      return;
-    }
-    if (!salary || !role) {
-      return;
-    }
-    setIsCreatingBusiness(true);
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Keep business name in location, store combined info in fullLocation
-      setLocation(businessName);
-      setFullLocation(`${businessName}, ${address}`);
-      setIsManualAddressValidated(true);
-      setShowNewBusinessForm(false);
-      setNewBusinessAddress('');
-      setAddressError('');
-      
-      setTimeout(() => checkForCompletion(), 100);
-    } catch {
-      console.error('Failed to create business');
-    } finally {
-      setIsCreatingBusiness(false);
-    }
-  };
-  return <div className="absolute inset-0 z-50 flex items-center justify-center">
-      <div className="app-card flex flex-col justify-center px-8 py-12">
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-app-yellow/10 to-app-orange/10">
+      <div className="w-full max-w-md space-y-8">
+        <div className="text-center space-y-2">
+          <h1 className="text-4xl font-bold text-app-black">Welcome to breakroom! 👋</h1>
+          <p className="text-app-gray-dark">Let's get started by sharing a few details</p>
+        </div>
         <div className="space-y-6">
-          <div className="text-center">
-            <h1 className="text-app-black mb-6 font-normal text-lg">
-              {/* Full text for larger screens, condensed for smaller screens */}
-              <span>
-                Join the Community! 
-              </span>
-            </h1>
-          </div>
-        
-          {/* Business (Location) */}
           <div>
-            <UnifiedBusinessSearch
-              value={location}
-              onChange={(value, business, filters, neighborhoodCoords) => {
-                handleLocationChange(value, business?.name);
-                // Only set hasSearchResults when we have a definitive answer
-                if (business) {
-                  handleSearchResultsChange(true, value);
-                }
-                // Don't immediately set to false here - let onNoResults handle it
-              }}
-              onBusinessSelect={(business) => {
-                setLocation(business.name);
-                setFullLocation(business.name);
-                setIsManualAddressValidated(false);
-                handleSearchResultsChange(true, business.name);
-                checkForCompletion();
-              }}
-              onNoResults={(query) => {
-                // Only update after search completes with definitive no results
-                handleSearchResultsChange(false, query);
-              }}
-              onBlur={handleLocationBlur}
-              onFocus={() => setHasBlurred(false)}
-              placeholder="Where do you work?..."
-              className="app-input"
-              variant="dropdown"
-            />
-          </div>
-        
-          <div className="text-center">
-            <p className="text-app-black mb-4 text-lg">
-              {/* Full text for larger screens, condensed for smaller screens */}
-              <span>Answers Kept Anonymous 🤐</span>
-            </p>
-          </div>
-        
-          {/* Role */}
-          <div>
-            <JobSearchDropdown value={role} onChange={handleRoleChange} onBlur={checkForCompletion} placeholder="Share your job!..." className="app-input" />
-          </div>
-        
-          <div className="text-center">
-            <p className="text-app-black mb-4 text-lg font-normal">
-              {/* Full text for larger screens, condensed for smaller screens */}
-              <span>Make A Difference! ❤️</span>
-            </p>
-          </div>
-        
-          {/* Salary + Time Period */}
-          <div>
-            <div className="flex items-center space-x-3">
-              <input type="text" inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*" value={salary} onChange={handleSalaryChange} onBlur={handleSalaryBlur} placeholder="Pay Est. ($)" className="app-input text-left text-lg flex-1 !py-0 h-12" />
-              <select value={timePeriod} onChange={e => setTimePeriod(e.target.value)} className="app-input text-lg w-auto !py-0 h-12">
-                <option value="HR">HR</option>
-                <option value="MO">MO</option>
-                <option value="YR">YR</option>
-              </select>
-            </div>
-          </div>
-        
-          <div className="text-center mt-8">
-            <p className="text-app-black text-lg">
-              {/* Full text for larger screens, condensed for smaller screens */}
-              <span className="hidden sm:inline">
-                Don't worry, your boss won't find out 😉
-              </span>
-              <span className="sm:hidden">
-                Don't worry! 😉
-                <br />
-                Your boss won't find out
-              </span>
-            </p>
-          </div>
-        
-          {/* New Business Form */}
-          {showNewBusinessForm && <div className="space-y-4 mt-6">
-              <div>
-                <input type="text" value={newBusinessAddress} onChange={handleAddressChange} placeholder="Enter business address (e.g., 123 Main St, City, State)..." className={`app-input ${addressError ? 'border-red-500 border-2' : ''}`} />
-                {addressError && <p className="text-red-500 text-sm mt-1 px-1">{addressError}</p>}
-                <p className="text-gray-500 text-xs mt-1 px-1">
-                  Please include street number, street name, and street type (e.g., St, Ave, Rd)
-                </p>
+            <UnifiedBusinessSearch value={location} onChange={(value) => { setLocation(value); setBusinessSelected(false); setShowAddressInput(false); }} onBusinessSelect={handleBusinessSelect} onBlur={() => { if (location.trim() && !businessSelected) setShowAddressInput(true); }} placeholder="Where do you work?..." className={`app-input ${showAddressInput && !businessSelected ? "border-red-500" : ""}`} variant="dropdown" />
+            {showAddressInput && (!businessSelected || isManualAddress) && (
+              <div className="mt-2 space-y-2">
+                <p className="text-red-500 text-xs">Business not found. Please enter the address:</p>
+                <input type="text" placeholder="Enter business address (e.g., 123 Main St, City, State)..." className={`app-input w-full ${addressError ? "border-red-500 border-2" : ""}`} value={manualAddress} onChange={(e) => { setManualAddress(e.target.value); if (addressError) setAddressError(''); }} onBlur={handleAddressBlur} />
+                {addressError && <p className="text-red-500 text-sm px-1">{addressError}</p>}
+                <p className="text-gray-500 text-xs px-1">Please include street number, street name, and street type (e.g., St, Ave, Rd)</p>
               </div>
-              <div className="flex items-center space-x-3">
-                <button onClick={validateAndCreateBusiness} disabled={isCreatingBusiness} className="app-input flex-1 bg-app-yellow text-app-black font-medium">
-                  {isCreatingBusiness ? 'Adding Business...' : 'Add New Business'}
-                </button>
-                <button onClick={() => {
-              setShowNewBusinessForm(false);
-              setNewBusinessAddress('');
-              setAddressError('');
-              setLocation('');
-            }} className="app-input w-auto px-6 bg-gray-100 text-app-gray-dark">
-                  Cancel
-                </button>
-              </div>
-            </div>}
+            )}
+          </div>
+          <div className="text-center"><p className="text-app-black mb-4 text-lg"><span>Answers Kept Anonymous 🤐</span></p></div>
+          <div><JobSearchDropdown value={role} onChange={(value) => { if (!isProfane(value)) setRole(value); }} onBlur={checkForCompletion} placeholder="Share your job!..." className="app-input" /></div>
+          <div className="text-center"><p className="text-app-black mb-4 text-lg font-normal"><span>Make A Difference! ❤️</span></p></div>
+          <div><div className="flex items-center space-x-3">
+            <input type="text" inputMode="decimal" value={salary} onChange={handleSalaryChange} onBlur={checkForCompletion} placeholder="Pay Est. ($)" className="app-input text-left text-lg flex-1 !py-0 h-12" />
+            <select value={timePeriod} onChange={e => setTimePeriod(e.target.value)} className="app-input text-lg w-auto !py-0 h-12"><option value="HR">HR</option><option value="MO">MO</option><option value="YR">YR</option></select>
+          </div></div>
+          <div className="text-center mt-8"><p className="text-app-black text-lg"><span className="hidden sm:inline">Don't worry, your boss won't find out 😉</span><span className="sm:hidden">Don't worry, it's anonymous 😉</span></p></div>
+          <div className="pt-6"><button onClick={checkForCompletion} disabled={!isComplete} className={`w-full py-3 px-6 rounded-lg font-medium transition-all ${isComplete ? 'bg-app-yellow text-app-black hover:bg-app-yellow/90' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>Continue</button></div>
         </div>
       </div>
-    </div>;
+    </div>
+  );
 };
+
 export default InitiationPage;

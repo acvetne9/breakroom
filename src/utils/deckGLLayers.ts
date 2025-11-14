@@ -40,7 +40,7 @@ const filterBusinessesInPolygon = (
     const turfPoly = turf.polygon([polygonCoords]);
 
     return businesses.filter((b) => {
-      if (!b?.position) return false;
+      if (!b || !b?.position) return false;
       return turf.booleanPointInPolygon(
         turf.point([b.position.lng, b.position.lat]),
         turfPoly
@@ -63,7 +63,9 @@ export const createBusinessScatterplotLayer = ({
   neighborhoodBoundary,
   searchActive = false
 }: DeckGLBusinessLayerProps) => {
-  const filteredBusinesses = filterBusinessesInPolygon(businesses, neighborhoodBoundary);
+  // Filter out null/undefined businesses first
+  const validBusinesses = businesses.filter(b => b != null);
+  const filteredBusinesses = filterBusinessesInPolygon(validBusinesses, neighborhoodBoundary);
 
   console.log(`🎯 Creating scatterplot layer with ${filteredBusinesses.length} businesses inside polygon`);
   
@@ -111,9 +113,12 @@ export const createBusinessScatterplotLayer = ({
 export const createEmojiLandmarkLayer = ({
   landmarks
 }: LandmarkEmojiLayerProps) => {
+  // Filter out null/undefined landmarks for safety
+  const validLandmarks = landmarks.filter(l => l != null && l.lat != null && l.lng != null && l.emoji != null);
+  
   return new TextLayer({
     id: 'emoji-landmarks',
-    data: landmarks,
+    data: validLandmarks,
     pickable: false, // Non-interactive, always behind business dots
     getPosition: (d: { lat: number; lng: number; emoji: string }) => [d.lng, d.lat],
     getText: (d: { lat: number; lng: number; emoji: string }) => d.emoji,
@@ -125,8 +130,8 @@ export const createEmojiLandmarkLayer = ({
       depthTest: false // Render in layer order (behind business dots)
     },
     updateTriggers: {
-      getPosition: landmarks.length,
-      getText: landmarks.length,
+      getPosition: validLandmarks.length,
+      getText: validLandmarks.length,
     },
   });
 };

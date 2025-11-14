@@ -20,6 +20,7 @@ interface UserData {
   role: string;
   location: string;
   fullLocation?: string;
+  businessName?: string;
   timePeriod: string;
 }
 
@@ -90,10 +91,11 @@ const MobileApp: React.FC = () => {
           const currentJob = await getCurrentJob();
           if (currentJob) {
             setUserData({
-              salary: `$${currentJob.salary}`,
+              salary: `$${currentJob.salary.toFixed(2)}`,
               role: currentJob.role,
               location: currentJob.location,
               fullLocation: currentJob.location,
+              businessName: currentJob.business_name || '',
               timePeriod: currentJob.time_period || "HR",
             });
             console.log("Loaded user data:", currentJob);
@@ -116,6 +118,38 @@ const MobileApp: React.FC = () => {
     initializeApp();
   }, [isFirstSession, deviceLoading]);
 
+  // Re-check current job when returning to home page
+  useEffect(() => {
+    if (currentSlide === 1 && currentView === "initiation") {
+      const recheckCurrentJob = async () => {
+        try {
+          const { hasCurrentJob, getCurrentJob } = await import("../services/currentJobs");
+          const hasJob = await hasCurrentJob();
+          
+          if (hasJob) {
+            const currentJob = await getCurrentJob();
+            if (currentJob) {
+              setUserData({
+                salary: `$${currentJob.salary.toFixed(2)}`,
+                role: currentJob.role,
+                location: currentJob.location,
+                fullLocation: currentJob.location,
+                businessName: currentJob.business_name || '',
+                timePeriod: currentJob.time_period || "HR",
+              });
+              setCurrentView("main");
+              console.log("Re-checked job on home page return - found job, switching to main view");
+            }
+          }
+        } catch (error) {
+          console.error("Error re-checking current job:", error);
+        }
+      };
+      
+      recheckCurrentJob();
+    }
+  }, [currentSlide, currentView]);
+
   const handleInitiationComplete = async (data: UserData) => {
     console.log('🎯 handleInitiationComplete called with:', data);
     setUserData(data);
@@ -123,16 +157,25 @@ const MobileApp: React.FC = () => {
 
     try {
       const { saveCurrentJob } = await import("../services/currentJobs");
-      const salary = parseInt(data.salary.replace(/[^0-9]/g, "")) || 0;
+      const { toast } = await import("@/hooks/use-toast");
+      const salary = parseFloat(data.salary.replace(/[^0-9.]/g, "")) || 0;
+      
+      console.log('💾 Attempting to save current job...');
       
       // STEP 1: Always save current job to database
       await saveCurrentJob({
         role: data.role,
         salary: salary,
         location: data.location,
+        business_name: data.businessName || '',
         time_period: data.timePeriod || "HR",
       });
-      console.log("✅ Current job saved to database");
+      console.log("✅ Current job saved to database successfully");
+      
+      toast({
+        title: "Job saved!",
+        description: "Your current job has been saved successfully.",
+      });
 
       let businessId: string | undefined;
 
@@ -171,24 +214,39 @@ const MobileApp: React.FC = () => {
       console.log("✅ Post created");
       
     } catch (error) {
-      console.error("Error saving job data:", error);
+      console.error("❌ Error saving job data:", error);
+      const { toast } = await import("@/hooks/use-toast");
+      toast({
+        variant: "destructive",
+        title: "Failed to save job",
+        description: error instanceof Error ? error.message : "Please try again",
+      });
     }
   };
 
-  const handleJobUpdate = async (jobData: { salary: string; role: string; location: string; timePeriod: string }) => {
+  const handleJobUpdate = async (jobData: { salary: string; role: string; location: string; businessName?: string; timePeriod: string }) => {
     console.log('🎯 handleJobUpdate called with:', jobData);
     try {
       const { saveCurrentJob } = await import("../services/currentJobs");
-      const salary = parseInt(jobData.salary.replace(/[^0-9]/g, "")) || 0;
+      const { toast } = await import("@/hooks/use-toast");
+      const salary = parseFloat(jobData.salary.replace(/[^0-9.]/g, "")) || 0;
+      
+      console.log('💾 Attempting to update current job...');
       
       // STEP 1: Always save current job
       await saveCurrentJob({
         role: jobData.role,
         salary: salary,
         location: jobData.location,
+        business_name: jobData.businessName || jobData.location,
         time_period: jobData.timePeriod,
       });
-      console.log("✅ Current job updated in database");
+      console.log("✅ Current job updated in database successfully");
+      
+      toast({
+        title: "Job updated!",
+        description: "Your current job has been updated successfully.",
+      });
 
       // Update userData state to reflect changes
       setUserData(prev => prev ? {
@@ -196,6 +254,7 @@ const MobileApp: React.FC = () => {
         salary: jobData.salary,
         role: jobData.role,
         location: jobData.location,
+        businessName: jobData.businessName || jobData.location,
         timePeriod: jobData.timePeriod,
       } : null);
       console.log("✅ userData state updated");
@@ -691,7 +750,7 @@ const MobileApp: React.FC = () => {
         >
           <Suspense fallback={<Skeleton className="w-full h-full" />}>
             <SettingsPage
-              initialData={userData || { salary: "", role: "", location: "", timePeriod: "HR" }}
+              initialData={userData || { salary: "", role: "", location: "", businessName: "", timePeriod: "HR" }}
               onStoriesClick={handleUserStoriesClick}
               onPostClick={(post) => {
                 setExpandedPost(post.id);

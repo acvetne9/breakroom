@@ -6,7 +6,7 @@ import { isProfane } from "../utils/profanityFilter";
 import { useDevice } from "@/contexts/DeviceContext";
 import { nycNeighborhoods } from "../utils/nyc_neighborhoods";
 import { usePosts } from "@/hooks/usePosts";
-import { getCurrentJob } from "@/services/currentJobs";
+import { getPastJobs, savePastJobs, deletePastJob, PastJobData } from "@/services/pastJobs";
 interface UserInfo {
   salary: string;
   role: string;
@@ -14,10 +14,11 @@ interface UserInfo {
   isHiring: boolean;
 }
 interface PastJob {
-  id: string;
+  id?: string;
   salary: string;
   role: string;
   location: string;
+  business_name?: string;
 }
 interface Post {
   id: string;
@@ -32,11 +33,12 @@ interface SettingsPageProps {
     role: string;
     location: string;
     fullLocation?: string;
+    businessName?: string;
     timePeriod?: string;
   };
   onStoriesClick?: () => void;
   onPostClick?: (post: Post) => void;
-  onJobUpdate?: (jobData: { salary: string; role: string; location: string; timePeriod: string }) => void;
+  onJobUpdate?: (jobData: { salary: string; role: string; location: string; businessName?: string; timePeriod: string }) => void;
   onPageLeave?: () => void;
   onSearchTrigger?: (searchTerm: string) => void;
 }
@@ -63,10 +65,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [currentJobFullLocation, setCurrentJobFullLocation] = useState<string>(
     initialData.fullLocation || initialData.location,
   );
+  const [currentJobBusinessName, setCurrentJobBusinessName] = useState<string>(
+    initialData.businessName || initialData.location,
+  );
   const [currentTimePeriod, setCurrentTimePeriod] = useState(initialData.timePeriod || "HR");
 
   // Business selection states for current job
-  const [currentJobBusinessInput, setCurrentJobBusinessInput] = useState("");
+  const [currentJobBusinessInput, setCurrentJobBusinessInput] = useState(initialData.businessName || initialData.location || "");
   const [currentJobBusinessSelected, setCurrentJobBusinessSelected] = useState(!!initialData.location);
   const [currentJobShowAddressInput, setCurrentJobShowAddressInput] = useState(false);
   const [currentJobAddress, setCurrentJobAddress] = useState("");
@@ -74,19 +79,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [currentJobIsManualAddress, setCurrentJobIsManualAddress] = useState(false);
 
   // Past jobs state
-  const [pastJobs, setPastJobs] = useState<PastJob[]>([
-    {
-      id: "1",
-      salary: "",
-      role: "",
-      location: "",
-    },
-  ]);
+  const [pastJobs, setPastJobs] = useState<PastJob[]>([]);
+  const [pastJobsLoading, setPastJobsLoading] = useState(true);
   const [pastJobTimePeriods, setPastJobTimePeriods] = useState<{
     [id: string]: string;
-  }>({
-    "1": "HR",
-  });
+  }>({});
 
   // Business selection states for past jobs
   const [pastJobBusinessInputs, setPastJobBusinessInputs] = useState<{
@@ -112,6 +109,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [currentJobChanged, setCurrentJobChanged] = useState(false);
   const currentJobRef = useRef(currentJob);
   const currentTimePeriodRef = useRef(currentTimePeriod);
+  const currentJobBusinessNameRef = useRef(currentJobBusinessName);
   const pastJobsRef = useRef(pastJobs);
   const pastJobTimePeriodsRef = useRef(pastJobTimePeriods);
   const changedJobsRef = useRef(changedJobs);
@@ -125,8 +123,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     currentJobFullLocationRef.current = currentJobFullLocation;
   }, [currentJobFullLocation]);
   useEffect(() => {
-    currentTimePeriodRef.current = currentTimePeriod;
-  }, [currentTimePeriod]);
+    currentJobBusinessNameRef.current = currentJobBusinessName;
+  }, [currentJobBusinessName]);
   useEffect(() => {
     pastJobsRef.current = pastJobs;
   }, [pastJobs]);
@@ -140,50 +138,91 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     currentJobChangedRef.current = currentJobChanged;
   }, [currentJobChanged]);
 
-  // Load current job from Supabase on mount
+  // Load past jobs from database on mount
   useEffect(() => {
-    const loadCurrentJob = async () => {
-      const jobData = await getCurrentJob();
-      if (jobData) {
-        setCurrentJob({
-          salary: jobData.salary ? `$${jobData.salary}` : "",
-          role: jobData.role || "",
-          location: jobData.location || "",
-          isHiring: false,
-        });
-        setCurrentJobFullLocation(jobData.location || "");
-        setCurrentTimePeriod(jobData.time_period || "HR");
-        setCurrentJobBusinessInput(jobData.location || "");
-        setCurrentJobBusinessSelected(!!jobData.location);
+    const loadPastJobs = async () => {
+      try {
+        const jobs = await getPastJobs();
+        if (jobs.length > 0) {
+          const formattedJobs: PastJob[] = jobs.map(job => ({
+            id: job.id,
+            salary: job.salary ? `$${job.salary.toFixed(2)}` : '',
+            role: job.role,
+            location: job.location,
+            business_name: job.business_name,
+          }));
+          setPastJobs(formattedJobs);
+          
+          // Initialize time periods
+          const periods: { [id: string]: string } = {};
+          jobs.forEach(job => {
+            if (job.id) {
+              periods[job.id] = job.time_period || "HR";
+            }
+          });
+          setPastJobTimePeriods(periods);
+        } else {
+          // No past jobs in database - start with one empty job
+          const newJobId = `temp_${Date.now()}`;
+          setPastJobs([{
+            id: newJobId,
+            salary: "",
+            role: "",
+            location: "",
+          }]);
+          setPastJobTimePeriods({ [newJobId]: "HR" });
+        }
+      } catch (error) {
+        console.error('Failed to load past jobs:', error);
+        // On error, still show one empty job
+        const newJobId = `temp_${Date.now()}`;
+        setPastJobs([{
+          id: newJobId,
+          salary: "",
+          role: "",
+          location: "",
+        }]);
+        setPastJobTimePeriods({ [newJobId]: "HR" });
+      } finally {
+        setPastJobsLoading(false);
       }
     };
-    loadCurrentJob();
+
+    loadPastJobs();
   }, []);
 
   // Initialize past job states
   useEffect(() => {
+    // Preserve existing states, only initialize new jobs
     const newInputs: {
       [id: string]: string;
-    } = {};
+    } = { ...pastJobBusinessInputs };
     const newSelected: {
       [id: string]: boolean;
-    } = {};
+    } = { ...pastJobBusinessSelected };
     const newShowAddress: {
       [id: string]: boolean;
-    } = {};
+    } = { ...pastJobShowAddressInputs };
     const newAddresses: {
       [id: string]: string;
-    } = {};
+    } = { ...pastJobAddresses };
     const newAddressErrors: {
       [id: string]: string;
-    } = {};
+    } = { ...pastJobAddressErrors };
+    
     pastJobs.forEach((job) => {
-      newInputs[job.id] = job.location || "";
-      newSelected[job.id] = !!job.location;
-      newShowAddress[job.id] = false;
-      newAddresses[job.id] = "";
-      newAddressErrors[job.id] = "";
+      const jobId = job.id || '';
+      
+      // Only initialize if this job doesn't have state yet
+      if (!(jobId in newInputs)) {
+        newInputs[jobId] = job.business_name || job.location || "";
+        newSelected[jobId] = !!job.location; // Mark as selected if has location
+        newShowAddress[jobId] = false;
+        newAddresses[jobId] = "";
+        newAddressErrors[jobId] = "";
+      }
     });
+    
     setPastJobBusinessInputs(newInputs);
     setPastJobBusinessSelected(newSelected);
     setPastJobShowAddressInputs(newShowAddress);
@@ -299,15 +338,28 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     }
     return true;
   };
+  
+  // Helper to check if job ID is from database (not a temp ID)
+  const isJobFromDatabase = (jobId?: string): boolean => {
+    if (!jobId) return false;
+    if (jobId.startsWith('temp_')) return false;
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidPattern.test(jobId);
+  };
+  
   const isPastJobComplete = (job: PastJob, timePeriod: string) => {
-    return (
-      job.salary &&
-      job.role &&
-      job.location &&
-      timePeriod &&
-      pastJobBusinessSelected[job.id] &&
-      (!pastJobShowAddressInputs[job.id] || isValidAddress(pastJobAddresses[job.id]))
-    );
+    const jobId = job.id || '';
+    
+    // Must have all basic fields (like current job)
+    const hasBasicFields = job.salary && job.role && job.location && timePeriod;
+    
+    // Must have business selected (like current job)
+    const hasValidBusiness = pastJobBusinessSelected[jobId];
+    
+    // If address input is shown, address must be valid (like current job)
+    const hasValidAddress = !pastJobShowAddressInputs[jobId] || isValidAddress(pastJobAddresses[jobId]);
+    
+    return hasBasicFields && hasValidBusiness && hasValidAddress;
   };
   const isCurrentJobComplete = () => {
     return (
@@ -339,26 +391,59 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           salary: currentJobRef.current.salary,
           role: currentJobRef.current.role,
           location: currentJobFullLocationRef.current || currentJobRef.current.location,
+          businessName: currentJobBusinessNameRef.current,
           timePeriod: currentTimePeriodRef.current,
         });
       }
-      changedJobsRef.current.forEach((jobId) => {
-        const job = pastJobsRef.current.find((j) => j.id === jobId);
-        const timePeriod = pastJobTimePeriodsRef.current[jobId];
-        if (job && isPastJobComplete(job, timePeriod)) {
-          onJobUpdate({
+      // Save past jobs to database
+      const completePastJobs = pastJobsRef.current
+        .filter((job) => {
+          const timePeriod = pastJobTimePeriodsRef.current[job.id || ''];
+          const isComplete = isPastJobComplete(job, timePeriod);
+          console.log(`🔍 Past job "${job.role || 'empty'}" complete:`, isComplete, {
             salary: job.salary,
             role: job.role,
             location: job.location,
-            timePeriod: timePeriod,
+            timePeriod,
+            businessSelected: pastJobBusinessSelected[job.id || ''],
           });
-        }
-      });
+          return isComplete;
+        })
+        .map((job): PastJobData => ({
+          id: job.id,
+          role: job.role,
+          salary: parseFloat(job.salary.replace(/[^0-9.]/g, '')),
+          location: job.location,
+          business_name: job.business_name || job.location,
+          time_period: pastJobTimePeriodsRef.current[job.id || ''] || 'HR',
+        }));
+
+      if (completePastJobs.length > 0) {
+        savePastJobs(completePastJobs)
+          .then(async () => {
+            // Reload past jobs to get real database IDs
+            const freshJobs = await getPastJobs();
+            if (freshJobs.length > 0) {
+              const formattedJobs: PastJob[] = freshJobs.map(job => ({
+                id: job.id,
+                salary: job.salary ? `$${job.salary.toFixed(2)}` : '',
+                role: job.role,
+                location: job.location,
+                business_name: job.business_name,
+              }));
+              setPastJobs(formattedJobs);
+            }
+          })
+          .catch((error) => {
+            console.error('Failed to save past jobs:', error);
+          });
+      }
+
       onPageLeave?.();
     };
   }, []);
   const addPastJob = () => {
-    const newJobId = Date.now().toString();
+    const newJobId = `temp_${Date.now()}`;
     const newJob: PastJob = {
       id: newJobId,
       salary: "",
@@ -393,7 +478,19 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       [newJobId]: "",
     });
   };
-  const removePastJob = (id: string) => {
+  const removePastJob = async (id: string) => {
+    const job = pastJobs.find((j) => j.id === id);
+    
+    // If job has a UUID id (loaded from database), delete it from database
+    // UUIDs have dashes, timestamps don't
+    if (job?.id && job.id.includes('-')) {
+      try {
+        await deletePastJob(id);
+      } catch (error) {
+        console.error('Failed to delete past job:', error);
+      }
+    }
+    
     setPastJobs(pastJobs.filter((job) => job.id !== id));
 
     // Clean up states for removed job
@@ -512,6 +609,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       location: business.name || business.location,
     });
     setCurrentJobFullLocation(business.fullLocation || business.name || business.location);
+    setCurrentJobBusinessName(business.name || business.location);
     setCurrentJobChanged(true);
   };
   const handleCurrentJobBusinessBlur = () => {
@@ -546,6 +644,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       location: address,
     });
     setCurrentJobFullLocation(address);
+    setCurrentJobBusinessName(currentJobBusinessInput); // Save the business name entered by user
     setCurrentJobBusinessSelected(true);
     setCurrentJobIsManualAddress(true);
     setCurrentJobChanged(true);
@@ -584,7 +683,18 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       ...pastJobShowAddressInputs,
       [jobId]: false,
     });
-    updatePastJob(jobId, "location", business.name || business.location);
+    setPastJobs(
+      pastJobs.map((job) =>
+        job.id === jobId
+          ? {
+              ...job,
+              location: business.location || business.name,
+              business_name: business.name || business.location,
+            }
+          : job,
+      ),
+    );
+    setChangedJobs((prev) => new Set([...prev, jobId]));
   };
   const handlePastJobBusinessBlur = (jobId: string) => {
     if (pastJobBusinessInputs[jobId]?.trim() && !pastJobBusinessSelected[jobId]) {
@@ -631,7 +741,17 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     }
 
     // Address is valid - save it
-    updatePastJob(jobId, "location", address);
+    setPastJobs(
+      pastJobs.map((job) =>
+        job.id === jobId
+          ? {
+              ...job,
+              location: address,
+              business_name: pastJobBusinessInputs[jobId] || address,
+            }
+          : job,
+      ),
+    );
     setPastJobBusinessSelected({
       ...pastJobBusinessSelected,
       [jobId]: true,
@@ -640,6 +760,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       ...pastJobAddressErrors,
       [jobId]: "",
     });
+    setChangedJobs((prev) => new Set([...prev, jobId]));
   };
   const handlePastJobRoleBlur = (jobId: string, value: string) => {
     if (value && !validateProfanity(value, "role")) {
@@ -689,13 +810,20 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 <UnifiedBusinessSearch
                   value={currentJobBusinessInput}
                   onChange={(value, business, filters, neighborhoodCoords) => {
-                    handleCurrentJobBusinessInputChange(value);
+                    if (!currentJobShowAddressInput) {
+                      handleCurrentJobBusinessInputChange(value);
+                    }
                   }}
-                  onBusinessSelect={handleCurrentJobBusinessSelect}
+                  onBusinessSelect={(business) => {
+                    if (!currentJobShowAddressInput) {
+                      handleCurrentJobBusinessSelect(business);
+                    }
+                  }}
                   onBlur={handleCurrentJobBusinessBlur}
                   className={`app-input w-full ${currentJobShowAddressInput && !currentJobBusinessSelected ? "border-red-500" : ""}`}
                   placeholder="Where do you work?..."
                   variant="dropdown"
+                  disabled={currentJobShowAddressInput}
                 />
 
                 {/* Address input for current job */}
@@ -777,13 +905,20 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     <UnifiedBusinessSearch
                       value={pastJobBusinessInputs[job.id] || ""}
                       onChange={(value, business, filters, neighborhoodCoords) => {
-                        handlePastJobBusinessInputChange(job.id, value);
+                        if (!pastJobShowAddressInputs[job.id]) {
+                          handlePastJobBusinessInputChange(job.id, value);
+                        }
                       }}
-                      onBusinessSelect={(business) => handlePastJobBusinessSelect(job.id, business)}
+                      onBusinessSelect={(business) => {
+                        if (!pastJobShowAddressInputs[job.id]) {
+                          handlePastJobBusinessSelect(job.id, business);
+                        }
+                      }}
                       onBlur={() => handlePastJobBusinessBlur(job.id)}
                       className={`app-input w-full ${pastJobShowAddressInputs[job.id] && !pastJobBusinessSelected[job.id] ? "border-red-500" : ""}`}
                       placeholder="Where did you work?..."
                       variant="dropdown"
+                      disabled={pastJobShowAddressInputs[job.id]}
                     />
 
                     {/* Address input for past job */}
@@ -823,7 +958,27 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                       type="text"
                       inputMode="numeric"
                       value={job.salary}
-                      onChange={(e) => updatePastJob(job.id, "salary", e.target.value)}
+                      onChange={(e) => {
+                        let cleanValue = e.target.value.replace(/[^0-9.]/g, "");
+                        const parts = cleanValue.split('.');
+                        if (parts.length > 2) {
+                          cleanValue = parts[0] + '.' + parts.slice(1).join('');
+                        }
+                        if (parts[1] && parts[1].length > 2) {
+                          cleanValue = parts[0] + '.' + parts[1].substring(0, 2);
+                        }
+                        updatePastJob(job.id, "salary", cleanValue ? `$${cleanValue}` : "");
+                      }}
+                      onBlur={() => {
+                        if (job.salary) {
+                          const value = job.salary.replace(/[^0-9.]/g, "");
+                          if (value.includes('.')) {
+                            const parts = value.split('.');
+                            const formatted = parts[1]?.length === 1 ? `${parts[0]}.${parts[1]}0` : value;
+                            updatePastJob(job.id, "salary", `$${formatted}`);
+                          }
+                        }
+                      }}
                       className="app-input flex-1"
                       placeholder="$17"
                     />

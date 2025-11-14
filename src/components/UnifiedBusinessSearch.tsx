@@ -19,6 +19,7 @@ interface UnifiedBusinessSearchProps {
   showIcon?: boolean;
   onLocationSave?: (location: string, fullLocation: string) => void;
   mapBusinesses?: any[];
+  disabled?: boolean;
 }
 
 interface NeighborhoodResult {
@@ -42,7 +43,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   variant = 'dropdown',
   showIcon = false,
   onLocationSave,
-  mapBusinesses = []
+  mapBusinesses = [],
+  disabled = false
 }) => {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -59,6 +61,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   const lastExecutedQuery = useRef<string>('');
   const wasClosedIntentionally = useRef(false);
   const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasUserInteracted = useRef(false);
 
   // Handle clicks outside to close dropdown
   useEffect(() => {
@@ -119,6 +122,13 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     }
   }, [showDropdown]);
 
+  // Reset interaction flag on unmount
+  useEffect(() => {
+    return () => {
+      hasUserInteracted.current = false;
+    };
+  }, []);
+
   // Cleanup blur timeout on unmount
   useEffect(() => {
     return () => {
@@ -130,6 +140,11 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
 
   // Show businesses from map in dropdown
   useEffect(() => {
+    // Don't run search logic when component is disabled
+    if (disabled) {
+      return;
+    }
+    
     const q = value.trim();
     
     if (!q) {
@@ -141,6 +156,13 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         committedQueryRef.current = '';
         onChange(value, undefined, null);
       }
+      return;
+    }
+
+    // Don't auto-search on mount with initial value for dropdown variant
+    // Only search if user has interacted OR if it's the search-bar variant
+    if (!hasUserInteracted.current && variant === 'dropdown') {
+      console.log('⏸️ Skipping auto-search on mount - waiting for user interaction');
       return;
     }
     
@@ -249,10 +271,12 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     }, 300);
     
     return () => clearTimeout(timer);
-  }, [value]);
+  }, [value, disabled]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (disabled) return; // Prevent changes when disabled
     const newValue = e.target.value;
+    hasUserInteracted.current = true;
     wasClosedIntentionally.current = false; // Clear flag when user types
     onChange(newValue);
     if (!newValue.trim()) {
@@ -263,6 +287,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   };
 
   const handleResultClick = (result: SearchResult) => {
+    if (disabled) return; // Prevent selection when disabled
     if ('isNeighborhood' in result && result.isNeighborhood) {
       // Handle neighborhood click - search for all businesses in that neighborhood
       const neighborhoodName = result.name.replace(' - Search Neighborhood', '');
@@ -417,11 +442,13 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           onBlur={handleInputBlur}
           onKeyDown={handleKeyDown}
           onFocus={() => {
+            if (disabled) return; // Prevent focus interaction when disabled
             // Cancel any pending blur closure
             if (blurTimeoutRef.current) {
               clearTimeout(blurTimeoutRef.current);
               blurTimeoutRef.current = null;
             }
+            hasUserInteracted.current = true;
             wasClosedIntentionally.current = false;
             const trimmedValue = value.trim();
             // Show dropdown if we have a value and either:
@@ -439,6 +466,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           }}
           placeholder={placeholder}
           className={`${baseInputClasses} ${className}`}
+          disabled={disabled}
+          readOnly={disabled}
         />
         {showIcon && variant === 'search-bar' && (
           <button
@@ -451,7 +480,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       </div>
 
       {/* Search Results Dropdown */}
-      {showDropdown && (searchResults.length > 0 || isSearching || value.trim()) && (
+      {!disabled && showDropdown && (searchResults.length > 0 || isSearching || value.trim()) && (
         <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 z-[9999]`}>
           <div 
             ref={dropdownRef}
