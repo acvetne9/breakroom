@@ -722,7 +722,7 @@ const MobileApp: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 overflow-hidden">
+    <div className={`fixed inset-0 ${!isMobile ? "overflow-hidden" : ""}`}>
       {/* Show loading state while initializing */}
       {currentView === "loading" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
