@@ -29,6 +29,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   const [role, setRole] = useState('');
   const [location, setLocation] = useState('');
   const [fullLocation, setFullLocation] = useState('');
+  const [businessName, setBusinessName] = useState('');
   const [timePeriod, setTimePeriod] = useState('HR');
   const [isComplete, setIsComplete] = useState(false);
   const [businessSelected, setBusinessSelected] = useState(false);
@@ -55,7 +56,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
     setIsComplete(complete);
     if (complete) {
       const finalLocation = isManualAddress ? manualAddress : (fullLocation || location);
-      onComplete({ salary, role, location: finalLocation, fullLocation: finalLocation, businessName: location, timePeriod });
+      onComplete({ salary, role, location: finalLocation, fullLocation: finalLocation, businessName: businessName || '', timePeriod });
     }
   };
 
@@ -67,6 +68,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
     setIsManualAddress(false);
     setLocation(business.name || business.location);
     setFullLocation(business.fullLocation || business.name || business.location);
+    setBusinessName(business.name || '');
   };
 
   const handleAddressBlur = () => {
@@ -75,6 +77,8 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
     if (isProfane(address)) { setAddressError('Invalid address content'); return; }
     if (!isValidAddress(address)) { setAddressError('Please enter a valid street address (e.g., "123 Main St, City, State")'); return; }
     setFullLocation(address);
+    setLocation(address);
+    setBusinessName('');
     setBusinessSelected(true);
     setIsManualAddress(true);
     setAddressError('');

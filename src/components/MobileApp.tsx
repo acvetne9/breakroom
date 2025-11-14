@@ -95,7 +95,7 @@ const MobileApp: React.FC = () => {
               role: currentJob.role,
               location: currentJob.location,
               fullLocation: currentJob.location,
-              businessName: currentJob.business_name || currentJob.location,
+              businessName: currentJob.business_name || '',
               timePeriod: currentJob.time_period || "HR",
             });
             console.log("Loaded user data:", currentJob);
@@ -135,7 +135,7 @@ const MobileApp: React.FC = () => {
         role: data.role,
         salary: salary,
         location: data.location,
-        business_name: data.businessName || data.location,
+        business_name: data.businessName || '',
         time_period: data.timePeriod || "HR",
       });
       console.log("✅ Current job saved to database successfully");
