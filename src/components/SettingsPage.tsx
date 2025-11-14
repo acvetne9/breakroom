@@ -193,29 +193,36 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   // Initialize past job states
   useEffect(() => {
+    // Preserve existing states, only initialize new jobs
     const newInputs: {
       [id: string]: string;
-    } = {};
+    } = { ...pastJobBusinessInputs };
     const newSelected: {
       [id: string]: boolean;
-    } = {};
+    } = { ...pastJobBusinessSelected };
     const newShowAddress: {
       [id: string]: boolean;
-    } = {};
+    } = { ...pastJobShowAddressInputs };
     const newAddresses: {
       [id: string]: string;
-    } = {};
+    } = { ...pastJobAddresses };
     const newAddressErrors: {
       [id: string]: string;
-    } = {};
+    } = { ...pastJobAddressErrors };
+    
     pastJobs.forEach((job) => {
       const jobId = job.id || '';
-      newInputs[jobId] = job.business_name || job.location || "";
-      newSelected[jobId] = !!job.location; // Mark as selected if has location
-      newShowAddress[jobId] = false;
-      newAddresses[jobId] = "";
-      newAddressErrors[jobId] = "";
+      
+      // Only initialize if this job doesn't have state yet
+      if (!(jobId in newInputs)) {
+        newInputs[jobId] = job.business_name || job.location || "";
+        newSelected[jobId] = !!job.location; // Mark as selected if has location
+        newShowAddress[jobId] = false;
+        newAddresses[jobId] = "";
+        newAddressErrors[jobId] = "";
+      }
     });
+    
     setPastJobBusinessInputs(newInputs);
     setPastJobBusinessSelected(newSelected);
     setPastJobShowAddressInputs(newShowAddress);
