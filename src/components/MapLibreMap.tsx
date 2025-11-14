@@ -112,7 +112,9 @@ const createOptimizedGridSampling = (
   maxBusinesses: number = 1000000,
   prioritizeVisible: boolean = false,
 ): Business[] => {
-  if (!businesses || businesses.length <= maxBusinesses) return businesses;
+  // Filter out null/undefined businesses first
+  const validBusinesses = businesses.filter(b => b != null);
+  if (!validBusinesses || validBusinesses.length <= maxBusinesses) return validBusinesses;
 
   if (prioritizeVisible) {
     const gridSize = Math.ceil(Math.sqrt(maxBusinesses / 1.5));
@@ -121,7 +123,7 @@ const createOptimizedGridSampling = (
 
     const grid = Array.from({ length: gridSize }, () => Array.from({ length: gridSize }, () => [] as Business[]));
 
-    businesses.forEach((business) => {
+    validBusinesses.forEach((business) => {
       if (!business?.position?.lat || !business?.position?.lng) return;
       const latIndex = Math.min(
         gridSize - 1,
@@ -146,7 +148,7 @@ const createOptimizedGridSampling = (
   const lngStep = (bounds.east - bounds.west) / gridSize;
 
   const grid = Array.from({ length: gridSize }, () => Array.from({ length: gridSize }, () => [] as Business[]));
-  businesses.forEach((business) => {
+  validBusinesses.forEach((business) => {
     if (!business?.position?.lat || !business?.position?.lng) return;
     const latIndex = Math.min(gridSize - 1, Math.max(0, Math.floor((business.position.lat - bounds.south) / latStep)));
     const lngIndex = Math.min(gridSize - 1, Math.max(0, Math.floor((business.position.lng - bounds.west) / lngStep)));
@@ -216,7 +218,7 @@ class BusinessCache {
     if (!Array.isArray(businesses)) return;
 
     if (replace) {
-      const incomingIds = new Set(businesses.map((b) => b.id));
+      const incomingIds = new Set(businesses.filter(b => b != null && b.id).map((b) => b.id));
       for (const id of this.cache.keys()) {
         if (!incomingIds.has(id)) this.cache.delete(id);
       }
@@ -478,7 +480,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const shouldRenderBusinesses = currentZoom >= 11 || !!searchFilters;
     
     if (businesses?.length > 0 && shouldRenderBusinesses) {
-      let validBusinesses = businesses.filter((b) => b?.position?.lat != null && b?.position?.lng != null);
+      let validBusinesses = businesses.filter((b) => b != null && b?.position?.lat != null && b?.position?.lng != null);
 
       // Filter by neighborhood boundary
       if (searchFilters?.neighborhoodFilter?.boundary?.length) {
