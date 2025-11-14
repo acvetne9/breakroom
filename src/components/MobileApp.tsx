@@ -118,6 +118,38 @@ const MobileApp: React.FC = () => {
     initializeApp();
   }, [isFirstSession, deviceLoading]);
 
+  // Re-check current job when returning to home page
+  useEffect(() => {
+    if (currentSlide === 1 && currentView === "initiation") {
+      const recheckCurrentJob = async () => {
+        try {
+          const { hasCurrentJob, getCurrentJob } = await import("../services/currentJobs");
+          const hasJob = await hasCurrentJob();
+          
+          if (hasJob) {
+            const currentJob = await getCurrentJob();
+            if (currentJob) {
+              setUserData({
+                salary: `$${currentJob.salary.toFixed(2)}`,
+                role: currentJob.role,
+                location: currentJob.location,
+                fullLocation: currentJob.location,
+                businessName: currentJob.business_name || '',
+                timePeriod: currentJob.time_period || "HR",
+              });
+              setCurrentView("main");
+              console.log("Re-checked job on home page return - found job, switching to main view");
+            }
+          }
+        } catch (error) {
+          console.error("Error re-checking current job:", error);
+        }
+      };
+      
+      recheckCurrentJob();
+    }
+  }, [currentSlide, currentView]);
+
   const handleInitiationComplete = async (data: UserData) => {
     console.log('🎯 handleInitiationComplete called with:', data);
     setUserData(data);
