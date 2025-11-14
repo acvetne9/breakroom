@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import JobSearchDropdown from './JobSearchDropdown';
 import UnifiedBusinessSearch from './UnifiedBusinessSearch';
 import { isProfane } from '@/utils/profanityFilter';
-import { JOB_OPTIONS } from '../utils/jobOptions';
+import { JOB_OPTIONS } from './JobSearchDropdown';
 
 interface InitiationPageProps {
   onComplete: (data: {
