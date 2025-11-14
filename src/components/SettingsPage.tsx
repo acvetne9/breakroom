@@ -162,9 +162,28 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             }
           });
           setPastJobTimePeriods(periods);
+        } else {
+          // No past jobs in database - start with one empty job
+          const newJobId = Date.now().toString();
+          setPastJobs([{
+            id: newJobId,
+            salary: "",
+            role: "",
+            location: "",
+          }]);
+          setPastJobTimePeriods({ [newJobId]: "HR" });
         }
       } catch (error) {
         console.error('Failed to load past jobs:', error);
+        // On error, still show one empty job
+        const newJobId = Date.now().toString();
+        setPastJobs([{
+          id: newJobId,
+          salary: "",
+          role: "",
+          location: "",
+        }]);
+        setPastJobTimePeriods({ [newJobId]: "HR" });
       } finally {
         setPastJobsLoading(false);
       }
