@@ -91,7 +91,7 @@ const MobileApp: React.FC = () => {
           const currentJob = await getCurrentJob();
           if (currentJob) {
             setUserData({
-              salary: `$${currentJob.salary}`,
+              salary: `$${currentJob.salary.toFixed(2)}`,
               role: currentJob.role,
               location: currentJob.location,
               fullLocation: currentJob.location,
@@ -125,7 +125,7 @@ const MobileApp: React.FC = () => {
 
     try {
       const { saveCurrentJob } = await import("../services/currentJobs");
-      const salary = parseInt(data.salary.replace(/[^0-9]/g, "")) || 0;
+      const salary = parseFloat(data.salary.replace(/[^0-9.]/g, "")) || 0;
       
       // STEP 1: Always save current job to database
       await saveCurrentJob({
@@ -182,7 +182,7 @@ const MobileApp: React.FC = () => {
     console.log('🎯 handleJobUpdate called with:', jobData);
     try {
       const { saveCurrentJob } = await import("../services/currentJobs");
-      const salary = parseInt(jobData.salary.replace(/[^0-9]/g, "")) || 0;
+      const salary = parseFloat(jobData.salary.replace(/[^0-9.]/g, "")) || 0;
       
       // STEP 1: Always save current job
       await saveCurrentJob({
