@@ -227,6 +227,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          browser_fingerprint: string | null
           created_at: string | null
           display_name: string | null
           id: string
@@ -236,6 +237,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          browser_fingerprint?: string | null
           created_at?: string | null
           display_name?: string | null
           id?: string
@@ -245,6 +247,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          browser_fingerprint?: string | null
           created_at?: string | null
           display_name?: string | null
           id?: string
