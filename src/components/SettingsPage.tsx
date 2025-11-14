@@ -4,6 +4,7 @@ import JobSearchDropdown from "./JobSearchDropdown";
 import UnifiedBusinessSearch from "./UnifiedBusinessSearch";
 import { isProfane } from "../utils/profanityFilter";
 import { useDevice } from "@/contexts/DeviceContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { nycNeighborhoods } from "../utils/nyc_neighborhoods";
 import { usePosts } from "@/hooks/usePosts";
 import { getPastJobs, savePastJobs, deletePastJob, PastJobData } from "@/services/pastJobs";
@@ -51,6 +52,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   onSearchTrigger,
 }) => {
   const { deviceId } = useDevice();
+  const isMobile = useIsMobile();
   const { getUserPostsAndCommented, trackCommentedPost } = usePosts();
   const userPosts = getUserPostsAndCommented();
 
@@ -789,7 +791,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     }, 100);
   };
   return (
-    <div className="w-full h-full flex items-center justify-center bg-transparent overflow-hidden">
+    <div className={`w-full h-full ${isMobile ? 'bg-transparent' : 'flex items-center justify-center bg-transparent overflow-hidden'}`}>
       <div
         ref={scrollContainerRef}
         className="app-card p-6 animate-fade-in flex flex-col max-h-[80vh] overflow-y-auto relative"

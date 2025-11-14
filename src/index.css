@@ -141,6 +141,16 @@
     transform: translateZ(0);
   }
 
+  /* Make card full-width on mobile for proper peeking */
+  @media (max-width: 768px) {
+    .app-card {
+      @apply w-full h-full rounded-none;
+      max-width: none;
+      border-left: none;
+      border-right: none;
+    }
+  }
+
   /* App Popup - smaller version of card */
   .app-popup {
     @apply w-[90vw] bg-white rounded-xl relative mx-auto;

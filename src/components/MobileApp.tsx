@@ -702,14 +702,14 @@ const MobileApp: React.FC = () => {
   const getSettingsCardPosition = () => {
     if (!isMobile) return currentSlide === 0 ? "0%" : "-100%";
     if (currentSlide === 0) return "0%";        // Fully visible
-    if (currentSlide === 1) return "-95%";      // 5% peeking
+    if (currentSlide === 1) return "-97.5%";    // 2.5% peeking
     return "-200%";                              // Hidden
   };
 
   const getExploreCardPosition = () => {
     if (!isMobile) return currentSlide === 2 ? "0%" : "100%";
     if (currentSlide === 2) return "0%";        // Fully visible
-    if (currentSlide === 1) return "95%";       // 5% peeking
+    if (currentSlide === 1) return "97.5%";     // 2.5% peeking
     return "200%";                               // Hidden
   };
 
