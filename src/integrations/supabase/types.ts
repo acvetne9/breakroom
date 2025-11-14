@@ -143,33 +143,47 @@ export type Database = {
       }
       past_jobs: {
         Row: {
+          business_name: string | null
           created_at: string | null
           id: string
           location: string | null
+          profile_id: string
           role: string
           salary: number | null
           time_period: string | null
-          user_id: string
+          updated_at: string | null
         }
         Insert: {
+          business_name?: string | null
           created_at?: string | null
           id?: string
           location?: string | null
+          profile_id: string
           role: string
           salary?: number | null
           time_period?: string | null
-          user_id: string
+          updated_at?: string | null
         }
         Update: {
+          business_name?: string | null
           created_at?: string | null
           id?: string
           location?: string | null
+          profile_id?: string
           role?: string
           salary?: number | null
           time_period?: string | null
-          user_id?: string
+          updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "past_jobs_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       posts: {
         Row: {
