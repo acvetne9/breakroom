@@ -32,11 +32,12 @@ interface SettingsPageProps {
     role: string;
     location: string;
     fullLocation?: string;
+    businessName?: string;
     timePeriod?: string;
   };
   onStoriesClick?: () => void;
   onPostClick?: (post: Post) => void;
-  onJobUpdate?: (jobData: { salary: string; role: string; location: string; timePeriod: string }) => void;
+  onJobUpdate?: (jobData: { salary: string; role: string; location: string; businessName?: string; timePeriod: string }) => void;
   onPageLeave?: () => void;
   onSearchTrigger?: (searchTerm: string) => void;
 }
@@ -63,10 +64,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [currentJobFullLocation, setCurrentJobFullLocation] = useState<string>(
     initialData.fullLocation || initialData.location,
   );
+  const [currentJobBusinessName, setCurrentJobBusinessName] = useState<string>(
+    initialData.businessName || initialData.location,
+  );
   const [currentTimePeriod, setCurrentTimePeriod] = useState(initialData.timePeriod || "HR");
 
   // Business selection states for current job
-  const [currentJobBusinessInput, setCurrentJobBusinessInput] = useState("");
+  const [currentJobBusinessInput, setCurrentJobBusinessInput] = useState(initialData.businessName || initialData.location || "");
   const [currentJobBusinessSelected, setCurrentJobBusinessSelected] = useState(!!initialData.location);
   const [currentJobShowAddressInput, setCurrentJobShowAddressInput] = useState(false);
   const [currentJobAddress, setCurrentJobAddress] = useState("");
@@ -112,6 +116,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [currentJobChanged, setCurrentJobChanged] = useState(false);
   const currentJobRef = useRef(currentJob);
   const currentTimePeriodRef = useRef(currentTimePeriod);
+  const currentJobBusinessNameRef = useRef(currentJobBusinessName);
   const pastJobsRef = useRef(pastJobs);
   const pastJobTimePeriodsRef = useRef(pastJobTimePeriods);
   const changedJobsRef = useRef(changedJobs);
@@ -125,8 +130,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     currentJobFullLocationRef.current = currentJobFullLocation;
   }, [currentJobFullLocation]);
   useEffect(() => {
-    currentTimePeriodRef.current = currentTimePeriod;
-  }, [currentTimePeriod]);
+    currentJobBusinessNameRef.current = currentJobBusinessName;
+  }, [currentJobBusinessName]);
   useEffect(() => {
     pastJobsRef.current = pastJobs;
   }, [pastJobs]);
@@ -139,26 +144,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   useEffect(() => {
     currentJobChangedRef.current = currentJobChanged;
   }, [currentJobChanged]);
-
-  // Load current job from Supabase on mount
-  useEffect(() => {
-    const loadCurrentJob = async () => {
-      const jobData = await getCurrentJob();
-      if (jobData) {
-        setCurrentJob({
-          salary: jobData.salary ? `$${jobData.salary}` : "",
-          role: jobData.role || "",
-          location: jobData.location || "",
-          isHiring: false,
-        });
-        setCurrentJobFullLocation(jobData.location || "");
-        setCurrentTimePeriod(jobData.time_period || "HR");
-        setCurrentJobBusinessInput(jobData.location || "");
-        setCurrentJobBusinessSelected(!!jobData.location);
-      }
-    };
-    loadCurrentJob();
-  }, []);
 
   // Initialize past job states
   useEffect(() => {
@@ -339,6 +324,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           salary: currentJobRef.current.salary,
           role: currentJobRef.current.role,
           location: currentJobFullLocationRef.current || currentJobRef.current.location,
+          businessName: currentJobBusinessNameRef.current,
           timePeriod: currentTimePeriodRef.current,
         });
       }
@@ -350,6 +336,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             salary: job.salary,
             role: job.role,
             location: job.location,
+            businessName: job.location, // For past jobs, use location as business name
             timePeriod: timePeriod,
           });
         }
@@ -512,6 +499,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       location: business.name || business.location,
     });
     setCurrentJobFullLocation(business.fullLocation || business.name || business.location);
+    setCurrentJobBusinessName(business.name || business.location);
     setCurrentJobChanged(true);
   };
   const handleCurrentJobBusinessBlur = () => {
@@ -546,6 +534,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       location: address,
     });
     setCurrentJobFullLocation(address);
+    setCurrentJobBusinessName(currentJobBusinessInput); // Save the business name entered by user
     setCurrentJobBusinessSelected(true);
     setCurrentJobIsManualAddress(true);
     setCurrentJobChanged(true);
