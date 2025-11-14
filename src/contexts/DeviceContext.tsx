@@ -121,6 +121,24 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
             }
           } else if (profile) {
             console.log('Profile already exists for authenticated user');
+            
+            // Update fingerprint if it's missing
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('browser_fingerprint')
+              .eq('id', profile.id)
+              .single();
+            
+            if (profileData && !profileData.browser_fingerprint) {
+              const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ browser_fingerprint: browserFingerprint })
+                .eq('id', profile.id);
+              
+              if (!updateError) {
+                console.log('Updated existing authenticated profile with browser fingerprint');
+              }
+            }
           }
         } else {
           const { data: profile, error: selectError } = await supabase
@@ -151,6 +169,24 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
             }
           } else if (profile) {
             console.log('Temp profile already exists');
+            
+            // Update fingerprint if it's missing
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('browser_fingerprint')
+              .eq('id', profile.id)
+              .single();
+            
+            if (profileData && !profileData.browser_fingerprint) {
+              const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ browser_fingerprint: browserFingerprint })
+                .eq('id', profile.id);
+              
+              if (!updateError) {
+                console.log('Updated existing temp profile with browser fingerprint');
+              }
+            }
           }
         }
         
