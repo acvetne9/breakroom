@@ -90,6 +90,7 @@ export const parseUnifiedSearchFilters = async (searchQuery: string): Promise<Un
   console.log(`🔍 [parseSearchFilters] Original terms: ${textTerms.join(', ')}`);
   
   // Expand text terms with synonyms - skip neighborhoods
+  const MAX_TOTAL_TERMS = 20; // Prevent overly broad searches
   const expandedTermsArrays = await Promise.all(
     textTerms.map(async term => {
       // Skip expansion for neighborhood names
@@ -100,11 +101,13 @@ export const parseUnifiedSearchFilters = async (searchQuery: string): Promise<Un
       }
       
       // Expand all other terms (will expand job roles AND other terms)
-      return await expandTerm(term);
+      const expanded = await expandTerm(term);
+      // Limit expansions per term to top 5 most relevant
+      return expanded.slice(0, 5);
     })
   );
   const expandedTextTerms = expandedTermsArrays.flat();
-  const uniqueExpandedTerms = [...new Set(expandedTextTerms)];
+  const uniqueExpandedTerms = [...new Set(expandedTextTerms)].slice(0, MAX_TOTAL_TERMS);
   
   console.log(`🔍 [parseSearchFilters] Expanded to: ${uniqueExpandedTerms.join(', ')}`);
   
@@ -368,9 +371,83 @@ export const searchBusinessesUnified = async (
         }))
     }));
     
-    // Apply enhanced business filtering using the centralized logic
-    console.log(`🔍 Applying enhanced filters to ${businessesWithRoles.length} businesses...`);
-    const filteredBusinesses = applyBusinessFilters(businessesWithRoles, filters as SearchFilters);
+    // Calculate relevance score for each business
+    console.log(`🎯 Scoring ${businessesWithRoles.length} businesses for relevance...`);
+    const scoredBusinesses = businessesWithRoles.map(business => {
+      let score = 0;
+      const nameLower = business.name.toLowerCase();
+      const typeLower = (business.businessType || '').toLowerCase();
+      const originalTermsLower = (filters.originalTerms || filters.textTerms).map(t => t.toLowerCase());
+      const searchQueryNormalized = originalTermsLower.join(' ');
+      
+      // HIGHEST PRIORITY: Exact full name match (case-insensitive)
+      if (nameLower === searchQueryNormalized) {
+        score += 1000;
+      }
+      
+      // HIGH PRIORITY: Name contains all original terms as complete words
+      const nameWords = nameLower.split(/\s+/);
+      const allTermsInName = originalTermsLower.every(term => 
+        nameWords.some(word => word === term || word.includes(term))
+      );
+      if (allTermsInName && score < 1000) {
+        score += 500;
+      }
+      
+      // MEDIUM-HIGH: Name starts with first search term
+      if (originalTermsLower.length > 0 && nameLower.startsWith(originalTermsLower[0])) {
+        score += 200;
+      }
+      
+      // MEDIUM: Count how many original terms match in name
+      originalTermsLower.forEach(term => {
+        if (nameLower.includes(term)) {
+          score += 50;
+        }
+      });
+      
+      // MEDIUM: Count how many original terms match in business type
+      originalTermsLower.forEach(term => {
+        if (typeLower.includes(term)) {
+          score += 30;
+        }
+      });
+      
+      // LOW: Matches only through expanded terms (less relevant)
+      const expandedOnlyTerms = (filters.textTerms || [])
+        .filter(t => !originalTermsLower.includes(t.toLowerCase()));
+      expandedOnlyTerms.forEach(term => {
+        if (nameLower.includes(term.toLowerCase())) {
+          score += 10;
+        }
+      });
+      
+      // BONUS: Has roles matching search terms
+      if (business.roles && business.roles.length > 0) {
+        const roleMatches = business.roles.some(role => 
+          originalTermsLower.some(term => 
+            (role.role || '').toLowerCase().includes(term)
+          )
+        );
+        if (roleMatches) score += 20;
+      }
+      
+      return { business, score };
+    });
+
+    // Sort by score (highest first)
+    const sortedBusinesses = scoredBusinesses
+      .sort((a, b) => b.score - a.score)
+      .map(item => item.business);
+
+    console.log(`🎯 Top 5 scored results:`, sortedBusinesses.slice(0, 5).map(b => ({
+      name: b.name,
+      score: scoredBusinesses.find(sb => sb.business.id === b.id)?.score
+    })));
+
+    // Apply enhanced business filtering to sorted results
+    console.log(`🔍 Applying enhanced filters to ${sortedBusinesses.length} businesses...`);
+    const filteredBusinesses = applyBusinessFilters(sortedBusinesses, filters as SearchFilters);
     
     // Limit to requested amount
     const finalResults = filteredBusinesses.slice(0, limit);
