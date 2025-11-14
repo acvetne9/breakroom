@@ -169,9 +169,6 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     setLocation(value);
     setFullLocation(fullLocation || value);
 
-    // Reset blur flag when user starts typing again
-    setHasBlurred(false);
-
     // Reset manual address flag if a database business is selected
     if (fullLocation) {
       setIsManualAddressValidated(false);
