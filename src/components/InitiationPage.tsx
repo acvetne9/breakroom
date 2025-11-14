@@ -11,6 +11,7 @@ interface InitiationPageProps {
     role: string;
     location: string;
     fullLocation?: string;
+    businessName?: string;
     timePeriod: string;
   }) => void;
 }
@@ -137,6 +138,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
           role,
           location,
           fullLocation: fullLocation || location,
+          businessName: location, // Save business name for display
           timePeriod
         };
         onComplete(dataToPass);

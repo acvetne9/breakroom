@@ -5,6 +5,7 @@ export interface CurrentJobData {
   role: string;
   salary: number;
   location: string;
+  business_name?: string;
   time_period: string;
 }
 
@@ -42,7 +43,7 @@ export const getCurrentJob = async (): Promise<CurrentJobData | null> => {
     
     const { data, error } = await supabase
       .from('current_jobs')
-      .select('role, salary, location, time_period')
+      .select('role, salary, location, business_name, time_period')
       .eq('profile_id', profileId)
       .maybeSingle();
     
@@ -80,6 +81,7 @@ export const saveCurrentJob = async (jobData: CurrentJobData): Promise<void> => 
           role: jobData.role,
           salary: jobData.salary,
           location: jobData.location,
+          business_name: jobData.business_name,
           time_period: jobData.time_period,
           updated_at: new Date().toISOString()
         })
@@ -95,6 +97,7 @@ export const saveCurrentJob = async (jobData: CurrentJobData): Promise<void> => 
           role: jobData.role,
           salary: jobData.salary,
           location: jobData.location,
+          business_name: jobData.business_name,
           time_period: jobData.time_period
         });
       

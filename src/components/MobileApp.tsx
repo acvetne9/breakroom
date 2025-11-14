@@ -20,6 +20,7 @@ interface UserData {
   role: string;
   location: string;
   fullLocation?: string;
+  businessName?: string;
   timePeriod: string;
 }
 
@@ -94,6 +95,7 @@ const MobileApp: React.FC = () => {
               role: currentJob.role,
               location: currentJob.location,
               fullLocation: currentJob.location,
+              businessName: currentJob.business_name || currentJob.location,
               timePeriod: currentJob.time_period || "HR",
             });
             console.log("Loaded user data:", currentJob);
@@ -130,6 +132,7 @@ const MobileApp: React.FC = () => {
         role: data.role,
         salary: salary,
         location: data.location,
+        business_name: data.businessName || data.location,
         time_period: data.timePeriod || "HR",
       });
       console.log("✅ Current job saved to database");
@@ -175,7 +178,7 @@ const MobileApp: React.FC = () => {
     }
   };
 
-  const handleJobUpdate = async (jobData: { salary: string; role: string; location: string; timePeriod: string }) => {
+  const handleJobUpdate = async (jobData: { salary: string; role: string; location: string; businessName?: string; timePeriod: string }) => {
     console.log('🎯 handleJobUpdate called with:', jobData);
     try {
       const { saveCurrentJob } = await import("../services/currentJobs");
@@ -186,6 +189,7 @@ const MobileApp: React.FC = () => {
         role: jobData.role,
         salary: salary,
         location: jobData.location,
+        business_name: jobData.businessName || jobData.location,
         time_period: jobData.timePeriod,
       });
       console.log("✅ Current job updated in database");
@@ -196,6 +200,7 @@ const MobileApp: React.FC = () => {
         salary: jobData.salary,
         role: jobData.role,
         location: jobData.location,
+        businessName: jobData.businessName || jobData.location,
         timePeriod: jobData.timePeriod,
       } : null);
       console.log("✅ userData state updated");
@@ -691,7 +696,7 @@ const MobileApp: React.FC = () => {
         >
           <Suspense fallback={<Skeleton className="w-full h-full" />}>
             <SettingsPage
-              initialData={userData || { salary: "", role: "", location: "", timePeriod: "HR" }}
+              initialData={userData || { salary: "", role: "", location: "", businessName: "", timePeriod: "HR" }}
               onStoriesClick={handleUserStoriesClick}
               onPostClick={(post) => {
                 setExpandedPost(post.id);
