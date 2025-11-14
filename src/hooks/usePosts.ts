@@ -242,6 +242,16 @@ export const usePosts = () => {
 
       // Remove from local state
       setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
+      
+      // Clean up from "My Stories" tracking
+      try {
+        const commentedPostIds = JSON.parse(localStorage.getItem('userCommentedPosts') || '[]');
+        const updatedIds = commentedPostIds.filter((id: string) => id !== postId);
+        localStorage.setItem('userCommentedPosts', JSON.stringify(updatedIds));
+      } catch (err) {
+        console.warn('Failed to clean up commented posts tracking:', err);
+      }
+      
       return true;
     } catch (err) {
       console.error('Delete error:', err);
