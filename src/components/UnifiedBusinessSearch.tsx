@@ -140,6 +140,11 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
 
   // Show businesses from map in dropdown
   useEffect(() => {
+    // Don't run search logic when component is disabled
+    if (disabled) {
+      return;
+    }
+    
     const q = value.trim();
     
     if (!q) {
@@ -266,7 +271,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     }, 300);
     
     return () => clearTimeout(timer);
-  }, [value]);
+  }, [value, disabled]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (disabled) return; // Prevent changes when disabled
