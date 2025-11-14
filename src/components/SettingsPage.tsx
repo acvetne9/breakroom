@@ -77,6 +77,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [currentJobAddress, setCurrentJobAddress] = useState("");
   const [currentJobAddressError, setCurrentJobAddressError] = useState("");
   const [currentJobIsManualAddress, setCurrentJobIsManualAddress] = useState(false);
+  // Ref to track address input state to avoid stale closures
+  const currentJobShowAddressInputRef = useRef(false);
 
   // Past jobs state
   const [pastJobs, setPastJobs] = useState<PastJob[]>([]);
@@ -598,11 +600,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     setCurrentJobBusinessInput(value);
     setCurrentJobBusinessSelected(false);
     setCurrentJobShowAddressInput(false);
+    currentJobShowAddressInputRef.current = false;
     setCurrentJobAddressError("");
   };
   const handleCurrentJobBusinessSelect = (business: any) => {
     setCurrentJobBusinessSelected(true);
     setCurrentJobShowAddressInput(false);
+    currentJobShowAddressInputRef.current = false;
     setCurrentJobIsManualAddress(false);
     setCurrentJob({
       ...currentJob,
@@ -615,6 +619,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const handleCurrentJobBusinessBlur = () => {
     if (currentJobBusinessInput.trim() && !currentJobBusinessSelected) {
       setCurrentJobShowAddressInput(true);
+      currentJobShowAddressInputRef.current = true;
     }
   };
   const handleCurrentJobAddressChange = (value: string) => {
@@ -810,7 +815,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 <UnifiedBusinessSearch
                   value={currentJobBusinessInput}
                   onChange={(value, business, filters, neighborhoodCoords) => {
-                    if (!currentJobShowAddressInput) {
+                    if (!currentJobShowAddressInputRef.current) {
                       handleCurrentJobBusinessInputChange(value);
                     }
                   }}
