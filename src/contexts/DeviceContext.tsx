@@ -109,7 +109,7 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
           }
         }
         
-        // Fallback: If fingerprint recovery failed but we have old device_id patterns, try direct lookup
+        // Fallback 1: If fingerprint recovery failed but we have old device_id patterns, try direct lookup
         if (!storedDeviceId) {
           const tempDeviceId = localStorage.getItem('device_id');
           if (tempDeviceId) {
@@ -125,6 +125,34 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
               storedDeviceId = directProfile.temp_user_id;
               console.log('Recovered device_id from direct lookup:', storedDeviceId);
             }
+          }
+        }
+        
+        // Fallback 2: Find the most recent unauthenticated profile without a fingerprint
+        // This handles old profiles created before fingerprinting was implemented
+        if (!storedDeviceId) {
+          console.log('Attempting to recover most recent profile without fingerprint...');
+          const { data: recentProfile } = await supabase
+            .from('profiles')
+            .select('temp_user_id')
+            .is('browser_fingerprint', null)
+            .eq('is_authenticated', false)
+            .not('temp_user_id', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          if (recentProfile?.temp_user_id) {
+            storedDeviceId = recentProfile.temp_user_id;
+            localStorage.setItem('device_id', storedDeviceId);
+            console.log('Recovered most recent profile without fingerprint:', storedDeviceId);
+            
+            // Update it with current fingerprint for future recovery
+            await supabase
+              .from('profiles')
+              .update({ browser_fingerprint: browserFingerprint })
+              .eq('temp_user_id', storedDeviceId);
+            console.log('Updated recovered profile with current fingerprint');
           }
         }
         
