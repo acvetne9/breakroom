@@ -80,6 +80,10 @@ const MobileApp: React.FC = () => {
 
     const initializeApp = async () => {
       try {
+        // Clear profile cache to ensure fresh data
+        const { clearProfileCache } = await import("../services/posts");
+        clearProfileCache();
+        
         console.log("Debug - isFirstSession:", isFirstSession);
 
         const { hasCurrentJob, getCurrentJob } = await import("../services/currentJobs");
