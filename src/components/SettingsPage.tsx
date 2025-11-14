@@ -147,7 +147,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         if (jobData) {
           // Update all current job states with loaded data
           setCurrentJob({
-            salary: jobData.salary?.toString() || '',
+            salary: jobData.salary ? `$${jobData.salary.toFixed(2)}` : '',
             role: jobData.role || '',
             location: jobData.location || '',
             isHiring: false,
