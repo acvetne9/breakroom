@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from "@/integrations/supabase/client";
+import { generateBrowserFingerprint } from "@/utils/browserFingerprint";
 
 interface DeviceContextType {
   deviceId: string;
@@ -52,12 +53,37 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
           console.log('Profile was created in a different session (or not at all)');
         }
         
+        // Generate browser fingerprint for recovery
+        const browserFingerprint = generateBrowserFingerprint();
+        console.log('Browser fingerprint:', browserFingerprint);
+        
         let storedDeviceId = localStorage.getItem('device_id');
         
         if (storedDeviceId && storedDeviceId.split('_').length < 3) {
           console.log('Clearing old device ID format:', storedDeviceId);
           localStorage.removeItem('device_id');
           storedDeviceId = null;
+        }
+        
+        // If no device_id in localStorage, try to recover from fingerprint
+        if (!storedDeviceId) {
+          console.log('No device_id in localStorage, attempting fingerprint recovery...');
+          
+          const { data: existingProfile, error: lookupError } = await supabase
+            .from('profiles')
+            .select('temp_user_id')
+            .eq('browser_fingerprint', browserFingerprint)
+            .eq('is_authenticated', false)
+            .maybeSingle();
+          
+          if (lookupError) {
+            console.error('Error looking up profile by fingerprint:', lookupError);
+          } else if (existingProfile?.temp_user_id) {
+            // Recovered device_id from fingerprint!
+            storedDeviceId = existingProfile.temp_user_id;
+            localStorage.setItem('device_id', storedDeviceId);
+            console.log('Recovered device_id from fingerprint:', storedDeviceId);
+          }
         }
         
         if (!storedDeviceId) {
@@ -112,7 +138,8 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
                 user_id: null,
                 temp_user_id: storedDeviceId,
                 display_name: 'Anonymous User',
-                is_authenticated: false
+                is_authenticated: false,
+                browser_fingerprint: browserFingerprint
               });
             
             if (insertError && insertError.code !== '23505') {
