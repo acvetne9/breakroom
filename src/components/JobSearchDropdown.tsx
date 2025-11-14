@@ -9,7 +9,7 @@ interface JobSearchDropdownProps {
   className?: string;
 }
 
-const JOB_OPTIONS = [
+export const JOB_OPTIONS = [
 "Software Engineer", "Frontend Developer", "Backend Developer", "Full Stack Developer", "Mobile App Developer", "Web Developer", "Ui Designer", "Ux Designer", "Data Scientist", "Machine Learning Engineer", "Ai Researcher", "Cloud Architect", "Devops Engineer", "Systems Administrator", "Network Engineer", "Database Administrator", "Cybersecurity Analyst", "Qa Engineer", "Game Developer", "Embedded Systems Engineer",
 "Technical Writer", "Product Manager", "Scrum Master", "It Support Specialist", "Help Desk Technician", "Doctor", "Nurse", "Licensed Practical Nurse", "Certified Nursing Assistant", "Pharmacist", "Pharmacy Technician", "Paramedic", "Emergency Medical Technician", "Dentist", "Dental Hygienist", "Dental Assistant", "Veterinarian", "Veterinary Technician", "Physical Therapist", "Occupational Therapist",
 "Radiologic Technologist", "Medical Assistant", "Surgical Technologist", "Respiratory Therapist", "Home Health Aide", "Barista", "Server", "Cook", "Line Cook", "Prep Cook", "Sous Chef", "Chef", "Pastry Chef", "Food Service Worker", "Waiter", "Waitress", "Host", "Hostess", "Busser", "Dishwasher",
