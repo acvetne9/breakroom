@@ -191,14 +191,19 @@ export async function expandTerm(job: string, enableLogging: boolean = true): Pr
     // Remove duplicates (case-insensitive)
     const uniqueTerms = Array.from(new Map(validTerms.map((term: string) => [term.toLowerCase(), term])).values());
 
+    // ALWAYS include the original search term to ensure consistent results
+    const finalTerms = Array.from(
+      new Set([cleanJob.toLowerCase(), ...uniqueTerms.map(t => t.toLowerCase())])
+    );
+
     log("Term expansion complete", {
       totalFetched: allResults.length,
       afterValidation: validTerms.length,
-      uniqueCount: uniqueTerms.length,
-      terms: uniqueTerms,
+      uniqueCount: finalTerms.length,
+      terms: finalTerms,
     });
 
-    return uniqueTerms;
+    return finalTerms;
   } catch (error) {
     log("Error occurred", { error: (error as Error).message });
     throw error;

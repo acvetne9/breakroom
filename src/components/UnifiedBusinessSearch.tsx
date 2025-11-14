@@ -3,7 +3,6 @@ import { EnhancedBusiness } from '@/types/search';
 import { parseSearchFilters } from '@/services/businessFiltering';
 import { findNeighborhoodBoundaryByName } from '@/utils/nyc_neighborhoods';
 import { isProfane } from '@/utils/profanityFilter';
-import { useToast } from '@/hooks/use-toast';
 import { Search } from 'lucide-react';
 import { searchBusinessesByQuery } from '@/services/unifiedSearch';
 
@@ -11,7 +10,9 @@ interface UnifiedBusinessSearchProps {
   value: string;
   onChange: (value: string, business?: EnhancedBusiness, filters?: any, neighborhoodCoords?: { lat: number; lon: number }) => void;
   onBusinessSelect?: (business: EnhancedBusiness) => void;
+  onNoResults?: (query: string) => void;
   onBlur?: () => void;
+  onFocus?: () => void;
   placeholder?: string;
   className?: string;
   variant?: 'dropdown' | 'search-bar';
@@ -33,7 +34,9 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   value,
   onChange,
   onBusinessSelect,
+  onNoResults,
   onBlur,
+  onFocus,
   placeholder = "Search businesses, roles, salary...",
   className = "",
   variant = 'dropdown',
@@ -44,7 +47,6 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
-  const { toast } = useToast();
   const isScrolling = useRef(false);
   
   const inputRef = useRef<HTMLInputElement>(null);
@@ -55,40 +57,74 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   const committedQueryRef = useRef<string>('');
   const resultsCache = useRef<Map<string, SearchResult[]>>(new Map());
   const lastExecutedQuery = useRef<string>('');
+  const wasClosedIntentionally = useRef(false);
+  const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Handle clicks outside to close dropdown
   useEffect(() => {
-    let scrollTimeout: NodeJS.Timeout;
-    
     const handleClickOutside = (event: MouseEvent) => {
-      // Don't close dropdown if we're scrolling within it
-      if (isScrolling.current) return;
+      console.log('🖱️ Click outside detected', {
+        isScrolling: isScrolling.current,
+        targetElement: event.target,
+        isInputClick: inputRef.current?.contains(event.target as Node),
+        isDropdownClick: dropdownRef.current?.contains(event.target as Node)
+      });
       
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowDropdown(false);
+      // Don't close dropdown if we're scrolling within it
+      if (isScrolling.current) {
+        console.log('⏸️ Click ignored - scrolling');
+        return;
       }
+      
+      // Don't close if clicking on the input or dropdown
+      if (
+        (inputRef.current && inputRef.current.contains(event.target as Node)) ||
+        (dropdownRef.current && dropdownRef.current.contains(event.target as Node))
+      ) {
+        console.log('⏸️ Click ignored - inside component');
+        return;
+      }
+      
+      console.log('✅ Closing dropdown');
+      wasClosedIntentionally.current = true;
+      setShowDropdown(false);
     };
-
-    const handleScroll = () => {
-      isScrolling.current = true;
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        isScrolling.current = false;
-      }, 150);
-    };
-
-    // Add scroll listener to the dropdown
-    const dropdown = dropdownRef.current;
-    if (dropdown) {
-      dropdown.addEventListener('scroll', handleScroll);
-    }
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
-      if (dropdown) {
+    };
+  }, []);
+
+  // Handle scroll within dropdown
+  useEffect(() => {
+    let scrollTimeout: NodeJS.Timeout;
+    const dropdown = dropdownRef.current;
+    
+    if (showDropdown && dropdown) {
+      const handleScroll = () => {
+        isScrolling.current = true;
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+          isScrolling.current = false;
+          console.log('🔄 Scroll state reset');
+        }, 150);
+      };
+      
+      dropdown.addEventListener('scroll', handleScroll);
+      return () => {
         dropdown.removeEventListener('scroll', handleScroll);
+        clearTimeout(scrollTimeout);
+      };
+    }
+  }, [showDropdown]);
+
+  // Cleanup blur timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current);
       }
-      clearTimeout(scrollTimeout);
     };
   }, []);
 
@@ -112,13 +148,19 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     const cachedResults = resultsCache.current.get(q);
     if (cachedResults) {
       setSearchResults(cachedResults);
-      setShowDropdown(true);
+      // Only show dropdown if not intentionally closed
+      if (!wasClosedIntentionally.current) {
+        setShowDropdown(true);
+      }
       setIsSearching(false);
       return;
     }
     
     setIsSearching(true);
-    setShowDropdown(true);
+    // Only show dropdown if not intentionally closed
+    if (!wasClosedIntentionally.current) {
+      setShowDropdown(true);
+    }
     const seq = ++searchSeqRef.current;
     
     const timer = setTimeout(async () => {
@@ -162,6 +204,18 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         }
         
         setSearchResults(results);
+
+        // Notify parent if no business results found (only after user stops typing)
+        const hasBusinessResults = results.some(r => !('isNeighborhood' in r));
+        if (!hasBusinessResults && onNoResults) {
+          // Delay callback to avoid interrupting ongoing typing
+          setTimeout(() => {
+            // Check if search is still current
+            if (seq === searchSeqRef.current && value.trim() === q) {
+              onNoResults(q);
+            }
+          }, 800);
+        }
         
         // Update parent with filters
         try {
@@ -195,10 +249,11 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     }, 300);
     
     return () => clearTimeout(timer);
-  }, [value, onChange, mapBusinesses]);
+  }, [value]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
+    wasClosedIntentionally.current = false; // Clear flag when user types
     onChange(newValue);
     if (!newValue.trim()) {
       setSearchResults([]);
@@ -245,6 +300,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       }
     }
     
+    wasClosedIntentionally.current = true; // Mark as intentionally closed
     setShowDropdown(false);
     setSearchResults([]);
   };
@@ -271,13 +327,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     
     // Check for profanity in search terms
     if (isProfane(trimmedValue)) {
-      toast({
-        title: "Search blocked",
-        description: "Inappropriate search terms detected",
-        variant: "destructive"
-      });
-      onChange(''); // Clear the search input
-      return;
+      console.log('❌ Profanity detected, blocking search');
+      return; // Just prevent search, don't clear input
     }
     
     // Commit the query and apply filters immediately (require 3+ characters for meaningful search)
@@ -321,17 +372,29 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     }
   };
 
-  const handleInputBlur = () => {
-    // Don't blur if we're scrolling in the dropdown
-    if (isScrolling.current) return;
+  const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    console.log('👋 Blur event', {
+      relatedTarget: e.relatedTarget,
+      isDropdownFocus: dropdownRef.current?.contains(e.relatedTarget as Node)
+    });
     
-    // Delay blur to allow dropdown clicks and scrolling
-    setTimeout(() => {
-      if (!isScrolling.current) {
-        setShowDropdown(false);
-        onBlur?.();
-      }
-    }, 200);
+    // Don't close if focusing within the dropdown
+    if (dropdownRef.current && e.relatedTarget && dropdownRef.current.contains(e.relatedTarget as Node)) {
+      console.log('⏸️ Blur ignored - focusing dropdown');
+      return;
+    }
+    
+    // Delay closing to prevent premature closure during rapid typing
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+    }
+    
+    blurTimeoutRef.current = setTimeout(() => {
+      console.log('✅ Closing dropdown on blur (delayed)');
+      wasClosedIntentionally.current = true;
+      setShowDropdown(false);
+      onBlur?.();
+    }, 150);
   };
 
   // Check if parent is passing app-input class (used in InitiationPage)
@@ -344,7 +407,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       : "w-full px-3 py-2 border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring";
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative">
       <div className="relative">
         <input
           ref={inputRef}
@@ -354,9 +417,25 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           onBlur={handleInputBlur}
           onKeyDown={handleKeyDown}
           onFocus={() => {
-            if (value.length > 2) {
+            // Cancel any pending blur closure
+            if (blurTimeoutRef.current) {
+              clearTimeout(blurTimeoutRef.current);
+              blurTimeoutRef.current = null;
+            }
+            wasClosedIntentionally.current = false;
+            const trimmedValue = value.trim();
+            // Show dropdown if we have a value and either:
+            // 1. We have current search results to display
+            // 2. We have cached results for this value
+            // 3. We're currently searching
+            if (trimmedValue.length > 2 && 
+                (searchResults.length > 0 || 
+                 resultsCache.current.has(trimmedValue) || 
+                 isSearching)) {
               setShowDropdown(true);
             }
+            // Call parent onFocus handler
+            onFocus?.();
           }}
           placeholder={placeholder}
           className={`${baseInputClasses} ${className}`}
@@ -375,6 +454,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       {showDropdown && (searchResults.length > 0 || isSearching || value.trim()) && (
         <div className={`absolute ${variant === 'search-bar' ? 'bottom-full mb-2' : 'top-full mt-1'} left-0 right-0 z-[9999]`}>
           <div 
+            ref={dropdownRef}
             className="bg-card shadow-xl border border-border max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
             style={{ borderRadius: '8px' }}
             onScroll={() => {

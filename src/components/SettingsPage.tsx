@@ -3,7 +3,6 @@ import { Plus, Minus } from "lucide-react";
 import JobSearchDropdown from "./JobSearchDropdown";
 import UnifiedBusinessSearch from "./UnifiedBusinessSearch";
 import { isProfane } from "../utils/profanityFilter";
-import { useToast } from "@/hooks/use-toast";
 import { useDevice } from "@/contexts/DeviceContext";
 import { nycNeighborhoods } from "../utils/nyc_neighborhoods";
 import { usePosts } from "@/hooks/usePosts";
@@ -50,7 +49,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   onSearchTrigger,
 }) => {
   const { deviceId } = useDevice();
-  const { toast } = useToast();
   const { getUserPostsAndCommented, trackCommentedPost } = usePosts();
   const userPosts = getUserPostsAndCommented();
 
@@ -73,6 +71,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [currentJobShowAddressInput, setCurrentJobShowAddressInput] = useState(false);
   const [currentJobAddress, setCurrentJobAddress] = useState("");
   const [currentJobAddressError, setCurrentJobAddressError] = useState("");
+  const [currentJobIsManualAddress, setCurrentJobIsManualAddress] = useState(false);
 
   // Past jobs state
   const [pastJobs, setPastJobs] = useState<PastJob[]>([
@@ -296,11 +295,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   };
   const validateProfanity = (text: string, fieldName: string): boolean => {
     if (isProfane(text)) {
-      toast({
-        title: `Invalid ${fieldName}`,
-        description: `Inappropriate content detected in ${fieldName}`,
-        variant: "destructive",
-      });
       return false;
     }
     return true;
@@ -340,6 +334,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         currentJobRef.current.location &&
         currentTimePeriodRef.current;
       if (currentJobChangedRef.current && hasCurrentJobChangedFromRefs() && isCurrentJobCompleteFromRefs()) {
+        console.log('🚪 SettingsPage cleanup: calling onJobUpdate for current job');
         onJobUpdate({
           salary: currentJobRef.current.salary,
           role: currentJobRef.current.role,
@@ -453,12 +448,39 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   // Current job handlers
   const handleSalaryChange = (value: string) => {
-    const cleanValue = value.replace(/[^0-9.]/g, "");
+    let cleanValue = value.replace(/[^0-9.]/g, "");
+    
+    // Ensure only one decimal point
+    const parts = cleanValue.split('.');
+    if (parts.length > 2) {
+      cleanValue = parts[0] + '.' + parts.slice(1).join('');
+    }
+    
+    // Limit to 2 decimal places
+    if (parts[1] && parts[1].length > 2) {
+      cleanValue = parts[0] + '.' + parts[1].substring(0, 2);
+    }
+    
     setCurrentJob({
       ...currentJob,
       salary: cleanValue ? `$${cleanValue}` : "",
     });
     setCurrentJobChanged(true);
+  };
+  
+  const handleSalaryBlur = () => {
+    if (currentJob.salary) {
+      const value = currentJob.salary.replace(/[^0-9.]/g, "");
+      if (value.includes('.')) {
+        const parts = value.split('.');
+        // Add trailing 0 if only 1 decimal place
+        const formatted = parts[1]?.length === 1 ? `${parts[0]}.${parts[1]}0` : value;
+        setCurrentJob({
+          ...currentJob,
+          salary: `$${formatted}`,
+        });
+      }
+    }
   };
   const handleCurrentJobRoleChange = (value: string) => {
     setCurrentJob({
@@ -484,6 +506,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const handleCurrentJobBusinessSelect = (business: any) => {
     setCurrentJobBusinessSelected(true);
     setCurrentJobShowAddressInput(false);
+    setCurrentJobIsManualAddress(false);
     setCurrentJob({
       ...currentJob,
       location: business.name || business.location,
@@ -524,6 +547,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     });
     setCurrentJobFullLocation(address);
     setCurrentJobBusinessSelected(true);
+    setCurrentJobIsManualAddress(true);
     setCurrentJobChanged(true);
     setCurrentJobAddressError("");
   };
@@ -675,7 +699,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 />
 
                 {/* Address input for current job */}
-                {currentJobShowAddressInput && !currentJobBusinessSelected && (
+                {currentJobShowAddressInput && (!currentJobBusinessSelected || currentJobIsManualAddress) && (
                   <div className="mt-2 space-y-2">
                     <p className="text-red-500 text-xs">Business not found. Please enter the address:</p>
                     <input
@@ -710,6 +734,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   inputMode="numeric"
                   value={currentJob.salary}
                   onChange={(e) => handleSalaryChange(e.target.value)}
+                  onBlur={handleSalaryBlur}
                   className="app-input flex-1"
                   placeholder="$14"
                 />

@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import JobSearchDropdown from './JobSearchDropdown';
 import UnifiedBusinessSearch from './UnifiedBusinessSearch';
 import { isProfane } from '@/utils/profanityFilter';
-import { useToast } from '@/hooks/use-toast';
 
 // Import the predefined job options to check against
 const JOB_OPTIONS = ["Software Engineer", "Frontend Developer", "Backend Developer", "Full Stack Developer", "Mobile App Developer", "Web Developer", "UI Designer", "UX Designer", "Data Scientist", "Machine Learning Engineer", "AI Researcher", "Cloud Architect", "DevOps Engineer", "Systems Administrator", "Network Engineer", "Database Administrator", "Cybersecurity Analyst", "QA Engineer", "Game Developer", "Embedded Systems Engineer", "Technical Writer", "Product Manager", "Scrum Master", "IT Support Specialist", "Help Desk Technician", "Doctor", "Nurse", "Licensed Practical Nurse", "Certified Nursing Assistant", "Pharmacist", "Pharmacy Technician", "Paramedic", "Emergency Medical Technician", "Dentist", "Dental Hygienist", "Dental Assistant", "Veterinarian", "Veterinary Technician", "Physical Therapist", "Occupational Therapist", "Radiologic Technologist", "Medical Assistant", "Surgical Technologist", "Respiratory Therapist", "Home Health Aide", "Barista", "Server", "Cook", "Line Cook", "Prep Cook", "Sous Chef", "Chef", "Pastry Chef", "Food Service Worker", "Waiter", "Waitress", "Host", "Hostess", "Busser", "Dishwasher", "Caterer", "Food Runner", "Fast Food Worker", "Drive-Thru Operator", "Bartender", "Barback", "Delivery Driver", "Pizza Delivery Driver", "Hotel Housekeeper", "Front Desk Clerk", "Hotel Concierge", "Bellhop", "Room Service Attendant", "Valet Attendant", "Casino Dealer", "Casino Host", "Event Coordinator", "Wedding Planner", "Banquet Server", "Club Promoter", "Tour Guide", "Cashier", "Retail Associate", "Sales Associate", "Stock Associate", "Customer Service Representative", "Customer Service", "Inventory Clerk", "Shelf Stocker", "Store Manager", "Assistant Store Manager", "Greeter", "Bagging Clerk", "Mall Security Guard", "Merchandiser", "Personal Shopper", "Gift Wrapper", "Loss Prevention Specialist", "Taxi Driver", "Ride-share Driver", "Driver", "Bus Driver", "School Bus Driver", "Truck Driver", "Delivery Driver", "Courier", "Bicycle Messenger", "Forklift Operator", "Warehouse Worker", "Order Picker", "Package Handler", "Logistics Coordinator", "Dock Worker", "Shipping Clerk", "Nanny", "Babysitter", "Daycare Worker", "Preschool Teacher", "Childcare Assistant", "Elder Caregiver", "Home Health Aide", "Housekeeper", "Cleaner", "Janitor", "Maid", "Pet Sitter", "Dog Walker", "Pet Groomer", "Landscaper", "Gardener", "Pool Cleaner", "Electrician", "Plumber", "Carpenter", "Welder", "HVAC Technician", "Auto Mechanic", "Diesel Mechanic", "Machinist", "Construction Worker", "General Laborer", "Roofing Specialist", "Painter", "Drywall Installer", "Flooring Installer", "Bricklayer", "Receptionist", "Administrative Assistant", "Office Clerk", "Data Entry Clerk", "File Clerk", "Executive Assistant", "Secretary", "Office Manager", "Virtual Assistant", "Call Center Representative", "Collections Agent", "Telemarketer", "Appointment Setter", "Mailroom Clerk", "Switchboard Operator", "Accountant", "Auditor", "Bookkeeper", "Tax Preparer", "Financial Analyst", "Budget Analyst", "Loan Officer", "Insurance Agent", "Claims Adjuster", "Bank Teller", "Mortgage Broker", "Investment Analyst", "Payroll Specialist", "Real Estate Agent", "Property Manager", "Teacher", "Teaching Assistant", "Substitute Teacher", "School Counselor", "Principal", "Tutor", "Librarian", "Library Assistant", "Academic Advisor", "Professor", "Lawyer", "Paralegal", "Legal Assistant", "Court Clerk", "Judge", "Security Guard", "Private Investigator", "Police Officer", "Corrections Officer", "Firefighter", "Manager", "Assistant Manager", "Shift Leader", "Supervisor", "Team Lead", "Freelance Writer", "Graphic Designer", "Illustrator", "Photographer", "Video Editor", "Voice Actor", "Music Producer", "Social Media Influencer", "Virtual Tutor", "Translator", "Maintenance Worker", "Facilities Technician", "Groundskeeper", "Building Superintendent", "Handyman", "Lifeguard", "Camp Counselor", "Amusement Park Worker", "Theme Park Attendant", "Carnival Worker", "Tour Bus Driver", "Street Performer", "Festival Staff", "Farm Worker", "Fruit Picker", "City Planner", "Urban Planner", "Building Inspector", "City Clerk", "City Council Member", "Mayor's Assistant", "Public Works Laborer", "Water Treatment Plant Operator", "Waste Management Worker", "Sanitation Worker", "Street Sweeper Operator", "Parking Enforcement Officer", "Meter Reader", "Building Maintenance Worker", "Parks and Recreation Worker", "Recreation Coordinator", "Community Outreach Specialist", "City Bus Driver", "Transit Operator", "Traffic Engineer", "Civil Engineer (Municipal)", "City Electrician", "Zoning Officer", "Public Safety Officer", "Emergency Management Coordinator", "City Attorney", "Planning and Zoning Coordinator", "City Engineer", "City Project Manager", "Permit Technician", "Code Enforcement Officer", "Neighborhood Services Coordinator", "City Grant Writer", "Community Development Specialist", "Animal Control Officer", "Public Health Inspector", "City Auditor", "Budget Officer", "City Finance Director", "Environmental Compliance Specialist", "City Surveyor", "Municipal Court Clerk", "Recycling Program Coordinator", "Water Quality Technician", "Traffic Signal Technician", "Road Maintenance Worker", "City Arborist", "Crew Member", "Associate", "Team Member", "Helper", "Laborer", "Worker", "Staff Member", "General Worker", "Operator", "Technician", "Specialist", "Coordinator", "Agent", "Assistant", "Personal Trainer", "Psychiatrist", "Consultant"];
@@ -66,9 +65,9 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   const [addressError, setAddressError] = useState('');
   const [hasSearchResults, setHasSearchResults] = useState(false);
   const [lastSearchValue, setLastSearchValue] = useState('');
-  const {
-    toast
-  } = useToast();
+  const [hasBlurred, setHasBlurred] = useState(false);
+  const [isManualAddressValidated, setIsManualAddressValidated] = useState(false);
+  const [debouncedLocation, setDebouncedLocation] = useState('');
 
   /** Format salary as $123.00 */
   const formatSalary = (input: string) => {
@@ -96,14 +95,37 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     const formatted = raw ? `$${raw}` : '';
     setSalary(formatted);
   };
+  
+  const handleSalaryBlur = () => {
+    if (salary) {
+      const value = salary.replace(/[^0-9.]/g, "");
+      if (value.includes('.')) {
+        const parts = value.split('.');
+        // Add trailing 0 if only 1 decimal place
+        const formatted = parts[1]?.length === 1 ? `${parts[0]}.${parts[1]}0` : value;
+        setSalary(`$${formatted}`);
+      }
+    }
+    checkForCompletion();
+  };
   const checkForCompletion = () => {
     const allFilled = salary.trim() !== '' && role.trim() !== '' && location.trim() !== '';
     const isValidRole = JOB_OPTIONS.includes(role.trim()) || role.trim() === 'Other';
     
-    // Business validation: either selected from dropdown OR new business with valid address
+    // Business validation: either selected from dropdown OR new business with valid address OR manual address validated
     const businessValidFromDropdown = fullLocation && fullLocation !== location;
     const businessValidNewBusiness = showNewBusinessForm && newBusinessAddress.trim() !== '' && isValidAddress(newBusinessAddress);
-    const businessValid = businessValidFromDropdown || businessValidNewBusiness;
+    const businessValid = businessValidFromDropdown || businessValidNewBusiness || isManualAddressValidated;
+    
+    console.log('🔍 InitiationPage validation:', {
+      allFilled,
+      isValidRole,
+      businessValidFromDropdown,
+      businessValidNewBusiness,
+      isManualAddressValidated,
+      businessValid,
+      willComplete: allFilled && isValidRole && businessValid && !isComplete
+    });
     
     if (allFilled && isValidRole && businessValid && !isComplete) {
       setIsComplete(true);
@@ -121,6 +143,16 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       }, 300);
     }
   };
+
+  // Debounce location changes to prevent rapid form toggling
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedLocation(location);
+    }, 1200); // Increased delay to ensure user finished typing
+    
+    return () => clearTimeout(timer);
+  }, [location]);
+
   const handleSearchResultsChange = (hasResults: boolean, searchValue: string) => {
     setHasSearchResults(hasResults);
     setLastSearchValue(searchValue);
@@ -129,11 +161,6 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   const handleRoleChange = (value: string) => {
     const isPredefinedOption = JOB_OPTIONS.includes(value);
     if (!isPredefinedOption && value && isProfane(value)) {
-      toast({
-        title: 'Invalid role',
-        description: 'Inappropriate content detected in job role',
-        variant: 'destructive'
-      });
       return;
     }
     setRole(value);
@@ -142,35 +169,55 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
     setLocation(value);
     setFullLocation(fullLocation || value);
 
-    // Only show new business form if:
-    // 1. User typed something (> 2 chars)
-    // 2. No business selected from dropdown (!fullLocation)
-    // 3. No search results found (!hasSearchResults)
-    // 4. User finished typing (value matches last search)
-    const shouldShowForm = !fullLocation && 
-                          value.length > 2 && 
-                          !hasSearchResults && 
-                          value === lastSearchValue;
-    
-    setShowNewBusinessForm(shouldShowForm);
+    // Reset blur flag when user starts typing again
+    setHasBlurred(false);
+
+    // Reset manual address flag if a database business is selected
+    if (fullLocation) {
+      setIsManualAddressValidated(false);
+    }
+
+    // Only evaluate shouldShowForm if user hasn't blurred yet
+    // Once blurred, handleLocationBlur is authoritative
+    if (!hasBlurred) {
+      const shouldShowForm = !fullLocation && 
+                            debouncedLocation.length > 2 && 
+                            !hasSearchResults && 
+                            debouncedLocation === lastSearchValue;
+      
+      setShowNewBusinessForm(shouldShowForm);
+    }
   };
   const handleLocationBlur = () => {
     const value = location.trim();
+    
+    // Mark that user has finished interacting with search
+    setHasBlurred(true);
+    
     if (!value) {
       setLocation('');
       setFullLocation('');
+      setShowNewBusinessForm(false);
+      setHasSearchResults(false);
       return;
     }
     if (value && isProfane(value)) {
-      toast({
-        title: 'Invalid location',
-        description: 'Inappropriate content detected in location',
-        variant: 'destructive'
-      });
       setLocation('');
       setFullLocation('');
+      setShowNewBusinessForm(false);
       return;
     }
+    
+    // Reset search results state when dropdown closes without selection
+    // This allows the form to show after dropdown closes
+    setTimeout(() => {
+      if (!fullLocation && value.length > 2) {
+        // If no business was selected, reset the hasSearchResults flag
+        setHasSearchResults(false);
+        setShowNewBusinessForm(true);
+      }
+    }, 200); // Small delay to allow click events to complete
+    
     setTimeout(() => checkForCompletion(), 10);
   };
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -184,22 +231,14 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
   };
   const validateAndCreateBusiness = async () => {
     const address = newBusinessAddress.trim();
+    const businessName = location.trim(); // Preserve the business name
+    
     if (!address) {
       setAddressError('Please enter a business address');
-      toast({
-        title: 'Address required',
-        description: 'Please enter the business address',
-        variant: 'destructive'
-      });
       return;
     }
     if (isProfane(address)) {
       setAddressError('Invalid address content');
-      toast({
-        title: 'Invalid address',
-        description: 'Inappropriate content detected in address',
-        variant: 'destructive'
-      });
       return;
     }
     if (!isValidAddress(address)) {
@@ -207,11 +246,6 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       return;
     }
     if (!salary || !role) {
-      toast({
-        title: 'Missing information',
-        description: 'Please fill in salary and role first',
-        variant: 'destructive'
-      });
       return;
     }
     setIsCreatingBusiness(true);
@@ -219,20 +253,17 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Set the full address as both location and fullLocation
-      setLocation(address);
-      setFullLocation(address);
+      // Keep business name in location, store combined info in fullLocation
+      setLocation(businessName);
+      setFullLocation(`${businessName}, ${address}`);
+      setIsManualAddressValidated(true);
       setShowNewBusinessForm(false);
       setNewBusinessAddress('');
       setAddressError('');
       
       setTimeout(() => checkForCompletion(), 100);
     } catch {
-      toast({
-        title: 'Error',
-        description: 'Failed to create business. Please try again.',
-        variant: 'destructive'
-      });
+      console.error('Failed to create business');
     } finally {
       setIsCreatingBusiness(false);
     }
@@ -255,18 +286,25 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
               value={location}
               onChange={(value, business, filters, neighborhoodCoords) => {
                 handleLocationChange(value, business?.name);
+                // Only set hasSearchResults when we have a definitive answer
                 if (business) {
                   handleSearchResultsChange(true, value);
-                } else {
-                  handleSearchResultsChange(false, value);
                 }
+                // Don't immediately set to false here - let onNoResults handle it
               }}
               onBusinessSelect={(business) => {
                 setLocation(business.name);
                 setFullLocation(business.name);
+                setIsManualAddressValidated(false);
                 handleSearchResultsChange(true, business.name);
                 checkForCompletion();
               }}
+              onNoResults={(query) => {
+                // Only update after search completes with definitive no results
+                handleSearchResultsChange(false, query);
+              }}
+              onBlur={handleLocationBlur}
+              onFocus={() => setHasBlurred(false)}
               placeholder="Where do you work?..."
               className="app-input"
               variant="dropdown"
@@ -295,7 +333,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({
           {/* Salary + Time Period */}
           <div>
             <div className="flex items-center space-x-3">
-              <input type="text" inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*" value={salary} onChange={handleSalaryChange} onBlur={checkForCompletion} placeholder="Pay Est. ($)" className="app-input text-left text-lg flex-1 !py-0 h-12" />
+              <input type="text" inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*" value={salary} onChange={handleSalaryChange} onBlur={handleSalaryBlur} placeholder="Pay Est. ($)" className="app-input text-left text-lg flex-1 !py-0 h-12" />
               <select value={timePeriod} onChange={e => setTimePeriod(e.target.value)} className="app-input text-lg w-auto !py-0 h-12">
                 <option value="HR">HR</option>
                 <option value="MO">MO</option>
