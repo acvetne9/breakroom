@@ -698,8 +698,31 @@ const MobileApp: React.FC = () => {
     }
   };
 
+  // Calculate card position for mobile peek behavior
+  const getSettingsCardPosition = () => {
+    if (!isMobile) return currentSlide === 0 ? "0%" : "-100%";
+    if (currentSlide === 0) return "0%";        // Fully visible
+    if (currentSlide === 1) return "-97.5%";    // 2.5% peeking
+    return "-200%";                              // Hidden
+  };
+
+  const getExploreCardPosition = () => {
+    if (!isMobile) return currentSlide === 2 ? "0%" : "100%";
+    if (currentSlide === 2) return "0%";        // Fully visible
+    if (currentSlide === 1) return "97.5%";     // 2.5% peeking
+    return "200%";                               // Hidden
+  };
+
+  const shouldRenderSettingsCard = () => {
+    return isMobile || currentSlide === 0;
+  };
+
+  const shouldRenderExploreCard = () => {
+    return isMobile || currentSlide === 2;
+  };
+
   return (
-    <div className="fixed inset-0 overflow-hidden">
+    <div className={`fixed inset-0 ${!isMobile ? "overflow-hidden" : ""}`}>
       {/* Show loading state while initializing */}
       {currentView === "loading" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
@@ -732,19 +755,22 @@ const MobileApp: React.FC = () => {
       {currentView === "initiation" && <InitiationPage onComplete={handleInitiationComplete} />}
 
       {/* Settings Card - slides from left */}
-      {currentSlide === 0 && (
+      {shouldRenderSettingsCard() && (
         <motion.div
-          initial={{ x: "-100%" }}
-          animate={{ x: 0 }}
-          exit={{ x: "-100%" }}
+          animate={{ x: getSettingsCardPosition() }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
           className="absolute inset-0 z-20"
-          drag="x"
+          style={{ 
+            pointerEvents: getSettingsCardPosition() === "-200%" ? "none" : "auto" 
+          }}
+          drag={isMobile ? "x" : false}
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.1}
           onDragEnd={(event, info) => {
-            if (info.offset.x < -100) {
+            if (info.offset.x < -100 && currentSlide === 0) {
               setCurrentSlide(1);
+            } else if (info.offset.x > 100 && currentSlide === 1) {
+              setCurrentSlide(0);
             }
           }}
         >
@@ -772,19 +798,22 @@ const MobileApp: React.FC = () => {
       )}
 
       {/* Explore Card - slides from right */}
-      {currentSlide === 2 && (
+      {shouldRenderExploreCard() && (
         <motion.div
-          initial={{ x: "100%" }}
-          animate={{ x: 0 }}
-          exit={{ x: "100%" }}
+          animate={{ x: getExploreCardPosition() }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
           className="absolute inset-0 z-20"
-          drag="x"
+          style={{ 
+            pointerEvents: getExploreCardPosition() === "200%" ? "none" : "auto" 
+          }}
+          drag={isMobile ? "x" : false}
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.1}
           onDragEnd={(event, info) => {
-            if (info.offset.x > 100) {
+            if (info.offset.x > 100 && currentSlide === 2) {
               setCurrentSlide(1);
+            } else if (info.offset.x < -100 && currentSlide === 1) {
+              setCurrentSlide(2);
             }
           }}
         >

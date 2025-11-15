@@ -141,6 +141,14 @@
     transform: translateZ(0);
   }
 
+  /* Remove auto margins on mobile for proper peeking alignment */
+  @media (max-width: 768px) {
+    .app-card {
+      margin-left: 0;
+      margin-right: 0;
+    }
+  }
+
   /* App Popup - smaller version of card */
   .app-popup {
     @apply w-[90vw] bg-white rounded-xl relative mx-auto;

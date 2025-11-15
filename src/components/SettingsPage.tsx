@@ -4,6 +4,7 @@ import JobSearchDropdown from "./JobSearchDropdown";
 import UnifiedBusinessSearch from "./UnifiedBusinessSearch";
 import { isProfane } from "../utils/profanityFilter";
 import { useDevice } from "@/contexts/DeviceContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { nycNeighborhoods } from "../utils/nyc_neighborhoods";
 import { usePosts } from "@/hooks/usePosts";
 import { getPastJobs, savePastJobs, deletePastJob, PastJobData } from "@/services/pastJobs";
@@ -51,6 +52,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   onSearchTrigger,
 }) => {
   const { deviceId } = useDevice();
+  const isMobile = useIsMobile();
   const { getUserPostsAndCommented, trackCommentedPost } = usePosts();
   const userPosts = getUserPostsAndCommented();
 
@@ -77,6 +79,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const [currentJobAddress, setCurrentJobAddress] = useState("");
   const [currentJobAddressError, setCurrentJobAddressError] = useState("");
   const [currentJobIsManualAddress, setCurrentJobIsManualAddress] = useState(false);
+  // Ref to track address input state to avoid stale closures
+  const currentJobShowAddressInputRef = useRef(false);
 
   // Past jobs state
   const [pastJobs, setPastJobs] = useState<PastJob[]>([]);
@@ -598,11 +602,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     setCurrentJobBusinessInput(value);
     setCurrentJobBusinessSelected(false);
     setCurrentJobShowAddressInput(false);
+    currentJobShowAddressInputRef.current = false;
     setCurrentJobAddressError("");
   };
   const handleCurrentJobBusinessSelect = (business: any) => {
     setCurrentJobBusinessSelected(true);
     setCurrentJobShowAddressInput(false);
+    currentJobShowAddressInputRef.current = false;
     setCurrentJobIsManualAddress(false);
     setCurrentJob({
       ...currentJob,
@@ -615,6 +621,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const handleCurrentJobBusinessBlur = () => {
     if (currentJobBusinessInput.trim() && !currentJobBusinessSelected) {
       setCurrentJobShowAddressInput(true);
+      currentJobShowAddressInputRef.current = true;
     }
   };
   const handleCurrentJobAddressChange = (value: string) => {
@@ -784,7 +791,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     }, 100);
   };
   return (
-    <div className="w-full h-full flex items-center justify-center bg-transparent overflow-hidden">
+    <div className={`w-full h-full ${isMobile ? 'flex items-center bg-transparent' : 'flex items-center justify-center bg-transparent overflow-hidden'}`}>
       <div
         ref={scrollContainerRef}
         className="app-card p-6 animate-fade-in flex flex-col max-h-[80vh] overflow-y-auto relative"
@@ -810,7 +817,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 <UnifiedBusinessSearch
                   value={currentJobBusinessInput}
                   onChange={(value, business, filters, neighborhoodCoords) => {
-                    if (!currentJobShowAddressInput) {
+                    if (!currentJobShowAddressInputRef.current) {
                       handleCurrentJobBusinessInputChange(value);
                     }
                   }}
