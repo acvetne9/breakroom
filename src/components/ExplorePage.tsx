@@ -54,6 +54,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   console.log('🔍 ExplorePage component initializing...');
   
   const { posts, loading, hasMore, submitPost, votePost, removePost, loadMore, trackCommentedPost } = usePosts();
+  const isMobile = useIsMobile();
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
   const [hideSystemPost, setHideSystemPost] = useState(false);
@@ -309,8 +310,6 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
       </div>
     );
   }
-
-  const isMobile = useIsMobile();
 
   return (
     <div className="w-full h-full flex items-center bg-transparent">
