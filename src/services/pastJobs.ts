@@ -16,6 +16,7 @@ export interface PastJobData {
 export const getPastJobs = async (): Promise<PastJobData[]> => {
   try {
     const { profileId } = await getUserProfile();
+    console.log('📋 Fetching past jobs for profile:', profileId);
     
     const { data, error } = await supabase
       .from('past_jobs')
@@ -24,14 +25,15 @@ export const getPastJobs = async (): Promise<PastJobData[]> => {
       .order('created_at', { ascending: false });
     
     if (error) {
-      console.error('Error fetching past jobs:', error);
-      return [];
+      console.error('❌ Error fetching past jobs:', error);
+      throw error;
     }
     
+    console.log('✅ Past jobs fetched:', data?.length || 0, 'jobs');
     return data || [];
   } catch (error) {
-    console.error('Error in getPastJobs:', error);
-    return [];
+    console.error('❌ Error in getPastJobs:', error);
+    throw error;
   }
 };
 

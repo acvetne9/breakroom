@@ -147,8 +147,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   useEffect(() => {
     const loadJobs = async () => {
       try {
+        console.log('🔄 Loading jobs from database...');
+        
         // Load current job
         const currentJobData = await getCurrentJob();
+        console.log('📥 Current job loaded:', currentJobData);
+        
         if (currentJobData) {
           setCurrentJob({
             salary: currentJobData.salary ? `$${currentJobData.salary}` : "",
@@ -171,10 +175,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           setCurrentJobShowAddressInput(isManualAddress);
           setCurrentJobAddress(isManualAddress ? currentJobData.location : "");
           setCurrentJobIsManualAddress(isManualAddress);
+        } else {
+          console.log('ℹ️ No current job found in database');
         }
         
         // Load past jobs
         const jobs = await getPastJobs();
+        console.log('📥 Past jobs loaded:', jobs.length, 'jobs');
+        
         if (jobs.length > 0) {
           const formattedJobs: PastJob[] = jobs.map(job => ({
             id: job.id,
@@ -216,6 +224,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           setPastJobAddresses(addresses);
           setPastJobAddressErrors(errors);
         } else {
+          console.log('ℹ️ No past jobs found in database');
           // No past jobs in database - start with one empty job
           const newJobId = `temp_${Date.now()}`;
           setPastJobs([{
@@ -226,9 +235,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           }]);
           setPastJobTimePeriods({ [newJobId]: "HR" });
         }
-      } catch (error) {
-        console.error('Failed to load jobs:', error);
-        // On error, still show one empty job
+      } catch (error: any) {
+        console.error('❌ Failed to load jobs:', error);
+        
+        // Show error to user with toast
+        const errorMessage = error?.message || 'Unknown error occurred';
+        console.error('Error details:', errorMessage);
+        
+        // Still initialize with one empty job
         const newJobId = `temp_${Date.now()}`;
         setPastJobs([{
           id: newJobId,
