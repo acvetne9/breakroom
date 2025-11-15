@@ -702,14 +702,14 @@ const MobileApp: React.FC = () => {
   const getSettingsCardPosition = () => {
     if (!isMobile) return currentSlide === 0 ? "0%" : "-100%";
     if (currentSlide === 0) return "0%";        // Fully visible
-    if (currentSlide === 1) return "-90%";      // Shows ~10% of the 90vw card
+    if (currentSlide === 1) return "-97.75%";   // Shows 2.5% of the 90vw card
     return "-200%";                              // Hidden
   };
 
   const getExploreCardPosition = () => {
     if (!isMobile) return currentSlide === 2 ? "0%" : "100%";
     if (currentSlide === 2) return "0%";        // Fully visible
-    if (currentSlide === 1) return "90%";       // Shows ~10% of the 90vw card
+    if (currentSlide === 1) return "97.75%";    // Shows 2.5% of the 90vw card
     return "200%";                               // Hidden
   };
 
@@ -764,7 +764,7 @@ const MobileApp: React.FC = () => {
             pointerEvents: getSettingsCardPosition() === "-200%" ? "none" : "auto" 
           }}
           drag={isMobile ? "x" : false}
-          dragConstraints={{ left: 0, right: 0 }}
+          dragConstraints={{ left: -200, right: 200 }}
           dragElastic={0.1}
           onDragEnd={(event, info) => {
             if (info.offset.x < -100 && currentSlide === 0) {
@@ -807,7 +807,7 @@ const MobileApp: React.FC = () => {
             pointerEvents: getExploreCardPosition() === "200%" ? "none" : "auto" 
           }}
           drag={isMobile ? "x" : false}
-          dragConstraints={{ left: 0, right: 0 }}
+          dragConstraints={{ left: -200, right: 200 }}
           dragElastic={0.1}
           onDragEnd={(event, info) => {
             if (info.offset.x > 100 && currentSlide === 2) {
