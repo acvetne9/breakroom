@@ -702,7 +702,7 @@ const MobileApp: React.FC = () => {
   const getSettingsCardPosition = () => {
     if (!isMobile) return currentSlide === 0 ? "0%" : "-100%";
     if (currentSlide === 0) return "0%";        // Fully visible
-    if (currentSlide === 1) return "-97.75%";   // Shows 2.5% of the 90vw card
+    if (currentSlide === 1) return "-87.75%";   // Shows 2.5% of the 90vw card (2.25vw visible)
     return "-200%";                              // Hidden
   };
 
