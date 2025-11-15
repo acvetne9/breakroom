@@ -822,6 +822,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       };
       const limit = getBusinessLimitForViewport(zoom);
       loadBusinessesInViewport?.(viewportBounds, limit, true);
+      
+      // Signal that initial businesses have been loaded
+      callbackRefs.current.onBusinessesLoaded?.();
     }
   }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport]);
 
