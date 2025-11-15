@@ -312,8 +312,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   }
 
   return (
-    <div className="w-full h-full flex items-center bg-transparent">
-      <div className="app-card h-full w-full relative">
+    <div className="relative w-full h-full">
       {/* Posts list */}
       <div className={`h-full overflow-y-auto pb-20 ${filteredBusinessId || filteredUserStories ? 'pt-20' : 'pt-20'}`}>
         <div className="space-y-4 px-4">
@@ -509,7 +508,6 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
             </button>
           </div>
         )}
-      </div>
       </div>
     </div>
   );
