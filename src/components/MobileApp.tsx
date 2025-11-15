@@ -7,9 +7,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDevice } from "@/contexts/DeviceContext";
 
-const HomePage = React.lazy(() => import("./HomePage"));
-const SettingsPage = React.lazy(() => import("./SettingsPage"));
-const ExplorePage = React.lazy(() => import("./ExplorePage"));
+import HomePage from "./HomePage";
+import SettingsPage from "./SettingsPage";
+import ExplorePage from "./ExplorePage";
 
 import { useBusinessesData } from "../hooks/useBusinessesData";
 import { Business } from "@/types/business";
