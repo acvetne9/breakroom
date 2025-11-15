@@ -13,5 +13,20 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+  },
+  global: {
+    headers: {
+      'x-device-id': localStorage.getItem('device_id') || ''
+    }
   }
 });
+
+// Update device ID header when it changes
+export const updateDeviceIdHeader = (deviceId: string) => {
+  console.log('🔧 Updating device_id header:', deviceId);
+  // Update the global headers
+  (supabase as any).headers = {
+    ...(supabase as any).headers,
+    'x-device-id': deviceId
+  };
+};

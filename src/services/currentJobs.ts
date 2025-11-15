@@ -40,6 +40,7 @@ export const hasCurrentJob = async (): Promise<boolean> => {
 export const getCurrentJob = async (): Promise<CurrentJobData | null> => {
   try {
     const { profileId } = await getUserProfile();
+    console.log('📋 Fetching current job for profile:', profileId);
     
     const { data, error } = await supabase
       .from('current_jobs')
@@ -48,14 +49,15 @@ export const getCurrentJob = async (): Promise<CurrentJobData | null> => {
       .maybeSingle();
     
     if (error) {
-      console.error('Error fetching current job:', error);
-      return null;
+      console.error('❌ Error fetching current job:', error);
+      throw error;
     }
     
+    console.log('✅ Current job fetched:', data ? 'found' : 'not found');
     return data;
   } catch (error) {
-    console.error('Error in getCurrentJob:', error);
-    return null;
+    console.error('❌ Error in getCurrentJob:', error);
+    throw error;
   }
 };
 
