@@ -8,6 +8,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { nycNeighborhoods } from "../utils/nyc_neighborhoods";
 import { usePosts } from "@/hooks/usePosts";
 import { getPastJobs, savePastJobs, savePastJob, deletePastJob, PastJobData } from "@/services/pastJobs";
+import { getCurrentJob, saveCurrentJob, deleteCurrentJob, type CurrentJobData } from "@/services/currentJobs";
 interface UserInfo {
   salary: string;
   role: string;
@@ -142,29 +143,78 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     currentJobChangedRef.current = currentJobChanged;
   }, [currentJobChanged]);
 
-  // Load past jobs from database on mount
+  // Load current and past jobs from database on mount
   useEffect(() => {
-    const loadPastJobs = async () => {
+    const loadJobs = async () => {
       try {
+        // Load current job
+        const currentJobData = await getCurrentJob();
+        if (currentJobData) {
+          setCurrentJob({
+            salary: currentJobData.salary ? `$${currentJobData.salary}` : "",
+            role: currentJobData.role || "",
+            location: currentJobData.location || "",
+            isHiring: false,
+          });
+          setCurrentJobFullLocation(currentJobData.location || "");
+          setCurrentJobBusinessName(currentJobData.business_name || currentJobData.location || "");
+          setCurrentTimePeriod(currentJobData.time_period || "HR");
+          
+          // Initialize business input states
+          setCurrentJobBusinessInput(currentJobData.business_name || currentJobData.location || "");
+          setCurrentJobBusinessSelected(!!currentJobData.location);
+          
+          // Check if manual address
+          const hasLocation = !!currentJobData.location;
+          const businessMatchesLocation = currentJobData.business_name === currentJobData.location || !currentJobData.business_name;
+          const isManualAddress = hasLocation && businessMatchesLocation;
+          setCurrentJobShowAddressInput(isManualAddress);
+          setCurrentJobAddress(isManualAddress ? currentJobData.location : "");
+          setCurrentJobIsManualAddress(isManualAddress);
+        }
+        
+        // Load past jobs
         const jobs = await getPastJobs();
         if (jobs.length > 0) {
           const formattedJobs: PastJob[] = jobs.map(job => ({
             id: job.id,
-            salary: job.salary ? `$${job.salary.toFixed(2)}` : '',
+            salary: job.salary ? `$${job.salary}` : '',
             role: job.role,
-            location: job.location,
+            location: job.location || "",
             business_name: job.business_name,
           }));
           setPastJobs(formattedJobs);
           
-          // Initialize time periods
+          // Initialize time periods and business inputs for all past jobs
           const periods: { [id: string]: string } = {};
+          const inputs: { [id: string]: string } = {};
+          const selected: { [id: string]: boolean } = {};
+          const showAddress: { [id: string]: boolean } = {};
+          const addresses: { [id: string]: string } = {};
+          const errors: { [id: string]: string } = {};
+          
           jobs.forEach(job => {
             if (job.id) {
               periods[job.id] = job.time_period || "HR";
+              
+              const hasLocation = !!job.location;
+              const businessMatchesLocation = job.business_name === job.location || !job.business_name;
+              const isManualAddress = hasLocation && businessMatchesLocation;
+              
+              inputs[job.id] = job.business_name || job.location || "";
+              selected[job.id] = hasLocation;
+              showAddress[job.id] = isManualAddress;
+              addresses[job.id] = isManualAddress ? (job.location || "") : "";
+              errors[job.id] = "";
             }
           });
+          
           setPastJobTimePeriods(periods);
+          setPastJobBusinessInputs(inputs);
+          setPastJobBusinessSelected(selected);
+          setPastJobShowAddressInputs(showAddress);
+          setPastJobAddresses(addresses);
+          setPastJobAddressErrors(errors);
         } else {
           // No past jobs in database - start with one empty job
           const newJobId = `temp_${Date.now()}`;
@@ -177,7 +227,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           setPastJobTimePeriods({ [newJobId]: "HR" });
         }
       } catch (error) {
-        console.error('Failed to load past jobs:', error);
+        console.error('Failed to load jobs:', error);
         // On error, still show one empty job
         const newJobId = `temp_${Date.now()}`;
         setPastJobs([{
@@ -192,51 +242,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       }
     };
 
-    loadPastJobs();
+    loadJobs();
   }, []);
 
-  // Initialize past job states
-  useEffect(() => {
-    // Preserve existing states, only initialize new jobs
-    const newInputs: {
-      [id: string]: string;
-    } = { ...pastJobBusinessInputs };
-    const newSelected: {
-      [id: string]: boolean;
-    } = { ...pastJobBusinessSelected };
-    const newShowAddress: {
-      [id: string]: boolean;
-    } = { ...pastJobShowAddressInputs };
-    const newAddresses: {
-      [id: string]: string;
-    } = { ...pastJobAddresses };
-    const newAddressErrors: {
-      [id: string]: string;
-    } = { ...pastJobAddressErrors };
-    
-    pastJobs.forEach((job) => {
-      const jobId = job.id || '';
-      
-      // Only initialize if this job doesn't have state yet
-      if (!(jobId in newInputs)) {
-        const hasLocation = !!job.location;
-        const businessMatchesLocation = job.business_name === job.location || !job.business_name;
-        const isManualAddress = hasLocation && businessMatchesLocation;
-        
-        newInputs[jobId] = job.business_name || job.location || "";
-        newSelected[jobId] = hasLocation; // Mark as selected if has location
-        newShowAddress[jobId] = isManualAddress; // Show address input if manual address
-        newAddresses[jobId] = isManualAddress ? job.location : "";
-        newAddressErrors[jobId] = "";
-      }
-    });
-    
-    setPastJobBusinessInputs(newInputs);
-    setPastJobBusinessSelected(newSelected);
-    setPastJobShowAddressInputs(newShowAddress);
-    setPastJobAddresses(newAddresses);
-    setPastJobAddressErrors(newAddressErrors);
-  }, [pastJobs.length]);
+
+  // Removed conflicting initialization useEffect - now handled in initial load above
+
 
   // Close help popup when clicking outside
   useEffect(() => {
