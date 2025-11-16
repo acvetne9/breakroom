@@ -489,7 +489,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     updateCurrentJob({
       businessInput: value,
       businessSelected: false,
-      showAddressInput: !!value.trim(),
+      showAddressInput: true, // Always show address input when typing
       addressError: "",
     });
   };
@@ -498,7 +498,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     updateCurrentJob({
       businessInput: business.name || business.location,
       businessSelected: true,
-      showAddressInput: false,
+      showAddressInput: false, // Hide address input only when business is selected
       addressInput: "",
       addressError: "",
       isManualAddress: false,
@@ -630,7 +630,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     updatePastJob(jobId, {
       businessInput: value,
       businessSelected: false,
-      showAddressInput: !!value.trim(),
+      showAddressInput: true, // Always show address input when typing
       addressError: "",
     });
   };
@@ -639,7 +639,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     updatePastJob(jobId, {
       businessInput: business.name || business.location,
       businessSelected: true,
-      showAddressInput: false,
+      showAddressInput: false, // Hide address input only when business is selected
       addressInput: "",
       addressError: "",
       location: business.location || business.name,
@@ -730,7 +730,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       <div className="w-full h-full flex items-center justify-center bg-transparent">
         <div className="app-card p-6 flex items-center gap-3">
           <Loader2 className="w-5 h-5 animate-spin text-app-gray-medium" />
-          <span className="text-app-gray-medium">Loading your jobs...</span>
         </div>
       </div>
     );
@@ -867,7 +866,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   {/* Save/Error Indicator */}
                   <div className="absolute -left-8 top-0 flex items-center gap-1">
                     {job.isSaving && <Loader2 className="w-3 h-3 animate-spin text-app-gray-medium" />}
-                    {job.hasError && <AlertCircle className="w-3 h-3 text-red-500" title={job.errorMessage} />}
+                    {job.hasError && (
+                      <div title={job.errorMessage}>
+                        <AlertCircle className="w-3 h-3 text-red-500" />
+                      </div>
+                    )}
                   </div>
 
                   {/* Business Location */}
