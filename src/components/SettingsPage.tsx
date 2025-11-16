@@ -9,12 +9,14 @@ import { nycNeighborhoods } from "../utils/nyc_neighborhoods";
 import { usePosts } from "@/hooks/usePosts";
 import { getPastJobs, savePastJobs, savePastJob, deletePastJob, PastJobData } from "@/services/pastJobs";
 import { getCurrentJob, saveCurrentJob, deleteCurrentJob, type CurrentJobData } from "@/services/currentJobs";
+
 interface UserInfo {
   salary: string;
   role: string;
   location: string;
   isHiring: boolean;
 }
+
 interface PastJob {
   id?: string;
   salary: string;
@@ -22,6 +24,7 @@ interface PastJob {
   location: string;
   business_name?: string;
 }
+
 interface Post {
   id: string;
   author: string;
@@ -29,6 +32,7 @@ interface Post {
   businessName?: string;
   createdAt: Date;
 }
+
 interface SettingsPageProps {
   initialData: {
     salary: string;
@@ -50,6 +54,7 @@ interface SettingsPageProps {
   onPageLeave?: () => void;
   onSearchTrigger?: (searchTerm: string) => void;
 }
+
 const SettingsPage: React.FC<SettingsPageProps> = ({
   initialData,
   onStoriesClick,
@@ -129,24 +134,31 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const currentJobChangedRef = useRef(currentJobChanged);
   const hasCreatedPostsRef = useRef(false);
   const currentJobFullLocationRef = useRef(currentJobFullLocation);
+
   useEffect(() => {
     currentJobRef.current = currentJob;
   }, [currentJob]);
+
   useEffect(() => {
     currentJobFullLocationRef.current = currentJobFullLocation;
   }, [currentJobFullLocation]);
+
   useEffect(() => {
     currentJobBusinessNameRef.current = currentJobBusinessName;
   }, [currentJobBusinessName]);
+
   useEffect(() => {
     pastJobsRef.current = pastJobs;
   }, [pastJobs]);
+
   useEffect(() => {
     pastJobTimePeriodsRef.current = pastJobTimePeriods;
   }, [pastJobTimePeriods]);
+
   useEffect(() => {
     changedJobsRef.current = changedJobs;
   }, [changedJobs]);
+
   useEffect(() => {
     currentJobChangedRef.current = currentJobChanged;
   }, [currentJobChanged]);
@@ -181,7 +193,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           const businessMatchesLocation =
             currentJobData.business_name === currentJobData.location || !currentJobData.business_name;
           const isManualAddress = hasLocation && businessMatchesLocation;
-          setCurrentJobShowAddressInput(isManualAddress);
+          setCurrentJobShowAddressInput(false); // Don't show address input on load
           setCurrentJobAddress(isManualAddress ? currentJobData.location : "");
           setCurrentJobIsManualAddress(isManualAddress);
         } else {
@@ -220,7 +232,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
               inputs[job.id] = job.business_name || job.location || "";
               selected[job.id] = hasLocation;
-              showAddress[job.id] = isManualAddress;
+              showAddress[job.id] = false; // Don't show address input on load
               addresses[job.id] = isManualAddress ? job.location || "" : "";
               errors[job.id] = "";
             }
@@ -271,8 +283,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
     loadJobs();
   }, []);
-
-  // Removed conflicting initialization useEffect - now handled in initial load above
 
   // Close help popup when clicking outside
   useEffect(() => {
@@ -376,6 +386,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     // Address is valid if it has street type or matches common patterns
     return hasStreetType || matchesPattern;
   };
+
   const validateProfanity = (text: string, fieldName: string): boolean => {
     if (isProfane(text)) {
       return false;
@@ -405,6 +416,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
     return hasBasicFields && hasValidBusiness && hasValidAddress;
   };
+
   const isCurrentJobComplete = () => {
     return (
       currentJob.salary &&
@@ -415,36 +427,55 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       (!currentJobShowAddressInput || isValidAddress(currentJobAddress))
     );
   };
+
   useEffect(() => {
     return () => {
-      if (hasCreatedPostsRef.current || !onJobUpdate) return;
+      if (hasCreatedPostsRef.current) return;
       hasCreatedPostsRef.current = true;
+
       const hasCurrentJobChangedFromRefs = () =>
         currentJobRef.current.salary !== initialCurrentJob.salary ||
         currentJobRef.current.role !== initialCurrentJob.role ||
         currentJobRef.current.location !== initialCurrentJob.location ||
         currentTimePeriodRef.current !== initialTimePeriod;
+
       const isCurrentJobCompleteFromRefs = () =>
         currentJobRef.current.salary &&
         currentJobRef.current.role &&
         currentJobRef.current.location &&
         currentTimePeriodRef.current;
+
+      // Save current job to database if changed and complete
       if (currentJobChangedRef.current && hasCurrentJobChangedFromRefs() && isCurrentJobCompleteFromRefs()) {
-        console.log("🚪 SettingsPage cleanup: calling onJobUpdate for current job");
-        onJobUpdate({
-          salary: currentJobRef.current.salary,
+        console.log("🚪 SettingsPage cleanup: saving current job to database");
+        const currentJobData: CurrentJobData = {
           role: currentJobRef.current.role,
+          salary: parseFloat(currentJobRef.current.salary.replace(/[^0-9.]/g, "")),
           location: currentJobFullLocationRef.current || currentJobRef.current.location,
-          businessName: currentJobBusinessNameRef.current,
-          timePeriod: currentTimePeriodRef.current,
+          business_name: currentJobBusinessNameRef.current,
+          time_period: currentTimePeriodRef.current,
+        };
+        saveCurrentJob(currentJobData).catch((error) => {
+          console.error("Failed to save current job:", error);
         });
+
+        // Also call onJobUpdate for compatibility
+        if (onJobUpdate) {
+          onJobUpdate({
+            salary: currentJobRef.current.salary,
+            role: currentJobRef.current.role,
+            location: currentJobFullLocationRef.current || currentJobRef.current.location,
+            businessName: currentJobBusinessNameRef.current,
+            timePeriod: currentTimePeriodRef.current,
+          });
+        }
       }
 
       // Only update changed past jobs that are already in the database
       const jobsToUpdate = pastJobsRef.current
         .filter((job) => {
           const jobId = job.id || "";
-          const isChanged = changedJobs.has(jobId);
+          const isChanged = changedJobsRef.current.has(jobId);
           const timePeriod = pastJobTimePeriodsRef.current[jobId];
           const isComplete = isPastJobComplete(job, timePeriod);
           const isRealDatabaseId = job.id && !job.id.startsWith("temp_") && job.id.includes("-");
@@ -471,6 +502,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       onPageLeave?.();
     };
   }, []);
+
   const addPastJob = async () => {
     const newJobId = `temp_${Date.now()}`;
     const newJob: PastJob = {
@@ -558,6 +590,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       console.error("Failed to save new past job:", error);
     }
   };
+
   const removePastJob = async (id: string) => {
     const job = pastJobs.find((j) => j.id === id);
 
@@ -600,6 +633,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     setPastJobAddresses(newAddresses);
     setPastJobAddressErrors(newAddressErrors);
   };
+
   const updatePastJob = (id: string, field: keyof Omit<PastJob, "id">, value: string) => {
     const processedValue =
       field === "salary" ? (value.replace(/[^0-9.]/g, "") ? `$${value.replace(/[^0-9.]/g, "")}` : "") : value;
@@ -615,6 +649,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     );
     setChangedJobs((prev) => new Set([...prev, id]));
   };
+
   const updatePastJobTimePeriod = (id: string, timePeriod: string) => {
     setPastJobTimePeriods({
       ...pastJobTimePeriods,
@@ -659,6 +694,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       }
     }
   };
+
   const handleCurrentJobRoleChange = (value: string) => {
     setCurrentJob({
       ...currentJob,
@@ -666,6 +702,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     });
     setCurrentJobChanged(true);
   };
+
   const handleCurrentJobRoleBlur = () => {
     if (currentJob.role && !validateProfanity(currentJob.role, "role")) {
       setCurrentJob({
@@ -674,18 +711,28 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       });
     }
   };
+
   const handleCurrentJobBusinessInputChange = (value: string) => {
     setCurrentJobBusinessInput(value);
     setCurrentJobBusinessSelected(false);
-    setCurrentJobShowAddressInput(false);
-    currentJobShowAddressInputRef.current = false;
+    // Show address input immediately when typing (business not yet selected)
+    if (value.trim()) {
+      setCurrentJobShowAddressInput(true);
+      currentJobShowAddressInputRef.current = true;
+    } else {
+      setCurrentJobShowAddressInput(false);
+      currentJobShowAddressInputRef.current = false;
+    }
     setCurrentJobAddressError("");
   };
+
   const handleCurrentJobBusinessSelect = (business: any) => {
     setCurrentJobBusinessSelected(true);
+    // Hide address input when business is selected from dropdown
     setCurrentJobShowAddressInput(false);
     currentJobShowAddressInputRef.current = false;
     setCurrentJobIsManualAddress(false);
+    setCurrentJobAddress(""); // Clear address input
     setCurrentJob({
       ...currentJob,
       location: business.name || business.location,
@@ -694,18 +741,16 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     setCurrentJobBusinessName(business.name || business.location);
     setCurrentJobChanged(true);
   };
+
   const handleCurrentJobBusinessBlur = () => {
-    if (currentJobBusinessInput.trim() && !currentJobBusinessSelected) {
-      setCurrentJobShowAddressInput(true);
-      currentJobShowAddressInputRef.current = true;
-    }
+    // No special logic needed on blur - address input visibility is controlled by onChange and onSelect
   };
+
   const handleCurrentJobAddressChange = (value: string) => {
     setCurrentJobAddress(value);
-    if (currentJobAddressError) {
-      setCurrentJobAddressError("");
-    }
+    // Don't clear error while typing
   };
+
   const handleCurrentJobAddressBlur = () => {
     const address = currentJobAddress.trim();
     if (!address) {
@@ -733,6 +778,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     setCurrentJobChanged(true);
     setCurrentJobAddressError("");
   };
+
   const handleCurrentTimePeriodChange = (value: string) => {
     setCurrentTimePeriod(value);
     setCurrentJobChanged(true);
@@ -748,23 +794,38 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       ...pastJobBusinessSelected,
       [jobId]: false,
     });
-    setPastJobShowAddressInputs({
-      ...pastJobShowAddressInputs,
-      [jobId]: false,
-    });
+    // Show address input immediately when typing (business not yet selected)
+    if (value.trim()) {
+      setPastJobShowAddressInputs({
+        ...pastJobShowAddressInputs,
+        [jobId]: true,
+      });
+    } else {
+      setPastJobShowAddressInputs({
+        ...pastJobShowAddressInputs,
+        [jobId]: false,
+      });
+    }
     setPastJobAddressErrors({
       ...pastJobAddressErrors,
       [jobId]: "",
     });
   };
+
   const handlePastJobBusinessSelect = (jobId: string, business: any) => {
     setPastJobBusinessSelected({
       ...pastJobBusinessSelected,
       [jobId]: true,
     });
+    // Hide address input when business is selected from dropdown
     setPastJobShowAddressInputs({
       ...pastJobShowAddressInputs,
       [jobId]: false,
+    });
+    // Clear address input
+    setPastJobAddresses({
+      ...pastJobAddresses,
+      [jobId]: "",
     });
     setPastJobs(
       pastJobs.map((job) =>
@@ -779,26 +840,19 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     );
     setChangedJobs((prev) => new Set([...prev, jobId]));
   };
+
   const handlePastJobBusinessBlur = (jobId: string) => {
-    if (pastJobBusinessInputs[jobId]?.trim() && !pastJobBusinessSelected[jobId]) {
-      setPastJobShowAddressInputs({
-        ...pastJobShowAddressInputs,
-        [jobId]: true,
-      });
-    }
+    // No special logic needed on blur - address input visibility is controlled by onChange and onSelect
   };
+
   const handlePastJobAddressChange = (jobId: string, value: string) => {
     setPastJobAddresses({
       ...pastJobAddresses,
       [jobId]: value,
     });
-    if (pastJobAddressErrors[jobId]) {
-      setPastJobAddressErrors({
-        ...pastJobAddressErrors,
-        [jobId]: "",
-      });
-    }
+    // Don't clear error while typing
   };
+
   const handlePastJobAddressBlur = (jobId: string) => {
     const address = pastJobAddresses[jobId]?.trim() || "";
     if (!address) {
@@ -845,6 +899,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     });
     setChangedJobs((prev) => new Set([...prev, jobId]));
   };
+
   const handlePastJobRoleBlur = (jobId: string, value: string) => {
     if (value && !validateProfanity(value, "role")) {
       updatePastJob(jobId, "role", "");
@@ -866,6 +921,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       }
     }, 100);
   };
+
   return (
     <div className="w-full h-full flex items-center justify-center bg-transparent overflow-hidden">
       <div
@@ -873,16 +929,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         className="app-card p-6 animate-fade-in flex flex-col max-h-[80vh] overflow-y-auto relative"
       >
         {/* Scrollable content area */}
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pr-2">
+        <div className="flex-1 overflow-y-auto pr-2">
           <h1 className="text-xl font-medium text-app-black mb-2">Your Page! 😊</h1>
-
-          {/* Neighborhoods
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-2">Neighborhoods</h3>
-          <div className="flex flex-wrap gap-x-3 gap-y-2">
-            {Object.values(nycNeighborhoods).flat().map(n => <button key={n.name} onClick={() => onSearchTrigger?.(n.name)} className="px-1.5 py-0.5 bg-app-yellow text-app-black rounded text-xs hover:bg-app-yellow/90 transition-colors">{n.name}</button>)}
-          </div>
-        </div> */}
 
           {/* Current Job */}
           <div className="mb-8">
@@ -893,34 +941,21 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 <UnifiedBusinessSearch
                   value={currentJobBusinessInput}
                   onChange={(value, business, filters, neighborhoodCoords) => {
-                    // Completely ignore all changes when address input is showing
-                    if (currentJobShowAddressInput) {
-                      return;
-                    }
                     handleCurrentJobBusinessInputChange(value);
                   }}
                   onBusinessSelect={(business) => {
-                    // Prevent business selection when address input is showing
-                    if (currentJobShowAddressInput) {
-                      return;
-                    }
                     handleCurrentJobBusinessSelect(business);
                   }}
-                  onBlur={() => {
-                    // Only handle blur if address input isn't already showing
-                    if (!currentJobShowAddressInput) {
-                      handleCurrentJobBusinessBlur();
-                    }
-                  }}
+                  onBlur={handleCurrentJobBusinessBlur}
                   className={`app-input w-full ${currentJobShowAddressInput && !currentJobBusinessSelected ? "border-red-500" : ""}`}
                   placeholder="Where do you work?..."
                   variant="dropdown"
                 />
 
                 {/* Address input for current job */}
-                {currentJobShowAddressInput && (!currentJobBusinessSelected || currentJobIsManualAddress) && (
+                {currentJobShowAddressInput && !currentJobBusinessSelected && (
                   <div className="mt-2 space-y-2">
-                    <p className="text-red-500 text-xs">Business not found. Please enter the address:</p>
+                    <p className="text-app-gray-medium text-xs">Can't find your business? Enter the address below:</p>
                     <input
                       type="text"
                       placeholder="Enter business address (e.g., 123 Main St, City, State)..."
@@ -996,14 +1031,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     <UnifiedBusinessSearch
                       value={pastJobBusinessInputs[job.id] || ""}
                       onChange={(value, business, filters, neighborhoodCoords) => {
-                        if (!pastJobShowAddressInputs[job.id]) {
-                          handlePastJobBusinessInputChange(job.id, value);
-                        }
+                        handlePastJobBusinessInputChange(job.id, value);
                       }}
                       onBusinessSelect={(business) => {
-                        if (!pastJobShowAddressInputs[job.id]) {
-                          handlePastJobBusinessSelect(job.id, business);
-                        }
+                        handlePastJobBusinessSelect(job.id, business);
                       }}
                       onBlur={() => handlePastJobBusinessBlur(job.id)}
                       className={`app-input w-full ${pastJobShowAddressInputs[job.id] && !pastJobBusinessSelected[job.id] ? "border-red-500" : ""}`}
@@ -1014,7 +1045,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     {/* Address input for past job */}
                     {pastJobShowAddressInputs[job.id] && !pastJobBusinessSelected[job.id] && (
                       <div className="mt-2 space-y-2">
-                        <p className="text-red-500 text-xs">Business not found. Please enter the address:</p>
+                        <p className="text-app-gray-medium text-xs">
+                          Can't find your business? Enter the address below:
+                        </p>
                         <input
                           type="text"
                           placeholder="Enter business address (e.g., 123 Main St, City, State)..."
@@ -1057,7 +1090,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                         if (parts[1] && parts[1].length > 2) {
                           cleanValue = parts[0] + "." + parts[1].substring(0, 2);
                         }
-                        updatePastJob(job.id, "salary", cleanValue ? `$${cleanValue}` : "");
+                        updatePastJob(job.id, "salary", cleanValue ? `${cleanValue}` : "");
                       }}
                       onBlur={() => {
                         if (job.salary) {
@@ -1065,7 +1098,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                           if (value.includes(".")) {
                             const parts = value.split(".");
                             const formatted = parts[1]?.length === 1 ? `${parts[0]}.${parts[1]}0` : value;
-                            updatePastJob(job.id, "salary", `$${formatted}`);
+                            updatePastJob(job.id, "salary", `${formatted}`);
                           }
                         }
                       }}
@@ -1183,4 +1216,5 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     </div>
   );
 };
+
 export default SettingsPage;
