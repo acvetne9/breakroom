@@ -1,28 +1,62 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Plus, Minus } from "lucide-react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Plus, Minus, Loader2, AlertCircle } from "lucide-react";
 import JobSearchDropdown from "./JobSearchDropdown";
 import UnifiedBusinessSearch from "./UnifiedBusinessSearch";
 import { isProfane } from "../utils/profanityFilter";
 import { useDevice } from "@/contexts/DeviceContext";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { nycNeighborhoods } from "../utils/nyc_neighborhoods";
 import { usePosts } from "@/hooks/usePosts";
-import { getPastJobs, savePastJobs, savePastJob, deletePastJob, PastJobData } from "@/services/pastJobs";
+import { getPastJobs, savePastJob, deletePastJob, type PastJobData } from "@/services/pastJobs";
 import { getCurrentJob, saveCurrentJob, deleteCurrentJob, type CurrentJobData } from "@/services/currentJobs";
 
-interface UserInfo {
-  salary: string;
+// Improved state interfaces
+interface CurrentJobState {
+  // Database fields
   role: string;
+  salary: number;
   location: string;
-  isHiring: boolean;
+  business_name: string;
+  time_period: string;
+
+  // UI state
+  businessInput: string;
+  businessSelected: boolean;
+  showAddressInput: boolean;
+  addressInput: string;
+  addressError: string;
+  isManualAddress: boolean;
+
+  // Sync state
+  isDirty: boolean;
+  isSaving: boolean;
+  hasError: boolean;
+  errorMessage?: string;
+  lastSavedAt?: Date;
 }
 
-interface PastJob {
-  id?: string;
-  salary: string;
+interface PastJobState {
+  // Database fields
+  id: string;
   role: string;
+  salary: number;
   location: string;
-  business_name?: string;
+  business_name: string;
+  time_period: string;
+
+  // UI state
+  businessInput: string;
+  businessSelected: boolean;
+  showAddressInput: boolean;
+  addressInput: string;
+  addressError: string;
+
+  // Sync state
+  isDirty: boolean;
+  isSaving: boolean;
+  hasError: boolean;
+  errorMessage?: string;
+  lastSavedAt?: Date;
+  isCollapsed: boolean;
 }
 
 interface Post {
@@ -65,261 +99,35 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 }) => {
   const { deviceId } = useDevice();
   const isMobile = useIsMobile();
-  const { getUserPostsAndCommented, trackCommentedPost } = usePosts();
+  const { getUserPostsAndCommented } = usePosts();
   const userPosts = getUserPostsAndCommented();
 
-  // Add ref for the scrollable container
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [currentJob, setCurrentJob] = useState<UserInfo>({
-    salary: initialData.salary,
-    role: initialData.role,
-    location: initialData.fullLocation || initialData.location,
-    isHiring: false,
-  });
-  const [currentJobFullLocation, setCurrentJobFullLocation] = useState<string>(
-    initialData.fullLocation || initialData.location,
-  );
-  const [currentJobBusinessName, setCurrentJobBusinessName] = useState<string>(
-    initialData.businessName || initialData.location,
-  );
-  const [currentTimePeriod, setCurrentTimePeriod] = useState(initialData.timePeriod || "HR");
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Business selection states for current job
-  const [currentJobBusinessInput, setCurrentJobBusinessInput] = useState(
-    initialData.businessName || initialData.location || "",
-  );
-  const [currentJobBusinessSelected, setCurrentJobBusinessSelected] = useState(!!initialData.location);
-  const [currentJobShowAddressInput, setCurrentJobShowAddressInput] = useState(false);
-  const [currentJobAddress, setCurrentJobAddress] = useState("");
-  const [currentJobAddressError, setCurrentJobAddressError] = useState("");
-  const [currentJobIsManualAddress, setCurrentJobIsManualAddress] = useState(false);
-  // Ref to track address input state to avoid stale closures
-  const currentJobShowAddressInputRef = useRef(false);
-
-  // Past jobs state
-  const [pastJobs, setPastJobs] = useState<PastJob[]>([]);
-  const [pastJobsLoading, setPastJobsLoading] = useState(true);
-  const [pastJobTimePeriods, setPastJobTimePeriods] = useState<{
-    [id: string]: string;
-  }>({});
-
-  // Business selection states for past jobs
-  const [pastJobBusinessInputs, setPastJobBusinessInputs] = useState<{
-    [id: string]: string;
-  }>({});
-  const [pastJobBusinessSelected, setPastJobBusinessSelected] = useState<{
-    [id: string]: boolean;
-  }>({});
-  const [pastJobShowAddressInputs, setPastJobShowAddressInputs] = useState<{
-    [id: string]: boolean;
-  }>({});
-  const [pastJobAddresses, setPastJobAddresses] = useState<{
-    [id: string]: string;
-  }>({});
-  const [pastJobAddressErrors, setPastJobAddressErrors] = useState<{
-    [id: string]: string;
-  }>({});
+  // Simplified state management
+  const [currentJob, setCurrentJob] = useState<CurrentJobState | null>(null);
+  const [pastJobs, setPastJobs] = useState<PastJobState[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isStoriesExpanded, setIsStoriesExpanded] = useState(false);
   const [showHelpPopup, setShowHelpPopup] = useState(false);
-  const [initialCurrentJob] = useState(currentJob);
-  const [initialTimePeriod] = useState(currentTimePeriod);
-  const [changedJobs, setChangedJobs] = useState<Set<string>>(new Set());
-  const [currentJobChanged, setCurrentJobChanged] = useState(false);
-  const currentJobRef = useRef(currentJob);
-  const currentTimePeriodRef = useRef(currentTimePeriod);
-  const currentJobBusinessNameRef = useRef(currentJobBusinessName);
-  const pastJobsRef = useRef(pastJobs);
-  const pastJobTimePeriodsRef = useRef(pastJobTimePeriods);
-  const changedJobsRef = useRef(changedJobs);
-  const currentJobChangedRef = useRef(currentJobChanged);
-  const hasCreatedPostsRef = useRef(false);
-  const currentJobFullLocationRef = useRef(currentJobFullLocation);
 
-  useEffect(() => {
-    currentJobRef.current = currentJob;
-  }, [currentJob]);
+  // Auto-save delay (ms)
+  const AUTO_SAVE_DELAY = 1000;
 
-  useEffect(() => {
-    currentJobFullLocationRef.current = currentJobFullLocation;
-  }, [currentJobFullLocation]);
+  // ==================== VALIDATION ====================
 
-  useEffect(() => {
-    currentJobBusinessNameRef.current = currentJobBusinessName;
-  }, [currentJobBusinessName]);
-
-  useEffect(() => {
-    pastJobsRef.current = pastJobs;
-  }, [pastJobs]);
-
-  useEffect(() => {
-    pastJobTimePeriodsRef.current = pastJobTimePeriods;
-  }, [pastJobTimePeriods]);
-
-  useEffect(() => {
-    changedJobsRef.current = changedJobs;
-  }, [changedJobs]);
-
-  useEffect(() => {
-    currentJobChangedRef.current = currentJobChanged;
-  }, [currentJobChanged]);
-
-  // Load current and past jobs from database on mount
-  useEffect(() => {
-    const loadJobs = async () => {
-      try {
-        console.log("🔄 Loading jobs from database...");
-
-        // Load current job
-        const currentJobData = await getCurrentJob();
-        console.log("📥 Current job loaded:", currentJobData);
-
-        if (currentJobData) {
-          setCurrentJob({
-            salary: currentJobData.salary ? `$${currentJobData.salary}` : "",
-            role: currentJobData.role || "",
-            location: currentJobData.location || "",
-            isHiring: false,
-          });
-          setCurrentJobFullLocation(currentJobData.location || "");
-          setCurrentJobBusinessName(currentJobData.business_name || currentJobData.location || "");
-          setCurrentTimePeriod(currentJobData.time_period || "HR");
-
-          // Initialize business input states
-          setCurrentJobBusinessInput(currentJobData.business_name || currentJobData.location || "");
-          setCurrentJobBusinessSelected(!!currentJobData.location);
-
-          // Check if manual address
-          const hasLocation = !!currentJobData.location;
-          const businessMatchesLocation =
-            currentJobData.business_name === currentJobData.location || !currentJobData.business_name;
-          const isManualAddress = hasLocation && businessMatchesLocation;
-          setCurrentJobShowAddressInput(false); // Don't show address input on load
-          setCurrentJobAddress(isManualAddress ? currentJobData.location : "");
-          setCurrentJobIsManualAddress(isManualAddress);
-        } else {
-          console.log("ℹ️ No current job found in database");
-        }
-
-        // Load past jobs
-        const jobs = await getPastJobs();
-        console.log("📥 Past jobs loaded:", jobs.length, "jobs");
-
-        if (jobs.length > 0) {
-          const formattedJobs: PastJob[] = jobs.map((job) => ({
-            id: job.id,
-            salary: job.salary ? `$${job.salary}` : "",
-            role: job.role,
-            location: job.location || "",
-            business_name: job.business_name,
-          }));
-          setPastJobs(formattedJobs);
-
-          // Initialize time periods and business inputs for all past jobs
-          const periods: { [id: string]: string } = {};
-          const inputs: { [id: string]: string } = {};
-          const selected: { [id: string]: boolean } = {};
-          const showAddress: { [id: string]: boolean } = {};
-          const addresses: { [id: string]: string } = {};
-          const errors: { [id: string]: string } = {};
-
-          jobs.forEach((job) => {
-            if (job.id) {
-              periods[job.id] = job.time_period || "HR";
-
-              const hasLocation = !!job.location;
-              const businessMatchesLocation = job.business_name === job.location || !job.business_name;
-              const isManualAddress = hasLocation && businessMatchesLocation;
-
-              inputs[job.id] = job.business_name || job.location || "";
-              selected[job.id] = hasLocation;
-              showAddress[job.id] = false; // Don't show address input on load
-              addresses[job.id] = isManualAddress ? job.location || "" : "";
-              errors[job.id] = "";
-            }
-          });
-
-          setPastJobTimePeriods(periods);
-          setPastJobBusinessInputs(inputs);
-          setPastJobBusinessSelected(selected);
-          setPastJobShowAddressInputs(showAddress);
-          setPastJobAddresses(addresses);
-          setPastJobAddressErrors(errors);
-        } else {
-          console.log("ℹ️ No past jobs found in database");
-          // No past jobs in database - start with one empty job
-          const newJobId = `temp_${Date.now()}`;
-          setPastJobs([
-            {
-              id: newJobId,
-              salary: "",
-              role: "",
-              location: "",
-            },
-          ]);
-          setPastJobTimePeriods({ [newJobId]: "HR" });
-        }
-      } catch (error: any) {
-        console.error("❌ Failed to load jobs:", error);
-
-        // Show error to user with toast
-        const errorMessage = error?.message || "Unknown error occurred";
-        console.error("Error details:", errorMessage);
-
-        // Still initialize with one empty job
-        const newJobId = `temp_${Date.now()}`;
-        setPastJobs([
-          {
-            id: newJobId,
-            salary: "",
-            role: "",
-            location: "",
-          },
-        ]);
-        setPastJobTimePeriods({ [newJobId]: "HR" });
-      } finally {
-        setPastJobsLoading(false);
-      }
-    };
-
-    loadJobs();
-  }, []);
-
-  // Close help popup when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (showHelpPopup) {
-        setShowHelpPopup(false);
-      }
-    };
-    if (showHelpPopup) {
-      document.addEventListener("click", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("click", handleClickOutside);
-    };
-  }, [showHelpPopup]);
-
-  // Address validation function
   const isValidAddress = (address: string): boolean => {
-    if (!address || address.trim().length === 0) return false;
-    const trimmedAddress = address.trim();
+    if (!address || address.trim().length < 10) return false;
+    const trimmed = address.trim();
 
-    // Check minimum length
-    if (trimmedAddress.length < 10) {
-      return false;
-    }
+    const hasNumbers = /\d/.test(trimmed);
+    const hasLetters = /[a-zA-Z]/.test(trimmed);
+    const hasSpaces = /\s/.test(trimmed);
 
-    // Check for basic address components
-    const hasNumbers = /\d/.test(trimmedAddress);
-    const hasLetters = /[a-zA-Z]/.test(trimmedAddress);
-    const hasSpaces = /\s/.test(trimmedAddress);
+    if (!hasNumbers || !hasLetters || !hasSpaces) return false;
 
-    // Must have numbers (street number), letters, and spaces
-    if (!hasNumbers || !hasLetters || !hasSpaces) {
-      return false;
-    }
-
-    // Common street types/suffixes
     const streetTypes = [
       "street",
       "st",
@@ -366,561 +174,584 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       "crossing",
       "xing",
     ];
-    const addressLower = trimmedAddress.toLowerCase();
-    const hasStreetType = streetTypes.some(
+
+    const addressLower = trimmed.toLowerCase();
+    return streetTypes.some(
       (type) =>
-        addressLower.includes(" " + type + " ") ||
-        addressLower.endsWith(" " + type) ||
-        addressLower.includes(" " + type + ","),
-    );
-
-    // Check for common address patterns
-    const addressPatterns = [
-      // Pattern: number + street name + type (e.g., "123 Main St")
-      /^\d+\s+[a-zA-Z\s]+\s+(street|st|avenue|ave|road|rd|drive|dr|lane|ln|boulevard|blvd|court|ct|place|pl|way|circle|cir|plaza|square|sq|parkway|pkwy|trail|tr|terrace|ter|highway|hwy|loop|row|walk|alley|crescent|cres|grove|heights|hill|park|ridge|view|crossing|xing)\b/i,
-      // Pattern with apartment/unit numbers
-      /^\d+\s+[a-zA-Z\s]+\s+(street|st|avenue|ave|road|rd|drive|dr|lane|ln|boulevard|blvd|court|ct|place|pl|way|circle|cir|plaza|square|sq|parkway|pkwy|trail|tr|terrace|ter|highway|hwy|loop|row|walk|alley|crescent|cres|grove|heights|hill|park|ridge|view|crossing|xing)\b.*?(apt|apartment|unit|suite|ste)?\s*\#?\d*$/i,
-    ];
-    const matchesPattern = addressPatterns.some((pattern) => pattern.test(trimmedAddress));
-
-    // Address is valid if it has street type or matches common patterns
-    return hasStreetType || matchesPattern;
-  };
-
-  const validateProfanity = (text: string, fieldName: string): boolean => {
-    if (isProfane(text)) {
-      return false;
-    }
-    return true;
-  };
-
-  // Helper to check if job ID is from database (not a temp ID)
-  const isJobFromDatabase = (jobId?: string): boolean => {
-    if (!jobId) return false;
-    if (jobId.startsWith("temp_")) return false;
-    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    return uuidPattern.test(jobId);
-  };
-
-  const isPastJobComplete = (job: PastJob, timePeriod: string) => {
-    const jobId = job.id || "";
-
-    // Must have all basic fields (like current job)
-    const hasBasicFields = job.salary && job.role && job.location && timePeriod;
-
-    // Must have business selected (like current job)
-    const hasValidBusiness = pastJobBusinessSelected[jobId];
-
-    // If address input is shown, address must be valid (like current job)
-    const hasValidAddress = !pastJobShowAddressInputs[jobId] || isValidAddress(pastJobAddresses[jobId]);
-
-    return hasBasicFields && hasValidBusiness && hasValidAddress;
-  };
-
-  const isCurrentJobComplete = () => {
-    return (
-      currentJob.salary &&
-      currentJob.role &&
-      currentJob.location &&
-      currentTimePeriod &&
-      currentJobBusinessSelected &&
-      (!currentJobShowAddressInput || isValidAddress(currentJobAddress))
+        addressLower.includes(` ${type} `) || addressLower.endsWith(` ${type}`) || addressLower.includes(` ${type},`),
     );
   };
 
-  useEffect(() => {
-    return () => {
-      if (hasCreatedPostsRef.current) return;
-      hasCreatedPostsRef.current = true;
+  const validateProfanity = (text: string): boolean => {
+    return !isProfane(text);
+  };
 
-      const hasCurrentJobChangedFromRefs = () =>
-        currentJobRef.current.salary !== initialCurrentJob.salary ||
-        currentJobRef.current.role !== initialCurrentJob.role ||
-        currentJobRef.current.location !== initialCurrentJob.location ||
-        currentTimePeriodRef.current !== initialTimePeriod;
+  const isCurrentJobComplete = (job: CurrentJobState | null): boolean => {
+    if (!job) return false;
+    return !!(
+      job.salary > 0 &&
+      job.role.trim() &&
+      job.location.trim() &&
+      job.time_period &&
+      job.businessSelected &&
+      (!job.showAddressInput || isValidAddress(job.addressInput))
+    );
+  };
 
-      const isCurrentJobCompleteFromRefs = () =>
-        currentJobRef.current.salary &&
-        currentJobRef.current.role &&
-        currentJobRef.current.location &&
-        currentTimePeriodRef.current;
+  const isPastJobComplete = (job: PastJobState): boolean => {
+    return !!(
+      job.salary > 0 &&
+      job.role.trim() &&
+      job.location.trim() &&
+      job.time_period &&
+      job.businessSelected &&
+      (!job.showAddressInput || isValidAddress(job.addressInput))
+    );
+  };
 
-      // Save current job to database if changed and complete
-      if (currentJobChangedRef.current && hasCurrentJobChangedFromRefs() && isCurrentJobCompleteFromRefs()) {
-        console.log("🚪 SettingsPage cleanup: saving current job to database");
-        const currentJobData: CurrentJobData = {
-          role: currentJobRef.current.role,
-          salary: parseFloat(currentJobRef.current.salary.replace(/[^0-9.]/g, "")),
-          location: currentJobFullLocationRef.current || currentJobRef.current.location,
-          business_name: currentJobBusinessNameRef.current,
-          time_period: currentTimePeriodRef.current,
-        };
-        saveCurrentJob(currentJobData).catch((error) => {
-          console.error("Failed to save current job:", error);
+  // ==================== DATABASE OPERATIONS ====================
+
+  const loadJobsFromDatabase = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
+
+    try {
+      // Load current job
+      const currentJobData = await getCurrentJob();
+
+      if (currentJobData) {
+        const isManualAddress = currentJobData.business_name === currentJobData.location;
+        setCurrentJob({
+          role: currentJobData.role || "",
+          salary: currentJobData.salary || 0,
+          location: currentJobData.location || "",
+          business_name: currentJobData.business_name || "",
+          time_period: currentJobData.time_period || "HR",
+          businessInput: currentJobData.business_name || currentJobData.location || "",
+          businessSelected: !!currentJobData.location,
+          showAddressInput: false,
+          addressInput: isManualAddress ? currentJobData.location : "",
+          addressError: "",
+          isManualAddress,
+          isDirty: false,
+          isSaving: false,
+          hasError: false,
+          lastSavedAt: new Date(),
         });
+      } else {
+        // Initialize empty current job
+        setCurrentJob({
+          role: initialData.role || "",
+          salary: initialData.salary ? parseFloat(initialData.salary.replace(/[^0-9.]/g, "")) : 0,
+          location: initialData.fullLocation || initialData.location || "",
+          business_name: initialData.businessName || initialData.location || "",
+          time_period: initialData.timePeriod || "HR",
+          businessInput: initialData.businessName || initialData.location || "",
+          businessSelected: !!initialData.location,
+          showAddressInput: false,
+          addressInput: "",
+          addressError: "",
+          isManualAddress: false,
+          isDirty: false,
+          isSaving: false,
+          hasError: false,
+        });
+      }
 
-        // Also call onJobUpdate for compatibility
+      // Load past jobs
+      const pastJobsData = await getPastJobs();
+
+      if (pastJobsData.length > 0) {
+        const formattedJobs: PastJobState[] = pastJobsData.map((job) => {
+          const isManualAddress = job.business_name === job.location;
+          return {
+            id: job.id!,
+            role: job.role,
+            salary: job.salary,
+            location: job.location || "",
+            business_name: job.business_name || "",
+            time_period: job.time_period || "HR",
+            businessInput: job.business_name || job.location || "",
+            businessSelected: !!job.location,
+            showAddressInput: false,
+            addressInput: isManualAddress ? job.location || "" : "",
+            addressError: "",
+            isDirty: false,
+            isSaving: false,
+            hasError: false,
+            lastSavedAt: new Date(),
+            isCollapsed: false,
+          };
+        });
+        setPastJobs(formattedJobs);
+      } else {
+        // Start with one empty past job
+        const newJobId = `temp_${Date.now()}`;
+        setPastJobs([createEmptyPastJob(newJobId)]);
+      }
+    } catch (error: any) {
+      console.error("Failed to load jobs:", error);
+      setLoadError(error?.message || "Failed to load jobs");
+      // Initialize with empty jobs on error
+      const newJobId = `temp_${Date.now()}`;
+      setPastJobs([createEmptyPastJob(newJobId)]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [initialData]);
+
+  const saveCurrentJobToDatabase = useCallback(
+    async (job: CurrentJobState) => {
+      if (!isCurrentJobComplete(job)) {
+        console.log("Current job incomplete, skipping save");
+        return;
+      }
+
+      setCurrentJob((prev) => (prev ? { ...prev, isSaving: true, hasError: false } : prev));
+
+      try {
+        const jobData: CurrentJobData = {
+          role: job.role,
+          salary: job.salary,
+          location: job.location,
+          business_name: job.business_name,
+          time_period: job.time_period,
+        };
+
+        await saveCurrentJob(jobData);
+
+        setCurrentJob((prev) =>
+          prev
+            ? {
+                ...prev,
+                isDirty: false,
+                isSaving: false,
+                hasError: false,
+                errorMessage: undefined,
+                lastSavedAt: new Date(),
+              }
+            : prev,
+        );
+
+        // Call legacy callback
         if (onJobUpdate) {
           onJobUpdate({
-            salary: currentJobRef.current.salary,
-            role: currentJobRef.current.role,
-            location: currentJobFullLocationRef.current || currentJobRef.current.location,
-            businessName: currentJobBusinessNameRef.current,
-            timePeriod: currentTimePeriodRef.current,
+            salary: `$${job.salary}`,
+            role: job.role,
+            location: job.location,
+            businessName: job.business_name,
+            timePeriod: job.time_period,
           });
+        }
+      } catch (error: any) {
+        console.error("Failed to save current job:", error);
+        setCurrentJob((prev) =>
+          prev
+            ? {
+                ...prev,
+                isSaving: false,
+                hasError: true,
+                errorMessage: error?.message || "Failed to save",
+              }
+            : prev,
+        );
+      }
+    },
+    [onJobUpdate],
+  );
+
+  const savePastJobToDatabase = useCallback(async (job: PastJobState) => {
+    if (!isPastJobComplete(job)) {
+      console.log("Past job incomplete, skipping save:", job.id);
+      return;
+    }
+
+    setPastJobs((prev) => prev.map((j) => (j.id === job.id ? { ...j, isSaving: true, hasError: false } : j)));
+
+    try {
+      const jobData: PastJobData = {
+        id: job.id.startsWith("temp_") ? undefined : job.id,
+        role: job.role,
+        salary: job.salary,
+        location: job.location,
+        business_name: job.business_name,
+        time_period: job.time_period,
+      };
+
+      const savedId = await savePastJob(jobData);
+
+      setPastJobs((prev) =>
+        prev.map((j) =>
+          j.id === job.id
+            ? {
+                ...j,
+                id: savedId, // Update temp ID with real ID
+                isDirty: false,
+                isSaving: false,
+                hasError: false,
+                errorMessage: undefined,
+                lastSavedAt: new Date(),
+              }
+            : j,
+        ),
+      );
+    } catch (error: any) {
+      console.error("Failed to save past job:", error);
+      setPastJobs((prev) =>
+        prev.map((j) =>
+          j.id === job.id
+            ? {
+                ...j,
+                isSaving: false,
+                hasError: true,
+                errorMessage: error?.message || "Failed to save",
+              }
+            : j,
+        ),
+      );
+    }
+  }, []);
+
+  const deletePastJobFromDatabase = useCallback(
+    async (jobId: string) => {
+      const job = pastJobs.find((j) => j.id === jobId);
+      if (!job) return;
+
+      // Only delete from database if it has a real ID
+      if (!jobId.startsWith("temp_")) {
+        try {
+          await deletePastJob(jobId);
+        } catch (error) {
+          console.error("Failed to delete past job:", error);
         }
       }
 
-      // Only update changed past jobs that are already in the database
-      const jobsToUpdate = pastJobsRef.current
-        .filter((job) => {
-          const jobId = job.id || "";
-          const isChanged = changedJobsRef.current.has(jobId);
-          const timePeriod = pastJobTimePeriodsRef.current[jobId];
-          const isComplete = isPastJobComplete(job, timePeriod);
-          const isRealDatabaseId = job.id && !job.id.startsWith("temp_") && job.id.includes("-");
-          return isChanged && isComplete && isRealDatabaseId;
-        })
-        .map(
-          (job): PastJobData => ({
-            id: job.id,
-            role: job.role,
-            salary: parseFloat(job.salary.replace(/[^0-9.]/g, "")),
-            location: job.location,
-            business_name: job.business_name || job.location,
-            time_period: pastJobTimePeriodsRef.current[job.id || ""] || "HR",
-          }),
-        );
+      setPastJobs((prev) => prev.filter((j) => j.id !== jobId));
+    },
+    [pastJobs],
+  );
 
-      // Update each changed job individually
-      if (jobsToUpdate.length > 0) {
-        Promise.all(jobsToUpdate.map((jobData) => savePastJob(jobData))).catch((error) => {
-          console.error("Failed to update past jobs:", error);
-        });
+  // ==================== AUTO-SAVE ====================
+
+  const scheduleAutoSave = useCallback(
+    (job: CurrentJobState | PastJobState, type: "current" | "past") => {
+      // Clear existing timeout
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
       }
 
-      onPageLeave?.();
-    };
-  }, []);
+      // Schedule new save
+      saveTimeoutRef.current = setTimeout(() => {
+        if (type === "current") {
+          saveCurrentJobToDatabase(job as CurrentJobState);
+        } else {
+          savePastJobToDatabase(job as PastJobState);
+        }
+      }, AUTO_SAVE_DELAY);
+    },
+    [saveCurrentJobToDatabase, savePastJobToDatabase],
+  );
 
-  const addPastJob = async () => {
-    const newJobId = `temp_${Date.now()}`;
-    const newJob: PastJob = {
-      id: newJobId,
-      salary: "",
-      role: "",
-      location: "",
-    };
+  // ==================== CURRENT JOB HANDLERS ====================
 
-    // Add to local state first
-    setPastJobs([...pastJobs, newJob]);
-    setPastJobTimePeriods({
-      ...pastJobTimePeriods,
-      [newJobId]: "HR",
-    });
-
-    // Initialize states for new job
-    setPastJobBusinessInputs({
-      ...pastJobBusinessInputs,
-      [newJobId]: "",
-    });
-    setPastJobBusinessSelected({
-      ...pastJobBusinessSelected,
-      [newJobId]: false,
-    });
-    setPastJobShowAddressInputs({
-      ...pastJobShowAddressInputs,
-      [newJobId]: false,
-    });
-    setPastJobAddresses({
-      ...pastJobAddresses,
-      [newJobId]: "",
-    });
-    setPastJobAddressErrors({
-      ...pastJobAddressErrors,
-      [newJobId]: "",
-    });
-
-    // Immediately save empty job to database
-    try {
-      const jobData: PastJobData = {
-        role: "",
-        salary: 0,
-        location: "",
-        business_name: "",
-        time_period: "HR",
-      };
-      const realId = await savePastJob(jobData);
-
-      // Update the job with the real database ID
-      setPastJobs((prev) => prev.map((j) => (j.id === newJobId ? { ...j, id: realId } : j)));
-
-      // Update all state objects with the new ID
-      setPastJobTimePeriods((prev) => {
-        const updated = { ...prev, [realId]: prev[newJobId] };
-        delete updated[newJobId];
+  const updateCurrentJob = useCallback(
+    (updates: Partial<CurrentJobState>) => {
+      setCurrentJob((prev) => {
+        if (!prev) return prev;
+        const updated = { ...prev, ...updates, isDirty: true };
+        scheduleAutoSave(updated, "current");
         return updated;
       });
-      setPastJobBusinessInputs((prev) => {
-        const updated = { ...prev, [realId]: prev[newJobId] };
-        delete updated[newJobId];
-        return updated;
-      });
-      setPastJobBusinessSelected((prev) => {
-        const updated = { ...prev, [realId]: prev[newJobId] };
-        delete updated[newJobId];
-        return updated;
-      });
-      setPastJobShowAddressInputs((prev) => {
-        const updated = { ...prev, [realId]: prev[newJobId] };
-        delete updated[newJobId];
-        return updated;
-      });
-      setPastJobAddresses((prev) => {
-        const updated = { ...prev, [realId]: prev[newJobId] };
-        delete updated[newJobId];
-        return updated;
-      });
-      setPastJobAddressErrors((prev) => {
-        const updated = { ...prev, [realId]: prev[newJobId] };
-        delete updated[newJobId];
-        return updated;
-      });
-    } catch (error) {
-      console.error("Failed to save new past job:", error);
-    }
-  };
+    },
+    [scheduleAutoSave],
+  );
 
-  const removePastJob = async (id: string) => {
-    const job = pastJobs.find((j) => j.id === id);
-
-    // If job has a UUID id (loaded from database), delete it from database
-    // UUIDs have dashes, timestamps don't
-    if (job?.id && job.id.includes("-")) {
-      try {
-        await deletePastJob(id);
-      } catch (error) {
-        console.error("Failed to delete past job:", error);
-      }
-    }
-
-    setPastJobs(pastJobs.filter((job) => job.id !== id));
-
-    // Clean up states for removed job
-    const newInputs = {
-      ...pastJobBusinessInputs,
-    };
-    const newSelected = {
-      ...pastJobBusinessSelected,
-    };
-    const newShowAddress = {
-      ...pastJobShowAddressInputs,
-    };
-    const newAddresses = {
-      ...pastJobAddresses,
-    };
-    const newAddressErrors = {
-      ...pastJobAddressErrors,
-    };
-    delete newInputs[id];
-    delete newSelected[id];
-    delete newShowAddress[id];
-    delete newAddresses[id];
-    delete newAddressErrors[id];
-    setPastJobBusinessInputs(newInputs);
-    setPastJobBusinessSelected(newSelected);
-    setPastJobShowAddressInputs(newShowAddress);
-    setPastJobAddresses(newAddresses);
-    setPastJobAddressErrors(newAddressErrors);
-  };
-
-  const updatePastJob = (id: string, field: keyof Omit<PastJob, "id">, value: string) => {
-    const processedValue =
-      field === "salary" ? (value.replace(/[^0-9.]/g, "") ? `$${value.replace(/[^0-9.]/g, "")}` : "") : value;
-    setPastJobs(
-      pastJobs.map((job) =>
-        job.id === id
-          ? {
-              ...job,
-              [field]: processedValue,
-            }
-          : job,
-      ),
-    );
-    setChangedJobs((prev) => new Set([...prev, id]));
-  };
-
-  const updatePastJobTimePeriod = (id: string, timePeriod: string) => {
-    setPastJobTimePeriods({
-      ...pastJobTimePeriods,
-      [id]: timePeriod,
-    });
-    setChangedJobs((prev) => new Set([...prev, id]));
-  };
-
-  // Current job handlers
-  const handleSalaryChange = (value: string) => {
+  const handleCurrentJobSalaryChange = (value: string) => {
     let cleanValue = value.replace(/[^0-9.]/g, "");
-
-    // Ensure only one decimal point
     const parts = cleanValue.split(".");
     if (parts.length > 2) {
       cleanValue = parts[0] + "." + parts.slice(1).join("");
     }
-
-    // Limit to 2 decimal places
     if (parts[1] && parts[1].length > 2) {
       cleanValue = parts[0] + "." + parts[1].substring(0, 2);
     }
 
-    setCurrentJob({
-      ...currentJob,
-      salary: cleanValue ? `$${cleanValue}` : "",
-    });
-    setCurrentJobChanged(true);
-  };
-
-  const handleSalaryBlur = () => {
-    if (currentJob.salary) {
-      const value = currentJob.salary.replace(/[^0-9.]/g, "");
-      if (value.includes(".")) {
-        const parts = value.split(".");
-        // Add trailing 0 if only 1 decimal place
-        const formatted = parts[1]?.length === 1 ? `${parts[0]}.${parts[1]}0` : value;
-        setCurrentJob({
-          ...currentJob,
-          salary: `$${formatted}`,
-        });
-      }
-    }
+    updateCurrentJob({ salary: parseFloat(cleanValue) || 0 });
   };
 
   const handleCurrentJobRoleChange = (value: string) => {
-    setCurrentJob({
-      ...currentJob,
-      role: value,
-    });
-    setCurrentJobChanged(true);
-  };
-
-  const handleCurrentJobRoleBlur = () => {
-    if (currentJob.role && !validateProfanity(currentJob.role, "role")) {
-      setCurrentJob({
-        ...currentJob,
-        role: "",
-      });
+    if (validateProfanity(value)) {
+      updateCurrentJob({ role: value });
     }
   };
 
   const handleCurrentJobBusinessInputChange = (value: string) => {
-    setCurrentJobBusinessInput(value);
-    setCurrentJobBusinessSelected(false);
-    // Show address input immediately when typing (business not yet selected)
-    if (value.trim()) {
-      setCurrentJobShowAddressInput(true);
-      currentJobShowAddressInputRef.current = true;
-    } else {
-      setCurrentJobShowAddressInput(false);
-      currentJobShowAddressInputRef.current = false;
-    }
-    setCurrentJobAddressError("");
+    updateCurrentJob({
+      businessInput: value,
+      businessSelected: false,
+      showAddressInput: !!value.trim(),
+      addressError: "",
+    });
   };
 
   const handleCurrentJobBusinessSelect = (business: any) => {
-    setCurrentJobBusinessSelected(true);
-    // Hide address input when business is selected from dropdown
-    setCurrentJobShowAddressInput(false);
-    currentJobShowAddressInputRef.current = false;
-    setCurrentJobIsManualAddress(false);
-    setCurrentJobAddress(""); // Clear address input
-    setCurrentJob({
-      ...currentJob,
+    updateCurrentJob({
+      businessInput: business.name || business.location,
+      businessSelected: true,
+      showAddressInput: false,
+      addressInput: "",
+      addressError: "",
+      isManualAddress: false,
       location: business.name || business.location,
+      business_name: business.name || business.location,
     });
-    setCurrentJobFullLocation(business.fullLocation || business.name || business.location);
-    setCurrentJobBusinessName(business.name || business.location);
-    setCurrentJobChanged(true);
-  };
-
-  const handleCurrentJobBusinessBlur = () => {
-    // No special logic needed on blur - address input visibility is controlled by onChange and onSelect
   };
 
   const handleCurrentJobAddressChange = (value: string) => {
-    setCurrentJobAddress(value);
-    // Don't clear error while typing
+    setCurrentJob((prev) => (prev ? { ...prev, addressInput: value } : prev));
   };
 
   const handleCurrentJobAddressBlur = () => {
-    const address = currentJobAddress.trim();
+    if (!currentJob) return;
+
+    const address = currentJob.addressInput.trim();
     if (!address) {
-      setCurrentJobAddressError("Please enter a business address");
+      setCurrentJob((prev) =>
+        prev
+          ? {
+              ...prev,
+              addressError: "Please enter a business address",
+            }
+          : prev,
+      );
       return;
     }
-    if (isProfane(address)) {
-      setCurrentJobAddressError("Invalid address content");
+    if (!validateProfanity(address)) {
+      setCurrentJob((prev) =>
+        prev
+          ? {
+              ...prev,
+              addressError: "Invalid address content",
+            }
+          : prev,
+      );
       return;
     }
     if (!isValidAddress(address)) {
-      setCurrentJobAddressError('Please enter a valid street address (e.g., "123 Main St, City, State")');
+      setCurrentJob((prev) =>
+        prev
+          ? {
+              ...prev,
+              addressError: 'Please enter a valid street address (e.g., "123 Main St, City, State")',
+            }
+          : prev,
+      );
       return;
     }
 
-    // Address is valid - save it
-    setCurrentJob({
-      ...currentJob,
+    updateCurrentJob({
       location: address,
+      business_name: currentJob.businessInput,
+      businessSelected: true,
+      isManualAddress: true,
+      addressError: "",
     });
-    setCurrentJobFullLocation(address);
-    setCurrentJobBusinessName(currentJobBusinessInput); // Save the business name entered by user
-    setCurrentJobBusinessSelected(true);
-    setCurrentJobIsManualAddress(true);
-    setCurrentJobChanged(true);
-    setCurrentJobAddressError("");
   };
 
-  const handleCurrentTimePeriodChange = (value: string) => {
-    setCurrentTimePeriod(value);
-    setCurrentJobChanged(true);
+  const handleCurrentJobTimePeriodChange = (value: string) => {
+    updateCurrentJob({ time_period: value });
   };
 
-  // Past job handlers
-  const handlePastJobBusinessInputChange = (jobId: string, value: string) => {
-    setPastJobBusinessInputs({
-      ...pastJobBusinessInputs,
-      [jobId]: value,
-    });
-    setPastJobBusinessSelected({
-      ...pastJobBusinessSelected,
-      [jobId]: false,
-    });
-    // Show address input immediately when typing (business not yet selected)
-    if (value.trim()) {
-      setPastJobShowAddressInputs({
-        ...pastJobShowAddressInputs,
-        [jobId]: true,
+  // ==================== PAST JOB HANDLERS ====================
+
+  const createEmptyPastJob = (id: string): PastJobState => ({
+    id,
+    role: "",
+    salary: 0,
+    location: "",
+    business_name: "",
+    time_period: "HR",
+    businessInput: "",
+    businessSelected: false,
+    showAddressInput: false,
+    addressInput: "",
+    addressError: "",
+    isDirty: false,
+    isSaving: false,
+    hasError: false,
+    isCollapsed: false,
+  });
+
+  const updatePastJob = useCallback(
+    (jobId: string, updates: Partial<PastJobState>) => {
+      setPastJobs((prev) => {
+        const updated = prev.map((job) => {
+          if (job.id !== jobId) return job;
+          const updatedJob = { ...job, ...updates, isDirty: true };
+          scheduleAutoSave(updatedJob, "past");
+          return updatedJob;
+        });
+        return updated;
       });
-    } else {
-      setPastJobShowAddressInputs({
-        ...pastJobShowAddressInputs,
-        [jobId]: false,
-      });
+    },
+    [scheduleAutoSave],
+  );
+
+  const handleAddPastJob = async () => {
+    const newJobId = `temp_${Date.now()}`;
+    const newJob = createEmptyPastJob(newJobId);
+    setPastJobs((prev) => [...prev, newJob]);
+  };
+
+  const handleRemovePastJob = (jobId: string) => {
+    deletePastJobFromDatabase(jobId);
+  };
+
+  const handlePastJobSalaryChange = (jobId: string, value: string) => {
+    let cleanValue = value.replace(/[^0-9.]/g, "");
+    const parts = cleanValue.split(".");
+    if (parts.length > 2) {
+      cleanValue = parts[0] + "." + parts.slice(1).join("");
     }
-    setPastJobAddressErrors({
-      ...pastJobAddressErrors,
-      [jobId]: "",
+    if (parts[1] && parts[1].length > 2) {
+      cleanValue = parts[0] + "." + parts[1].substring(0, 2);
+    }
+
+    updatePastJob(jobId, { salary: parseFloat(cleanValue) || 0 });
+  };
+
+  const handlePastJobRoleChange = (jobId: string, value: string) => {
+    if (validateProfanity(value)) {
+      updatePastJob(jobId, { role: value });
+    }
+  };
+
+  const handlePastJobBusinessInputChange = (jobId: string, value: string) => {
+    updatePastJob(jobId, {
+      businessInput: value,
+      businessSelected: false,
+      showAddressInput: !!value.trim(),
+      addressError: "",
     });
   };
 
   const handlePastJobBusinessSelect = (jobId: string, business: any) => {
-    setPastJobBusinessSelected({
-      ...pastJobBusinessSelected,
-      [jobId]: true,
+    updatePastJob(jobId, {
+      businessInput: business.name || business.location,
+      businessSelected: true,
+      showAddressInput: false,
+      addressInput: "",
+      addressError: "",
+      location: business.location || business.name,
+      business_name: business.name || business.location,
     });
-    // Hide address input when business is selected from dropdown
-    setPastJobShowAddressInputs({
-      ...pastJobShowAddressInputs,
-      [jobId]: false,
-    });
-    // Clear address input
-    setPastJobAddresses({
-      ...pastJobAddresses,
-      [jobId]: "",
-    });
-    setPastJobs(
-      pastJobs.map((job) =>
-        job.id === jobId
-          ? {
-              ...job,
-              location: business.location || business.name,
-              business_name: business.name || business.location,
-            }
-          : job,
-      ),
-    );
-    setChangedJobs((prev) => new Set([...prev, jobId]));
-  };
-
-  const handlePastJobBusinessBlur = (jobId: string) => {
-    // No special logic needed on blur - address input visibility is controlled by onChange and onSelect
   };
 
   const handlePastJobAddressChange = (jobId: string, value: string) => {
-    setPastJobAddresses({
-      ...pastJobAddresses,
-      [jobId]: value,
-    });
-    // Don't clear error while typing
+    setPastJobs((prev) => prev.map((job) => (job.id === jobId ? { ...job, addressInput: value } : job)));
   };
 
   const handlePastJobAddressBlur = (jobId: string) => {
-    const address = pastJobAddresses[jobId]?.trim() || "";
+    const job = pastJobs.find((j) => j.id === jobId);
+    if (!job) return;
+
+    const address = job.addressInput.trim();
     if (!address) {
-      setPastJobAddressErrors({
-        ...pastJobAddressErrors,
-        [jobId]: "Please enter a business address",
-      });
+      setPastJobs((prev) =>
+        prev.map((j) => (j.id === jobId ? { ...j, addressError: "Please enter a business address" } : j)),
+      );
       return;
     }
-    if (isProfane(address)) {
-      setPastJobAddressErrors({
-        ...pastJobAddressErrors,
-        [jobId]: "Invalid address content",
-      });
+    if (!validateProfanity(address)) {
+      setPastJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, addressError: "Invalid address content" } : j)));
       return;
     }
     if (!isValidAddress(address)) {
-      setPastJobAddressErrors({
-        ...pastJobAddressErrors,
-        [jobId]: 'Please enter a valid street address (e.g., "123 Main St, City, State")',
-      });
+      setPastJobs((prev) =>
+        prev.map((j) =>
+          j.id === jobId
+            ? { ...j, addressError: 'Please enter a valid street address (e.g., "123 Main St, City, State")' }
+            : j,
+        ),
+      );
       return;
     }
 
-    // Address is valid - save it
-    setPastJobs(
-      pastJobs.map((job) =>
-        job.id === jobId
-          ? {
-              ...job,
-              location: address,
-              business_name: pastJobBusinessInputs[jobId] || address,
-            }
-          : job,
-      ),
-    );
-    setPastJobBusinessSelected({
-      ...pastJobBusinessSelected,
-      [jobId]: true,
+    updatePastJob(jobId, {
+      location: address,
+      business_name: job.businessInput,
+      businessSelected: true,
+      addressError: "",
     });
-    setPastJobAddressErrors({
-      ...pastJobAddressErrors,
-      [jobId]: "",
-    });
-    setChangedJobs((prev) => new Set([...prev, jobId]));
   };
 
-  const handlePastJobRoleBlur = (jobId: string, value: string) => {
-    if (value && !validateProfanity(value, "role")) {
-      updatePastJob(jobId, "role", "");
-    }
+  const handlePastJobTimePeriodChange = (jobId: string, value: string) => {
+    updatePastJob(jobId, { time_period: value });
   };
 
-  // Handle help button click with scroll to bottom
-  const handleHelpButtonClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowHelpPopup(!showHelpPopup);
+  // ==================== EFFECTS ====================
 
-    // Scroll to bottom after a short delay to allow popup to render
-    setTimeout(() => {
-      if (scrollContainerRef.current) {
-        scrollContainerRef.current.scrollTo({
-          top: scrollContainerRef.current.scrollHeight,
-          behavior: "smooth",
-        });
+  // Load jobs on mount
+  useEffect(() => {
+    loadJobsFromDatabase();
+  }, [loadJobsFromDatabase]);
+
+  // Cleanup: save all dirty jobs before unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
       }
-    }, 100);
-  };
+      onPageLeave?.();
+    };
+  }, [onPageLeave]);
+
+  // Close help popup when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (showHelpPopup) {
+        setShowHelpPopup(false);
+      }
+    };
+
+    if (showHelpPopup) {
+      document.addEventListener("click", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("click", handleClickOutside);
+    };
+  }, [showHelpPopup]);
+
+  // ==================== RENDER ====================
+
+  if (isLoading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-transparent">
+        <div className="app-card p-6 flex items-center gap-3">
+          <Loader2 className="w-5 h-5 animate-spin text-app-gray-medium" />
+          <span className="text-app-gray-medium">Loading your jobs...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-transparent">
+        <div className="app-card p-6 flex items-center gap-3 border-red-500">
+          <AlertCircle className="w-5 h-5 text-red-500" />
+          <div>
+            <p className="text-red-500 font-medium">Failed to load jobs</p>
+            <p className="text-sm text-app-gray-medium">{loadError}</p>
+            <button onClick={loadJobsFromDatabase} className="mt-2 text-sm text-app-yellow hover:underline">
+              Try again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full h-full flex items-center justify-center bg-transparent overflow-hidden">
@@ -928,122 +759,129 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         ref={scrollContainerRef}
         className="app-card p-6 animate-fade-in flex flex-col max-h-[80vh] overflow-y-auto relative"
       >
-        {/* Scrollable content area */}
         <div className="flex-1 overflow-y-auto pr-2">
           <h1 className="text-xl font-medium text-app-black mb-2">Your Page! 😊</h1>
 
           {/* Current Job */}
-          <div className="mb-8">
-            <h2 className="text-lg font-medium text-app-black mb-4">Current Job</h2>
-            <div className="space-y-4">
-              {/* Business Location */}
-              <div>
-                <UnifiedBusinessSearch
-                  value={currentJobBusinessInput}
-                  onChange={(value, business, filters, neighborhoodCoords) => {
-                    handleCurrentJobBusinessInputChange(value);
-                  }}
-                  onBusinessSelect={(business) => {
-                    handleCurrentJobBusinessSelect(business);
-                  }}
-                  onBlur={handleCurrentJobBusinessBlur}
-                  className={`app-input w-full ${currentJobShowAddressInput && !currentJobBusinessSelected ? "border-red-500" : ""}`}
-                  placeholder="Where do you work?..."
-                  variant="dropdown"
-                />
-
-                {/* Address input for current job */}
-                {currentJobShowAddressInput && !currentJobBusinessSelected && (
-                  <div className="mt-2 space-y-2">
-                    <p className="text-app-gray-medium text-xs">Can't find your business? Enter the address below:</p>
-                    <input
-                      type="text"
-                      placeholder="Enter business address (e.g., 123 Main St, City, State)..."
-                      className={`app-input w-full ${currentJobAddressError ? "border-red-500 border-2" : ""}`}
-                      value={currentJobAddress}
-                      onChange={(e) => handleCurrentJobAddressChange(e.target.value)}
-                      onBlur={handleCurrentJobAddressBlur}
-                    />
-                    {currentJobAddressError && <p className="text-red-500 text-sm px-1">{currentJobAddressError}</p>}
-                    <p className="text-gray-500 text-xs px-1">
-                      Please include street number, street name, and street type (e.g., St, Ave, Rd)
-                    </p>
-                  </div>
+          {currentJob && (
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-app-black">Current Job</h2>
+                {currentJob.isSaving && <Loader2 className="w-4 h-4 animate-spin text-app-gray-medium" />}
+                {currentJob.hasError && (
+                  <AlertCircle className="w-4 h-4 text-red-500" title={currentJob.errorMessage} />
                 )}
               </div>
 
-              {/* Role */}
-              <JobSearchDropdown
-                value={currentJob.role}
-                onChange={handleCurrentJobRoleChange}
-                onBlur={handleCurrentJobRoleBlur}
-                placeholder="Search or select a job role..."
-                className="app-input w-full"
-              />
+              <div className="space-y-4">
+                {/* Business Location */}
+                <div>
+                  <UnifiedBusinessSearch
+                    value={currentJob.businessInput}
+                    onChange={(value) => handleCurrentJobBusinessInputChange(value)}
+                    onBusinessSelect={handleCurrentJobBusinessSelect}
+                    className={`app-input w-full ${
+                      currentJob.showAddressInput && !currentJob.businessSelected ? "border-red-500" : ""
+                    }`}
+                    placeholder="Where do you work?..."
+                    variant="dropdown"
+                  />
 
-              {/* Salary + Time Period */}
-              <div className="flex items-center space-x-3">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={currentJob.salary}
-                  onChange={(e) => handleSalaryChange(e.target.value)}
-                  onBlur={handleSalaryBlur}
-                  className="app-input flex-1"
-                  placeholder="$14"
+                  {currentJob.showAddressInput && !currentJob.businessSelected && (
+                    <div className="mt-2 space-y-2">
+                      <p className="text-app-gray-medium text-xs">Can't find your business? Enter the address below:</p>
+                      <input
+                        type="text"
+                        placeholder="Enter business address (e.g., 123 Main St, City, State)..."
+                        className={`app-input w-full ${currentJob.addressError ? "border-red-500 border-2" : ""}`}
+                        value={currentJob.addressInput}
+                        onChange={(e) => handleCurrentJobAddressChange(e.target.value)}
+                        onBlur={handleCurrentJobAddressBlur}
+                      />
+                      {currentJob.addressError && (
+                        <p className="text-red-500 text-sm px-1">{currentJob.addressError}</p>
+                      )}
+                      <p className="text-gray-500 text-xs px-1">
+                        Please include street number, street name, and street type (e.g., St, Ave, Rd)
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Role */}
+                <JobSearchDropdown
+                  value={currentJob.role}
+                  onChange={handleCurrentJobRoleChange}
+                  placeholder="Search or select a job role..."
+                  className="app-input w-full"
                 />
-                <select
-                  value={currentTimePeriod}
-                  onChange={(e) => handleCurrentTimePeriodChange(e.target.value)}
-                  className="px-4 py-3 bg-white text-sm"
-                  style={{
-                    border: "2px solid hsl(var(--app-gray-light))",
-                    borderRadius: "0.5rem",
-                    height: "48px",
-                    fontSize: "16px",
-                  }}
-                >
-                  <option value="HR">HR</option>
-                  <option value="MO">MO</option>
-                  <option value="YR">YR</option>
-                </select>
-                <div className="w-6"></div>
+
+                {/* Salary + Time Period */}
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={currentJob.salary > 0 ? `$${currentJob.salary}` : ""}
+                    onChange={(e) => handleCurrentJobSalaryChange(e.target.value)}
+                    className="app-input flex-1"
+                    placeholder="$14"
+                  />
+                  <select
+                    value={currentJob.time_period}
+                    onChange={(e) => handleCurrentJobTimePeriodChange(e.target.value)}
+                    className="px-4 py-3 bg-white text-sm"
+                    style={{
+                      border: "2px solid hsl(var(--app-gray-light))",
+                      borderRadius: "0.5rem",
+                      height: "48px",
+                      fontSize: "16px",
+                    }}
+                  >
+                    <option value="HR">HR</option>
+                    <option value="MO">MO</option>
+                    <option value="YR">YR</option>
+                  </select>
+                  <div className="w-6"></div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Past Jobs */}
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-medium text-app-black">Past Jobs</h2>
               <button
-                onClick={addPastJob}
+                onClick={handleAddPastJob}
                 className="w-6 h-6 bg-app-yellow rounded-full flex items-center justify-center"
               >
                 <Plus className="w-4 h-4 text-app-black" />
               </button>
             </div>
+
             <div className="space-y-4">
               {pastJobs.map((job) => (
-                <div key={job.id} className="space-y-3 w-full">
+                <div key={job.id} className="space-y-3 w-full relative">
+                  {/* Save/Error Indicator */}
+                  <div className="absolute -left-8 top-0 flex items-center gap-1">
+                    {job.isSaving && <Loader2 className="w-3 h-3 animate-spin text-app-gray-medium" />}
+                    {job.hasError && <AlertCircle className="w-3 h-3 text-red-500" title={job.errorMessage} />}
+                  </div>
+
                   {/* Business Location */}
                   <div>
                     <UnifiedBusinessSearch
-                      value={pastJobBusinessInputs[job.id] || ""}
-                      onChange={(value, business, filters, neighborhoodCoords) => {
-                        handlePastJobBusinessInputChange(job.id, value);
-                      }}
-                      onBusinessSelect={(business) => {
-                        handlePastJobBusinessSelect(job.id, business);
-                      }}
-                      onBlur={() => handlePastJobBusinessBlur(job.id)}
-                      className={`app-input w-full ${pastJobShowAddressInputs[job.id] && !pastJobBusinessSelected[job.id] ? "border-red-500" : ""}`}
+                      value={job.businessInput}
+                      onChange={(value) => handlePastJobBusinessInputChange(job.id, value)}
+                      onBusinessSelect={(business) => handlePastJobBusinessSelect(job.id, business)}
+                      className={`app-input w-full ${
+                        job.showAddressInput && !job.businessSelected ? "border-red-500" : ""
+                      }`}
                       placeholder="Where did you work?..."
                       variant="dropdown"
                     />
 
-                    {/* Address input for past job */}
-                    {pastJobShowAddressInputs[job.id] && !pastJobBusinessSelected[job.id] && (
+                    {job.showAddressInput && !job.businessSelected && (
                       <div className="mt-2 space-y-2">
                         <p className="text-app-gray-medium text-xs">
                           Can't find your business? Enter the address below:
@@ -1051,14 +889,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                         <input
                           type="text"
                           placeholder="Enter business address (e.g., 123 Main St, City, State)..."
-                          className={`app-input w-full ${pastJobAddressErrors[job.id] ? "border-red-500 border-2" : ""}`}
-                          value={pastJobAddresses[job.id] || ""}
+                          className={`app-input w-full ${job.addressError ? "border-red-500 border-2" : ""}`}
+                          value={job.addressInput}
                           onChange={(e) => handlePastJobAddressChange(job.id, e.target.value)}
                           onBlur={() => handlePastJobAddressBlur(job.id)}
                         />
-                        {pastJobAddressErrors[job.id] && (
-                          <p className="text-red-500 text-sm px-1">{pastJobAddressErrors[job.id]}</p>
-                        )}
+                        {job.addressError && <p className="text-red-500 text-sm px-1">{job.addressError}</p>}
                         <p className="text-gray-500 text-xs px-1">
                           Please include street number, street name, and street type (e.g., St, Ave, Rd)
                         </p>
@@ -1069,8 +905,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   {/* Role */}
                   <JobSearchDropdown
                     value={job.role}
-                    onChange={(value) => updatePastJob(job.id, "role", value)}
-                    onBlur={() => handlePastJobRoleBlur(job.id, job.role)}
+                    onChange={(value) => handlePastJobRoleChange(job.id, value)}
                     placeholder="Search or select a job role..."
                     className="app-input w-full"
                   />
@@ -1080,34 +915,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     <input
                       type="text"
                       inputMode="numeric"
-                      value={job.salary}
-                      onChange={(e) => {
-                        let cleanValue = e.target.value.replace(/[^0-9.]/g, "");
-                        const parts = cleanValue.split(".");
-                        if (parts.length > 2) {
-                          cleanValue = parts[0] + "." + parts.slice(1).join("");
-                        }
-                        if (parts[1] && parts[1].length > 2) {
-                          cleanValue = parts[0] + "." + parts[1].substring(0, 2);
-                        }
-                        updatePastJob(job.id, "salary", cleanValue ? `${cleanValue}` : "");
-                      }}
-                      onBlur={() => {
-                        if (job.salary) {
-                          const value = job.salary.replace(/[^0-9.]/g, "");
-                          if (value.includes(".")) {
-                            const parts = value.split(".");
-                            const formatted = parts[1]?.length === 1 ? `${parts[0]}.${parts[1]}0` : value;
-                            updatePastJob(job.id, "salary", `${formatted}`);
-                          }
-                        }
-                      }}
+                      value={job.salary > 0 ? `${job.salary}` : ""}
+                      onChange={(e) => handlePastJobSalaryChange(job.id, e.target.value)}
                       className="app-input flex-1"
                       placeholder="$17"
                     />
                     <select
-                      value={pastJobTimePeriods[job.id] || "HR"}
-                      onChange={(e) => updatePastJobTimePeriod(job.id, e.target.value)}
+                      value={job.time_period}
+                      onChange={(e) => handlePastJobTimePeriodChange(job.id, e.target.value)}
                       className="px-4 py-3 bg-white text-sm"
                       style={{
                         border: "2px solid hsl(var(--app-gray-light))",
@@ -1121,7 +936,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                       <option value="YR">YR</option>
                     </select>
                     <button
-                      onClick={() => removePastJob(job.id)}
+                      onClick={() => handleRemovePastJob(job.id)}
                       className="w-6 h-6 bg-app-yellow rounded-full flex items-center justify-center"
                     >
                       <Minus className="w-4 h-4 text-app-black" />
@@ -1181,17 +996,28 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             )}
           </div>
 
-          {/* Help Button - At the bottom left of scrollable content */}
+          {/* Help Button */}
           <div className="mt-8 flex justify-start relative">
             <button
-              onClick={handleHelpButtonClick}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowHelpPopup(!showHelpPopup);
+                setTimeout(() => {
+                  if (scrollContainerRef.current) {
+                    scrollContainerRef.current.scrollTo({
+                      top: scrollContainerRef.current.scrollHeight,
+                      behavior: "smooth",
+                    });
+                  }
+                }, 100);
+              }}
               className="w-6 h-6 bg-app-gray-light rounded-full flex items-center justify-center hover:bg-app-gray-medium transition-colors text-app-black font-bold text-sm"
             >
               ?
             </button>
           </div>
 
-          {/* Help Popup - Styled like other cards with rounded edges */}
+          {/* Help Popup */}
           {showHelpPopup && (
             <div
               className="mt-4 w-full bg-white border-2 border-app-yellow rounded-xl p-4 shadow-lg"
@@ -1202,13 +1028,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 publicly available sources. We do not independently verify all information, and it should not be taken
                 as factual statements about any individual or organization.
               </p>
-              <a
-                href="https://breakroom-privacy-policy.lovable.app/privacy-policy"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Privacy Policy
-              </a>
             </div>
           )}
         </div>
