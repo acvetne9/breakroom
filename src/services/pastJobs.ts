@@ -41,7 +41,7 @@ export const getPastJobs = async (): Promise<PastJobData[]> => {
  * Save or update a single past job
  * Returns the job ID
  */
-export const savePastJob = async (jobData: PastJobData): Promise<PastJobData & { id: string }> => {
+export const savePastJob = async (jobData: PastJobData): Promise<string> => {
   try {
     const { profileId } = await getUserProfile();
     
@@ -58,11 +58,11 @@ export const savePastJob = async (jobData: PastJobData): Promise<PastJobData & {
           updated_at: new Date().toISOString()
         })
         .eq('id', jobData.id)
-        .select('id, role, salary, location, business_name, time_period')
+        .select('id')
         .single();
       
       if (error) throw error;
-      return data as PastJobData & { id: string };
+      return data.id;
     } else {
       // Create new job
       const { data, error } = await supabase
@@ -75,11 +75,11 @@ export const savePastJob = async (jobData: PastJobData): Promise<PastJobData & {
           business_name: jobData.business_name,
           time_period: jobData.time_period
         })
-        .select('id, role, salary, location, business_name, time_period')
+        .select('id')
         .single();
       
       if (error) throw error;
-      return data as PastJobData & { id: string };
+      return data.id;
     }
   } catch (error) {
     console.error('Error saving past job:', error);

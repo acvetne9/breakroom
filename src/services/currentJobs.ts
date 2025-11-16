@@ -63,12 +63,10 @@ export const getCurrentJob = async (): Promise<CurrentJobData | null> => {
 
 /**
  * Create or update the current job for the current user
- * Returns the full saved job data
  */
-export const saveCurrentJob = async (jobData: CurrentJobData): Promise<CurrentJobData> => {
+export const saveCurrentJob = async (jobData: CurrentJobData): Promise<void> => {
   try {
     const { profileId } = await getUserProfile();
-    console.log('💾 Saving current job for profile:', profileId);
     
     // Check if a current job already exists
     const { data: existing } = await supabase
@@ -79,7 +77,7 @@ export const saveCurrentJob = async (jobData: CurrentJobData): Promise<CurrentJo
     
     if (existing) {
       // Update existing job
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('current_jobs')
         .update({
           role: jobData.role,
@@ -89,16 +87,12 @@ export const saveCurrentJob = async (jobData: CurrentJobData): Promise<CurrentJo
           time_period: jobData.time_period,
           updated_at: new Date().toISOString()
         })
-        .eq('id', existing.id)
-        .select('role, salary, location, business_name, time_period')
-        .single();
+        .eq('id', existing.id);
       
       if (error) throw error;
-      console.log('✅ Current job updated');
-      return data;
     } else {
       // Create new job
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('current_jobs')
         .insert({
           profile_id: profileId,
@@ -107,16 +101,12 @@ export const saveCurrentJob = async (jobData: CurrentJobData): Promise<CurrentJo
           location: jobData.location,
           business_name: jobData.business_name,
           time_period: jobData.time_period
-        })
-        .select('role, salary, location, business_name, time_period')
-        .single();
+        });
       
       if (error) throw error;
-      console.log('✅ Current job created');
-      return data;
     }
   } catch (error) {
-    console.error('❌ Error saving current job:', error);
+    console.error('Error saving current job:', error);
     throw error;
   }
 };
