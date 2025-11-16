@@ -915,7 +915,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   className={`app-input w-full ${currentJobShowAddressInput && !currentJobBusinessSelected ? "border-red-500" : ""}`}
                   placeholder="Where do you work?..."
                   variant="dropdown"
-                  disabled={currentJobShowAddressInput}
                 />
 
                 {/* Address input for current job */}
@@ -1010,7 +1009,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                       className={`app-input w-full ${pastJobShowAddressInputs[job.id] && !pastJobBusinessSelected[job.id] ? "border-red-500" : ""}`}
                       placeholder="Where did you work?..."
                       variant="dropdown"
-                      disabled={pastJobShowAddressInputs[job.id]}
                     />
 
                     {/* Address input for past job */}
