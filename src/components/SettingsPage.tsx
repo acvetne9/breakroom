@@ -1058,6 +1058,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 publicly available sources. We do not independently verify all information, and it should not be taken
                 as factual statements about any individual or organization.
               </p>
+              <a
+                href="https://breakroom-privacy-policy.lovable.app/privacy-policy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-app-yellow hover:underline"
+              >
+                Privacy Policy
+              </a>
             </div>
           )}
         </div>
