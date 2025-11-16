@@ -491,6 +491,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       businessSelected: false,
       showAddressInput: true, // Always show address input when typing
       addressError: "",
+      // Don't clear the address input - keep what user has entered
     });
   };
 
@@ -499,7 +500,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       businessInput: business.name || business.location,
       businessSelected: true,
       showAddressInput: false, // Hide address input only when business is selected
-      addressInput: "",
+      addressInput: "", // Clear address when selecting from dropdown
       addressError: "",
       isManualAddress: false,
       location: business.name || business.location,
@@ -521,6 +522,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           ? {
               ...prev,
               addressError: "Please enter a business address",
+              businessSelected: false, // Keep business unselected
             }
           : prev,
       );
@@ -532,6 +534,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           ? {
               ...prev,
               addressError: "Invalid address content",
+              businessSelected: false,
             }
           : prev,
       );
@@ -543,18 +546,21 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           ? {
               ...prev,
               addressError: 'Please enter a valid street address (e.g., "123 Main St, City, State")',
+              businessSelected: false,
             }
           : prev,
       );
       return;
     }
 
+    // Address is valid - save it and keep address input visible
     updateCurrentJob({
       location: address,
-      business_name: currentJob.businessInput,
+      business_name: currentJob.businessInput || address,
       businessSelected: true,
       isManualAddress: true,
       addressError: "",
+      showAddressInput: true, // Keep showing the address input even after validation
     });
   };
 
@@ -632,6 +638,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       businessSelected: false,
       showAddressInput: true, // Always show address input when typing
       addressError: "",
+      // Don't clear the address input - keep what user has entered
     });
   };
 
@@ -640,7 +647,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       businessInput: business.name || business.location,
       businessSelected: true,
       showAddressInput: false, // Hide address input only when business is selected
-      addressInput: "",
+      addressInput: "", // Clear address when selecting from dropdown
       addressError: "",
       location: business.location || business.name,
       business_name: business.name || business.location,
@@ -658,30 +665,54 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     const address = job.addressInput.trim();
     if (!address) {
       setPastJobs((prev) =>
-        prev.map((j) => (j.id === jobId ? { ...j, addressError: "Please enter a business address" } : j)),
+        prev.map((j) =>
+          j.id === jobId
+            ? {
+                ...j,
+                addressError: "Please enter a business address",
+                businessSelected: false,
+              }
+            : j,
+        ),
       );
       return;
     }
     if (!validateProfanity(address)) {
-      setPastJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, addressError: "Invalid address content" } : j)));
+      setPastJobs((prev) =>
+        prev.map((j) =>
+          j.id === jobId
+            ? {
+                ...j,
+                addressError: "Invalid address content",
+                businessSelected: false,
+              }
+            : j,
+        ),
+      );
       return;
     }
     if (!isValidAddress(address)) {
       setPastJobs((prev) =>
         prev.map((j) =>
           j.id === jobId
-            ? { ...j, addressError: 'Please enter a valid street address (e.g., "123 Main St, City, State")' }
+            ? {
+                ...j,
+                addressError: 'Please enter a valid street address (e.g., "123 Main St, City, State")',
+                businessSelected: false,
+              }
             : j,
         ),
       );
       return;
     }
 
+    // Address is valid - save it and keep address input visible
     updatePastJob(jobId, {
       location: address,
-      business_name: job.businessInput,
+      business_name: job.businessInput || address,
       businessSelected: true,
       addressError: "",
+      showAddressInput: true, // Keep showing the address input even after validation
     });
   };
 
@@ -726,13 +757,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   // ==================== RENDER ====================
 
   if (isLoading) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-transparent">
-        <div className="app-card p-6 flex items-center gap-3">
-          <Loader2 className="w-5 h-5 animate-spin text-app-gray-medium" />
-        </div>
-      </div>
-    );
+    return null;
   }
 
   if (loadError) {
