@@ -769,7 +769,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 <h2 className="text-lg font-medium text-app-black">Current Job</h2>
                 {currentJob.isSaving && <Loader2 className="w-4 h-4 animate-spin text-app-gray-medium" />}
                 {currentJob.hasError && (
-                  <AlertCircle className="w-4 h-4 text-red-500" title={currentJob.errorMessage} />
+                  <div title={currentJob.errorMessage}>
+                    <AlertCircle className="w-4 h-4 text-red-500" />
+                  </div>
                 )}
               </div>
 
@@ -1028,6 +1030,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 publicly available sources. We do not independently verify all information, and it should not be taken
                 as factual statements about any individual or organization.
               </p>
+              <a
+                href="https://breakroom-privacy-policy.lovable.app/privacy-policy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-app-yellow hover:underline"
+              >
+                Privacy Policy
+              </a>
             </div>
           )}
         </div>
