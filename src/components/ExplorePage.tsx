@@ -54,6 +54,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   console.log('🔍 ExplorePage component initializing...');
   
   const { posts, loading, hasMore, submitPost, votePost, removePost, loadMore, trackCommentedPost } = usePosts();
+  const isMobile = useIsMobile();
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
   const [hideSystemPost, setHideSystemPost] = useState(false);
@@ -310,11 +311,8 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     );
   }
 
-  const isMobile = useIsMobile();
-
   return (
-    <div className="w-full h-full flex items-center bg-transparent">
-      <div className="app-card h-full w-full relative">
+    <div className="relative w-full h-full">
       {/* Posts list */}
       <div className={`h-full overflow-y-auto pb-20 ${filteredBusinessId || filteredUserStories ? 'pt-20' : 'pt-20'}`}>
         <div className="space-y-4 px-4">
@@ -510,7 +508,6 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
             </button>
           </div>
         )}
-      </div>
       </div>
     </div>
   );

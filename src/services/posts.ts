@@ -1,5 +1,30 @@
 import { supabase } from "@/integrations/supabase/client";
 
+// Debug function to check profile status
+export const debugProfileStatus = async () => {
+  const deviceId = localStorage.getItem('device_id');
+  console.log('🔍 Debug: device_id in localStorage:', deviceId);
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  console.log('🔍 Debug: authenticated user:', user?.id);
+  
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    console.log('🔍 Debug: profile for auth user:', profile);
+  } else if (deviceId) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('temp_user_id', deviceId)
+      .maybeSingle();
+    console.log('🔍 Debug: profile for device_id:', profile);
+  }
+};
+
 // Cache for user profile to avoid race conditions
 let cachedProfileId: string | null = null;
 let profilePromise: Promise<{ profileId: string; wasCreated: boolean }> | null = null;

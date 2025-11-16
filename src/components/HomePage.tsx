@@ -78,10 +78,15 @@ const HomePage: React.FC<HomePageProps> = ({
   const [searchValue, setSearchValue] = useState("");
   const [debouncedSearchValue, setDebouncedSearchValue] = useState("");
   const [neighborhoodCenter, setNeighborhoodCenter] = useState<{ lat: number; lon: number } | null>(null);
-  const [showLoading, setShowLoading] = useState(true);
+  const [animationComplete, setAnimationComplete] = useState(false);
+  const [mapDataReady, setMapDataReady] = useState(false);
+  const [businessDataReady, setBusinessDataReady] = useState(false);
   const [searchCompleted, setSearchCompleted] = useState(false);
   const [mapBusinesses, setMapBusinesses] = useState<any[]>([]);
   const [showWelcome, setShowWelcome] = useState(false);
+
+  // Computed loading state - show overlay until all three complete
+  const showLoadingOverlay = !animationComplete || !mapDataReady || !businessDataReady;
 
   // Debounce search value updates (2 seconds as requested)
   useEffect(() => {
@@ -128,11 +133,19 @@ const HomePage: React.FC<HomePageProps> = ({
   }, []);
 
   const handleLoadingComplete = () => {
-    setShowLoading(false);
+    setAnimationComplete(true);
+  };
+
+  const handleMapLoaded = () => {
+    setMapDataReady(true);
+  };
+
+  const handleBusinessesLoaded = () => {
+    setBusinessDataReady(true);
   };
 
   useEffect(() => {
-    if (!showLoading && currentView === "main") {
+    if (!showLoadingOverlay && currentView === "main") {
       const timer1 = setTimeout(() => {
         setShowWelcome(true);
         const timer2 = setTimeout(() => setShowWelcome(false), 6000);
@@ -140,7 +153,7 @@ const HomePage: React.FC<HomePageProps> = ({
       }, 500);
       return () => clearTimeout(timer1);
     }
-  }, [showLoading, currentView]);
+  }, [showLoadingOverlay, currentView]);
 
   const selectedBusiness = propSelectedBusiness;
 
@@ -253,9 +266,22 @@ const HomePage: React.FC<HomePageProps> = ({
 
   return (
     <div className="absolute inset-0 w-full h-full min-w-[200px] min-h-[200px]">
-      {showLoading && <BreakroomLoading onComplete={handleLoadingComplete} />}
+      {/* Map renders immediately but hidden behind loading screen */}
+      <MapLibreMap
+        onBusinessClick={handleBusinessClick}
+        selectedBusiness={selectedBusiness}
+        landmarks={LANDMARKS}
+        searchFilters={searchFilters}
+        neighborhoodCenter={neighborhoodCenter}
+        onBusinessesUpdate={setMapBusinesses}
+        onMapLoaded={handleMapLoaded}
+        onBusinessesLoaded={handleBusinessesLoaded}
+      />
 
-      {showWelcome && (
+      {/* Loading overlay on top */}
+      {showLoadingOverlay && <BreakroomLoading onComplete={handleLoadingComplete} />}
+
+      {showWelcome && !showLoadingOverlay && (
         <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-30 w-[90%] max-w-lg transition-opacity duration-700">
           <div className="bg-white rounded-2xl shadow-md px-4 py-3 text-center text-sm font-medium border border-gray-200">
             <p>Welcome to breakroom!</p>
@@ -264,16 +290,8 @@ const HomePage: React.FC<HomePageProps> = ({
         </div>
       )}
 
-      {!showLoading && (
+      {!showLoadingOverlay && (
         <div>
-          <MapLibreMap
-            onBusinessClick={handleBusinessClick}
-            selectedBusiness={selectedBusiness}
-            landmarks={LANDMARKS}
-            searchFilters={searchFilters}
-            neighborhoodCenter={neighborhoodCenter}
-            onBusinessesUpdate={setMapBusinesses}
-          />
 
           {selectedBusiness && !showBusinessDetails && (
             <BusinessPreview

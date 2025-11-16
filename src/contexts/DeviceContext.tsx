@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, updateDeviceIdHeader } from "@/integrations/supabase/client";
 import { generateBrowserFingerprint, generateLegacyBrowserFingerprint } from "@/utils/browserFingerprint";
 
 interface DeviceContextType {
@@ -259,6 +259,8 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
         }
         
         setDeviceId(storedDeviceId);
+        // Update Supabase client header with device_id
+        updateDeviceIdHeader(storedDeviceId);
       } catch (error) {
         console.error('Fatal error in device initialization:', error);
       } finally {
