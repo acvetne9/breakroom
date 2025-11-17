@@ -844,10 +844,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         className="app-card p-6 animate-fade-in flex flex-col max-h-[80vh] overflow-y-auto relative"
       >
         <div className="flex-1 overflow-y-auto pr-2">
-          <div className="flex items-center gap-2 mb-2">
-            <h1 className="text-xl font-medium text-app-black whitespace-nowrap">Tip #1:</h1>
-            <p className="text-xl font-light text-app-black">Use the search bar on the map to search businesses by keyword, roles, and pay.</p>
-          </div>
+          <h1 className="text-xl font-medium text-app-black mb-2">Welcome to breakroom! 😊</h1>
+          <p className="text-xl text-app-black mb-2">
+            <span className="font-medium">Tip #1:</span>
+            <span className="font-light"> Use the search bar on the map to search businesses by keyword, roles, and pay.</span>
+          </p>
           
           {/* Current Job */}
           {currentJob && (
