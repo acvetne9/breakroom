@@ -155,8 +155,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       job.role.trim() &&
       job.location.trim() &&
       job.time_period &&
-      job.businessSelected &&
-      (!job.showAddressInput || isValidAddress(job.addressInput))
+      // Business is complete if either selected from dropdown OR valid manual address entered
+      (job.businessSelected || (job.isManualAddress && job.addressInput && isValidAddress(job.addressInput)))
     );
   };
 
@@ -166,8 +166,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       job.role.trim() &&
       job.location.trim() &&
       job.time_period &&
-      job.businessSelected &&
-      (!job.showAddressInput || isValidAddress(job.addressInput))
+      // Business is complete if either selected from dropdown OR valid manual address entered
+      (job.businessSelected || (job.addressInput && isValidAddress(job.addressInput)))
     );
   };
 
@@ -178,19 +178,22 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     setLoadError(null);
     
     try {
+      console.log("🔄 Loading jobs from database...");
+      
       // Load current job
       const currentJobData = await getCurrentJob();
+      console.log("📥 Current job loaded:", currentJobData);
       
-      if (currentJobData) {
+      if (currentJobData && currentJobData.location) {
         const isManualAddress = currentJobData.business_name === currentJobData.location;
-        setCurrentJob({
+        const newCurrentJob = {
           role: currentJobData.role || "",
           salary: currentJobData.salary || 0,
           location: currentJobData.location || "",
           business_name: currentJobData.business_name || "",
           time_period: currentJobData.time_period || "HR",
-          businessInput: currentJobData.business_name || currentJobData.location || "",
-          businessSelected: !!currentJobData.location,
+          businessInput: currentJobData.business_name || "",
+          businessSelected: true, // Mark as selected since it came from database
           showAddressInput: false,
           addressInput: isManualAddress ? currentJobData.location : "",
           addressError: "",
@@ -199,17 +202,20 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           isSaving: false,
           hasError: false,
           lastSavedAt: new Date(),
-        });
+        };
+        console.log("✅ Setting current job state:", newCurrentJob);
+        setCurrentJob(newCurrentJob);
       } else {
-        // Initialize empty current job
+        console.log("ℹ️ No current job found, initializing empty");
+        // Initialize one empty current job (like past jobs)
         setCurrentJob({
-          role: initialData.role || "",
-          salary: initialData.salary ? parseFloat(initialData.salary.replace(/[^0-9.]/g, "")) : 0,
-          location: initialData.fullLocation || initialData.location || "",
-          business_name: initialData.businessName || initialData.location || "",
-          time_period: initialData.timePeriod || "HR",
-          businessInput: initialData.businessName || initialData.location || "",
-          businessSelected: !!initialData.location,
+          role: "",
+          salary: 0,
+          location: "",
+          business_name: "",
+          time_period: "HR",
+          businessInput: "",
+          businessSelected: false,
           showAddressInput: false,
           addressInput: "",
           addressError: "",
@@ -222,6 +228,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       
       // Load past jobs
       const pastJobsData = await getPastJobs();
+      console.log("📥 Past jobs loaded:", pastJobsData.length, "jobs");
       
       if (pastJobsData.length > 0) {
         const formattedJobs: PastJobState[] = pastJobsData.map(job => {
@@ -233,8 +240,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             location: job.location || "",
             business_name: job.business_name || "",
             time_period: job.time_period || "HR",
-            businessInput: job.business_name || job.location || "",
-            businessSelected: !!job.location,
+            businessInput: job.business_name || "",
+            businessSelected: true, // Mark as selected since it came from database
             showAddressInput: false,
             addressInput: isManualAddress ? job.location || "" : "",
             addressError: "",
@@ -247,20 +254,37 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         });
         setPastJobs(formattedJobs);
       } else {
+        console.log("ℹ️ No past jobs found, initializing one empty job");
         // Start with one empty past job
         const newJobId = `temp_${Date.now()}`;
         setPastJobs([createEmptyPastJob(newJobId)]);
       }
     } catch (error: any) {
-      console.error("Failed to load jobs:", error);
+      console.error("❌ Failed to load jobs:", error);
       setLoadError(error?.message || "Failed to load jobs");
       // Initialize with empty jobs on error
+      setCurrentJob({
+        role: "",
+        salary: 0,
+        location: "",
+        business_name: "",
+        time_period: "HR",
+        businessInput: "",
+        businessSelected: false,
+        showAddressInput: false,
+        addressInput: "",
+        addressError: "",
+        isManualAddress: false,
+        isDirty: false,
+        isSaving: false,
+        hasError: false,
+      });
       const newJobId = `temp_${Date.now()}`;
       setPastJobs([createEmptyPastJob(newJobId)]);
     } finally {
       setIsLoading(false);
     }
-  }, [initialData]);
+  }, []);
 
   const saveCurrentJobToDatabase = useCallback(async (job: CurrentJobState) => {
     if (!isCurrentJobComplete(job)) {
@@ -459,7 +483,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       setCurrentJob(prev => prev ? { 
         ...prev, 
         addressError: "Please enter a business address",
-        businessSelected: false, // Keep business unselected
       } : prev);
       return;
     }
@@ -467,7 +490,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       setCurrentJob(prev => prev ? { 
         ...prev, 
         addressError: "Invalid address content",
-        businessSelected: false,
       } : prev);
       return;
     }
@@ -475,19 +497,19 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       setCurrentJob(prev => prev ? { 
         ...prev, 
         addressError: 'Please enter a valid street address (e.g., "123 Main St, City, State")',
-        businessSelected: false,
       } : prev);
       return;
     }
 
-    // Address is valid - save it and keep address input visible
+    // Address is valid - save it but DON'T mark business as selected
+    // Keep showing address input with valid address
     updateCurrentJob({
       location: address,
       business_name: currentJob.businessInput || address,
-      businessSelected: true,
       isManualAddress: true,
       addressError: "",
-      showAddressInput: true, // Keep showing the address input even after validation
+      showAddressInput: true, // Keep showing the address input
+      businessSelected: false, // DON'T mark as selected - only dropdown selection does this
     });
   };
 
@@ -550,6 +572,20 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     updatePastJob(jobId, { salary: parseFloat(cleanValue) || 0 });
   };
 
+  const handlePastJobSalaryBlur = (jobId: string) => {
+    const job = pastJobs.find(j => j.id === jobId);
+    if (!job || !job.salary) return;
+    
+    const value = job.salary.toString();
+    if (value.includes(".")) {
+      const parts = value.split(".");
+      // Add trailing 0 if only 1 decimal place
+      if (parts[1]?.length === 1) {
+        updatePastJob(jobId, { salary: parseFloat(`${parts[0]}.${parts[1]}0`) });
+      }
+    }
+  };
+
   const handlePastJobRoleChange = (jobId: string, value: string) => {
     if (validateProfanity(value)) {
       updatePastJob(jobId, { role: value });
@@ -594,7 +630,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         j.id === jobId ? { 
           ...j, 
           addressError: "Please enter a business address",
-          businessSelected: false,
         } : j
       ));
       return;
@@ -604,7 +639,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         j.id === jobId ? { 
           ...j, 
           addressError: "Invalid address content",
-          businessSelected: false,
         } : j
       ));
       return;
@@ -614,19 +648,19 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         j.id === jobId ? { 
           ...j, 
           addressError: 'Please enter a valid street address (e.g., "123 Main St, City, State")',
-          businessSelected: false,
         } : j
       ));
       return;
     }
 
-    // Address is valid - save it and keep address input visible
+    // Address is valid - save it but DON'T mark business as selected
+    // Keep showing address input with valid address
     updatePastJob(jobId, {
       location: address,
       business_name: job.businessInput || address,
-      businessSelected: true,
       addressError: "",
-      showAddressInput: true, // Keep showing the address input even after validation
+      showAddressInput: true, // Keep showing the address input
+      businessSelected: false, // DON'T mark as selected - only dropdown selection does this
     });
   };
 
