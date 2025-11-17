@@ -852,7 +852,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           <p className="text-xl text-app-black mb-2">
             <span className="font-medium">Tip:</span>{" "}
             <span className="font-light opacity-70">
-              Use the search bar on the map to search businesses by keyword, roles, and pay.
+              Use the search bar on the map to search businesses by keyword, roles, neighborhood, and pay.
             </span>
           </p>
 
