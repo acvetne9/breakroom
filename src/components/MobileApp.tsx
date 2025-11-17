@@ -43,6 +43,7 @@ const MobileApp: React.FC = () => {
   console.log("🚀 MobileApp component rendering");
   const isMobile = useIsMobile();
   const { user } = useAuth();
+  const { deviceId, isFirstSession, loading: deviceLoading } = useDevice();
   const [currentView, setCurrentView] = useState<"initiation" | "main" | "loading">("loading");
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -62,7 +63,18 @@ const MobileApp: React.FC = () => {
   // Ref to prevent double initialization in React 18 StrictMode
   const hasInitialized = useRef(false);
 
-  const { isFirstSession, loading: deviceLoading } = useDevice();
+  // Helper function to check if current job exists
+  const hasCurrentJob = async (): Promise<boolean> => {
+    if (!deviceId) return false;
+    try {
+      const { getCurrentJob } = await import("../services/currentJobs");
+      const job = await getCurrentJob(deviceId);
+      return job !== null;
+    } catch (error) {
+      console.error("Error checking current job:", error);
+      return false;
+    }
+  };
 
   useEffect(() => {
     if (hasInitialized.current) {
@@ -70,25 +82,24 @@ const MobileApp: React.FC = () => {
       return;
     }
 
-    if (deviceLoading) {
-      console.log("Waiting for device initialization...");
+    if (deviceLoading || !deviceId) {
+      console.log("Waiting for device initialization...", { deviceLoading, deviceId });
       return;
     }
 
     hasInitialized.current = true;
-    console.log("MobileApp initialization starting");
+    console.log("MobileApp initialization starting with deviceId:", deviceId);
 
     const initializeApp = async () => {
       try {
         console.log("Debug - isFirstSession:", isFirstSession);
 
-        const { hasCurrentJob, getCurrentJob } = await import("../services/currentJobs");
         const hasJob = await hasCurrentJob();
-
         console.log("Current job check:", hasJob);
 
         if (hasJob) {
-          const currentJob = await getCurrentJob();
+          const { getCurrentJob } = await import("../services/currentJobs");
+          const currentJob = await getCurrentJob(deviceId);
           if (currentJob) {
             setUserData({
               salary: `$${currentJob.salary.toFixed(2)}`,
@@ -116,18 +127,18 @@ const MobileApp: React.FC = () => {
     };
 
     initializeApp();
-  }, [isFirstSession, deviceLoading]);
+  }, [isFirstSession, deviceLoading, deviceId]);
 
   // Re-check current job when returning to home page
   useEffect(() => {
-    if (currentSlide === 1 && currentView === "initiation") {
+    if (currentSlide === 1 && currentView === "initiation" && deviceId) {
       const recheckCurrentJob = async () => {
         try {
-          const { hasCurrentJob, getCurrentJob } = await import("../services/currentJobs");
           const hasJob = await hasCurrentJob();
 
           if (hasJob) {
-            const currentJob = await getCurrentJob();
+            const { getCurrentJob } = await import("../services/currentJobs");
+            const currentJob = await getCurrentJob(deviceId);
             if (currentJob) {
               setUserData({
                 salary: `$${currentJob.salary.toFixed(2)}`,
@@ -148,22 +159,27 @@ const MobileApp: React.FC = () => {
 
       recheckCurrentJob();
     }
-  }, [currentSlide, currentView]);
+  }, [currentSlide, currentView, deviceId]);
 
   const handleInitiationComplete = async (data: UserData) => {
     console.log("🎯 handleInitiationComplete called with:", data);
+
+    if (!deviceId) {
+      console.error("❌ No deviceId available");
+      return;
+    }
+
     setUserData(data);
     setCurrentView("main");
 
     try {
       const { saveCurrentJob } = await import("../services/currentJobs");
-      const { toast } = await import("@/hooks/use-toast");
       const salary = parseFloat(data.salary.replace(/[^0-9.]/g, "")) || 0;
 
       console.log("💾 Attempting to save current job...");
 
       // STEP 1: Always save current job to database
-      await saveCurrentJob({
+      await saveCurrentJob(deviceId, {
         role: data.role,
         salary: salary,
         location: data.location,
@@ -209,7 +225,6 @@ const MobileApp: React.FC = () => {
       console.log("✅ Post created");
     } catch (error) {
       console.error("❌ Error saving job data:", error);
-      const { toast } = await import("@/hooks/use-toast");
     }
   };
 
@@ -221,15 +236,20 @@ const MobileApp: React.FC = () => {
     timePeriod: string;
   }) => {
     console.log("🎯 handleJobUpdate called with:", jobData);
+
+    if (!deviceId) {
+      console.error("❌ No deviceId available");
+      return;
+    }
+
     try {
       const { saveCurrentJob } = await import("../services/currentJobs");
-      const { toast } = await import("@/hooks/use-toast");
       const salary = parseFloat(jobData.salary.replace(/[^0-9.]/g, "")) || 0;
 
       console.log("💾 Attempting to update current job...");
 
       // STEP 1: Always save current job
-      await saveCurrentJob({
+      await saveCurrentJob(deviceId, {
         role: jobData.role,
         salary: salary,
         location: jobData.location,
@@ -307,8 +327,6 @@ const MobileApp: React.FC = () => {
       return prev;
     });
   };
-
-  // Remove handlePostSubmit - now handled by ExplorePage directly
 
   const handleBusinessClick = async (business: any) => {
     // Handle null business (close action)
@@ -487,13 +505,10 @@ const MobileApp: React.FC = () => {
     }
   };
 
-  // Remove handlePostVote and handlePostDelete - now handled by ExplorePage directly
-
   const handleRoleVote = async (businessId: string, roleIndex: number, voteType: "up" | "down") => {
     console.log("🗳️ MobileApp.handleRoleVote called:", { businessId, roleIndex, voteType });
 
     // Find the role ID from the business
-    // Check selectedBusiness first since that's what's being displayed
     let business = selectedBusiness?.id === businessId ? selectedBusiness : businesses.find((b) => b.id === businessId);
 
     console.log("📍 Found business:", {
@@ -504,8 +519,6 @@ const MobileApp: React.FC = () => {
       hasRoleId: !!business?.roles?.[roleIndex]?.id,
     });
 
-    // If business doesn't have role IDs, fetch full details first
-    // Defensive check - should not happen if handleBusinessClick works correctly
     if (!business?.roles?.[roleIndex]?.id) {
       console.error("❌ Role missing ID - this should not happen!", {
         businessId,
@@ -525,18 +538,14 @@ const MobileApp: React.FC = () => {
     setVotingRoles((prev) => new Set(prev).add(roleId));
 
     try {
-      // Import utilities
       const { calculateVoteChange } = await import("@/utils/voteCalculations");
       const { persistVote } = await import("@/services/voting");
 
-      // Calculate new state optimistically
       const { newUserVote, newTotal } = calculateVoteChange(role.userVote, voteType, role.votesTotal);
 
-      // Store previous state for rollback
       const previousVotesTotal = role.votesTotal;
       const previousUserVote = role.userVote;
 
-      // Update UI immediately - both businesses array and selectedBusiness
       let updatedBusinessForSelection: Business | null = null;
 
       setBusinesses((prev) =>
@@ -549,7 +558,6 @@ const MobileApp: React.FC = () => {
               ),
             };
 
-            // Store for selectedBusiness update
             if (selectedBusiness?.id === businessId) {
               updatedBusinessForSelection = updatedBusiness;
             }
@@ -560,19 +568,17 @@ const MobileApp: React.FC = () => {
         }),
       );
 
-      // Update selectedBusiness separately to avoid closure issues
       if (updatedBusinessForSelection) {
         setSelectedBusiness(updatedBusinessForSelection);
       }
 
-      // Persist in background
       const dbVoteType = newUserVote === "up" ? "upvote" : newUserVote === "down" ? "downvote" : null;
       const result = await persistVote("role_votes", "business_role_id", roleId, dbVoteType);
 
       if (!result.success) {
         console.error("❌ Failed to persist vote:", result.error);
         alert("Vote failed to save. Please try again.");
-        // Rollback on error - both businesses array and selectedBusiness
+
         let rolledBackBusinessForSelection: Business | null = null;
 
         setBusinesses((prev) =>
@@ -585,7 +591,6 @@ const MobileApp: React.FC = () => {
                 ),
               };
 
-              // Store for selectedBusiness update
               if (selectedBusiness?.id === businessId) {
                 rolledBackBusinessForSelection = rolledBackBusiness;
               }
@@ -596,19 +601,16 @@ const MobileApp: React.FC = () => {
           }),
         );
 
-        // Update selectedBusiness separately to avoid closure issues
         if (rolledBackBusinessForSelection) {
           setSelectedBusiness(rolledBackBusinessForSelection);
         }
       } else {
         console.log("✅ Vote persisted, syncing with database...");
 
-        // Sync with database to get actual votes_total and userVote
         try {
           const refreshedBusiness = await fetchFullBusinessDetails(businessId);
 
           if (refreshedBusiness) {
-            // Update both businesses array and selectedBusiness with database values
             setBusinesses((prev) => prev.map((b) => (b.id === businessId ? refreshedBusiness : b)));
 
             if (selectedBusiness?.id === businessId) {
@@ -623,12 +625,9 @@ const MobileApp: React.FC = () => {
           }
         } catch (syncError) {
           console.warn("⚠️ Failed to sync with database after vote:", syncError);
-          // Don't rollback - the vote succeeded, we just couldn't refresh
-          // The optimistic value is close enough
         }
       }
     } finally {
-      // Always clear the voting state
       setVotingRoles((prev) => {
         const next = new Set(prev);
         next.delete(roleId);
@@ -637,7 +636,7 @@ const MobileApp: React.FC = () => {
     }
   };
 
-  // Sync selectedBusiness when businesses data changes (for voting updates)
+  // Sync selectedBusiness when businesses data changes
   useEffect(() => {
     if (selectedBusiness) {
       const updatedBusiness = businesses.find((b) => b.id === selectedBusiness.id);
@@ -645,23 +644,20 @@ const MobileApp: React.FC = () => {
         setSelectedBusiness(updatedBusiness);
       }
     }
-  }, [businesses]);
+  }, [businesses, selectedBusiness]);
 
   // Handle business state when sliding to explore/settings and back
   useEffect(() => {
     if (currentSlide === 2 || currentSlide === 0) {
-      // Going to explore or settings page - save current business and close it
       if (selectedBusiness) {
         setPreviouslySelectedBusiness(selectedBusiness);
         setSelectedBusiness(null);
       }
     } else if (currentSlide === 1 && previouslySelectedBusiness) {
-      // Coming back to home page - restore previously selected business
       setSelectedBusiness(previouslySelectedBusiness);
       setPreviouslySelectedBusiness(null);
     }
 
-    // Clear user stories filter when navigating away from explore
     if (currentSlide !== 2 && filteredUserStories) {
       setFilteredUserStories(false);
     }
@@ -671,9 +667,8 @@ const MobileApp: React.FC = () => {
     const threshold = 100;
     const dragStartX = event.clientX || event.touches?.[0]?.clientX || 0;
     const screenWidth = window.innerWidth;
-    const edgeThreshold = 50; // Only allow swiping within 50px of screen edges
+    const edgeThreshold = 50;
 
-    // Only allow swiping if drag started near screen edges
     const isNearLeftEdge = dragStartX < edgeThreshold;
     const isNearRightEdge = dragStartX > screenWidth - edgeThreshold;
 
@@ -686,19 +681,18 @@ const MobileApp: React.FC = () => {
     }
   };
 
-  // Calculate card position for mobile peek behavior
   const getSettingsCardPosition = () => {
     if (!isMobile) return currentSlide === 0 ? "0%" : "-100%";
-    if (currentSlide === 0) return "0%"; // Fully visible
-    if (currentSlide === 1) return "-92.75%"; // Shows 2.5% of the 90vw card (accounts for 5vw margin)
-    return "-200%"; // Hidden
+    if (currentSlide === 0) return "0%";
+    if (currentSlide === 1) return "-92.75%";
+    return "-200%";
   };
 
   const getExploreCardPosition = () => {
     if (!isMobile) return currentSlide === 2 ? "0%" : "100%";
-    if (currentSlide === 2) return "0%"; // Fully visible
-    if (currentSlide === 1) return "92.75%"; // Shows 2.5% of the 90vw card (accounts for 5vw margin)
-    return "200%"; // Hidden
+    if (currentSlide === 2) return "0%";
+    if (currentSlide === 1) return "92.75%";
+    return "200%";
   };
 
   const shouldRenderSettingsCard = () => {
@@ -711,14 +705,12 @@ const MobileApp: React.FC = () => {
 
   return (
     <div className={`fixed inset-0 ${!isMobile ? "overflow-hidden" : ""}`}>
-      {/* Show loading state while initializing */}
       {currentView === "loading" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
           <Skeleton className="w-full h-full" />
         </div>
       )}
 
-      {/* Map is always the background */}
       <Suspense fallback={<Skeleton className="w-full h-full" />}>
         <HomePage
           currentSlide={currentSlide}
@@ -739,10 +731,8 @@ const MobileApp: React.FC = () => {
         />
       </Suspense>
 
-      {/* Initiation Card - slides up and disappears */}
       {currentView === "initiation" && <InitiationPage onComplete={handleInitiationComplete} />}
 
-      {/* Settings Card - slides from left */}
       {shouldRenderSettingsCard() && (
         <motion.div
           animate={{ x: getSettingsCardPosition() }}
@@ -768,13 +758,11 @@ const MobileApp: React.FC = () => {
               onStoriesClick={handleUserStoriesClick}
               onPostClick={(post) => {
                 setExpandedPost(post.id);
-                setCurrentSlide(2); // Navigate to explore page
+                setCurrentSlide(2);
               }}
               onJobUpdate={handleJobUpdate}
               onSearchTrigger={(searchTerm) => {
-                // Navigate to home page and trigger search
                 setCurrentSlide(1);
-                // Set search state that will be picked up by HomePage
                 setTimeout(() => {
                   const searchEvent = new CustomEvent("triggerSearch", { detail: searchTerm });
                   window.dispatchEvent(searchEvent);
@@ -785,7 +773,6 @@ const MobileApp: React.FC = () => {
         </motion.div>
       )}
 
-      {/* Explore Card - slides from right */}
       {shouldRenderExploreCard() && (
         <motion.div
           animate={{ x: getExploreCardPosition() }}
@@ -812,7 +799,7 @@ const MobileApp: React.FC = () => {
               onBusinessView={(businessId) => {
                 const business = businesses.find((b) => b.id === businessId);
                 if (business) {
-                  setSelectedBusiness(business); // ✅ MapLibreMap will auto-fly
+                  setSelectedBusiness(business);
                   setCurrentSlide(1);
                 } else {
                   (async () => {
@@ -843,18 +830,14 @@ const MobileApp: React.FC = () => {
         </motion.div>
       )}
 
-      {/* Swipe detection overlay - only at screen edges */}
       <div className="absolute inset-0 z-10 pointer-events-none">
-        {/* Left edge swipe area */}
         <div
           className="absolute left-0 top-0 w-12 h-full pointer-events-auto"
           onTouchStart={(e) => {
-            // Prevent swipe if multi-touch (zoom gesture)
             if (currentSlide > 0 && e.touches.length === 1) {
               const touch = e.touches[0];
               const startX = touch.clientX;
               const handleTouchMove = (moveEvent: TouchEvent) => {
-                // Check if still single touch
                 if (moveEvent.touches.length !== 1) {
                   document.removeEventListener("touchmove", handleTouchMove);
                   document.removeEventListener("touchend", handleTouchEnd);
@@ -878,16 +861,13 @@ const MobileApp: React.FC = () => {
           }}
         />
 
-        {/* Right edge swipe area */}
         <div
           className="absolute right-0 top-0 w-12 h-full pointer-events-auto"
           onTouchStart={(e) => {
-            // Prevent swipe if multi-touch (zoom gesture)
             if (currentSlide < 2 && e.touches.length === 1) {
               const touch = e.touches[0];
               const startX = touch.clientX;
               const handleTouchMove = (moveEvent: TouchEvent) => {
-                // Check if still single touch
                 if (moveEvent.touches.length !== 1) {
                   document.removeEventListener("touchmove", handleTouchMove);
                   document.removeEventListener("touchend", handleTouchEnd);
@@ -912,7 +892,6 @@ const MobileApp: React.FC = () => {
         />
       </div>
 
-      {/* Slide indicators - only show on desktop */}
       {!isMobile && (
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-50">
           {[0, 1, 2].map((index) => (
