@@ -220,9 +220,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
       // Load current job
       const currentJobData = await getCurrentJob();
-      console.log("📥 Current job loaded:", currentJobData);
+      console.log("📥 Raw current job data:", JSON.stringify(currentJobData, null, 2));
 
-      if (currentJobData && currentJobData.location) {
+      if (currentJobData) {
         const isManualAddress = currentJobData.business_name === currentJobData.location;
         const newCurrentJob = {
           role: currentJobData.role || "",
