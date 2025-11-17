@@ -17,7 +17,7 @@ interface CurrentJobState {
   location: string;
   business_name: string;
   time_period: string;
-
+  
   // UI state
   businessInput: string;
   businessSelected: boolean;
@@ -25,7 +25,7 @@ interface CurrentJobState {
   addressInput: string;
   addressError: string;
   isManualAddress: boolean;
-
+  
   // Sync state
   isDirty: boolean;
   isSaving: boolean;
@@ -42,14 +42,14 @@ interface PastJobState {
   location: string;
   business_name: string;
   time_period: string;
-
+  
   // UI state
   businessInput: string;
   businessSelected: boolean;
   showAddressInput: boolean;
   addressInput: string;
   addressError: string;
-
+  
   // Sync state
   isDirty: boolean;
   isSaving: boolean;
@@ -104,7 +104,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
-
+  
   // Simplified state management
   const [currentJob, setCurrentJob] = useState<CurrentJobState | null>(null);
   const [pastJobs, setPastJobs] = useState<PastJobState[]>([]);
@@ -117,68 +117,30 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const AUTO_SAVE_DELAY = 1000;
 
   // ==================== VALIDATION ====================
-
+  
   const isValidAddress = (address: string): boolean => {
     if (!address || address.trim().length < 10) return false;
     const trimmed = address.trim();
-
+    
     const hasNumbers = /\d/.test(trimmed);
     const hasLetters = /[a-zA-Z]/.test(trimmed);
     const hasSpaces = /\s/.test(trimmed);
-
+    
     if (!hasNumbers || !hasLetters || !hasSpaces) return false;
-
+    
     const streetTypes = [
-      "street",
-      "st",
-      "avenue",
-      "ave",
-      "road",
-      "rd",
-      "drive",
-      "dr",
-      "lane",
-      "ln",
-      "boulevard",
-      "blvd",
-      "court",
-      "ct",
-      "place",
-      "pl",
-      "way",
-      "circle",
-      "cir",
-      "plaza",
-      "square",
-      "sq",
-      "parkway",
-      "pkwy",
-      "trail",
-      "tr",
-      "terrace",
-      "ter",
-      "highway",
-      "hwy",
-      "loop",
-      "row",
-      "walk",
-      "alley",
-      "crescent",
-      "cres",
-      "grove",
-      "heights",
-      "hill",
-      "park",
-      "ridge",
-      "view",
-      "crossing",
-      "xing",
+      "street", "st", "avenue", "ave", "road", "rd", "drive", "dr", "lane", "ln",
+      "boulevard", "blvd", "court", "ct", "place", "pl", "way", "circle", "cir",
+      "plaza", "square", "sq", "parkway", "pkwy", "trail", "tr", "terrace", "ter",
+      "highway", "hwy", "loop", "row", "walk", "alley", "crescent", "cres", "grove",
+      "heights", "hill", "park", "ridge", "view", "crossing", "xing"
     ];
-
+    
     const addressLower = trimmed.toLowerCase();
-    return streetTypes.some(
-      (type) =>
-        addressLower.includes(` ${type} `) || addressLower.endsWith(` ${type}`) || addressLower.includes(` ${type},`),
+    return streetTypes.some(type => 
+      addressLower.includes(` ${type} `) ||
+      addressLower.endsWith(` ${type}`) ||
+      addressLower.includes(` ${type},`)
     );
   };
 
@@ -210,15 +172,15 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   // ==================== DATABASE OPERATIONS ====================
-
+  
   const loadJobsFromDatabase = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
-
+    
     try {
       // Load current job
       const currentJobData = await getCurrentJob();
-
+      
       if (currentJobData) {
         const isManualAddress = currentJobData.business_name === currentJobData.location;
         setCurrentJob({
@@ -257,12 +219,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           hasError: false,
         });
       }
-
+      
       // Load past jobs
       const pastJobsData = await getPastJobs();
-
+      
       if (pastJobsData.length > 0) {
-        const formattedJobs: PastJobState[] = pastJobsData.map((job) => {
+        const formattedJobs: PastJobState[] = pastJobsData.map(job => {
           const isManualAddress = job.business_name === job.location;
           return {
             id: job.id!,
@@ -300,65 +262,54 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     }
   }, [initialData]);
 
-  const saveCurrentJobToDatabase = useCallback(
-    async (job: CurrentJobState) => {
-      if (!isCurrentJobComplete(job)) {
-        console.log("Current job incomplete, skipping save");
-        return;
-      }
+  const saveCurrentJobToDatabase = useCallback(async (job: CurrentJobState) => {
+    if (!isCurrentJobComplete(job)) {
+      console.log("Current job incomplete, skipping save");
+      return;
+    }
 
-      setCurrentJob((prev) => (prev ? { ...prev, isSaving: true, hasError: false } : prev));
+    setCurrentJob(prev => prev ? { ...prev, isSaving: true, hasError: false } : prev);
 
-      try {
-        const jobData: CurrentJobData = {
+    try {
+      const jobData: CurrentJobData = {
+        role: job.role,
+        salary: job.salary,
+        location: job.location,
+        business_name: job.business_name,
+        time_period: job.time_period,
+      };
+      
+      await saveCurrentJob(jobData);
+      
+      setCurrentJob(prev => prev ? {
+        ...prev,
+        isDirty: false,
+        isSaving: false,
+        hasError: false,
+        errorMessage: undefined,
+        lastSavedAt: new Date(),
+      } : prev);
+
+      // Call legacy callback
+      if (onJobUpdate) {
+        onJobUpdate({
+          salary: `$${job.salary}`,
           role: job.role,
-          salary: job.salary,
           location: job.location,
-          business_name: job.business_name,
-          time_period: job.time_period,
-        };
-
-        await saveCurrentJob(jobData);
-
-        setCurrentJob((prev) =>
-          prev
-            ? {
-                ...prev,
-                isDirty: false,
-                isSaving: false,
-                hasError: false,
-                errorMessage: undefined,
-                lastSavedAt: new Date(),
-              }
-            : prev,
-        );
-
-        // Call legacy callback
-        if (onJobUpdate) {
-          onJobUpdate({
-            salary: `$${job.salary}`,
-            role: job.role,
-            location: job.location,
-            businessName: job.business_name,
-            timePeriod: job.time_period,
-          });
-        }
-      } catch (error: any) {
-        console.error("Failed to save current job:", error);
-        setCurrentJob((prev) =>
-          prev
-            ? {
-                ...prev,
-                isSaving: false,
-                hasError: true,
-                errorMessage: error?.message || "Failed to save",
-              }
-            : prev,
-        );
+          businessName: job.business_name,
+          timePeriod: job.time_period,
+        });
       }
-    },
-    [onJobUpdate],
-  );
+    } catch (error: any) {
+      console.error("Failed to save current job:", error);
+      setCurrentJob(prev => prev ? {
+        ...prev,
+        isSaving: false,
+        hasError: true,
+        errorMessage: error?.message || "Failed to save",
+      } : prev);
+    }
+  }, [onJobUpdate]);
 
   const savePastJobToDatabase = useCallback(async (job: PastJobState) => {
     if (!isPastJobComplete(job)) {
@@ -366,7 +317,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       return;
     }
 
-    setPastJobs((prev) => prev.map((j) => (j.id === job.id ? { ...j, isSaving: true, hasError: false } : j)));
+    setPastJobs(prev => prev.map(j => 
+      j.id === job.id ? { ...j, isSaving: true, hasError: false } : j
+    ));
 
     try {
       const jobData: PastJobData = {
@@ -377,94 +330,80 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         business_name: job.business_name,
         time_period: job.time_period,
       };
-
+      
       const savedId = await savePastJob(jobData);
-
-      setPastJobs((prev) =>
-        prev.map((j) =>
-          j.id === job.id
-            ? {
-                ...j,
-                id: savedId, // Update temp ID with real ID
-                isDirty: false,
-                isSaving: false,
-                hasError: false,
-                errorMessage: undefined,
-                lastSavedAt: new Date(),
-              }
-            : j,
-        ),
-      );
+      
+      setPastJobs(prev => prev.map(j => 
+        j.id === job.id ? {
+          ...j,
+          id: savedId, // Update temp ID with real ID
+          isDirty: false,
+          isSaving: false,
+          hasError: false,
+          errorMessage: undefined,
+          lastSavedAt: new Date(),
+        } : j
+      ));
     } catch (error: any) {
       console.error("Failed to save past job:", error);
-      setPastJobs((prev) =>
-        prev.map((j) =>
-          j.id === job.id
-            ? {
-                ...j,
-                isSaving: false,
-                hasError: true,
-                errorMessage: error?.message || "Failed to save",
-              }
-            : j,
-        ),
-      );
+      setPastJobs(prev => prev.map(j => 
+        j.id === job.id ? {
+          ...j,
+          isSaving: false,
+          hasError: true,
+          errorMessage: error?.message || "Failed to save",
+        } : j
+      ));
     }
   }, []);
 
-  const deletePastJobFromDatabase = useCallback(
-    async (jobId: string) => {
-      const job = pastJobs.find((j) => j.id === jobId);
-      if (!job) return;
+  const deletePastJobFromDatabase = useCallback(async (jobId: string) => {
+    const job = pastJobs.find(j => j.id === jobId);
+    if (!job) return;
 
-      // Only delete from database if it has a real ID
-      if (!jobId.startsWith("temp_")) {
-        try {
-          await deletePastJob(jobId);
-        } catch (error) {
-          console.error("Failed to delete past job:", error);
-        }
+    // Only delete from database if it has a real ID
+    if (!jobId.startsWith("temp_")) {
+      try {
+        await deletePastJob(jobId);
+      } catch (error) {
+        console.error("Failed to delete past job:", error);
       }
+    }
 
-      setPastJobs((prev) => prev.filter((j) => j.id !== jobId));
-    },
-    [pastJobs],
-  );
+    setPastJobs(prev => prev.filter(j => j.id !== jobId));
+  }, [pastJobs]);
 
   // ==================== AUTO-SAVE ====================
+  
+  const scheduleAutoSave = useCallback((
+    job: CurrentJobState | PastJobState,
+    type: 'current' | 'past'
+  ) => {
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
 
-  const scheduleAutoSave = useCallback(
-    (job: CurrentJobState | PastJobState, type: "current" | "past") => {
-      // Clear existing timeout
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
+    // Schedule new save
+    saveTimeoutRef.current = setTimeout(() => {
+      if (type === 'current') {
+        saveCurrentJobToDatabase(job as CurrentJobState);
+      } else {
+        savePastJobToDatabase(job as PastJobState);
       }
-
-      // Schedule new save
-      saveTimeoutRef.current = setTimeout(() => {
-        if (type === "current") {
-          saveCurrentJobToDatabase(job as CurrentJobState);
-        } else {
-          savePastJobToDatabase(job as PastJobState);
-        }
-      }, AUTO_SAVE_DELAY);
-    },
-    [saveCurrentJobToDatabase, savePastJobToDatabase],
-  );
+    }, AUTO_SAVE_DELAY);
+  }, [saveCurrentJobToDatabase, savePastJobToDatabase]);
 
   // ==================== CURRENT JOB HANDLERS ====================
-
-  const updateCurrentJob = useCallback(
-    (updates: Partial<CurrentJobState>) => {
-      setCurrentJob((prev) => {
-        if (!prev) return prev;
-        const updated = { ...prev, ...updates, isDirty: true };
-        scheduleAutoSave(updated, "current");
-        return updated;
-      });
-    },
-    [scheduleAutoSave],
-  );
+  
+  const updateCurrentJob = useCallback((updates: Partial<CurrentJobState>) => {
+    setCurrentJob(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, ...updates, isDirty: true };
+      scheduleAutoSave(updated, 'current');
+      return updated;
+    });
+  }, [scheduleAutoSave]);
 
   const handleCurrentJobSalaryChange = (value: string) => {
     let cleanValue = value.replace(/[^0-9.]/g, "");
@@ -475,7 +414,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     if (parts[1] && parts[1].length > 2) {
       cleanValue = parts[0] + "." + parts[1].substring(0, 2);
     }
-
+    
     updateCurrentJob({ salary: parseFloat(cleanValue) || 0 });
   };
 
@@ -509,47 +448,35 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   const handleCurrentJobAddressChange = (value: string) => {
-    setCurrentJob((prev) => (prev ? { ...prev, addressInput: value } : prev));
+    setCurrentJob(prev => prev ? { ...prev, addressInput: value } : prev);
   };
 
   const handleCurrentJobAddressBlur = () => {
     if (!currentJob) return;
-
+    
     const address = currentJob.addressInput.trim();
     if (!address) {
-      setCurrentJob((prev) =>
-        prev
-          ? {
-              ...prev,
-              addressError: "Please enter a business address",
-              businessSelected: false, // Keep business unselected
-            }
-          : prev,
-      );
+      setCurrentJob(prev => prev ? { 
+        ...prev, 
+        addressError: "Please enter a business address",
+        businessSelected: false, // Keep business unselected
+      } : prev);
       return;
     }
     if (!validateProfanity(address)) {
-      setCurrentJob((prev) =>
-        prev
-          ? {
-              ...prev,
-              addressError: "Invalid address content",
-              businessSelected: false,
-            }
-          : prev,
-      );
+      setCurrentJob(prev => prev ? { 
+        ...prev, 
+        addressError: "Invalid address content",
+        businessSelected: false,
+      } : prev);
       return;
     }
     if (!isValidAddress(address)) {
-      setCurrentJob((prev) =>
-        prev
-          ? {
-              ...prev,
-              addressError: 'Please enter a valid street address (e.g., "123 Main St, City, State")',
-              businessSelected: false,
-            }
-          : prev,
-      );
+      setCurrentJob(prev => prev ? { 
+        ...prev, 
+        addressError: 'Please enter a valid street address (e.g., "123 Main St, City, State")',
+        businessSelected: false,
+      } : prev);
       return;
     }
 
@@ -569,7 +496,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   // ==================== PAST JOB HANDLERS ====================
-
+  
   const createEmptyPastJob = (id: string): PastJobState => ({
     id,
     role: "",
@@ -588,25 +515,22 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     isCollapsed: false,
   });
 
-  const updatePastJob = useCallback(
-    (jobId: string, updates: Partial<PastJobState>) => {
-      setPastJobs((prev) => {
-        const updated = prev.map((job) => {
-          if (job.id !== jobId) return job;
-          const updatedJob = { ...job, ...updates, isDirty: true };
-          scheduleAutoSave(updatedJob, "past");
-          return updatedJob;
-        });
-        return updated;
+  const updatePastJob = useCallback((jobId: string, updates: Partial<PastJobState>) => {
+    setPastJobs(prev => {
+      const updated = prev.map(job => {
+        if (job.id !== jobId) return job;
+        const updatedJob = { ...job, ...updates, isDirty: true };
+        scheduleAutoSave(updatedJob, 'past');
+        return updatedJob;
       });
-    },
-    [scheduleAutoSave],
-  );
+      return updated;
+    });
+  }, [scheduleAutoSave]);
 
   const handleAddPastJob = async () => {
     const newJobId = `temp_${Date.now()}`;
     const newJob = createEmptyPastJob(newJobId);
-    setPastJobs((prev) => [...prev, newJob]);
+    setPastJobs(prev => [...prev, newJob]);
   };
 
   const handleRemovePastJob = (jobId: string) => {
@@ -622,7 +546,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     if (parts[1] && parts[1].length > 2) {
       cleanValue = parts[0] + "." + parts[1].substring(0, 2);
     }
-
+    
     updatePastJob(jobId, { salary: parseFloat(cleanValue) || 0 });
   };
 
@@ -655,54 +579,44 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   const handlePastJobAddressChange = (jobId: string, value: string) => {
-    setPastJobs((prev) => prev.map((job) => (job.id === jobId ? { ...job, addressInput: value } : job)));
+    setPastJobs(prev => prev.map(job => 
+      job.id === jobId ? { ...job, addressInput: value } : job
+    ));
   };
 
   const handlePastJobAddressBlur = (jobId: string) => {
-    const job = pastJobs.find((j) => j.id === jobId);
+    const job = pastJobs.find(j => j.id === jobId);
     if (!job) return;
-
+    
     const address = job.addressInput.trim();
     if (!address) {
-      setPastJobs((prev) =>
-        prev.map((j) =>
-          j.id === jobId
-            ? {
-                ...j,
-                addressError: "Please enter a business address",
-                businessSelected: false,
-              }
-            : j,
-        ),
-      );
+      setPastJobs(prev => prev.map(j => 
+        j.id === jobId ? { 
+          ...j, 
+          addressError: "Please enter a business address",
+          businessSelected: false,
+        } : j
+      ));
       return;
     }
     if (!validateProfanity(address)) {
-      setPastJobs((prev) =>
-        prev.map((j) =>
-          j.id === jobId
-            ? {
-                ...j,
-                addressError: "Invalid address content",
-                businessSelected: false,
-              }
-            : j,
-        ),
-      );
+      setPastJobs(prev => prev.map(j => 
+        j.id === jobId ? { 
+          ...j, 
+          addressError: "Invalid address content",
+          businessSelected: false,
+        } : j
+      ));
       return;
     }
     if (!isValidAddress(address)) {
-      setPastJobs((prev) =>
-        prev.map((j) =>
-          j.id === jobId
-            ? {
-                ...j,
-                addressError: 'Please enter a valid street address (e.g., "123 Main St, City, State")',
-                businessSelected: false,
-              }
-            : j,
-        ),
-      );
+      setPastJobs(prev => prev.map(j => 
+        j.id === jobId ? { 
+          ...j, 
+          addressError: 'Please enter a valid street address (e.g., "123 Main St, City, State")',
+          businessSelected: false,
+        } : j
+      ));
       return;
     }
 
@@ -721,7 +635,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   // ==================== EFFECTS ====================
-
+  
   // Load jobs on mount
   useEffect(() => {
     loadJobsFromDatabase();
@@ -744,18 +658,18 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         setShowHelpPopup(false);
       }
     };
-
+    
     if (showHelpPopup) {
       document.addEventListener("click", handleClickOutside);
     }
-
+    
     return () => {
       document.removeEventListener("click", handleClickOutside);
     };
   }, [showHelpPopup]);
 
   // ==================== RENDER ====================
-
+  
   if (isLoading) {
     return null;
   }
@@ -768,7 +682,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           <div>
             <p className="text-red-500 font-medium">Failed to load jobs</p>
             <p className="text-sm text-app-gray-medium">{loadError}</p>
-            <button onClick={loadJobsFromDatabase} className="mt-2 text-sm text-app-yellow hover:underline">
+            <button
+              onClick={loadJobsFromDatabase}
+              className="mt-2 text-sm text-app-yellow hover:underline"
+            >
               Try again
             </button>
           </div>
@@ -791,14 +708,16 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             <div className="mb-8">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-medium text-app-black">Current Job</h2>
-                {currentJob.isSaving && <Loader2 className="w-4 h-4 animate-spin text-app-gray-medium" />}
+                {currentJob.isSaving && (
+                  <Loader2 className="w-4 h-4 animate-spin text-app-gray-medium" />
+                )}
                 {currentJob.hasError && (
                   <div title={currentJob.errorMessage}>
                     <AlertCircle className="w-4 h-4 text-red-500" />
                   </div>
                 )}
               </div>
-
+              
               <div className="space-y-4">
                 {/* Business Location */}
                 <div>
@@ -815,11 +734,15 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
                   {currentJob.showAddressInput && !currentJob.businessSelected && (
                     <div className="mt-2 space-y-2">
-                      <p className="text-app-gray-medium text-xs">Can't find your business? Enter the address below:</p>
+                      <p className="text-app-gray-medium text-xs">
+                        Can't find your business? Enter the address below:
+                      </p>
                       <input
                         type="text"
                         placeholder="Enter business address (e.g., 123 Main St, City, State)..."
-                        className={`app-input w-full ${currentJob.addressError ? "border-red-500 border-2" : ""}`}
+                        className={`app-input w-full ${
+                          currentJob.addressError ? "border-red-500 border-2" : ""
+                        }`}
                         value={currentJob.addressInput}
                         onChange={(e) => handleCurrentJobAddressChange(e.target.value)}
                         onBlur={handleCurrentJobAddressBlur}
@@ -884,13 +807,15 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 <Plus className="w-4 h-4 text-app-black" />
               </button>
             </div>
-
+            
             <div className="space-y-4">
               {pastJobs.map((job) => (
                 <div key={job.id} className="space-y-3 w-full relative">
                   {/* Save/Error Indicator */}
                   <div className="absolute -left-8 top-0 flex items-center gap-1">
-                    {job.isSaving && <Loader2 className="w-3 h-3 animate-spin text-app-gray-medium" />}
+                    {job.isSaving && (
+                      <Loader2 className="w-3 h-3 animate-spin text-app-gray-medium" />
+                    )}
                     {job.hasError && (
                       <div title={job.errorMessage}>
                         <AlertCircle className="w-3 h-3 text-red-500" />
@@ -919,12 +844,16 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                         <input
                           type="text"
                           placeholder="Enter business address (e.g., 123 Main St, City, State)..."
-                          className={`app-input w-full ${job.addressError ? "border-red-500 border-2" : ""}`}
+                          className={`app-input w-full ${
+                            job.addressError ? "border-red-500 border-2" : ""
+                          }`}
                           value={job.addressInput}
                           onChange={(e) => handlePastJobAddressChange(job.id, e.target.value)}
                           onBlur={() => handlePastJobAddressBlur(job.id)}
                         />
-                        {job.addressError && <p className="text-red-500 text-sm px-1">{job.addressError}</p>}
+                        {job.addressError && (
+                          <p className="text-red-500 text-sm px-1">{job.addressError}</p>
+                        )}
                         <p className="text-gray-500 text-xs px-1">
                           Please include street number, street name, and street type (e.g., St, Ave, Rd)
                         </p>
