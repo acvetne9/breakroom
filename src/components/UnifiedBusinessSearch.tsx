@@ -215,11 +215,21 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         console.log(`✅ [Dropdown] Found ${searchResults.length} immediate results`);
 
         // Convert to EnhancedBusiness format and add to results
-        const enhancedResults = searchResults.map((b) => ({
-          ...b,
-          lat: b.position.lat,
-          lng: b.position.lng,
-        })) as EnhancedBusiness[];
+        const enhancedResults = searchResults.map((b) => {
+          // Debug: Log what address fields are available
+          console.log("🔍 Business address fields:", {
+            name: b.name,
+            address: b.address,
+            formatted_address: b.formatted_address,
+            vicinity: b.vicinity,
+          });
+
+          return {
+            ...b,
+            lat: b.position.lat,
+            lng: b.position.lng,
+          };
+        }) as EnhancedBusiness[];
 
         results.push(...enhancedResults);
 
