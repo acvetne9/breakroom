@@ -149,6 +149,7 @@ export type Database = {
           created_at: string | null
           id: string
           location: string | null
+          device_id: string | null
           profile_id: string
           role: string
           salary: number | null
@@ -159,6 +160,7 @@ export type Database = {
           business_name?: string | null
           created_at?: string | null
           id?: string
+          device_id?: string | null
           location?: string | null
           profile_id: string
           role: string
