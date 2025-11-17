@@ -10,7 +10,7 @@ export interface PastJobData {
 }
 
 export const getPastJobs = async (deviceId: string): Promise<PastJobData[]> => {
-  console.log("🔍 Fetching past jobs this device:", deviceId);
+  console.log("🔍 Fetching past jobs for device:", deviceId);
 
   const { data, error } = await supabase
     .from("past_jobs")
