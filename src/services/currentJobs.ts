@@ -39,8 +39,16 @@ export const hasCurrentJob = async (): Promise<boolean> => {
  */
 export const getCurrentJob = async (): Promise<CurrentJobData | null> => {
   try {
+    // 🔍 DEBUG: Log device_id being used
+    const deviceId = localStorage.getItem('device_id');
+    console.log('🔍 [getCurrentJob] device_id from localStorage:', deviceId);
+    
     const { profileId } = await getUserProfile();
-    console.log('📋 Fetching current job for profile:', profileId);
+    console.log('🔍 [getCurrentJob] profileId from getUserProfile:', profileId);
+    
+    // 🔍 DEBUG: Verify the device_id header is set
+    const headers = (supabase as any).headers;
+    console.log('🔍 [getCurrentJob] Supabase client headers:', headers);
     
     const { data, error } = await supabase
       .from('current_jobs')
@@ -49,14 +57,27 @@ export const getCurrentJob = async (): Promise<CurrentJobData | null> => {
       .maybeSingle();
     
     if (error) {
-      console.error('❌ Error fetching current job:', error);
+      console.error('❌ [getCurrentJob] Error fetching current job:', {
+        error,
+        profileId,
+        deviceId,
+        errorCode: error.code,
+        errorMessage: error.message,
+        errorDetails: error.details
+      });
       throw error;
     }
     
-    console.log('✅ Current job fetched:', data ? 'found' : 'not found');
+    console.log('✅ [getCurrentJob] Query result:', {
+      found: !!data,
+      data,
+      profileId,
+      deviceId
+    });
+    
     return data;
   } catch (error) {
-    console.error('❌ Error in getCurrentJob:', error);
+    console.error('❌ [getCurrentJob] Exception:', error);
     throw error;
   }
 };
