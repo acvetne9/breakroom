@@ -845,7 +845,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       >
         <div className="flex-1 overflow-y-auto pr-2">
           <h1 className="text-xl font-medium text-app-black mb-2">Welcome to breakroom! 😊</h1>
-          <div><h1 className="text-xl font-medium text-app-black mb-2">Tip #1: </h1><p>Use the search bar on the map to search businesses by keyword, roles, and pay.</p></div>
+          <div></div><h1 className="text-xl font-medium text-app-black mb-2">Tip #1: </h1>Use the search bar on the map to search businesses by keyword, roles, and pay.</div>
           {/* Current Job */}
           {currentJob && (
             <div className="mb-8">
