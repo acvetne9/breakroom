@@ -431,6 +431,12 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     }, 150);
   };
 
+  // Helper function to get display address for a business
+  const getBusinessAddress = (business: EnhancedBusiness): string | null => {
+    // Priority order: address > formatted_address > vicinity
+    return business.address || business.formatted_address || business.vicinity || null;
+  };
+
   // Check if parent is passing app-input class (used in InitiationPage)
   const isAppInputStyle = className.includes("app-input");
 
@@ -536,10 +542,10 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
                                 : (result as EnhancedBusiness).businessType || "Business"}
                             </span>
                           </div>
-                          {/* Show Supabase address if it exists, otherwise nothing */}
-                          {(result as EnhancedBusiness).address && (
-                            <span className="text-xs text-gray-500 truncate mt-0.5">
-                              {(result as EnhancedBusiness).address}
+                          {/* Show address if available */}
+                          {getBusinessAddress(result as EnhancedBusiness) && (
+                            <span className="text-xs text-muted-foreground truncate mt-0.5">
+                              {getBusinessAddress(result as EnhancedBusiness)}
                             </span>
                           )}
                         </div>
