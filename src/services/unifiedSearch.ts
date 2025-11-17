@@ -1,9 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
-import { Business } from '@/types/business';
-import { applyBusinessFilters, SearchFilters } from './businessFiltering';
-import { expandTerm } from '@/utils/smartSearch';
-import { sanitizeVoteTotal } from '@/utils/voteCalculations';
-import { findNeighborhoodBoundaryByName } from '@/utils/nyc_neighborhoods';
+import { Business } from "@/types/business";
+import { applyBusinessFilters, SearchFilters } from "./businessFiltering";
+import { expandTerm } from "@/utils/smartSearch";
+import { sanitizeVoteTotal } from "@/utils/voteCalculations";
+import { findNeighborhoodBoundaryByName } from "@/utils/nyc_neighborhoods";
 
 // Search results cache to prevent repeated queries
 const searchCache = new Map<string, { results: Business[]; timestamp: number }>();
@@ -15,20 +15,20 @@ export interface UnifiedSearchFilters extends SearchFilters {}
 // Parse salary strings to hourly rate
 const parseSalaryToHourly = (salary: string): number | null => {
   if (!salary) return null;
-  
-  const numericValue = parseFloat(salary.replace(/[$,]/g, ''));
+
+  const numericValue = parseFloat(salary.replace(/[$,]/g, ""));
   if (isNaN(numericValue)) return null;
-  
+
   const salaryLower = salary.toLowerCase();
-  
-  if (salaryLower.includes('/hr') || salaryLower.includes('hour')) {
+
+  if (salaryLower.includes("/hr") || salaryLower.includes("hour")) {
     return numericValue;
-  } else if (salaryLower.includes('/month') || salaryLower.includes('monthly')) {
+  } else if (salaryLower.includes("/month") || salaryLower.includes("monthly")) {
     return numericValue / 160; // ~160 hours per month
-  } else if (salaryLower.includes('/year') || salaryLower.includes('yearly') || salaryLower.includes('annual')) {
+  } else if (salaryLower.includes("/year") || salaryLower.includes("yearly") || salaryLower.includes("annual")) {
     return numericValue / 2080; // ~2080 hours per year
   }
-  
+
   return numericValue; // Default to hourly
 };
 
@@ -37,16 +37,16 @@ export const parseUnifiedSearchFilters = async (searchQuery: string): Promise<Un
   if (!searchQuery.trim()) return null;
 
   const query = searchQuery.toLowerCase().trim();
-  
+
   // Extract salary patterns first
   const salaryPatterns = [
     /\$(\d+(?:\.\d{1,2})?)\s*(?:[-–]\s*\$?(\d+(?:\.\d{1,2})?))?\s*(?:\/?\s*(hr|hour|month|year|annual))?/g,
-    /(\d+(?:\.\d{1,2})?)\s*(?:[-–]\s*(\d+(?:\.\d{1,2})?))?\s*\$?\s*(?:\/?\s*(hr|hour|month|year|annual))/g
+    /(\d+(?:\.\d{1,2})?)\s*(?:[-–]\s*(\d+(?:\.\d{1,2})?))?\s*\$?\s*(?:\/?\s*(hr|hour|month|year|annual))/g,
   ];
-  
+
   let salaryQuery = null;
   let remainingText = searchQuery;
-  
+
   for (const pattern of salaryPatterns) {
     const match = query.match(pattern);
     if (match) {
@@ -56,70 +56,70 @@ export const parseUnifiedSearchFilters = async (searchQuery: string): Promise<Un
         const min = parseFloat(parts[0]);
         const max = parts[1] ? parseFloat(parts[1]) : undefined;
         const unitMatch = fullMatch.match(/(hr|hour|month|year|annual)/);
-        const unit = unitMatch ? unitMatch[0] : 'hr';
-        
+        const unit = unitMatch ? unitMatch[0] : "hr";
+
         let minHourly = min;
         let maxHourly = max;
-        
-        if (unit.includes('month')) {
+
+        if (unit.includes("month")) {
           minHourly = min / 160;
           maxHourly = max ? max / 160 : undefined;
-        } else if (unit.includes('year') || unit.includes('annual')) {
+        } else if (unit.includes("year") || unit.includes("annual")) {
           minHourly = min / 2080;
           maxHourly = max ? max / 2080 : undefined;
         }
-        
+
         salaryQuery = {
           min: minHourly,
           max: maxHourly,
-          isRange: !!max
+          isRange: !!max,
         };
-        
-        remainingText = remainingText.replace(new RegExp(fullMatch, 'gi'), '').trim();
+
+        remainingText = remainingText.replace(new RegExp(fullMatch, "gi"), "").trim();
         break;
       }
     }
   }
-  
+
   // Parse remaining text terms
   const textTerms = remainingText
     .split(/\s+/)
-    .filter(term => term.length > 0)
-    .map(term => term.toLowerCase());
-  
-  console.log(`🔍 [parseSearchFilters] Original terms: ${textTerms.join(', ')}`);
-  
+    .filter((term) => term.length > 0)
+    .map((term) => term.toLowerCase());
+
+  console.log(`🔍 [parseSearchFilters] Original terms: ${textTerms.join(", ")}`);
+
   // Expand text terms with synonyms - skip neighborhoods
   const MAX_TOTAL_TERMS = 20; // Prevent overly broad searches
   const expandedTermsArrays = await Promise.all(
-    textTerms.map(async term => {
+    textTerms.map(async (term) => {
       // Skip expansion for neighborhood names
       const isNeighborhood = findNeighborhoodBoundaryByName(term);
       if (isNeighborhood) {
         console.log(`⏭️ Skipping expansion for neighborhood: ${term}`);
         return [term]; // Return original term only
       }
-      
+
       // Expand all other terms (will expand job roles AND other terms)
       const expanded = await expandTerm(term);
       // Limit expansions per term to top 5 most relevant
       return expanded.slice(0, 5);
-    })
+    }),
   );
   const expandedTextTerms = expandedTermsArrays.flat();
   const uniqueExpandedTerms = [...new Set(expandedTextTerms)].slice(0, MAX_TOTAL_TERMS);
-  
-  console.log(`🔍 [parseSearchFilters] Expanded to: ${uniqueExpandedTerms.join(', ')}`);
-  
-  const filters: UnifiedSearchFilters = { 
-    textTerms: uniqueExpandedTerms,  // Expanded terms for role matching
-    originalTerms: textTerms          // Original terms for name/type matching
+
+  console.log(`🔍 [parseSearchFilters] Expanded to: ${uniqueExpandedTerms.join(", ")}`);
+
+  const filters: UnifiedSearchFilters = {
+    textTerms: uniqueExpandedTerms, // Expanded terms for role matching
+    originalTerms: textTerms, // Original terms for name/type matching
   };
-  
+
   if (salaryQuery) filters.salaryQuery = salaryQuery;
-  
-  console.log('✅ [parseSearchFilters] Final filters:', filters);
-  
+
+  console.log("✅ [parseSearchFilters] Final filters:", filters);
+
   return filters;
 };
 
@@ -127,40 +127,44 @@ export const parseUnifiedSearchFilters = async (searchQuery: string): Promise<Un
 export const searchBusinessesUnified = async (
   filters: UnifiedSearchFilters,
   bounds?: { north: number; south: number; east: number; west: number },
-  limit: number = 1000
+  limit: number = 1000,
 ): Promise<Business[]> => {
-  
   const cacheKey = JSON.stringify({ filters, bounds, limit });
-  
+
   // Check cache first
   const cached = searchCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    console.log('🚀 Search cache HIT');
+    console.log("🚀 Search cache HIT");
     return cached.results;
   }
-  
+
   try {
     // Use database-level text search for comprehensive matching
     let businesses: any[] = [];
-    
+
     // Universal search across ALL fields (name, type, address, roles)
-    if ((filters.textTerms && filters.textTerms.length > 0) || (filters.originalTerms && filters.originalTerms.length > 0)) {
-      console.log(`🔍 [searchBusinessesUnified] Starting universal search for ${filters.textTerms.length} expanded terms: ${filters.textTerms.join(', ')}`);
-      
+    if (
+      (filters.textTerms && filters.textTerms.length > 0) ||
+      (filters.originalTerms && filters.originalTerms.length > 0)
+    ) {
+      console.log(
+        `🔍 [searchBusinessesUnified] Starting universal search for ${filters.textTerms.length} expanded terms: ${filters.textTerms.join(", ")}`,
+      );
+
       // Build search conditions - prioritize original terms for name/type/address
       const searchConditions: string[] = [];
-      
+
       // First, search with original terms (exact intent - e.g., "amazon" for business name)
       if (filters.originalTerms && filters.originalTerms.length > 0) {
-        filters.originalTerms.forEach(term => {
+        filters.originalTerms.forEach((term) => {
           searchConditions.push(`name.ilike.%${term}%`);
           searchConditions.push(`business_type.ilike.%${term}%`);
           searchConditions.push(`address.ilike.%${term}%`);
         });
       }
-      
+
       // Then add expanded terms for additional matches (e.g., synonyms for roles)
-      filters.textTerms.forEach(term => {
+      filters.textTerms.forEach((term) => {
         // Skip if already covered by original terms
         if (!filters.originalTerms || !filters.originalTerms.includes(term)) {
           searchConditions.push(`name.ilike.%${term}%`);
@@ -168,138 +172,134 @@ export const searchBusinessesUnified = async (
           searchConditions.push(`address.ilike.%${term}%`);
         }
       });
-      
-      console.log(`🔍 [searchBusinessesUnified] SQL conditions: ${searchConditions.join(' OR ')}`);
-      
+
+      console.log(`🔍 [searchBusinessesUnified] SQL conditions: ${searchConditions.join(" OR ")}`);
+
       // QUERY 1: Search businesses table (name, type, address) in parallel
       const businessSearchPromise = (async () => {
         let textQuery = supabase
-          .from('businesses')
-          .select('id, name, lat, lng, atmosphere, business_type, website, address');
-        
+          .from("businesses")
+          .select("id, name, lat, lng, atmosphere, business_type, website, address");
+
         if (bounds) {
           textQuery = textQuery
-            .gte('lat', bounds.south)
-            .lte('lat', bounds.north)
-            .gte('lng', bounds.west)
-            .lte('lng', bounds.east);
+            .gte("lat", bounds.south)
+            .lte("lat", bounds.north)
+            .gte("lng", bounds.west)
+            .lte("lng", bounds.east);
         }
-        
-        textQuery = textQuery.or(searchConditions.join(','));
+
+        textQuery = textQuery.or(searchConditions.join(","));
         const queryLimit = bounds ? Math.min(limit * 10, 10000) : 5000;
         textQuery = textQuery.limit(queryLimit);
-        
+
         const { data, error } = await textQuery;
         if (error) {
-          console.error('❌ Business text search error:', error);
+          console.error("❌ Business text search error:", error);
           return [];
         }
         console.log(`✅ Business text search found ${data?.length || 0} matches`);
         return data || [];
       })();
-      
+
       // QUERY 2: Search business_roles table (roles) in parallel
       const roleSearchPromise = (async () => {
-        const roleConditions = filters.textTerms.map(term => 
-          `role.ilike.%${term}%`
-        ).join(',');
-        
+        const roleConditions = filters.textTerms.map((term) => `role.ilike.%${term}%`).join(",");
+
         console.log(`🔍 [searchBusinessesUnified] Role SQL conditions: ${roleConditions}`);
-        
+
         const { data: matchingRoles, error } = await supabase
-          .from('business_roles')
-          .select('business_id')
+          .from("business_roles")
+          .select("business_id")
           .or(roleConditions)
           .limit(3000);
-        
+
         if (error) {
-          console.error('❌ Role search error:', error);
+          console.error("❌ Role search error:", error);
           return [];
         }
-        
+
         if (!matchingRoles || matchingRoles.length === 0) {
-          console.log('⚠️ No role matches found');
+          console.log("⚠️ No role matches found");
           return [];
         }
-        
-        const roleBusinessIds = [...new Set(matchingRoles.map(r => r.business_id))];
+
+        const roleBusinessIds = [...new Set(matchingRoles.map((r) => r.business_id))];
         console.log(`✅ Role search found ${roleBusinessIds.length} unique businesses`);
-        
+
         // Fetch businesses from role matches in batches
         const FETCH_BATCH_SIZE = 200;
         const roleBusinesses: any[] = [];
-        
+
         for (let i = 0; i < roleBusinessIds.length; i += FETCH_BATCH_SIZE) {
           const batchIds = roleBusinessIds.slice(i, i + FETCH_BATCH_SIZE);
-          
+
           let query = supabase
-            .from('businesses')
-            .select('id, name, lat, lng, atmosphere, business_type, website, address')
-            .in('id', batchIds);
-          
+            .from("businesses")
+            .select("id, name, lat, lng, atmosphere, business_type, website, address")
+            .in("id", batchIds);
+
           if (bounds) {
             query = query
-              .gte('lat', bounds.south)
-              .lte('lat', bounds.north)
-              .gte('lng', bounds.west)
-              .lte('lng', bounds.east);
+              .gte("lat", bounds.south)
+              .lte("lat", bounds.north)
+              .gte("lng", bounds.west)
+              .lte("lng", bounds.east);
           }
-          
+
           const { data } = await query;
           if (data) roleBusinesses.push(...data);
         }
-        
+
         return roleBusinesses;
       })();
-      
+
       // Wait for both queries to complete in parallel
-      const [businessMatches, roleMatches] = await Promise.all([
-        businessSearchPromise,
-        roleSearchPromise
-      ]);
-      
+      const [businessMatches, roleMatches] = await Promise.all([businessSearchPromise, roleSearchPromise]);
+
       // Combine and deduplicate results
       const businessMap = new Map();
-      businessMatches.forEach(b => businessMap.set(b.id, b));
-      roleMatches.forEach(b => businessMap.set(b.id, b));
-      
+      businessMatches.forEach((b) => businessMap.set(b.id, b));
+      roleMatches.forEach((b) => businessMap.set(b.id, b));
+
       businesses = Array.from(businessMap.values());
-      console.log(`🔍 Combined search found ${businesses.length} unique businesses (${businessMatches.length} from text, ${roleMatches.length} from roles)`);
-      
+      console.log(
+        `🔍 Combined search found ${businesses.length} unique businesses (${businessMatches.length} from text, ${roleMatches.length} from roles)`,
+      );
     } else {
       // No text terms - load businesses based on bounds only
       let baseQuery = supabase
-        .from('businesses')
-        .select('id, name, lat, lng, atmosphere, business_type, website, address');
-      
+        .from("businesses")
+        .select("id, name, lat, lng, atmosphere, business_type, website, address");
+
       if (bounds) {
         baseQuery = baseQuery
-          .gte('lat', bounds.south)
-          .lte('lat', bounds.north)
-          .gte('lng', bounds.west)
-          .lte('lng', bounds.east);
+          .gte("lat", bounds.south)
+          .lte("lat", bounds.north)
+          .gte("lng", bounds.west)
+          .lte("lng", bounds.east);
       }
-      
+
       const queryLimit = bounds ? Math.min(limit * 10, 10000) : 5000;
       baseQuery = baseQuery.limit(queryLimit);
-      
+
       const { data: allBusinesses } = await baseQuery;
       businesses = allBusinesses || [];
     }
-    
+
     if (businesses.length === 0) {
-      console.log('⚠️ No businesses found from universal search');
+      console.log("⚠️ No businesses found from universal search");
     }
-    
+
     console.log(`🔍 Found ${businesses.length} businesses, loading all roles...`);
-    
+
     // Load roles in safe batches to avoid oversized URLs
-    const businessIds = businesses.map(b => b.id);
+    const businessIds = businesses.map((b) => b.id);
     let allRoles: any[] = [];
 
     if (businessIds.length > 0) {
       const BATCH_SIZE = 150; // keep URL well under limits
-      const CONCURRENCY = 6;  // fast but safe parallelism
+      const CONCURRENCY = 6; // fast but safe parallelism
       const chunks: string[][] = [];
       for (let i = 0; i < businessIds.length; i += BATCH_SIZE) {
         chunks.push(businessIds.slice(i, i + BATCH_SIZE));
@@ -307,13 +307,13 @@ export const searchBusinessesUnified = async (
 
       const executeBatch = async (ids: string[]) => {
         const { data, error } = await supabase
-          .from('business_roles')
-          .select('business_id, id, role, salary, votes_total')
-          .in('business_id', ids)
-          .order('votes_total', { ascending: false })
-          .order('created_at', { ascending: true });
+          .from("business_roles")
+          .select("business_id, id, role, salary, votes_total")
+          .in("business_id", ids)
+          .order("votes_total", { ascending: false })
+          .order("created_at", { ascending: true });
         if (error) {
-          console.error('❌ Roles batch error:', error);
+          console.error("❌ Roles batch error:", error);
           return [] as any[];
         }
         return (data || []) as any[];
@@ -333,7 +333,7 @@ export const searchBusinessesUnified = async (
             .then((rows) => {
               allRoles.push(...rows);
             })
-            .catch((e) => console.error('❌ Roles batch failed:', e))
+            .catch((e) => console.error("❌ Roles batch failed:", e))
             .finally(() => {
               active--;
               launch();
@@ -345,113 +345,110 @@ export const searchBusinessesUnified = async (
 
       console.log(`✅ Loaded ${allRoles.length} roles for ${businesses.length} businesses in ${chunks.length} batches`);
     }
-    
+
     // Only check for empty roles table if no roles loaded and we expected some
     if (allRoles.length === 0 && businesses.length > 0) {
-      console.warn('⚠️ No roles loaded for businesses - roles table may be empty');
+      console.warn("⚠️ No roles loaded for businesses - roles table may be empty");
     }
-    
-    
-    // Combine businesses with their roles
-    const businessesWithRoles: Business[] = businesses.map(business => ({
+
+    const businessesWithRoles: Business[] = businesses.map((business) => ({
       id: business.id,
       name: business.name,
       position: { lat: business.lat, lng: business.lng },
       atmosphere: business.atmosphere || [],
       businessType: business.business_type,
       website: business.website,
+      address: business.address,
       roles: allRoles
-        .filter(role => role.business_id === business.id)
-        .map(role => ({
+        .filter((role) => role.business_id === business.id)
+        .map((role) => ({
           id: role.id,
           role: role.role,
           salary: role.salary,
           votesTotal: sanitizeVoteTotal(role.votes_total),
-          userVote: null
-        }))
+          userVote: null,
+        })),
     }));
-    
+
     // Calculate relevance score for each business
     console.log(`🎯 Scoring ${businessesWithRoles.length} businesses for relevance...`);
-    const scoredBusinesses = businessesWithRoles.map(business => {
+    const scoredBusinesses = businessesWithRoles.map((business) => {
       let score = 0;
       const nameLower = business.name.toLowerCase();
-      const typeLower = (business.businessType || '').toLowerCase();
-      const originalTermsLower = (filters.originalTerms || filters.textTerms).map(t => t.toLowerCase());
-      const searchQueryNormalized = originalTermsLower.join(' ');
-      
+      const typeLower = (business.businessType || "").toLowerCase();
+      const originalTermsLower = (filters.originalTerms || filters.textTerms).map((t) => t.toLowerCase());
+      const searchQueryNormalized = originalTermsLower.join(" ");
+
       // HIGHEST PRIORITY: Exact full name match (case-insensitive)
       if (nameLower === searchQueryNormalized) {
         score += 1000;
       }
-      
+
       // HIGH PRIORITY: Name contains all original terms as complete words
       const nameWords = nameLower.split(/\s+/);
-      const allTermsInName = originalTermsLower.every(term => 
-        nameWords.some(word => word === term || word.includes(term))
+      const allTermsInName = originalTermsLower.every((term) =>
+        nameWords.some((word) => word === term || word.includes(term)),
       );
       if (allTermsInName && score < 1000) {
         score += 500;
       }
-      
+
       // MEDIUM-HIGH: Name starts with first search term
       if (originalTermsLower.length > 0 && nameLower.startsWith(originalTermsLower[0])) {
         score += 200;
       }
-      
+
       // MEDIUM: Count how many original terms match in name
-      originalTermsLower.forEach(term => {
+      originalTermsLower.forEach((term) => {
         if (nameLower.includes(term)) {
           score += 50;
         }
       });
-      
+
       // MEDIUM: Count how many original terms match in business type
-      originalTermsLower.forEach(term => {
+      originalTermsLower.forEach((term) => {
         if (typeLower.includes(term)) {
           score += 30;
         }
       });
-      
+
       // LOW: Matches only through expanded terms (less relevant)
-      const expandedOnlyTerms = (filters.textTerms || [])
-        .filter(t => !originalTermsLower.includes(t.toLowerCase()));
-      expandedOnlyTerms.forEach(term => {
+      const expandedOnlyTerms = (filters.textTerms || []).filter((t) => !originalTermsLower.includes(t.toLowerCase()));
+      expandedOnlyTerms.forEach((term) => {
         if (nameLower.includes(term.toLowerCase())) {
           score += 10;
         }
       });
-      
+
       // BONUS: Has roles matching search terms
       if (business.roles && business.roles.length > 0) {
-        const roleMatches = business.roles.some(role => 
-          originalTermsLower.some(term => 
-            (role.role || '').toLowerCase().includes(term)
-          )
+        const roleMatches = business.roles.some((role) =>
+          originalTermsLower.some((term) => (role.role || "").toLowerCase().includes(term)),
         );
         if (roleMatches) score += 20;
       }
-      
+
       return { business, score };
     });
 
     // Sort by score (highest first)
-    const sortedBusinesses = scoredBusinesses
-      .sort((a, b) => b.score - a.score)
-      .map(item => item.business);
+    const sortedBusinesses = scoredBusinesses.sort((a, b) => b.score - a.score).map((item) => item.business);
 
-    console.log(`🎯 Top 5 scored results:`, sortedBusinesses.slice(0, 5).map(b => ({
-      name: b.name,
-      score: scoredBusinesses.find(sb => sb.business.id === b.id)?.score
-    })));
+    console.log(
+      `🎯 Top 5 scored results:`,
+      sortedBusinesses.slice(0, 5).map((b) => ({
+        name: b.name,
+        score: scoredBusinesses.find((sb) => sb.business.id === b.id)?.score,
+      })),
+    );
 
     // Apply enhanced business filtering to sorted results
     console.log(`🔍 Applying enhanced filters to ${sortedBusinesses.length} businesses...`);
     const filteredBusinesses = applyBusinessFilters(sortedBusinesses, filters as SearchFilters);
-    
+
     // Limit to requested amount
     const finalResults = filteredBusinesses.slice(0, limit);
-    
+
     // Cache results
     if (searchCache.size >= MAX_CACHE_SIZE) {
       const oldestKey = searchCache.keys().next().value;
@@ -459,15 +456,14 @@ export const searchBusinessesUnified = async (
     }
     searchCache.set(cacheKey, {
       results: finalResults,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
-    
+
     // Single summary log instead of spam
     console.log(`✅ Search completed: ${businesses.length} businesses -> ${finalResults.length} results`);
     return finalResults;
-    
   } catch (error) {
-    console.error('❌ Unified search error:', error);
+    console.error("❌ Unified search error:", error);
     return [];
   }
 };
@@ -476,19 +472,18 @@ export const searchBusinessesUnified = async (
 export const searchBusinessesByQuery = async (
   query: string,
   bounds?: { north: number; south: number; east: number; west: number },
-  limit: number = 1000
+  limit: number = 1000,
 ): Promise<Business[]> => {
-  
   if (!query.trim()) return [];
-  
+
   const filters = await parseUnifiedSearchFilters(query);
   if (!filters) return [];
-  
+
   return searchBusinessesUnified(filters, bounds, limit);
 };
 
 // Clear search cache
 export const clearSearchCache = () => {
   searchCache.clear();
-  console.log('🧹 Search cache cleared');
+  console.log("🧹 Search cache cleared");
 };
