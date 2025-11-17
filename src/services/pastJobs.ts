@@ -15,7 +15,7 @@ export const getPastJobs = async (deviceId: string): Promise<PastJobData[]> => {
   const { data, error } = await supabase
     .from("past_jobs")
     .select("*")
-    .eq("device_id", deviceId)
+    .eq("profile_id", deviceId)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -43,7 +43,7 @@ export const savePastJob = async (deviceId: string, jobData: PastJobData): Promi
         updated_at: new Date().toISOString(),
       })
       .eq("id", jobData.id)
-      .eq("device_id", deviceId);
+      .eq("profile_id", deviceId);
 
     if (error) {
       console.error("❌ Error updating past job:", error);
@@ -57,7 +57,7 @@ export const savePastJob = async (deviceId: string, jobData: PastJobData): Promi
     const { data, error } = await supabase
       .from("past_jobs")
       .insert({
-        device_id: deviceId,
+        profile_id: deviceId,
         role: jobData.role,
         salary: jobData.salary,
         location: jobData.location,
@@ -78,7 +78,7 @@ export const savePastJob = async (deviceId: string, jobData: PastJobData): Promi
 };
 
 export const deletePastJob = async (deviceId: string, jobId: string): Promise<void> => {
-  const { error } = await supabase.from("past_jobs").delete().eq("id", jobId).eq("device_id", deviceId);
+  const { error } = await supabase.from("past_jobs").delete().eq("id", jobId).eq("profile_id", deviceId);
 
   if (error) {
     console.error("❌ Error deleting past job:", error);
