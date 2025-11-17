@@ -97,7 +97,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   onPageLeave,
   onSearchTrigger,
 }) => {
-  const { deviceId, loading: deviceLoading } = useDevice();
+  const { deviceId } = useDevice();
   const isMobile = useIsMobile();
   const { getUserPostsAndCommented } = usePosts();
   const userPosts = getUserPostsAndCommented();
@@ -178,13 +178,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     setLoadError(null);
     
     try {
-      console.log("🔄 [SettingsPage] Loading jobs from database...");
-      console.log("🔍 [SettingsPage] device_id in localStorage:", localStorage.getItem('device_id'));
-      console.log("🔍 [SettingsPage] deviceId from context:", deviceId);
+      console.log("🔄 Loading jobs from database...");
       
       // Load current job
       const currentJobData = await getCurrentJob();
-      console.log("📥 [SettingsPage] Current job loaded:", currentJobData);
+      console.log("📥 Current job loaded:", currentJobData);
       
       if (currentJobData && currentJobData.location) {
         const isManualAddress = currentJobData.business_name === currentJobData.location;
@@ -233,28 +231,41 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       console.log("📥 Past jobs loaded:", pastJobsData.length, "jobs");
       
       if (pastJobsData.length > 0) {
-        const formattedJobs: PastJobState[] = pastJobsData.map(job => {
-          const isManualAddress = job.business_name === job.location;
-          return {
-            id: job.id!,
-            role: job.role,
-            salary: job.salary,
-            location: job.location || "",
-            business_name: job.business_name || "",
-            time_period: job.time_period || "HR",
-            businessInput: job.business_name || "",
-            businessSelected: true, // Mark as selected since it came from database
-            showAddressInput: false,
-            addressInput: isManualAddress ? job.location || "" : "",
-            addressError: "",
-            isDirty: false,
-            isSaving: false,
-            hasError: false,
-            lastSavedAt: new Date(),
-            isCollapsed: false,
-          };
-        });
-        setPastJobs(formattedJobs);
+        // Filter out incomplete jobs, but keep at least one (empty) job
+        const completeJobs = pastJobsData.filter(job => 
+          job.role && job.salary > 0 && job.location && job.time_period
+        );
+        
+        if (completeJobs.length > 0) {
+          // We have complete jobs - show only those
+          const formattedJobs: PastJobState[] = completeJobs.map(job => {
+            const isManualAddress = job.business_name === job.location;
+            return {
+              id: job.id!,
+              role: job.role,
+              salary: job.salary,
+              location: job.location || "",
+              business_name: job.business_name || "",
+              time_period: job.time_period || "HR",
+              businessInput: job.business_name || "",
+              businessSelected: true, // Mark as selected since it came from database
+              showAddressInput: false,
+              addressInput: isManualAddress ? job.location || "" : "",
+              addressError: "",
+              isDirty: false,
+              isSaving: false,
+              hasError: false,
+              lastSavedAt: new Date(),
+              isCollapsed: false,
+            };
+          });
+          setPastJobs(formattedJobs);
+        } else {
+          // All jobs incomplete - show one empty job
+          console.log("ℹ️ All past jobs incomplete, showing one empty job");
+          const newJobId = `temp_${Date.now()}`;
+          setPastJobs([createEmptyPastJob(newJobId)]);
+        }
       } else {
         console.log("ℹ️ No past jobs found, initializing one empty job");
         // Start with one empty past job
@@ -562,11 +573,16 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   const handlePastJobSalaryChange = (jobId: string, value: string) => {
+    // Remove $ and any non-numeric characters except decimal point
     let cleanValue = value.replace(/[^0-9.]/g, "");
+    
+    // Ensure only one decimal point
     const parts = cleanValue.split(".");
     if (parts.length > 2) {
       cleanValue = parts[0] + "." + parts.slice(1).join("");
     }
+    
+    // Limit to 2 decimal places
     if (parts[1] && parts[1].length > 2) {
       cleanValue = parts[0] + "." + parts[1].substring(0, 2);
     }
@@ -585,6 +601,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       if (parts[1]?.length === 1) {
         updatePastJob(jobId, { salary: parseFloat(`${parts[0]}.${parts[1]}0`) });
       }
+    }
+  };
+
+  const handlePastJobSalaryFocus = (jobId: string) => {
+    const job = pastJobs.find(j => j.id === jobId);
+    // If salary is 0 or empty, set a default $ to indicate it's ready for input
+    if (!job || job.salary === 0) {
+      // Don't actually change the value, just let the display show $
     }
   };
 
@@ -672,21 +696,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   // ==================== EFFECTS ====================
   
-  // Load jobs on mount - wait for device to be ready
+  // Load jobs on mount
   useEffect(() => {
-    console.log('🎯 [SettingsPage] Mount effect triggered:', {
-      isDeviceLoading: deviceLoading,
-      hasDeviceId: !!deviceId,
-      deviceId: deviceId?.substring(0, 30) + '...'
-    });
-    
-    if (!deviceLoading && deviceId) {
-      console.log('✅ [SettingsPage] Device ready, loading jobs...');
-      loadJobsFromDatabase();
-    } else {
-      console.log('⏳ [SettingsPage] Waiting for device initialization...', { deviceLoading, hasDeviceId: !!deviceId });
-    }
-  }, [deviceLoading, deviceId, loadJobsFromDatabase]);
+    loadJobsFromDatabase();
+  }, [loadJobsFromDatabase]);
 
   // Cleanup: save all dirty jobs before unmount
   useEffect(() => {
