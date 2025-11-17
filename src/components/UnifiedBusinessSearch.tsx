@@ -215,21 +215,11 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         console.log(`✅ [Dropdown] Found ${searchResults.length} immediate results`);
 
         // Convert to EnhancedBusiness format and add to results
-        const enhancedResults = searchResults.map((b) => {
-          // Debug: Log what address fields are available
-          console.log("🔍 Business address fields:", {
-            name: b.name,
-            address: b.address,
-            formatted_address: b.formatted_address,
-            vicinity: b.vicinity,
-          });
-
-          return {
-            ...b,
-            lat: b.position.lat,
-            lng: b.position.lng,
-          };
-        }) as EnhancedBusiness[];
+        const enhancedResults = searchResults.map((b) => ({
+          ...b,
+          lat: b.position.lat,
+          lng: b.position.lng,
+        })) as EnhancedBusiness[];
 
         results.push(...enhancedResults);
 
@@ -443,8 +433,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
 
   // Helper function to get display address for a business
   const getBusinessAddress = (business: EnhancedBusiness): string | null => {
-    // Priority order: address > formatted_address > vicinity
-    return business.address || business.formatted_address || business.vicinity || null;
+    // Only check for address property (the one that exists in Business type)
+    return business.address || null;
   };
 
   // Check if parent is passing app-input class (used in InitiationPage)
