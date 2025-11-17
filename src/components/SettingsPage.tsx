@@ -214,14 +214,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const loadJobsFromDatabase = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
-
+  
     try {
-      console.log("🔄 Loading jobs from database...");
-
-      // Load current job
-      const currentJobData = await getCurrentJob();
+      console.log("🔄 Loading jobs from database for device:", deviceId);
+  
+      // Load current job with deviceId
+      const currentJobData = await getCurrentJob(deviceId);
       console.log("📥 Raw current job data:", JSON.stringify(currentJobData, null, 2));
-
+  
       if (currentJobData) {
         const isManualAddress = currentJobData.business_name === currentJobData.location;
         const newCurrentJob = {
@@ -233,7 +233,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           businessInput: currentJobData.business_name || "",
           businessSelected: true, // Mark as selected since it came from database
           showAddressInput: false,
-          addressInput: isManualAddress ? currentJobData.location : "",
+          addressInput: isManualAddress ? currentJobData.location || "" : "",
           addressError: "",
           isManualAddress,
           isDirty: false,
@@ -245,7 +245,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         setCurrentJob(newCurrentJob);
       } else {
         console.log("ℹ️ No current job found, initializing empty");
-        // Initialize one empty current job (like past jobs)
+        // Initialize one empty current job
         setCurrentJob({
           role: "",
           salary: 0,
@@ -263,17 +263,17 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           hasError: false,
         });
       }
-
-      // Load past jobs
-      const pastJobsData = await getPastJobs();
+  
+      // Load past jobs with deviceId
+      const pastJobsData = await getPastJobs(deviceId);
       console.log("📥 Past jobs loaded:", pastJobsData.length, "jobs");
-
+  
       if (pastJobsData.length > 0) {
         // Filter out incomplete jobs, but keep at least one (empty) job
         const completeJobs = pastJobsData.filter(
           (job) => job.role && job.salary > 0 && job.location && job.time_period,
         );
-
+  
         if (completeJobs.length > 0) {
           // We have complete jobs - show only those
           const formattedJobs: PastJobState[] = completeJobs.map((job) => {
@@ -335,7 +335,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [deviceId]);
 
   const saveCurrentJobToDatabase = useCallback(
     async (job: CurrentJobState) => {
