@@ -103,6 +103,7 @@ export type Database = {
           created_at: string | null
           id: string
           location: string | null
+          device_id: string | null
           profile_id: string
           role: string | null
           salary: number | null
@@ -114,6 +115,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           location?: string | null
+          device_id?: string | null;
           profile_id: string
           role?: string | null
           salary?: number | null
