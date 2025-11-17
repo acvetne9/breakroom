@@ -212,16 +212,21 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   // ==================== DATABASE OPERATIONS ====================
 
   const loadJobsFromDatabase = useCallback(async () => {
+    if (!deviceId) {
+      console.log("⏳ No deviceId yet, waiting...");
+      return;
+    }
+
     setIsLoading(true);
     setLoadError(null);
-  
+
     try {
       console.log("🔄 Loading jobs from database for device:", deviceId);
-  
+
       // Load current job with deviceId
       const currentJobData = await getCurrentJob(deviceId);
       console.log("📥 Raw current job data:", JSON.stringify(currentJobData, null, 2));
-  
+
       if (currentJobData) {
         const isManualAddress = currentJobData.business_name === currentJobData.location;
         const newCurrentJob = {
@@ -263,17 +268,17 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           hasError: false,
         });
       }
-  
+
       // Load past jobs with deviceId
       const pastJobsData = await getPastJobs(deviceId);
       console.log("📥 Past jobs loaded:", pastJobsData.length, "jobs");
-  
+
       if (pastJobsData.length > 0) {
         // Filter out incomplete jobs, but keep at least one (empty) job
         const completeJobs = pastJobsData.filter(
           (job) => job.role && job.salary > 0 && job.location && job.time_period,
         );
-  
+
         if (completeJobs.length > 0) {
           // We have complete jobs - show only those
           const formattedJobs: PastJobState[] = completeJobs.map((job) => {
@@ -339,6 +344,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const saveCurrentJobToDatabase = useCallback(
     async (job: CurrentJobState) => {
+      if (!deviceId) {
+        console.log("❌ No deviceId available for saving");
+        return;
+      }
+
       if (!isCurrentJobComplete(job)) {
         console.log("Current job incomplete, skipping save");
         return;
@@ -355,7 +365,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           time_period: job.time_period,
         };
 
-        await saveCurrentJob(jobData);
+        await saveCurrentJob(deviceId, jobData);
 
         setCurrentJob((prev) =>
           prev
@@ -394,70 +404,83 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         );
       }
     },
-    [onJobUpdate],
+    [deviceId, onJobUpdate],
   );
 
-  const savePastJobToDatabase = useCallback(async (job: PastJobState) => {
-    if (!isPastJobComplete(job)) {
-      console.log("Past job incomplete, skipping save:", job.id);
-      return;
-    }
+  const savePastJobToDatabase = useCallback(
+    async (job: PastJobState) => {
+      if (!deviceId) {
+        console.log("❌ No deviceId available for saving");
+        return;
+      }
 
-    setPastJobs((prev) => prev.map((j) => (j.id === job.id ? { ...j, isSaving: true, hasError: false } : j)));
+      if (!isPastJobComplete(job)) {
+        console.log("Past job incomplete, skipping save:", job.id);
+        return;
+      }
 
-    try {
-      const jobData: PastJobData = {
-        id: job.id.startsWith("temp_") ? undefined : job.id,
-        role: job.role,
-        salary: job.salary,
-        location: job.location,
-        business_name: job.business_name,
-        time_period: job.time_period,
-      };
+      setPastJobs((prev) => prev.map((j) => (j.id === job.id ? { ...j, isSaving: true, hasError: false } : j)));
 
-      const savedId = await savePastJob(jobData);
+      try {
+        const jobData: PastJobData = {
+          id: job.id.startsWith("temp_") ? undefined : job.id,
+          role: job.role,
+          salary: job.salary,
+          location: job.location,
+          business_name: job.business_name,
+          time_period: job.time_period,
+        };
 
-      setPastJobs((prev) =>
-        prev.map((j) =>
-          j.id === job.id
-            ? {
-                ...j,
-                id: savedId, // Update temp ID with real ID
-                isDirty: false,
-                isSaving: false,
-                hasError: false,
-                errorMessage: undefined,
-                lastSavedAt: new Date(),
-              }
-            : j,
-        ),
-      );
-    } catch (error: any) {
-      console.error("Failed to save past job:", error);
-      setPastJobs((prev) =>
-        prev.map((j) =>
-          j.id === job.id
-            ? {
-                ...j,
-                isSaving: false,
-                hasError: true,
-                errorMessage: error?.message || "Failed to save",
-              }
-            : j,
-        ),
-      );
-    }
-  }, []);
+        const savedId = await savePastJob(deviceId, jobData);
+
+        setPastJobs((prev) =>
+          prev.map((j) =>
+            j.id === job.id
+              ? {
+                  ...j,
+                  id: savedId, // Update temp ID with real ID
+                  isDirty: false,
+                  isSaving: false,
+                  hasError: false,
+                  errorMessage: undefined,
+                  lastSavedAt: new Date(),
+                }
+              : j,
+          ),
+        );
+      } catch (error: any) {
+        console.error("Failed to save past job:", error);
+        setPastJobs((prev) =>
+          prev.map((j) =>
+            j.id === job.id
+              ? {
+                  ...j,
+                  isSaving: false,
+                  hasError: true,
+                  errorMessage: error?.message || "Failed to save",
+                }
+              : j,
+          ),
+        );
+      }
+    },
+    [deviceId],
+  );
 
   const deletePastJobFromDatabase = useCallback(
     async (jobId: string) => {
+      if (!deviceId) {
+        console.log("❌ No deviceId available for deletion");
+        return;
+      }
+
       const job = pastJobs.find((j) => j.id === jobId);
       if (!job) return;
 
       // Only delete from database if it has a real ID
       if (!jobId.startsWith("temp_")) {
         try {
-          await deletePastJob(jobId);
+          await deletePastJob(deviceId, jobId);
         } catch (error) {
           console.error("Failed to delete past job:", error);
         }
@@ -465,7 +488,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
       setPastJobs((prev) => prev.filter((j) => j.id !== jobId));
     },
-    [pastJobs],
+    [deviceId, pastJobs],
   );
 
   // ==================== AUTO-SAVE ====================
@@ -666,28 +689,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     updatePastJob(jobId, { salary: parseFloat(cleanValue) || 0 });
   };
 
-  const handlePastJobSalaryBlur = (jobId: string) => {
-    const job = pastJobs.find((j) => j.id === jobId);
-    if (!job || !job.salary) return;
-
-    const value = job.salary.toString();
-    if (value.includes(".")) {
-      const parts = value.split(".");
-      // Add trailing 0 if only 1 decimal place
-      if (parts[1]?.length === 1) {
-        updatePastJob(jobId, { salary: parseFloat(`${parts[0]}.${parts[1]}0`) });
-      }
-    }
-  };
-
-  const handlePastJobSalaryFocus = (jobId: string) => {
-    const job = pastJobs.find((j) => j.id === jobId);
-    // If salary is 0 or empty, set a default $ to indicate it's ready for input
-    if (!job || job.salary === 0) {
-      // Don't actually change the value, just let the display show $
-    }
-  };
-
   const handlePastJobRoleChange = (jobId: string, value: string) => {
     if (validateProfanity(value)) {
       updatePastJob(jobId, { role: value });
@@ -784,8 +785,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   // Load jobs on mount
   useEffect(() => {
-    loadJobsFromDatabase();
-  }, [loadJobsFromDatabase]);
+    if (deviceId) {
+      loadJobsFromDatabase();
+    }
+  }, [deviceId, loadJobsFromDatabase]);
 
   // Cleanup: save all dirty jobs before unmount
   useEffect(() => {
@@ -844,10 +847,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         className="app-card p-6 animate-fade-in flex flex-col max-h-[80vh] overflow-y-auto relative"
       >
         <div className="flex-1 overflow-y-auto pr-2">
-          <h1 className="text-xl font-medium text-app-black mb-2">
-            Welcome to breakroom! 😊
-          </h1>
-          
+          <h1 className="text-xl font-medium text-app-black mb-2">Welcome to breakroom! 😊</h1>
+
           <p className="text-xl text-app-black mb-2">
             <span className="font-medium">Tip:</span>{" "}
             <span className="font-light opacity-70">
@@ -916,7 +917,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   <input
                     type="text"
                     inputMode="numeric"
-                    value={currentJob.salary > 0 ? `$${currentJob.salary}` : ""}
+                    value={currentJob.salary > 0 ? `${currentJob.salary}` : ""}
                     onChange={(e) => handleCurrentJobSalaryChange(e.target.value)}
                     className="app-input flex-1"
                     placeholder="$14"
