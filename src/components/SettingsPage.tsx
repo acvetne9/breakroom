@@ -97,7 +97,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   onPageLeave,
   onSearchTrigger,
 }) => {
-  const { deviceId } = useDevice();
+  const { deviceId, loading: deviceLoading } = useDevice();
   const isMobile = useIsMobile();
   const { getUserPostsAndCommented } = usePosts();
   const userPosts = getUserPostsAndCommented();
@@ -178,11 +178,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     setLoadError(null);
     
     try {
-      console.log("🔄 Loading jobs from database...");
+      console.log("🔄 [SettingsPage] Loading jobs from database...");
+      console.log("🔍 [SettingsPage] device_id in localStorage:", localStorage.getItem('device_id'));
+      console.log("🔍 [SettingsPage] deviceId from context:", deviceId);
       
       // Load current job
       const currentJobData = await getCurrentJob();
-      console.log("📥 Current job loaded:", currentJobData);
+      console.log("📥 [SettingsPage] Current job loaded:", currentJobData);
       
       if (currentJobData && currentJobData.location) {
         const isManualAddress = currentJobData.business_name === currentJobData.location;
@@ -670,10 +672,21 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   // ==================== EFFECTS ====================
   
-  // Load jobs on mount
+  // Load jobs on mount - wait for device to be ready
   useEffect(() => {
-    loadJobsFromDatabase();
-  }, [loadJobsFromDatabase]);
+    console.log('🎯 [SettingsPage] Mount effect triggered:', {
+      isDeviceLoading: deviceLoading,
+      hasDeviceId: !!deviceId,
+      deviceId: deviceId?.substring(0, 30) + '...'
+    });
+    
+    if (!deviceLoading && deviceId) {
+      console.log('✅ [SettingsPage] Device ready, loading jobs...');
+      loadJobsFromDatabase();
+    } else {
+      console.log('⏳ [SettingsPage] Waiting for device initialization...', { deviceLoading, hasDeviceId: !!deviceId });
+    }
+  }, [deviceLoading, deviceId, loadJobsFromDatabase]);
 
   // Cleanup: save all dirty jobs before unmount
   useEffect(() => {
