@@ -11,11 +11,7 @@ export interface CurrentJobData {
 export const getCurrentJob = async (deviceId: string): Promise<CurrentJobData | null> => {
   console.log("🔍 Fetching current job for device:", deviceId);
 
-  const { data, error } = (await supabase
-    .from("current_jobs")
-    .select("*")
-    .eq("device_id", deviceId)
-    .maybeSingle()) as any; // Temporarily bypass type checking // Use maybeSingle() instead of single() to avoid errors when no rows exist
+  const { data, error } = await supabase.from("current_jobs").select("*").eq("profile_id", deviceId).maybeSingle(); // Use maybeSingle() instead of single() to avoid errors when no rows exist
 
   if (error) {
     console.error("❌ Error fetching current job:", error);
@@ -30,7 +26,11 @@ export const saveCurrentJob = async (deviceId: string, jobData: CurrentJobData):
   console.log("💾 Saving current job for device:", deviceId);
 
   // First check if a record exists
-  const { data: existing } = await supabase.from("current_jobs").select("id").eq("device_id", deviceId).maybeSingle();
+  const { data: existing } = (await supabase
+    .from("current_jobs")
+    .select("id")
+    .eq("device_id", deviceId)
+    .maybeSingle()) as any;
 
   if (existing) {
     // Update existing record
@@ -39,7 +39,7 @@ export const saveCurrentJob = async (deviceId: string, jobData: CurrentJobData):
       .update({
         ...jobData,
         updated_at: new Date().toISOString(),
-      })
+      } as any)
       .eq("device_id", deviceId);
 
     if (error) {
@@ -51,7 +51,7 @@ export const saveCurrentJob = async (deviceId: string, jobData: CurrentJobData):
     const { error } = await supabase.from("current_jobs").insert({
       device_id: deviceId,
       ...jobData,
-    });
+    } as any);
 
     if (error) {
       console.error("❌ Error inserting current job:", error);
