@@ -3,7 +3,7 @@ export interface BusinessRole {
   role: string;
   salary: string;
   votesTotal: number;
-  userVote?: 'up' | 'down' | null;
+  userVote?: "up" | "down" | null;
 }
 
 export interface Business {

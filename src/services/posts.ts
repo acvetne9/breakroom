@@ -76,25 +76,35 @@ export const getUserProfile = async (): Promise<{ profileId: string; wasCreated:
       console.log('💾 Cached profile ID:', cachedProfileId);
       return { profileId: profile.id, wasCreated: false };
     } else {
-      console.log('👻 Unauthenticated user - using device ID');
+      console.log('👻 [getUserProfile] Unauthenticated user - using device ID');
       let deviceId = localStorage.getItem('device_id');
+      console.log('🔍 [getUserProfile] device_id from localStorage:', deviceId);
       
       if (!deviceId) {
+        console.error('❌ [getUserProfile] No device_id in localStorage!');
         throw new Error('Device ID not found');
       }
       
-      const { data: profile } = await supabase
+      const { data: profile, error } = await supabase
         .from('profiles')
-        .select('id')
+        .select('id, temp_user_id, browser_fingerprint')
         .eq('temp_user_id', deviceId)
         .maybeSingle();
       
+      console.log('🔍 [getUserProfile] Profile query result:', {
+        found: !!profile,
+        profile,
+        error,
+        queriedDeviceId: deviceId
+      });
+      
       if (!profile) {
-        throw new Error('Profile not found for device');
+        console.error('❌ [getUserProfile] No profile found for device_id:', deviceId);
+        throw new Error(`Profile not found for device: ${deviceId}`);
       }
       
       cachedProfileId = profile.id;
-      console.log('💾 Cached profile ID:', cachedProfileId);
+      console.log('💾 [getUserProfile] Cached profile ID:', cachedProfileId);
       return { profileId: profile.id, wasCreated: false };
     }
   })();
