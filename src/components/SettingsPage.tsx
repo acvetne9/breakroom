@@ -516,8 +516,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const formatSalaryDisplay = (salary: number): string => {
     if (salary === 0) return "";
-    // Always format with $ and 2 decimal places
-    return `$${salary.toFixed(2)}`;
+
+    // Convert to string to preserve trailing zeros
+    const salaryStr = salary.toString();
+
+    // Add leading $
+    return `$${salaryStr}`;
   };
 
   const parseSalaryInput = (value: string): number => {
