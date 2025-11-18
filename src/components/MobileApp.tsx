@@ -681,6 +681,28 @@ const MobileApp: React.FC = () => {
     }
   };
 
+  const handleSettingsDrag = (event: any, info: PanInfo) => {
+    // Only allow dragging left (to go to home) when on Settings page
+    if (currentSlide === 0 && info.offset.x < -100) {
+      setCurrentSlide(1);
+    }
+    // Only allow dragging right (to go to settings) when on Home page
+    else if (currentSlide === 1 && info.offset.x > 100) {
+      setCurrentSlide(0);
+    }
+  };
+
+  const handleExploreDrag = (event: any, info: PanInfo) => {
+    // Only allow dragging right (to go to home) when on Explore page
+    if (currentSlide === 2 && info.offset.x > 100) {
+      setCurrentSlide(1);
+    }
+    // Only allow dragging left (to go to explore) when on Home page
+    else if (currentSlide === 1 && info.offset.x < -100) {
+      setCurrentSlide(2);
+    }
+  };
+
   const getSettingsCardPosition = () => {
     if (!isMobile) return currentSlide === 0 ? "0%" : "-100%";
     if (currentSlide === 0) return "0%";
