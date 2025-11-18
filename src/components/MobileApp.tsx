@@ -663,46 +663,6 @@ const MobileApp: React.FC = () => {
     }
   }, [currentSlide, selectedBusiness, previouslySelectedBusiness, filteredUserStories]);
 
-  const handleDragEnd = (event: any, info: PanInfo) => {
-    const threshold = 100;
-    const dragStartX = event.clientX || event.touches?.[0]?.clientX || 0;
-    const screenWidth = window.innerWidth;
-    const edgeThreshold = 50;
-
-    const isNearLeftEdge = dragStartX < edgeThreshold;
-    const isNearRightEdge = dragStartX > screenWidth - edgeThreshold;
-
-    if (isNearLeftEdge || isNearRightEdge) {
-      if (info.offset.x > threshold && currentSlide > 0) {
-        setCurrentSlide(currentSlide - 1);
-      } else if (info.offset.x < -threshold && currentSlide < 2) {
-        setCurrentSlide(currentSlide + 1);
-      }
-    }
-  };
-
-  const handleSettingsDrag = (event: any, info: PanInfo) => {
-    // Only allow dragging left (to go to home) when on Settings page
-    if (currentSlide === 0 && info.offset.x < -100) {
-      setCurrentSlide(1);
-    }
-    // Only allow dragging right (to go to settings) when on Home page
-    else if (currentSlide === 1 && info.offset.x > 100) {
-      setCurrentSlide(0);
-    }
-  };
-
-  const handleExploreDrag = (event: any, info: PanInfo) => {
-    // Only allow dragging right (to go to home) when on Explore page
-    if (currentSlide === 2 && info.offset.x > 100) {
-      setCurrentSlide(1);
-    }
-    // Only allow dragging left (to go to explore) when on Home page
-    else if (currentSlide === 1 && info.offset.x < -100) {
-      setCurrentSlide(2);
-    }
-  };
-
   const getSettingsCardPosition = () => {
     if (!isMobile) return currentSlide === 0 ? "0%" : "-100%";
     if (currentSlide === 0) return "0%";
@@ -762,16 +722,7 @@ const MobileApp: React.FC = () => {
           className="absolute inset-0 z-20"
           style={{
             pointerEvents: getSettingsCardPosition() === "-200%" ? "none" : "auto",
-          }}
-          drag={isMobile ? "x" : false}
-          dragConstraints={{ left: -200, right: 200 }}
-          dragElastic={0.1}
-          onDragEnd={(event, info) => {
-            if (info.offset.x < -100 && currentSlide === 0) {
-              setCurrentSlide(1);
-            } else if (info.offset.x > 100 && currentSlide === 1) {
-              setCurrentSlide(0);
-            }
+            touchAction: "pan-y",
           }}
         >
           <Suspense fallback={<Skeleton className="w-full h-full" />}>
@@ -802,16 +753,7 @@ const MobileApp: React.FC = () => {
           className="absolute inset-0 z-20"
           style={{
             pointerEvents: getExploreCardPosition() === "200%" ? "none" : "auto",
-          }}
-          drag={isMobile ? "x" : false}
-          dragConstraints={{ left: -200, right: 200 }}
-          dragElastic={0.1}
-          onDragEnd={(event, info) => {
-            if (info.offset.x > 100 && currentSlide === 2) {
-              setCurrentSlide(1);
-            } else if (info.offset.x < -100 && currentSlide === 1) {
-              setCurrentSlide(2);
-            }
+            touchAction: "pan-y",
           }}
         >
           <Suspense fallback={<Skeleton className="w-full h-full" />}>
