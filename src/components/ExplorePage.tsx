@@ -60,18 +60,25 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
   const [hideSystemPost, setHideSystemPost] = useState(false);
-  const [isSwipingOrTransitioning, setIsSwipingOrTransitioning] = useState(false);
+  const [isSwipingOrTransitioning, setIsSwipingOrTransitioning] = useState(true); // Start as true
+  const [inputBoxVisible, setInputBoxVisible] = useState(false);
 
   // Detect when user is swiping/transitioning between pages
   useEffect(() => {
+    console.log("🔄 ExplorePage currentSlide changed:", currentSlide);
+
     // If not fully on explore page (currentSlide !== 2), we're transitioning
     if (currentSlide !== 2) {
       setIsSwipingOrTransitioning(true);
+      setInputBoxVisible(false);
+      console.log("🚫 Blocking interactions - not on explore page");
     } else {
       // Add a small delay before allowing clicks after reaching explore page
       const timer = setTimeout(() => {
         setIsSwipingOrTransitioning(false);
-      }, 150);
+        setInputBoxVisible(true);
+        console.log("✅ Interactions enabled - on explore page");
+      }, 200);
       return () => clearTimeout(timer);
     }
   }, [currentSlide]);
@@ -331,9 +338,6 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     );
   }
 
-  // Only show input box when fully on explore page (currentSlide === 2)
-  const showInputBox = currentSlide === 2;
-
   return (
     <div className="relative w-full h-full">
       {/* Posts list */}
@@ -481,9 +485,12 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
         )}
       </div>
 
-      {/* Input bar at bottom - only show when fully on explore page */}
-      {showInputBox && (
-        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
+      {/* Input bar at bottom - only show when fully on explore page with smooth transition */}
+      {inputBoxVisible && (
+        <div
+          className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 transition-opacity duration-200"
+          style={{ opacity: inputBoxVisible ? 1 : 0 }}
+        >
           {expandedPost ? (
             // Comment input when post is expanded
             <div className="relative">
