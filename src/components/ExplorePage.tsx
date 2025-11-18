@@ -315,9 +315,9 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     <div className="relative w-full h-full">
       {/* Posts list */}
       <div className={`h-full overflow-y-auto pb-20 ${filteredBusinessId || filteredUserStories ? 'pt-20' : 'pt-20'}`}>
-        <div className="space-y-4 px-4">
+        <div className="space-y-4 px-4 flex flex-col items-center">
           {paginatedPosts.map(post => (
-            <div key={post.id} className="relative">
+            <div key={post.id} className="relative w-full max-w-2xl">
               {/* Post with background collage if business has 5+ photos */}
               <div
                 className={`app-popup-transparent p-4 cursor-pointer ${post.images && post.images.length >= 5 ? 'relative overflow-hidden' : ''} ${

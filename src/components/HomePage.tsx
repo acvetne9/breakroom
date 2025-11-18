@@ -267,16 +267,21 @@ const HomePage: React.FC<HomePageProps> = ({
   return (
     <div className="absolute inset-0 w-full h-full min-w-[200px] min-h-[200px]">
       {/* Map renders immediately but hidden behind loading screen */}
-      <MapLibreMap
-        onBusinessClick={handleBusinessClick}
-        selectedBusiness={selectedBusiness}
-        landmarks={LANDMARKS}
-        searchFilters={searchFilters}
-        neighborhoodCenter={neighborhoodCenter}
-        onBusinessesUpdate={setMapBusinesses}
-        onMapLoaded={handleMapLoaded}
-        onBusinessesLoaded={handleBusinessesLoaded}
-      />
+      <div 
+        className="absolute inset-0"
+        style={{ pointerEvents: currentSlide !== 1 ? 'none' : 'auto' }}
+      >
+        <MapLibreMap
+          onBusinessClick={handleBusinessClick}
+          selectedBusiness={selectedBusiness}
+          landmarks={LANDMARKS}
+          searchFilters={searchFilters}
+          neighborhoodCenter={neighborhoodCenter}
+          onBusinessesUpdate={setMapBusinesses}
+          onMapLoaded={handleMapLoaded}
+          onBusinessesLoaded={handleBusinessesLoaded}
+        />
+      </div>
 
       {/* Loading overlay on top */}
       {showLoadingOverlay && <BreakroomLoading onComplete={handleLoadingComplete} />}
