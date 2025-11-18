@@ -395,16 +395,16 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             : prev,
         );
 
-        // Call legacy callback
-        if (onJobUpdate) {
-          onJobUpdate({
-            salary: `$${job.salary}`,
-            role: job.role,
-            location: job.location,
-            businessName: job.business_name,
-            timePeriod: job.time_period,
-          });
-        }
+        // Call legacy callback (temporarily disabled to debug map issue)
+        // if (onJobUpdate) {
+        //   onJobUpdate({
+        //     salary: `${job.salary}`,
+        //     role: job.role,
+        //     location: job.location,
+        //     businessName: job.business_name,
+        //     timePeriod: job.time_period,
+        //   });
+        // }
       } catch (error: any) {
         console.error("Failed to save current job:", error);
         setCurrentJob((prev) =>
