@@ -514,11 +514,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   // ==================== SALARY FORMATTING ====================
 
-  const formatSalaryDisplay = (salary: number): string => {
-    if (salary === 0) return "";
-    // Show the number as-is while typing (with $)
-    const str = salary.toString();
-    return `$${str}`;
+  const formatSalaryDisplay = (salary: number | string): string => {
+    if (salary === 0 || salary === "") return "";
+    // If it's a string (while typing), just add $
+    if (typeof salary === "string") {
+      return `$${salary}`;
+    }
+    // If it's a number (after blur), format with 2 decimals
+    return `$${salary.toFixed(2)}`;
   };
 
   const parseSalaryInput = (value: string): number => {
@@ -543,32 +546,27 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   );
 
   const handleCurrentJobSalaryChange = (value: string) => {
-    // Remove $ sign
     let cleanValue = value.replace(/\$/g, "");
-
-    // Only allow numbers and one decimal point
     cleanValue = cleanValue.replace(/[^0-9.]/g, "");
 
-    // Only one decimal point
     const parts = cleanValue.split(".");
     if (parts.length > 2) {
       cleanValue = parts[0] + "." + parts.slice(1).join("");
     }
 
-    // Limit to 2 decimal places
     if (parts[1] && parts[1].length > 2) {
       cleanValue = parts[0] + "." + parts[1].substring(0, 2);
     }
 
-    // Store as number (or 0 if empty)
-    const numValue = cleanValue === "" || cleanValue === "." ? 0 : parseFloat(cleanValue);
-    updateCurrentJob({ salary: isNaN(numValue) ? 0 : numValue });
+    // Store the string directly (cast to any to bypass TypeScript)
+    updateCurrentJob({ salary: cleanValue as any });
   };
 
   const handleCurrentJobSalaryBlur = () => {
-    // On blur, format to exactly 2 decimals
-    if (currentJob && currentJob.salary > 0) {
-      updateCurrentJob({ salary: parseFloat(currentJob.salary.toFixed(2)) });
+    if (currentJob) {
+      // Convert string to number with 2 decimals
+      const numValue = parseFloat(currentJob.salary as any) || 0;
+      updateCurrentJob({ salary: parseFloat(numValue.toFixed(2)) });
     }
   };
 
@@ -705,28 +703,26 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   const handlePastJobSalaryChange = (jobId: string, value: string) => {
-    // Remove everything except numbers and decimal point
-    let cleanValue = value.replace(/[^0-9.]/g, "");
+    let cleanValue = value.replace(/\$/g, "");
+    cleanValue = cleanValue.replace(/[^0-9.]/g, "");
 
-    // Ensure only one decimal point
     const parts = cleanValue.split(".");
     if (parts.length > 2) {
       cleanValue = parts[0] + "." + parts.slice(1).join("");
     }
 
-    // Limit to 2 decimal places
     if (parts[1] && parts[1].length > 2) {
       cleanValue = parts[0] + "." + parts[1].substring(0, 2);
     }
 
-    updatePastJob(jobId, { salary: parseFloat(cleanValue) || 0 });
+    updatePastJob(jobId, { salary: cleanValue as any });
   };
 
   const handlePastJobSalaryBlur = (jobId: string) => {
-    // Format to 2 decimal places on blur
     const job = pastJobs.find((j) => j.id === jobId);
-    if (job && job.salary > 0) {
-      updatePastJob(jobId, { salary: parseFloat(job.salary.toFixed(2)) });
+    if (job) {
+      const numValue = parseFloat(job.salary as any) || 0;
+      updatePastJob(jobId, { salary: parseFloat(numValue.toFixed(2)) });
     }
   };
 
