@@ -38,6 +38,7 @@ interface ExplorePageProps {
   onNavigateToHomeBusiness?: (businessId: string) => void;
   onBusinessPreview?: (businessId: string) => void;
   onFlyToBusiness?: (businessId: string, post?: any) => void; // 🚀 NEW - accepts optional post for cached coordinates
+  currentSlide?: number; // Add currentSlide to control input visibility
 }
 
 const ExplorePage: React.FC<ExplorePageProps> = ({
@@ -50,6 +51,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   onNavigateToHomeBusiness,
   onBusinessPreview,
   onFlyToBusiness,
+  currentSlide = 2, // Default to 2 (fully on explore page)
 }) => {
   console.log('🔍 ExplorePage component initializing...');
   
@@ -311,6 +313,9 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     );
   }
 
+  // Only show input box when fully on explore page (currentSlide === 2)
+  const showInputBox = currentSlide === 2;
+
   return (
     <div className="relative w-full h-full">
       {/* Posts list */}
@@ -463,52 +468,54 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
         )}
       </div>
 
-      {/* Input bar at bottom */}
-      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
-        {expandedPost ? (
-          // Comment input when post is expanded
-          <div className="relative">
-            <input
-              type="text"
-              value={commentText}
-              onChange={e => setCommentText(e.target.value)}
-              placeholder={commentPlaceholder}
-              className="search-bar pr-14"
-              onKeyPress={e => {
-                if (e.key === 'Enter') {
-                  handleCommentSubmit();
-                }
-              }}
-            />
-            <button
-              onClick={handleCommentSubmit}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-lg bg-transparent"
-            >
-              🗣️
-            </button>
-          </div>
-        ) : (
-          // Post input for explore page
-          <div className="relative">
-            <input
-              type="text"
-              value={postText}
-              onChange={e => setPostText(e.target.value)}
-              placeholder={postPlaceholder}
-              className="search-bar pr-14"
-              onKeyPress={e => {
-                if (e.key === 'Enter') handlePostSubmit();
-              }}
-            />
-            <button
-              onClick={handlePostSubmit}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-lg bg-transparent"
-            >
-              🗣️
-            </button>
-          </div>
-        )}
-      </div>
+      {/* Input bar at bottom - only show when fully on explore page */}
+      {showInputBox && (
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
+          {expandedPost ? (
+            // Comment input when post is expanded
+            <div className="relative">
+              <input
+                type="text"
+                value={commentText}
+                onChange={e => setCommentText(e.target.value)}
+                placeholder={commentPlaceholder}
+                className="search-bar pr-14"
+                onKeyPress={e => {
+                  if (e.key === 'Enter') {
+                    handleCommentSubmit();
+                  }
+                }}
+              />
+              <button
+                onClick={handleCommentSubmit}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-lg bg-transparent"
+              >
+                🗣️
+              </button>
+            </div>
+          ) : (
+            // Post input for explore page
+            <div className="relative">
+              <input
+                type="text"
+                value={postText}
+                onChange={e => setPostText(e.target.value)}
+                placeholder={postPlaceholder}
+                className="search-bar pr-14"
+                onKeyPress={e => {
+                  if (e.key === 'Enter') handlePostSubmit();
+                }}
+              />
+              <button
+                onClick={handlePostSubmit}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-lg bg-transparent"
+              >
+                🗣️
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
