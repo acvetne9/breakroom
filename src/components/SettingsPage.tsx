@@ -516,12 +516,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const formatSalaryDisplay = (salary: number): string => {
     if (salary === 0) return "";
-
-    // Convert to string to preserve trailing zeros
-    const salaryStr = salary.toString();
-
-    // Add leading $
-    return `$${salaryStr}`;
+    // Show the number as-is while typing (with $)
+    const str = salary.toString();
+    return `$${str}`;
   };
 
   const parseSalaryInput = (value: string): number => {
@@ -546,10 +543,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   );
 
   const handleCurrentJobSalaryChange = (value: string) => {
-    // Remove everything except numbers and decimal point
-    let cleanValue = value.replace(/[^0-9.]/g, "");
+    // Remove $ sign
+    let cleanValue = value.replace(/\$/g, "");
 
-    // Ensure only one decimal point
+    // Only allow numbers and one decimal point
+    cleanValue = cleanValue.replace(/[^0-9.]/g, "");
+
+    // Only one decimal point
     const parts = cleanValue.split(".");
     if (parts.length > 2) {
       cleanValue = parts[0] + "." + parts.slice(1).join("");
@@ -560,11 +560,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
       cleanValue = parts[0] + "." + parts[1].substring(0, 2);
     }
 
-    updateCurrentJob({ salary: parseFloat(cleanValue) || 0 });
+    // Store as number (or 0 if empty)
+    const numValue = cleanValue === "" || cleanValue === "." ? 0 : parseFloat(cleanValue);
+    updateCurrentJob({ salary: isNaN(numValue) ? 0 : numValue });
   };
 
   const handleCurrentJobSalaryBlur = () => {
-    // Format to 2 decimal places on blur
+    // On blur, format to exactly 2 decimals
     if (currentJob && currentJob.salary > 0) {
       updateCurrentJob({ salary: parseFloat(currentJob.salary.toFixed(2)) });
     }
