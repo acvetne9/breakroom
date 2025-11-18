@@ -722,7 +722,19 @@ const MobileApp: React.FC = () => {
           className="absolute inset-0 z-20"
           style={{
             pointerEvents: getSettingsCardPosition() === "-200%" ? "none" : "auto",
-            touchAction: "pan-y",
+          }}
+          drag={isMobile ? "x" : false}
+          dragConstraints={{
+            left: currentSlide === 0 ? -200 : 0,
+            right: currentSlide === 1 ? 200 : 0,
+          }}
+          dragElastic={0.2}
+          onDragEnd={(event, info) => {
+            if (currentSlide === 0 && info.offset.x < -100) {
+              setCurrentSlide(1);
+            } else if (currentSlide === 1 && info.offset.x > 100) {
+              setCurrentSlide(0);
+            }
           }}
         >
           <Suspense fallback={<Skeleton className="w-full h-full" />}>
@@ -753,7 +765,19 @@ const MobileApp: React.FC = () => {
           className="absolute inset-0 z-20"
           style={{
             pointerEvents: getExploreCardPosition() === "200%" ? "none" : "auto",
-            touchAction: "pan-y",
+          }}
+          drag={isMobile ? "x" : false}
+          dragConstraints={{
+            left: currentSlide === 1 ? -200 : 0,
+            right: currentSlide === 2 ? 200 : 0,
+          }}
+          dragElastic={0.2}
+          onDragEnd={(event, info) => {
+            if (currentSlide === 2 && info.offset.x > 100) {
+              setCurrentSlide(1);
+            } else if (currentSlide === 1 && info.offset.x < -100) {
+              setCurrentSlide(2);
+            }
           }}
         >
           <Suspense fallback={<Skeleton className="w-full h-full" />}>
