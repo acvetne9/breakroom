@@ -100,7 +100,22 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const { deviceId } = useDevice();
   const isMobile = useIsMobile();
   const { getUserPostsAndCommented } = usePosts();
-  const userPosts = getUserPostsAndCommented();
+  const [userPosts, setUserPosts] = useState<Post[]>([]);
+
+  // Refresh user posts whenever stories section is expanded or posts change
+  useEffect(() => {
+    if (isStoriesExpanded) {
+      const refreshedPosts = getUserPostsAndCommented();
+      setUserPosts(refreshedPosts);
+      console.log("📖 Refreshed user posts:", refreshedPosts.length);
+    }
+  }, [isStoriesExpanded, getUserPostsAndCommented]);
+
+  // Also refresh when component mounts
+  useEffect(() => {
+    const refreshedPosts = getUserPostsAndCommented();
+    setUserPosts(refreshedPosts);
+  }, [getUserPostsAndCommented]);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
@@ -514,14 +529,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   // ==================== SALARY FORMATTING ====================
 
-  const formatSalaryDisplay = (salary: number | string): string => {
-    if (salary === 0 || salary === "") return "";
-    // If it's a string (while typing), just add $
-    if (typeof salary === "string") {
-      return `$${salary}`;
-    }
-    // If it's a number (after blur), format with 2 decimals
-    return `$${salary.toFixed(2)}`;
+  const formatSalaryDisplay = (salary: number): string => {
+    if (salary === 0) return "";
+    return `${salary.toFixed(2)}`;
   };
 
   const parseSalaryInput = (value: string): number => {
@@ -546,27 +556,27 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   );
 
   const handleCurrentJobSalaryChange = (value: string) => {
-    let cleanValue = value.replace(/\$/g, "");
-    cleanValue = cleanValue.replace(/[^0-9.]/g, "");
+    // Remove everything except numbers and decimal point
+    let cleanValue = value.replace(/[^0-9.]/g, "");
 
+    // Ensure only one decimal point
     const parts = cleanValue.split(".");
     if (parts.length > 2) {
       cleanValue = parts[0] + "." + parts.slice(1).join("");
     }
 
+    // Limit to 2 decimal places
     if (parts[1] && parts[1].length > 2) {
       cleanValue = parts[0] + "." + parts[1].substring(0, 2);
     }
 
-    // Store the string directly (cast to any to bypass TypeScript)
-    updateCurrentJob({ salary: cleanValue as any });
+    updateCurrentJob({ salary: parseFloat(cleanValue) || 0 });
   };
 
   const handleCurrentJobSalaryBlur = () => {
-    if (currentJob) {
-      // Convert string to number with 2 decimals
-      const numValue = parseFloat(currentJob.salary as any) || 0;
-      updateCurrentJob({ salary: parseFloat(numValue.toFixed(2)) });
+    // Format to 2 decimal places on blur
+    if (currentJob && currentJob.salary > 0) {
+      updateCurrentJob({ salary: parseFloat(currentJob.salary.toFixed(2)) });
     }
   };
 
@@ -703,26 +713,28 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   const handlePastJobSalaryChange = (jobId: string, value: string) => {
-    let cleanValue = value.replace(/\$/g, "");
-    cleanValue = cleanValue.replace(/[^0-9.]/g, "");
+    // Remove everything except numbers and decimal point
+    let cleanValue = value.replace(/[^0-9.]/g, "");
 
+    // Ensure only one decimal point
     const parts = cleanValue.split(".");
     if (parts.length > 2) {
       cleanValue = parts[0] + "." + parts.slice(1).join("");
     }
 
+    // Limit to 2 decimal places
     if (parts[1] && parts[1].length > 2) {
       cleanValue = parts[0] + "." + parts[1].substring(0, 2);
     }
 
-    updatePastJob(jobId, { salary: cleanValue as any });
+    updatePastJob(jobId, { salary: parseFloat(cleanValue) || 0 });
   };
 
   const handlePastJobSalaryBlur = (jobId: string) => {
+    // Format to 2 decimal places on blur
     const job = pastJobs.find((j) => j.id === jobId);
-    if (job) {
-      const numValue = parseFloat(job.salary as any) || 0;
-      updatePastJob(jobId, { salary: parseFloat(numValue.toFixed(2)) });
+    if (job && job.salary > 0) {
+      updatePastJob(jobId, { salary: parseFloat(job.salary.toFixed(2)) });
     }
   };
 
@@ -954,7 +966,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   <input
                     type="text"
                     inputMode="decimal"
-                    value={formatSalaryDisplay(currentJob.salary)}
+                    value={formatSalaryForDisplay(currentJob.salary)}
                     onChange={(e) => handleCurrentJobSalaryChange(e.target.value)}
                     onBlur={handleCurrentJobSalaryBlur}
                     className="app-input flex-1"
@@ -1053,7 +1065,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     <input
                       type="text"
                       inputMode="decimal"
-                      value={formatSalaryDisplay(job.salary)}
+                      value={formatSalaryForDisplay(job.salary)}
                       onChange={(e) => handlePastJobSalaryChange(job.id, e.target.value)}
                       onBlur={() => handlePastJobSalaryBlur(job.id)}
                       className="app-input flex-1"
@@ -1088,12 +1100,26 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
           {/* My Stories & Comments */}
           <div className="mt-8">
-            <button
-              onClick={() => setIsStoriesExpanded(!isStoriesExpanded)}
-              className="flex items-center justify-between w-full text-left"
-            >
-              <h3 className="text-lg font-medium text-app-black">My Stories 📖</h3>
-            </button>
+            <div className="flex items-center justify-between w-full mb-2">
+              <button
+                onClick={() => setIsStoriesExpanded(!isStoriesExpanded)}
+                className="flex items-center gap-2 text-left"
+              >
+                <h3 className="text-lg font-medium text-app-black">My Stories 📖</h3>
+              </button>
+              {isStoriesExpanded && (
+                <button
+                  onClick={() => {
+                    // Force refresh by toggling
+                    setIsStoriesExpanded(false);
+                    setTimeout(() => setIsStoriesExpanded(true), 10);
+                  }}
+                  className="text-xs text-app-gray-medium hover:text-app-gray-dark"
+                >
+                  Refresh
+                </button>
+              )}
+            </div>
             {isStoriesExpanded && (
               <div className="mt-4 space-y-2">
                 {userPosts.length === 0 ? (
