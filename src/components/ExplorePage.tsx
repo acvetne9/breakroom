@@ -485,12 +485,9 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
         )}
       </div>
 
-      {/* Input bar at bottom - only show when fully on explore page with smooth transition */}
-      {inputBoxVisible && (
-        <div
-          className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 transition-opacity duration-200"
-          style={{ opacity: inputBoxVisible ? 1 : 0 }}
-        >
+      {/* Input bar at bottom - only show when fully on explore page */}
+      {currentSlide === 2 && (
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
           {expandedPost ? (
             // Comment input when post is expanded
             <div className="relative">
