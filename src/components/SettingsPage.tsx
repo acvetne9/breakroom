@@ -516,7 +516,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const formatSalaryDisplay = (salary: number): string => {
     if (salary === 0) return "";
-    return `${salary.toFixed(2)}`;
+    return salary.toString();
   };
 
   const parseSalaryInput = (value: string): number => {
