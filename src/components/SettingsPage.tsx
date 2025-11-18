@@ -527,23 +527,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     [saveCurrentJobToDatabase, savePastJobToDatabase],
   );
 
-  // ==================== USER POSTS REFRESH ====================
-
-  // Refresh user posts whenever stories section is expanded or posts change
-  useEffect(() => {
-    if (isStoriesExpanded) {
-      const refreshedPosts = getUserPostsAndCommented();
-      setUserPosts(refreshedPosts);
-      console.log("📖 Refreshed user posts:", refreshedPosts.length);
-    }
-  }, [isStoriesExpanded, getUserPostsAndCommented]);
-
-  // Also refresh when component mounts
-  useEffect(() => {
-    const refreshedPosts = getUserPostsAndCommented();
-    setUserPosts(refreshedPosts);
-  }, [getUserPostsAndCommented]);
-
   // ==================== SALARY FORMATTING ====================
 
   const formatSalaryDisplay = (salary: number): string => {
