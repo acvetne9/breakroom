@@ -265,12 +265,15 @@ const HomePage: React.FC<HomePageProps> = ({
   }, []);
 
   return (
-    <div className="absolute inset-0 w-full h-full min-w-[200px] min-h-[200px]">
+    <div
+      className="absolute inset-0 w-full h-full min-w-[200px] min-h-[200px]"
+      style={{
+        pointerEvents: currentSlide !== 1 ? "none" : "auto",
+        touchAction: currentSlide !== 1 ? "none" : "auto",
+      }}
+    >
       {/* Map renders immediately but hidden behind loading screen */}
-      <div 
-        className="absolute inset-0"
-        style={{ pointerEvents: currentSlide !== 1 ? 'none' : 'auto' }}
-      >
+      <div className="absolute inset-0" style={{ pointerEvents: currentSlide !== 1 ? "none" : "auto" }}>
         <MapLibreMap
           onBusinessClick={handleBusinessClick}
           selectedBusiness={selectedBusiness}
@@ -297,7 +300,6 @@ const HomePage: React.FC<HomePageProps> = ({
 
       {!showLoadingOverlay && (
         <div>
-
           {selectedBusiness && !showBusinessDetails && (
             <BusinessPreview
               business={selectedBusiness}
