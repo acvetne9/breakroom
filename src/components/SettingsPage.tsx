@@ -102,6 +102,15 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const { getUserPostsAndCommented } = usePosts();
   const [userPosts, setUserPosts] = useState<Post[]>([]);
 
+  // Refresh user posts whenever stories section is expanded or posts change
+  useEffect(() => {
+    if (isStoriesExpanded) {
+      const refreshedPosts = getUserPostsAndCommented();
+      setUserPosts(refreshedPosts);
+      console.log("📖 Refreshed user posts:", refreshedPosts.length);
+    }
+  }, [isStoriesExpanded, getUserPostsAndCommented]);
+
   // Also refresh when component mounts
   useEffect(() => {
     const refreshedPosts = getUserPostsAndCommented();
@@ -121,15 +130,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   // Auto-save delay (ms)
   const AUTO_SAVE_DELAY = 1000;
-
-  // Refresh user posts whenever stories section is expanded or posts change
-  useEffect(() => {
-    if (isStoriesExpanded) {
-      const refreshedPosts = getUserPostsAndCommented();
-      setUserPosts(refreshedPosts);
-      console.log("📖 Refreshed user posts:", refreshedPosts.length);
-    }
-  }, [isStoriesExpanded, getUserPostsAndCommented]);
 
   // ==================== VALIDATION ====================
 
@@ -839,6 +839,21 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     }
   }, [deviceId, loadJobsFromDatabase]);
 
+  // Refresh user posts when component mounts only
+  useEffect(() => {
+    const refreshedPosts = getUserPostsAndCommented();
+    setUserPosts(refreshedPosts);
+  }, []); // Empty dependency array - only run once on mount
+
+  // Refresh user posts when stories section is expanded
+  useEffect(() => {
+    if (isStoriesExpanded) {
+      const refreshedPosts = getUserPostsAndCommented();
+      setUserPosts(refreshedPosts);
+      console.log("📖 Refreshed user posts:", refreshedPosts.length);
+    }
+  }, [isStoriesExpanded]); // Only depend on isStoriesExpanded, not the function
+
   // Cleanup: save all dirty jobs before unmount
   useEffect(() => {
     return () => {
@@ -966,7 +981,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   <input
                     type="text"
                     inputMode="decimal"
-                    value={formatSalaryDisplay(currentJob.salary)}
+                    value={formatSalaryForDisplay(currentJob.salary)}
                     onChange={(e) => handleCurrentJobSalaryChange(e.target.value)}
                     onBlur={handleCurrentJobSalaryBlur}
                     className="app-input flex-1"
@@ -1065,7 +1080,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     <input
                       type="text"
                       inputMode="decimal"
-                      value={formatSalaryDisplay(job.salary)}
+                      value={formatSalaryForDisplay(job.salary)}
                       onChange={(e) => handlePastJobSalaryChange(job.id, e.target.value)}
                       onBlur={() => handlePastJobSalaryBlur(job.id)}
                       className="app-input flex-1"
@@ -1107,6 +1122,18 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
               >
                 <h3 className="text-lg font-medium text-app-black">My Stories 📖</h3>
               </button>
+              {isStoriesExpanded && (
+                <button
+                  onClick={() => {
+                    // Force refresh by toggling
+                    setIsStoriesExpanded(false);
+                    setTimeout(() => setIsStoriesExpanded(true), 10);
+                  }}
+                  className="text-xs text-app-gray-medium hover:text-app-gray-dark"
+                >
+                  Refresh
+                </button>
+              )}
             </div>
             {isStoriesExpanded && (
               <div className="mt-4 space-y-2">
