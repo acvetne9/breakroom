@@ -60,6 +60,21 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
   const [hideSystemPost, setHideSystemPost] = useState(false);
+  const [isSwipingOrTransitioning, setIsSwipingOrTransitioning] = useState(false);
+
+  // Detect when user is swiping/transitioning between pages
+  useEffect(() => {
+    // If not fully on explore page (currentSlide !== 2), we're transitioning
+    if (currentSlide !== 2) {
+      setIsSwipingOrTransitioning(true);
+    } else {
+      // Add a small delay before allowing clicks after reaching explore page
+      const timer = setTimeout(() => {
+        setIsSwipingOrTransitioning(false);
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [currentSlide]);
 
   // Infinite scroll - load more posts when scrolling to bottom
   useEffect(() => {
@@ -177,6 +192,12 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   };
 
   const handlePostClick = (postId: string) => {
+    // Prevent opening posts during swipe/transition
+    if (isSwipingOrTransitioning) {
+      console.log("🚫 Blocked post click during swipe/transition");
+      return;
+    }
+
     // If clicking the same post, toggle closed
     setExpandedPost((prev) => (prev === postId ? null : postId));
     onExpandedPostChange?.(expandedPost === postId ? null : postId);
