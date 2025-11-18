@@ -102,15 +102,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const { getUserPostsAndCommented } = usePosts();
   const [userPosts, setUserPosts] = useState<Post[]>([]);
 
-  // Refresh user posts whenever stories section is expanded or posts change
-  useEffect(() => {
-    if (isStoriesExpanded) {
-      const refreshedPosts = getUserPostsAndCommented();
-      setUserPosts(refreshedPosts);
-      console.log("📖 Refreshed user posts:", refreshedPosts.length);
-    }
-  }, [isStoriesExpanded, getUserPostsAndCommented]);
-
   // Also refresh when component mounts
   useEffect(() => {
     const refreshedPosts = getUserPostsAndCommented();
@@ -130,6 +121,15 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   // Auto-save delay (ms)
   const AUTO_SAVE_DELAY = 1000;
+
+  // Refresh user posts whenever stories section is expanded or posts change
+  useEffect(() => {
+    if (isStoriesExpanded) {
+      const refreshedPosts = getUserPostsAndCommented();
+      setUserPosts(refreshedPosts);
+      console.log("📖 Refreshed user posts:", refreshedPosts.length);
+    }
+  }, [isStoriesExpanded, getUserPostsAndCommented]);
 
   // ==================== VALIDATION ====================
 
