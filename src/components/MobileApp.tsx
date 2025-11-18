@@ -782,6 +782,7 @@ const MobileApp: React.FC = () => {
         >
           <Suspense fallback={<Skeleton className="w-full h-full" />}>
             <ExplorePage
+              currentSlide={currentSlide}
               filteredBusinessId={filteredBusinessId || undefined}
               filteredUserStories={filteredUserStories}
               onBusinessView={(businessId) => {
