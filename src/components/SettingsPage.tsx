@@ -1065,7 +1065,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     <input
                       type="text"
                       inputMode="decimal"
-                      value={formatSalaryForDisplay(job.salary)}
+                      value={formatSalaryDisplay(job.salary)}
                       onChange={(e) => handlePastJobSalaryChange(job.id, e.target.value)}
                       onBlur={() => handlePastJobSalaryBlur(job.id)}
                       className="app-input flex-1"
