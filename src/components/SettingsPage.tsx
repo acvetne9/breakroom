@@ -102,11 +102,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const { getUserPostsAndCommented } = usePosts();
   const [userPosts, setUserPosts] = useState<Post[]>([]);
 
-  // Also refresh when component mounts
+  // Also refresh when component mounts - FIXED: empty dependency array
   useEffect(() => {
     const refreshedPosts = getUserPostsAndCommented();
     setUserPosts(refreshedPosts);
-  }, [getUserPostsAndCommented]);
+  }, []); // Empty dependency array - only run on mount
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
@@ -122,14 +122,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   // Auto-save delay (ms)
   const AUTO_SAVE_DELAY = 1000;
 
-  // Refresh user posts whenever stories section is expanded or posts change
+  // Refresh user posts whenever stories section is expanded - FIXED: removed getUserPostsAndCommented from deps
   useEffect(() => {
     if (isStoriesExpanded) {
       const refreshedPosts = getUserPostsAndCommented();
       setUserPosts(refreshedPosts);
       console.log("📖 Refreshed user posts:", refreshedPosts.length);
     }
-  }, [isStoriesExpanded, getUserPostsAndCommented]);
+  }, [isStoriesExpanded]); // Only depend on isStoriesExpanded
 
   // ==================== VALIDATION ====================
 
