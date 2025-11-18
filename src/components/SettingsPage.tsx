@@ -1107,18 +1107,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
               >
                 <h3 className="text-lg font-medium text-app-black">My Stories 📖</h3>
               </button>
-              {isStoriesExpanded && (
-                <button
-                  onClick={() => {
-                    // Force refresh by toggling
-                    setIsStoriesExpanded(false);
-                    setTimeout(() => setIsStoriesExpanded(true), 10);
-                  }}
-                  className="text-xs text-app-gray-medium hover:text-app-gray-dark"
-                >
-                  Refresh
-                </button>
-              )}
             </div>
             {isStoriesExpanded && (
               <div className="mt-4 space-y-2">
