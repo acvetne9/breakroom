@@ -43,7 +43,7 @@ const MobileApp: React.FC = () => {
   console.log("🚀 MobileApp component rendering");
   const isMobile = useIsMobile();
   const { user } = useAuth();
-  const { deviceId, isFirstSession, loading: deviceLoading } = useDevice();
+  const { deviceId, loading: deviceLoading } = useDevice();
   const [currentView, setCurrentView] = useState<"initiation" | "main" | "loading">("loading");
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -62,6 +62,24 @@ const MobileApp: React.FC = () => {
 
   // Ref to prevent double initialization in React 18 StrictMode
   const hasInitialized = useRef(false);
+
+  // Add this near hasCurrentJob helper (around line 62)
+  const hasProfile = async (): Promise<boolean> => {
+    if (!deviceId) return false;
+    try {
+      const { data, error } = await supabase.from("profiles").select("id").eq("id", deviceId).maybeSingle();
+
+      if (error) {
+        console.error("Error checking profile:", error);
+        return false;
+      }
+
+      return !!data;
+    } catch (error) {
+      console.error("Error checking profile:", error);
+      return false;
+    }
+  };
 
   // Helper function to check if current job exists
   const hasCurrentJob = async (): Promise<boolean> => {
@@ -92,10 +110,11 @@ const MobileApp: React.FC = () => {
 
     const initializeApp = async () => {
       try {
-        console.log("Debug - isFirstSession:", isFirstSession);
-
+        const profileExists = await hasProfile();
         const hasJob = await hasCurrentJob();
-        console.log("Current job check:", hasJob);
+
+        console.log("Profile exists:", profileExists);
+        console.log("Current job exists:", hasJob);
 
         if (hasJob) {
           const { getCurrentJob } = await import("../services/currentJobs");
@@ -113,11 +132,22 @@ const MobileApp: React.FC = () => {
           }
           console.log("Job found - going to main view");
           setCurrentView("main");
-        } else if (isFirstSession) {
-          console.log("First session, no job - going to main view");
+        } else if (!profileExists) {
+          // First session - create profile row and go to main view
+          console.log("No profile row found - creating profile and going to main view");
+
+          const { error } = await supabase.from("profiles").insert({ id: deviceId });
+
+          if (error) {
+            console.error("❌ Error creating profile row:", error);
+          } else {
+            console.log("✅ Profile row created for device:", deviceId);
+          }
+
           setCurrentView("main");
         } else {
-          console.log("Not first session, no job - showing initiation page");
+          // Has profile but no job - show initiation page
+          console.log("Profile exists but no job - showing initiation page");
           setCurrentView("initiation");
         }
       } catch (error) {
