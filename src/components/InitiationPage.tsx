@@ -48,6 +48,15 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
     setSalary(value ? `$${value}` : '');
   };
 
+  const handleSalaryBlur = () => {
+    if (salary) {
+      const numericValue = parseFloat(salary.replace(/[^0-9.]/g, ''));
+      if (numericValue > 0) {
+        setSalary(`$${numericValue.toFixed(2)}`);
+      }
+    }
+  };
+
   const checkForCompletion = () => {
     const allFilled = salary.trim() && role.trim() && location.trim();
     const isValidRole = JOB_OPTIONS.includes(role.trim()) || role.trim() === 'Other';
@@ -85,33 +94,133 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-app-yellow/10 to-app-orange/10">
-      <div className="w-full max-w-md space-y-8">
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold text-app-black">Welcome to breakroom! 👋</h1>
-          <p className="text-app-gray-dark">Let's get started by sharing a few details</p>
-        </div>
-        <div className="space-y-6">
+    <div className="w-full h-full flex items-center justify-center bg-transparent overflow-hidden p-4">
+      <div className="app-card p-6 animate-fade-in w-full max-w-md">
+        <div className="space-y-4">
+          {/* Header */}
+          <div className="text-center space-y-1">
+            <h1 className="text-2xl font-medium text-app-black">Welcome to breakroom! 👋</h1>
+            <p className="text-sm text-app-gray-dark">Let's get started by sharing a few details</p>
+          </div>
+
+          {/* Business Location */}
           <div>
-            <UnifiedBusinessSearch value={location} onChange={(value) => { setLocation(value); setBusinessSelected(false); setShowAddressInput(false); }} onBusinessSelect={handleBusinessSelect} onBlur={() => { if (location.trim() && !businessSelected) setShowAddressInput(true); }} placeholder="Where do you work?..." className={`app-input ${showAddressInput && !businessSelected ? "border-red-500" : ""}`} variant="dropdown" />
+            <UnifiedBusinessSearch 
+              value={location} 
+              onChange={(value) => { 
+                setLocation(value); 
+                setBusinessSelected(false); 
+                setShowAddressInput(false); 
+              }} 
+              onBusinessSelect={handleBusinessSelect} 
+              onBlur={() => { 
+                if (location.trim() && !businessSelected) setShowAddressInput(true); 
+              }} 
+              placeholder="Where do you work?..." 
+              className={`app-input ${showAddressInput && !businessSelected ? "border-red-500" : ""}`} 
+              variant="dropdown" 
+            />
             {showAddressInput && (!businessSelected || isManualAddress) && (
               <div className="mt-2 space-y-2">
                 <p className="text-red-500 text-xs">Business not found. Please enter the address:</p>
-                <input type="text" placeholder="Enter business address (e.g., 123 Main St, City, State)..." className={`app-input w-full ${addressError ? "border-red-500 border-2" : ""}`} value={manualAddress} onChange={(e) => { setManualAddress(e.target.value); if (addressError) setAddressError(''); }} onBlur={handleAddressBlur} />
+                <input 
+                  type="text" 
+                  placeholder="Enter business address (e.g., 123 Main St, City, State)..." 
+                  className={`app-input w-full ${addressError ? "border-red-500 border-2" : ""}`} 
+                  value={manualAddress} 
+                  onChange={(e) => { 
+                    setManualAddress(e.target.value); 
+                    if (addressError) setAddressError(''); 
+                  }} 
+                  onBlur={handleAddressBlur} 
+                />
                 {addressError && <p className="text-red-500 text-sm px-1">{addressError}</p>}
-                <p className="text-gray-500 text-xs px-1">Please include street number, street name, and street type (e.g., St, Ave, Rd)</p>
+                <p className="text-gray-500 text-xs px-1">
+                  Please include street number, street name, and street type (e.g., St, Ave, Rd)
+                </p>
               </div>
             )}
           </div>
-          <div className="text-center"><p className="text-app-black mb-4 text-lg"><span>Answers Kept Anonymous 🤐</span></p></div>
-          <div><JobSearchDropdown value={role} onChange={(value) => { if (!isProfane(value)) setRole(value); }} onBlur={checkForCompletion} placeholder="Share your job!..." className="app-input" /></div>
-          <div className="text-center"><p className="text-app-black mb-4 text-lg font-normal"><span>Make A Difference! ❤️</span></p></div>
-          <div><div className="flex items-center space-x-3">
-            <input type="text" inputMode="decimal" value={salary} onChange={handleSalaryChange} onBlur={checkForCompletion} placeholder="Pay Est. ($)" className="app-input text-left text-lg flex-1 !py-0 h-12" />
-            <select value={timePeriod} onChange={e => setTimePeriod(e.target.value)} className="app-input text-lg w-auto !py-0 h-12"><option value="HR">HR</option><option value="MO">MO</option><option value="YR">YR</option></select>
-          </div></div>
-          <div className="text-center mt-8"><p className="text-app-black text-lg"><span className="hidden sm:inline">Don't worry, your boss won't find out 😉</span><span className="sm:hidden">Don't worry, it's anonymous 😉</span></p></div>
-          <div className="pt-6"><button onClick={checkForCompletion} disabled={!isComplete} className={`w-full py-3 px-6 rounded-lg font-medium transition-all ${isComplete ? 'bg-app-yellow text-app-black hover:bg-app-yellow/90' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>Continue</button></div>
+
+          {/* Anonymous message */}
+          <div className="text-center">
+            <p className="text-app-black text-sm">
+              <span>Answers Kept Anonymous 🤐</span>
+            </p>
+          </div>
+
+          {/* Job Role */}
+          <div>
+            <JobSearchDropdown 
+              value={role} 
+              onChange={(value) => { 
+                if (!isProfane(value)) setRole(value); 
+              }} 
+              onBlur={checkForCompletion} 
+              placeholder="Share your job!..." 
+              className="app-input" 
+            />
+          </div>
+
+          {/* Make a difference message */}
+          <div className="text-center">
+            <p className="text-app-black text-sm font-normal">
+              <span>Make A Difference! ❤️</span>
+            </p>
+          </div>
+
+          {/* Salary + Time Period */}
+          <div>
+            <div className="flex items-center space-x-3">
+              <input 
+                type="text" 
+                inputMode="decimal" 
+                value={salary} 
+                onChange={handleSalaryChange}
+                onBlur={handleSalaryBlur}
+                placeholder="Pay Est. ($)" 
+                className="app-input text-left flex-1" 
+              />
+              <select 
+                value={timePeriod} 
+                onChange={e => setTimePeriod(e.target.value)} 
+                className="px-4 py-3 bg-white text-sm"
+                style={{
+                  border: "2px solid hsl(var(--app-gray-light))",
+                  borderRadius: "0.5rem",
+                  height: "48px",
+                  fontSize: "16px",
+                }}
+              >
+                <option value="HR">HR</option>
+                <option value="MO">MO</option>
+                <option value="YR">YR</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Anonymous reassurance */}
+          <div className="text-center">
+            <p className="text-app-black text-sm">
+              <span className="hidden sm:inline">Don't worry, your boss won't find out 😉</span>
+              <span className="sm:hidden">Don't worry, it's anonymous 😉</span>
+            </p>
+          </div>
+
+          {/* Continue Button */}
+          <div>
+            <button 
+              onClick={checkForCompletion} 
+              disabled={!isComplete} 
+              className={`w-full py-3 px-6 rounded-lg font-medium transition-all ${
+                isComplete 
+                  ? 'bg-app-yellow text-app-black hover:bg-app-yellow/90' 
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              Continue
+            </button>
+          </div>
         </div>
       </div>
     </div>
