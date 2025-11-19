@@ -573,12 +573,29 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     const displayValue = value ? `$${value}` : '';
     const numericValue = parseFloat(value) || 0;
     
+    // Direct state update like InitiationPage does
     setCurrentJob((prev) => {
       if (!prev) return prev;
-      const updated = { ...prev, salary: numericValue, salaryDisplay: displayValue, isDirty: true };
-      scheduleAutoSave(updated, "current");
-      return updated;
+      return { 
+        ...prev, 
+        salary: numericValue, 
+        salaryDisplay: displayValue,
+        isDirty: true
+      };
     });
+    
+    // Schedule auto-save separately
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      setCurrentJob((prev) => {
+        if (prev && isCurrentJobComplete(prev)) {
+          saveCurrentJobToDatabase(prev);
+        }
+        return prev;
+      });
+    }, AUTO_SAVE_DELAY);
   };
 
   const handleCurrentJobSalaryBlur = () => {
@@ -727,7 +744,26 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     }
     const displayValue = value ? `$${value}` : '';
     const numericValue = parseFloat(value) || 0;
-    updatePastJob(jobId, { salary: numericValue, salaryDisplay: displayValue });
+    
+    // Direct state update like InitiationPage does
+    setPastJobs((prev) => 
+      prev.map((job) => 
+        job.id === jobId 
+          ? { ...job, salary: numericValue, salaryDisplay: displayValue, isDirty: true }
+          : job
+      )
+    );
+    
+    // Schedule auto-save separately
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      const job = pastJobs.find(j => j.id === jobId);
+      if (job && isPastJobComplete(job)) {
+        savePastJobToDatabase(job);
+      }
+    }, AUTO_SAVE_DELAY);
   };
 
   const handlePastJobSalaryBlur = (jobId: string) => {
