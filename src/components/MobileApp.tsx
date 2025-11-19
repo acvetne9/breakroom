@@ -157,7 +157,7 @@ const MobileApp: React.FC = () => {
     };
 
     initializeApp();
-  }, [isFirstSession, deviceLoading, deviceId]);
+  }, [deviceLoading, deviceId]);
 
   // Re-check current job when returning to home page
   useEffect(() => {
