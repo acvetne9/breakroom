@@ -268,20 +268,33 @@ export const getUserVotes = async (postIds: string[]): Promise<{ [postId: string
     return {};
   }
 
-  // Get authenticated or temp user ID
-  const userId = await getUserId();
+  // Get device ID directly
+  const deviceId = localStorage.getItem("device_id");
 
-  const { data: votes } = await supabase
+  if (!deviceId) {
+    console.warn("No device ID found, cannot fetch user votes");
+    return {};
+  }
+
+  console.log("🔍 Fetching votes for user:", deviceId);
+
+  const { data: votes, error } = await supabase
     .from("votes")
     .select("post_id, vote_type")
-    .eq("user_id", userId)
+    .eq("user_id", deviceId)
     .in("post_id", postIds);
+
+  if (error) {
+    console.error("❌ Error fetching user votes:", error);
+    return {};
+  }
 
   const userVotes: { [postId: string]: "up" | "down" } = {};
   votes?.forEach((vote) => {
     userVotes[vote.post_id] = vote.vote_type === "upvote" ? "up" : "down";
   });
 
+  console.log("✅ Fetched user votes:", userVotes);
   return userVotes;
 };
 
