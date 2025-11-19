@@ -744,7 +744,7 @@ const MobileApp: React.FC = () => {
         />
       </Suspense>
   
-      {shouldRenderSettingsCard() && (
+      {shouldRenderSettingsCard() && currentView !== "initiation" && (
         <motion.div
           animate={{ x: getSettingsCardPosition() }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
@@ -787,7 +787,7 @@ const MobileApp: React.FC = () => {
         </motion.div>
       )}
   
-      {shouldRenderExploreCard() && (
+      {shouldRenderExploreCard() && currentView !== "initiation" && (
         <motion.div
           animate={{ x: getExploreCardPosition() }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
