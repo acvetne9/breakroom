@@ -96,130 +96,138 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   return (
     <div className="w-full h-full flex items-center justify-center bg-transparent overflow-hidden p-4">
       <div className="app-card p-6 animate-fade-in w-full max-w-md">
-        <div className="space-y-4">
-          {/* Header */}
-          <div className="text-center space-y-1">
+        <div className="flex flex-col h-full">
+          {/* Header - stays at top */}
+          <div className="text-center space-y-1 mb-4">
             <h1 className="text-2xl font-medium text-app-black">Welcome to breakroom! 👋</h1>
             <p className="text-sm text-app-gray-dark">Let's get started by sharing a few details</p>
           </div>
 
-          {/* Business Location */}
-          <div>
-            <UnifiedBusinessSearch 
-              value={location} 
-              onChange={(value) => { 
-                setLocation(value); 
-                setBusinessSelected(false); 
-                setShowAddressInput(false); 
-              }} 
-              onBusinessSelect={handleBusinessSelect} 
-              onBlur={() => { 
-                if (location.trim() && !businessSelected) setShowAddressInput(true); 
-              }} 
-              placeholder="Where do you work?..." 
-              className={`app-input ${showAddressInput && !businessSelected ? "border-red-500" : ""}`} 
-              variant="dropdown" 
-            />
-            {showAddressInput && (!businessSelected || isManualAddress) && (
-              <div className="mt-2 space-y-2">
-                <p className="text-red-500 text-xs">Business not found. Please enter the address:</p>
-                <input 
-                  type="text" 
-                  placeholder="Enter business address (e.g., 123 Main St, City, State)..." 
-                  className={`app-input w-full ${addressError ? "border-red-500 border-2" : ""}`} 
-                  value={manualAddress} 
-                  onChange={(e) => { 
-                    setManualAddress(e.target.value); 
-                    if (addressError) setAddressError(''); 
+          {/* Content - vertically centered */}
+          <div className="flex-1 flex items-center">
+            <div className="w-full space-y-4">
+              {/* Business Location */}
+              <div>
+                <UnifiedBusinessSearch 
+                  value={location} 
+                  onChange={(value) => { 
+                    setLocation(value); 
+                    setBusinessSelected(false); 
+                    setShowAddressInput(false); 
                   }} 
-                  onBlur={handleAddressBlur} 
+                  onBusinessSelect={handleBusinessSelect} 
+                  onBlur={() => { 
+                    if (location.trim() && !businessSelected) setShowAddressInput(true); 
+                  }} 
+                  placeholder="Where do you work?..." 
+                  className={`app-input ${showAddressInput && !businessSelected ? "border-red-500" : ""}`} 
+                  variant="dropdown" 
                 />
-                {addressError && <p className="text-red-500 text-sm px-1">{addressError}</p>}
-                <p className="text-gray-500 text-xs px-1">
-                  Please include street number, street name, and street type (e.g., St, Ave, Rd)
+                {showAddressInput && (!businessSelected || isManualAddress) && (
+                  <div className="mt-2 space-y-2">
+                    <p className="text-red-500 text-xs">Business not found. Please enter the address:</p>
+                    <input 
+                      type="text" 
+                      placeholder="Enter business address (e.g., 123 Main St, City, State)..." 
+                      className={`app-input w-full ${addressError ? "border-red-500 border-2" : ""}`} 
+                      value={manualAddress} 
+                      onChange={(e) => { 
+                        setManualAddress(e.target.value); 
+                        if (addressError) setAddressError(''); 
+                      }} 
+                      onBlur={handleAddressBlur} 
+                    />
+                    {addressError && <p className="text-red-500 text-sm px-1">{addressError}</p>}
+                    <p className="text-gray-500 text-xs px-1">
+                      Please include street number, street name, and street type (e.g., St, Ave, Rd)
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Anonymous message */}
+              <div className="text-center">
+                <p className="text-app-black text-sm">
+                  <span>Answers Kept Anonymous 🤐</span>
                 </p>
               </div>
-            )}
-          </div>
 
-          {/* Anonymous message */}
-          <div className="text-center">
-            <p className="text-app-black text-sm">
-              <span>Answers Kept Anonymous 🤐</span>
-            </p>
-          </div>
+              {/* Job Role */}
+              <div>
+                <JobSearchDropdown 
+                  value={role} 
+                  onChange={(value) => { 
+                    if (!isProfane(value)) setRole(value); 
+                  }} 
+                  onBlur={checkForCompletion} 
+                  placeholder="Share your job!..." 
+                  className="app-input" 
+                />
+              </div>
 
-          {/* Job Role */}
-          <div>
-            <JobSearchDropdown 
-              value={role} 
-              onChange={(value) => { 
-                if (!isProfane(value)) setRole(value); 
-              }} 
-              onBlur={checkForCompletion} 
-              placeholder="Share your job!..." 
-              className="app-input" 
-            />
-          </div>
+              {/* Make a difference message */}
+              <div className="text-center">
+                <p className="text-app-black text-sm font-normal">
+                  <span>Make A Difference! ❤️</span>
+                </p>
+              </div>
 
-          {/* Make a difference message */}
-          <div className="text-center">
-            <p className="text-app-black text-sm font-normal">
-              <span>Make A Difference! ❤️</span>
-            </p>
-          </div>
+              {/* Salary + Time Period */}
+              <div>
+                <div className="flex items-center space-x-3">
+                  <input 
+                    type="text" 
+                    inputMode="decimal" 
+                    value={salary} 
+                    onChange={handleSalaryChange}
+                    onBlur={handleSalaryBlur}
+                    placeholder="Pay Est. ($)" 
+                    className="app-input text-left flex-1" 
+                  />
+                  <select 
+                    value={timePeriod} 
+                    onChange={e => setTimePeriod(e.target.value)} 
+                    className="px-4 py-3 bg-white text-sm"
+                    style={{
+                      border: "2px solid hsl(var(--app-gray-light))",
+                      borderRadius: "0.5rem",
+                      height: "48px",
+                      fontSize: "16px",
+                    }}
+                  >
+                    <option value="HR">HR</option>
+                    <option value="MO">MO</option>
+                    <option value="YR">YR</option>
+                  </select>
+                </div>
+              </div>
 
-          {/* Salary + Time Period */}
-          <div>
-            <div className="flex items-center space-x-3">
-              <input 
-                type="text" 
-                inputMode="decimal" 
-                value={salary} 
-                onChange={handleSalaryChange}
-                onBlur={handleSalaryBlur}
-                placeholder="Pay Est. ($)" 
-                className="app-input text-left flex-1" 
-              />
-              <select 
-                value={timePeriod} 
-                onChange={e => setTimePeriod(e.target.value)} 
-                className="px-4 py-3 bg-white text-sm"
-                style={{
-                  border: "2px solid hsl(var(--app-gray-light))",
-                  borderRadius: "0.5rem",
-                  height: "48px",
-                  fontSize: "16px",
-                }}
-              >
-                <option value="HR">HR</option>
-                <option value="MO">MO</option>
-                <option value="YR">YR</option>
-              </select>
+              {/* Anonymous reassurance */}
+              <div className="text-center">
+                <p className="text-app-black text-sm">
+                  <span className="hidden sm:inline">Don't worry, your boss won't find out 😉</span>
+                  <span className="sm:hidden">Don't worry, it's anonymous 😉</span>
+                </p>
+              </div>
+
+              {/* Continue Button */}
+              <div>
+                <button 
+                  onClick={checkForCompletion} 
+                  disabled={!isComplete} 
+                  className={`w-full py-3 px-6 rounded-lg font-medium transition-all ${
+                    isComplete 
+                      ? 'bg-app-yellow text-app-black hover:bg-app-yellow/90' 
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }`}
+                  style={{
+                    borderRadius: "0.5rem",
+                  }}
+                >
+                  Continue
+                </button>
+              </div>
             </div>
-          </div>
-
-          {/* Anonymous reassurance */}
-          <div className="text-center">
-            <p className="text-app-black text-sm">
-              <span className="hidden sm:inline">Don't worry, your boss won't find out 😉</span>
-              <span className="sm:hidden">Don't worry, it's anonymous 😉</span>
-            </p>
-          </div>
-
-          {/* Continue Button */}
-          <div>
-            <button 
-              onClick={checkForCompletion} 
-              disabled={!isComplete} 
-              className={`w-full py-3 px-6 rounded-lg font-medium transition-all ${
-                isComplete 
-                  ? 'bg-app-yellow text-app-black hover:bg-app-yellow/90' 
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              }`}
-            >
-              Continue
-            </button>
           </div>
         </div>
       </div>
