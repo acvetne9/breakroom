@@ -270,41 +270,42 @@ export const getUserVotes = async (postIds: string[]): Promise<{ [postId: string
 
   // Get device ID directly
   const deviceId = localStorage.getItem("device_id");
-
+  
   if (!deviceId) {
     console.warn("No device ID found, cannot fetch user votes");
     return {};
   }
 
   console.log("🔍 Fetching votes for user:", deviceId, "for", postIds.length, "posts");
-  console.log("🔍 Post IDs being queried:", postIds);
-  console.log("🔍 First post ID type:", typeof postIds[0], postIds[0]);
 
   try {
-    const { data: votes, error } = await supabase
-      .from("votes")
-      .select("post_id, vote_type")
-      .eq("user_id", deviceId)
-      .in("post_id", postIds);
+    // Batch requests in chunks of 100 to avoid URL length limits
+    const BATCH_SIZE = 100;
+    const allVotes: { [postId: string]: "up" | "down" } = {};
 
-    if (error) {
-      console.error("❌ Error fetching user votes:", error);
-      // Return empty object instead of throwing
-      return {};
+    for (let i = 0; i < postIds.length; i += BATCH_SIZE) {
+      const batch = postIds.slice(i, i + BATCH_SIZE);
+      
+      const { data: votes, error } = await supabase
+        .from("votes")
+        .select("post_id, vote_type")
+        .eq("user_id", deviceId)
+        .in("post_id", batch);
+
+      if (error) {
+        console.error("❌ Error fetching user votes batch:", error);
+        continue; // Skip this batch but continue with others
+      }
+
+      if (votes) {
+        votes.forEach((vote) => {
+          allVotes[vote.post_id] = vote.vote_type === "upvote" ? "up" : "down";
+        });
+      }
     }
 
-    if (!votes) {
-      console.log("ℹ️ No votes found");
-      return {};
-    }
-
-    const userVotes: { [postId: string]: "up" | "down" } = {};
-    votes.forEach((vote) => {
-      userVotes[vote.post_id] = vote.vote_type === "upvote" ? "up" : "down";
-    });
-
-    console.log("✅ Fetched user votes:", Object.keys(userVotes).length, "votes");
-    return userVotes;
+    console.log("✅ Fetched user votes:", Object.keys(allVotes).length, "votes");
+    return allVotes;
   } catch (error) {
     console.error("❌ Exception fetching user votes:", error);
     return {};
