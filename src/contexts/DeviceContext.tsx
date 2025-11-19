@@ -67,13 +67,18 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
             .maybeSingle();
 
           if (!existingProfile) {
-            console.log("⚠️ Profile missing, creating it now");
-            const { error } = await supabase.from("profiles").insert({ id: storedDeviceId });
-
-            if (error) {
-              console.error("❌ Error creating profile:", error);
+            console.log("📝 Creating profile for device:", storedDeviceId);
+            const { data: newProfile, error: insertError } = await supabase
+              .from('profiles')
+              .insert({ id: storedDeviceId })
+              .select('id')
+              .single();
+            
+            if (insertError) {
+              console.error("❌ CRITICAL: Failed to create profile:", insertError);
+              console.error("❌ Error details:", JSON.stringify(insertError, null, 2));
             } else {
-              console.log("✅ Profile created in database");
+              console.log("✅ Profile created successfully:", newProfile);
             }
           }
         }
