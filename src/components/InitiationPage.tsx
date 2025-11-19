@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import JobSearchDropdown from './JobSearchDropdown';
 import UnifiedBusinessSearch from './UnifiedBusinessSearch';
 import { isProfane } from '@/utils/profanityFilter';
 import { JOB_OPTIONS } from './JobSearchDropdown';
+import { useDevice } from "@/contexts/DeviceContext";
+import { saveCurrentJob, type CurrentJobData } from "@/services/currentJobs";
 
 interface InitiationPageProps {
   onComplete: (data: {
@@ -25,18 +27,83 @@ const isValidAddress = (address: string): boolean => {
 };
 
 const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
-  const [salary, setSalary] = useState('');
+  const { deviceId } = useDevice();
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
+  const AUTO_SAVE_DELAY = 1000;
+
+  const [salary, setSalary] = useState(0);
+  const [salaryDisplay, setSalaryDisplay] = useState('');
   const [role, setRole] = useState('');
   const [location, setLocation] = useState('');
-  const [fullLocation, setFullLocation] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [timePeriod, setTimePeriod] = useState('HR');
-  const [isComplete, setIsComplete] = useState(false);
   const [businessSelected, setBusinessSelected] = useState(false);
   const [showAddressInput, setShowAddressInput] = useState(false);
   const [manualAddress, setManualAddress] = useState('');
   const [addressError, setAddressError] = useState('');
   const [isManualAddress, setIsManualAddress] = useState(false);
+  const [businessInput, setBusinessInput] = useState('');
+
+  const isJobComplete = useCallback(() => {
+    return !!(
+      salary > 0 &&
+      role.trim() &&
+      location.trim() &&
+      (businessSelected || (isManualAddress && manualAddress && isValidAddress(manualAddress)))
+    );
+  }, [salary, role, location, businessSelected, isManualAddress, manualAddress]);
+
+  const saveJobToDatabase = useCallback(async () => {
+    if (!deviceId) {
+      console.log("❌ No deviceId available for saving");
+      return;
+    }
+
+    if (!isJobComplete()) {
+      console.log("Job incomplete, skipping save");
+      return;
+    }
+
+    try {
+      const jobData: CurrentJobData = {
+        role: role,
+        salary: salary,
+        location: location,
+        business_name: businessName || location,
+        time_period: timePeriod,
+      };
+
+      console.log("💾 Saving current job to database:", jobData);
+      await saveCurrentJob(deviceId, jobData);
+      console.log("✅ Job saved successfully");
+
+      // Call onComplete to close initiation page
+      onComplete({
+        salary: salaryDisplay,
+        role: role,
+        location: location,
+        fullLocation: location,
+        businessName: businessName,
+        timePeriod: timePeriod,
+      });
+    } catch (error: any) {
+      console.error("❌ Failed to save current job:", error);
+    }
+  }, [deviceId, isJobComplete, salary, role, location, businessName, timePeriod, salaryDisplay, onComplete]);
+
+  const scheduleAutoSave = useCallback(() => {
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Only schedule save if job is complete
+    if (isJobComplete()) {
+      saveTimeoutRef.current = setTimeout(() => {
+        saveJobToDatabase();
+      }, AUTO_SAVE_DELAY);
+    }
+  }, [isJobComplete, saveJobToDatabase]);
 
   const handleSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/[^0-9.]/g, '');
@@ -45,53 +112,89 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
       if (parts.length > 2) value = parts[0] + '.' + parts.slice(1).join('');
       if (parts[1]?.length > 2) value = parts[0] + '.' + parts[1].substring(0, 2);
     }
-    setSalary(value ? `$${value}` : '');
+    const displayValue = value ? `$${value}` : '';
+    const numericValue = parseFloat(value) || 0;
+    
+    setSalary(numericValue);
+    setSalaryDisplay(displayValue);
   };
 
   const handleSalaryBlur = () => {
-    if (salary) {
-      const numericValue = parseFloat(salary.replace(/[^0-9.]/g, ''));
-      if (numericValue > 0) {
-        setSalary(`$${numericValue.toFixed(2)}`);
-      }
+    if (salary > 0) {
+      const formattedValue = salary.toFixed(2);
+      setSalaryDisplay(`$${formattedValue}`);
+    }
+    scheduleAutoSave();
+  };
+
+  const handleRoleChange = (value: string) => {
+    if (!isProfane(value)) {
+      setRole(value);
     }
   };
 
-  const checkForCompletion = () => {
-    const allFilled = salary.trim() && role.trim() && location.trim();
-    const isValidRole = JOB_OPTIONS.includes(role.trim()) || role.trim() === 'Other';
-    const businessValid = businessSelected && (!showAddressInput || isValidAddress(manualAddress));
-    const complete = allFilled && isValidRole && businessValid;
-    setIsComplete(complete);
-    if (complete) {
-      const finalLocation = isManualAddress ? manualAddress : (fullLocation || location);
-      onComplete({ salary, role, location: finalLocation, fullLocation: finalLocation, businessName: businessName || '', timePeriod });
-    }
+  const handleRoleBlur = () => {
+    scheduleAutoSave();
   };
 
-  useEffect(() => { checkForCompletion(); }, [salary, role, location, fullLocation, timePeriod, businessSelected, manualAddress]);
+  const handleBusinessInputChange = (value: string) => {
+    setBusinessInput(value);
+    setBusinessSelected(false);
+    setShowAddressInput(true);
+    setAddressError('');
+  };
 
   const handleBusinessSelect = (business: any) => {
     setBusinessSelected(true);
     setShowAddressInput(false);
     setIsManualAddress(false);
     setLocation(business.name || business.location);
-    setFullLocation(business.fullLocation || business.name || business.location);
     setBusinessName(business.name || '');
+    setBusinessInput(business.name || business.location);
+    scheduleAutoSave();
+  };
+
+  const handleAddressChange = (value: string) => {
+    setManualAddress(value);
+    if (addressError) setAddressError('');
   };
 
   const handleAddressBlur = () => {
     const address = manualAddress.trim();
-    if (!address) { setAddressError('Please enter a business address'); return; }
-    if (isProfane(address)) { setAddressError('Invalid address content'); return; }
-    if (!isValidAddress(address)) { setAddressError('Please enter a valid street address (e.g., "123 Main St, City, State")'); return; }
-    setFullLocation(address);
+    if (!address) { 
+      setAddressError('Please enter a business address'); 
+      return; 
+    }
+    if (isProfane(address)) { 
+      setAddressError('Invalid address content'); 
+      return; 
+    }
+    if (!isValidAddress(address)) { 
+      setAddressError('Please enter a valid street address (e.g., "123 Main St, City, State")'); 
+      return; 
+    }
+    
     setLocation(address);
-    setBusinessName('');
-    setBusinessSelected(true);
+    setBusinessName(businessInput || address);
+    setBusinessSelected(false); // Don't mark as selected for manual address
     setIsManualAddress(true);
     setAddressError('');
+    scheduleAutoSave();
   };
+
+  const handleTimePeriodChange = (value: string) => {
+    setTimePeriod(value);
+    scheduleAutoSave();
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="w-full h-full flex items-center justify-center bg-transparent overflow-hidden p-4">
@@ -109,21 +212,14 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
               {/* Business Location */}
               <div>
                 <UnifiedBusinessSearch 
-                  value={location} 
-                  onChange={(value) => { 
-                    setLocation(value); 
-                    setBusinessSelected(false); 
-                    setShowAddressInput(false); 
-                  }} 
-                  onBusinessSelect={handleBusinessSelect} 
-                  onBlur={() => { 
-                    if (location.trim() && !businessSelected) setShowAddressInput(true); 
-                  }} 
+                  value={businessInput} 
+                  onChange={handleBusinessInputChange}
+                  onBusinessSelect={handleBusinessSelect}
                   placeholder="Where do you work?..." 
                   className={`app-input ${showAddressInput && !businessSelected ? "border-red-500" : ""}`} 
                   variant="dropdown" 
                 />
-                {showAddressInput && (!businessSelected || isManualAddress) && (
+                {showAddressInput && !businessSelected && (
                   <div className="mt-2 space-y-2">
                     <p className="text-red-500 text-xs">Business not found. Please enter the address:</p>
                     <input 
@@ -131,10 +227,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                       placeholder="Enter business address (e.g., 123 Main St, City, State)..." 
                       className={`app-input w-full ${addressError ? "border-red-500 border-2" : ""}`} 
                       value={manualAddress} 
-                      onChange={(e) => { 
-                        setManualAddress(e.target.value); 
-                        if (addressError) setAddressError(''); 
-                      }} 
+                      onChange={(e) => handleAddressChange(e.target.value)}
                       onBlur={handleAddressBlur} 
                     />
                     {addressError && <p className="text-red-500 text-sm px-1">{addressError}</p>}
@@ -156,10 +249,8 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
               <div>
                 <JobSearchDropdown 
                   value={role} 
-                  onChange={(value) => { 
-                    if (!isProfane(value)) setRole(value); 
-                  }} 
-                  onBlur={checkForCompletion} 
+                  onChange={handleRoleChange}
+                  onBlur={handleRoleBlur}
                   placeholder="Share your job!..." 
                   className="app-input" 
                 />
@@ -178,15 +269,15 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                   <input 
                     type="text" 
                     inputMode="decimal" 
-                    value={salary} 
+                    value={salaryDisplay} 
                     onChange={handleSalaryChange}
                     onBlur={handleSalaryBlur}
-                    placeholder="Pay Est. ($)" 
+                    placeholder="$14.00" 
                     className="app-input text-left flex-1" 
                   />
                   <select 
                     value={timePeriod} 
-                    onChange={e => setTimePeriod(e.target.value)} 
+                    onChange={e => handleTimePeriodChange(e.target.value)}
                     className="px-4 py-3 bg-white text-sm"
                     style={{
                       border: "2px solid hsl(var(--app-gray-light))",
@@ -208,24 +299,6 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                   <span className="hidden sm:inline">Don't worry, your boss won't find out 😉</span>
                   <span className="sm:hidden">Don't worry, it's anonymous 😉</span>
                 </p>
-              </div>
-
-              {/* Continue Button */}
-              <div>
-                <button 
-                  onClick={checkForCompletion} 
-                  disabled={!isComplete} 
-                  className={`w-full py-3 px-6 rounded-lg font-medium transition-all ${
-                    isComplete 
-                      ? 'bg-app-yellow text-app-black hover:bg-app-yellow/90' 
-                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  }`}
-                  style={{
-                    borderRadius: "0.5rem",
-                  }}
-                >
-                  Continue
-                </button>
               </div>
             </div>
           </div>
