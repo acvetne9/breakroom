@@ -33,69 +33,20 @@ export const clearProfileCache = () => {
   profilePromise = null;
 };
 
-// Get user profile (fetch only, doesn't create)
-export const getUserProfile = async (): Promise<{ profileId: string; wasCreated: boolean }> => {
-  console.log("🔐 getUserProfile called - cached:", !!cachedProfileId);
-
-  // Return cached profile if available
+export const getUserProfile = async (): Promise<{ profileId: string }> => {
   if (cachedProfileId) {
-    console.log("✅ Returning cached profile:", cachedProfileId);
-    return { profileId: cachedProfileId, wasCreated: false };
+    return { profileId: cachedProfileId };
   }
 
-  // Return existing promise if one is in progress
-  if (profilePromise) {
-    console.log("⏳ Returning existing profile promise");
-    return profilePromise;
+  // Just get deviceId - that's the profile ID
+  const deviceId = localStorage.getItem("device_id");
+
+  if (!deviceId) {
+    throw new Error("Device ID not found");
   }
 
-  // Create new promise for profile fetch
-  profilePromise = (async () => {
-    console.log("🚀 Fetching user profile");
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (user) {
-      console.log("👤 Authenticated user detected:", user.id);
-      const { data: profile } = await supabase.from("profiles").select("id").eq("user_id", user.id).maybeSingle();
-
-      if (!profile) {
-        throw new Error("Profile not found for authenticated user");
-      }
-
-      cachedProfileId = profile.id;
-      console.log("💾 Cached profile ID:", cachedProfileId);
-      return { profileId: profile.id, wasCreated: false };
-    } else {
-      console.log("👻 [getUserProfile] Unauthenticated user - using device ID as profile ID");
-      let deviceId = localStorage.getItem("device_id");
-      console.log("🔍 [getUserProfile] device_id from localStorage:", deviceId);
-
-      if (!deviceId) {
-        console.error("❌ [getUserProfile] No device_id in localStorage!");
-        throw new Error("Device ID not found");
-      }
-
-      // For anonymous users, the device_id IS the profile id
-      // No need to query - just use it directly
-      cachedProfileId = deviceId;
-      console.log("💾 [getUserProfile] Using device_id as profile ID:", cachedProfileId);
-      return { profileId: deviceId, wasCreated: false };
-    }
-  })();
-
-  try {
-    const result = await profilePromise;
-    profilePromise = null;
-    console.log("✅ getUserProfile completed:", result);
-    return result;
-  } catch (error) {
-    profilePromise = null;
-    cachedProfileId = null;
-    console.error("❌ getUserProfile failed:", error);
-    throw error;
-  }
+  cachedProfileId = deviceId;
+  return { profileId: deviceId };
 };
 
 // Retrieve authenticated user ID or temporary ID for backwards compatibility
