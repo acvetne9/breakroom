@@ -30,6 +30,15 @@ export async function persistVote(
   try {
     const { profileId: userId } = await getUserProfile();
 
+    // DEBUG: Check what we're sending
+    console.log("🔍 DEBUG persistVote:", {
+      userId,
+      deviceIdFromLocalStorage: localStorage.getItem("device_id"),
+      tableName,
+      itemId,
+      voteType,
+    });
+
     if (voteType === null) {
       // Remove vote
       const { error } = await supabase
@@ -54,7 +63,7 @@ export async function persistVote(
           vote_type: voteType,
         } as any,
         {
-          onConflict: conflictColumns, // ✅ Fixed!
+          onConflict: conflictColumns,
         },
       );
 
