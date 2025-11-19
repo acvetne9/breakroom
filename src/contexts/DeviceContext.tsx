@@ -46,9 +46,36 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
           localStorage.setItem("device_id", storedDeviceId);
           setIsFirstSession(true);
           console.log("✅ Generated new UUID device ID:", storedDeviceId);
+
+          // Create profile in database immediately
+          const { error } = await supabase.from("profiles").insert({ id: storedDeviceId });
+
+          if (error) {
+            console.error("❌ Error creating profile:", error);
+          } else {
+            console.log("✅ Profile created in database");
+          }
         } else {
           setIsFirstSession(false);
           console.log("✅ Found existing device_id in localStorage:", storedDeviceId);
+
+          // Verify profile exists, create if missing
+          const { data: existingProfile } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("id", storedDeviceId)
+            .maybeSingle();
+
+          if (!existingProfile) {
+            console.log("⚠️ Profile missing, creating it now");
+            const { error } = await supabase.from("profiles").insert({ id: storedDeviceId });
+
+            if (error) {
+              console.error("❌ Error creating profile:", error);
+            } else {
+              console.log("✅ Profile created in database");
+            }
+          }
         }
 
         // Set the device ID (UUID) - this is what gets used in current_jobs.profile_id
