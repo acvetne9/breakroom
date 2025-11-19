@@ -531,7 +531,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const formatSalaryDisplay = (salary: number): string => {
     if (salary === 0) return "";
-    return `${salary.toFixed(2)}`;
+    return `$${salary.toFixed(2)}`;
   };
 
   const parseSalaryInput = (value: string): number => {
@@ -555,29 +555,19 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     [scheduleAutoSave],
   );
 
-  const handleCurrentJobSalaryChange = (value: string) => {
-    // Remove everything except numbers and decimal point
-    let cleanValue = value.replace(/[^0-9.]/g, "");
-
-    // Ensure only one decimal point
-    const parts = cleanValue.split(".");
-    if (parts.length > 2) {
-      cleanValue = parts[0] + "." + parts.slice(1).join("");
+  const handleCurrentJobSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/[^0-9.]/g, '');
+    if (value.includes('.')) {
+      const parts = value.split('.');
+      if (parts.length > 2) value = parts[0] + '.' + parts.slice(1).join('');
+      if (parts[1]?.length > 2) value = parts[0] + '.' + parts[1].substring(0, 2);
     }
-
-    // Limit to 2 decimal places
-    if (parts[1] && parts[1].length > 2) {
-      cleanValue = parts[0] + "." + parts[1].substring(0, 2);
-    }
-
-    updateCurrentJob({ salary: parseFloat(cleanValue) || 0 });
+    const numericValue = parseFloat(value) || 0;
+    updateCurrentJob({ salary: numericValue });
   };
 
   const handleCurrentJobSalaryBlur = () => {
-    // Format to 2 decimal places on blur
-    if (currentJob && currentJob.salary > 0) {
-      updateCurrentJob({ salary: parseFloat(currentJob.salary.toFixed(2)) });
-    }
+    // No additional formatting needed - formatSalaryDisplay handles it
   };
 
   const handleCurrentJobRoleChange = (value: string) => {
@@ -712,30 +702,19 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     deletePastJobFromDatabase(jobId);
   };
 
-  const handlePastJobSalaryChange = (jobId: string, value: string) => {
-    // Remove everything except numbers and decimal point
-    let cleanValue = value.replace(/[^0-9.]/g, "");
-
-    // Ensure only one decimal point
-    const parts = cleanValue.split(".");
-    if (parts.length > 2) {
-      cleanValue = parts[0] + "." + parts.slice(1).join("");
+  const handlePastJobSalaryChange = (jobId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/[^0-9.]/g, '');
+    if (value.includes('.')) {
+      const parts = value.split('.');
+      if (parts.length > 2) value = parts[0] + '.' + parts.slice(1).join('');
+      if (parts[1]?.length > 2) value = parts[0] + '.' + parts[1].substring(0, 2);
     }
-
-    // Limit to 2 decimal places
-    if (parts[1] && parts[1].length > 2) {
-      cleanValue = parts[0] + "." + parts[1].substring(0, 2);
-    }
-
-    updatePastJob(jobId, { salary: parseFloat(cleanValue) || 0 });
+    const numericValue = parseFloat(value) || 0;
+    updatePastJob(jobId, { salary: numericValue });
   };
 
   const handlePastJobSalaryBlur = (jobId: string) => {
-    // Format to 2 decimal places on blur
-    const job = pastJobs.find((j) => j.id === jobId);
-    if (job && job.salary > 0) {
-      updatePastJob(jobId, { salary: parseFloat(job.salary.toFixed(2)) });
-    }
+    // No additional formatting needed - formatSalaryDisplay handles it
   };
 
   const handlePastJobRoleChange = (jobId: string, value: string) => {
@@ -967,7 +946,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     type="text"
                     inputMode="decimal"
                     value={formatSalaryDisplay(currentJob.salary)}
-                    onChange={(e) => handleCurrentJobSalaryChange(e.target.value)}
+                    onChange={handleCurrentJobSalaryChange}
                     onBlur={handleCurrentJobSalaryBlur}
                     className="app-input flex-1"
                     placeholder="$14.00"
@@ -1066,7 +1045,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                       type="text"
                       inputMode="decimal"
                       value={formatSalaryDisplay(job.salary)}
-                      onChange={(e) => handlePastJobSalaryChange(job.id, e.target.value)}
+                      onChange={(e) => handlePastJobSalaryChange(job.id, e)}
                       onBlur={() => handlePastJobSalaryBlur(job.id)}
                       className="app-input flex-1"
                       placeholder="$17.00"
