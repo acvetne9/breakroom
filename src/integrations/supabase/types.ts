@@ -103,7 +103,6 @@ export type Database = {
           created_at: string | null
           id: string
           location: string | null
-          device_id: string | null
           profile_id: string
           role: string | null
           salary: number | null
@@ -115,7 +114,6 @@ export type Database = {
           created_at?: string | null
           id?: string
           location?: string | null
-          device_id?: string | null;
           profile_id: string
           role?: string | null
           salary?: number | null
@@ -133,15 +131,7 @@ export type Database = {
           time_period?: string | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "current_jobs_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: true
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       past_jobs: {
         Row: {
@@ -149,7 +139,6 @@ export type Database = {
           created_at: string | null
           id: string
           location: string | null
-          device_id: string | null
           profile_id: string
           role: string
           salary: number | null
@@ -160,7 +149,6 @@ export type Database = {
           business_name?: string | null
           created_at?: string | null
           id?: string
-          device_id?: string | null
           location?: string | null
           profile_id: string
           role: string
@@ -179,15 +167,7 @@ export type Database = {
           time_period?: string | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "past_jobs_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       posts: {
         Row: {
@@ -250,7 +230,6 @@ export type Database = {
           display_name: string | null
           id: string
           is_authenticated: boolean
-          temp_user_id: string | null
           updated_at: string | null
           user_id: string | null
         }
@@ -260,7 +239,6 @@ export type Database = {
           display_name?: string | null
           id?: string
           is_authenticated?: boolean
-          temp_user_id?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -270,7 +248,6 @@ export type Database = {
           display_name?: string | null
           id?: string
           is_authenticated?: boolean
-          temp_user_id?: string | null
           updated_at?: string | null
           user_id?: string | null
         }

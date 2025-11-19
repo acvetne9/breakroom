@@ -100,7 +100,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const { deviceId } = useDevice();
   const isMobile = useIsMobile();
   const { getUserPostsAndCommented } = usePosts();
-  const userPosts = getUserPostsAndCommented();
+  const [userPosts, setUserPosts] = useState<Post[]>([]);
+
+  // Also refresh when component mounts - FIXED: empty dependency array
+  useEffect(() => {
+    const refreshedPosts = getUserPostsAndCommented();
+    setUserPosts(refreshedPosts);
+  }, []); // Empty dependency array - only run on mount
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
@@ -115,6 +121,15 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   // Auto-save delay (ms)
   const AUTO_SAVE_DELAY = 1000;
+
+  // Refresh user posts whenever stories section is expanded - FIXED: removed getUserPostsAndCommented from deps
+  useEffect(() => {
+    if (isStoriesExpanded) {
+      const refreshedPosts = getUserPostsAndCommented();
+      setUserPosts(refreshedPosts);
+      console.log("📖 Refreshed user posts:", refreshedPosts.length);
+    }
+  }, [isStoriesExpanded]); // Only depend on isStoriesExpanded
 
   // ==================== VALIDATION ====================
 
@@ -380,16 +395,16 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             : prev,
         );
 
-        // Call legacy callback
-        if (onJobUpdate) {
-          onJobUpdate({
-            salary: `$${job.salary}`,
-            role: job.role,
-            location: job.location,
-            businessName: job.business_name,
-            timePeriod: job.time_period,
-          });
-        }
+        // Call legacy callback (temporarily disabled to debug map issue)
+        // if (onJobUpdate) {
+        //   onJobUpdate({
+        //     salary: `${job.salary}`,
+        //     role: job.role,
+        //     location: job.location,
+        //     businessName: job.business_name,
+        //     timePeriod: job.time_period,
+        //   });
+        // }
       } catch (error: any) {
         console.error("Failed to save current job:", error);
         setCurrentJob((prev) =>
@@ -1085,12 +1100,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
           {/* My Stories & Comments */}
           <div className="mt-8">
-            <button
-              onClick={() => setIsStoriesExpanded(!isStoriesExpanded)}
-              className="flex items-center justify-between w-full text-left"
-            >
-              <h3 className="text-lg font-medium text-app-black">My Stories 📖</h3>
-            </button>
+            <div className="flex items-center justify-between w-full mb-2">
+              <button
+                onClick={() => setIsStoriesExpanded(!isStoriesExpanded)}
+                className="flex items-center gap-2 text-left"
+              >
+                <h3 className="text-lg font-medium text-app-black">My Stories 📖</h3>
+              </button>
+            </div>
             {isStoriesExpanded && (
               <div className="mt-4 space-y-2">
                 {userPosts.length === 0 ? (
