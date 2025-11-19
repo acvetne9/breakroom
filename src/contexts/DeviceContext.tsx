@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { supabase, updateDeviceIdHeader } from "@/integrations/supabase/client";
+import { updateDeviceIdHeader } from "@/integrations/supabase/client";
 
 interface DeviceContextType {
   deviceId: string;
@@ -32,63 +32,31 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
       try {
         // Check if this is a new device (no device_id in localStorage)
         let storedDeviceId = localStorage.getItem("device_id");
-
+        
         // Clear old device ID format (with device_ prefix)
         if (storedDeviceId && storedDeviceId.startsWith("device_")) {
           console.log("⚠️ Clearing old device ID format (non-UUID):", storedDeviceId);
           localStorage.removeItem("device_id");
           storedDeviceId = null;
         }
-
+        
         // Generate new UUID if no device ID exists
         if (!storedDeviceId) {
           storedDeviceId = generateDeviceId();
           localStorage.setItem("device_id", storedDeviceId);
           setIsFirstSession(true);
           console.log("✅ Generated new UUID device ID:", storedDeviceId);
-
-          // Create profile in database immediately
-          const { error } = await supabase.from("profiles").insert({ id: storedDeviceId });
-
-          if (error) {
-            console.error("❌ Error creating profile:", error);
-          } else {
-            console.log("✅ Profile created in database");
-          }
         } else {
           setIsFirstSession(false);
           console.log("✅ Found existing device_id in localStorage:", storedDeviceId);
-
-          // Verify profile exists, create if missing
-          const { data: existingProfile } = await supabase
-            .from("profiles")
-            .select("id")
-            .eq("id", storedDeviceId)
-            .maybeSingle();
-
-          if (!existingProfile) {
-            console.log("📝 Creating profile for device:", storedDeviceId);
-            const { data: newProfile, error: insertError } = await supabase
-              .from('profiles')
-              .insert({ id: storedDeviceId })
-              .select('id')
-              .single();
-            
-            if (insertError) {
-              console.error("❌ CRITICAL: Failed to create profile:", insertError);
-              console.error("❌ Error details:", JSON.stringify(insertError, null, 2));
-            } else {
-              console.log("✅ Profile created successfully:", newProfile);
-            }
-          }
         }
-
-        // Set the device ID (UUID) - this is what gets used in current_jobs.profile_id
+        
+        // Set the device ID (UUID)
         setDeviceId(storedDeviceId);
-
+        
         // Update Supabase client header with device_id
         updateDeviceIdHeader(storedDeviceId);
-
+        
         console.log("✅ Device initialization complete. Device ID:", storedDeviceId);
       } catch (error) {
         console.error("❌ Fatal error in device initialization:", error);
@@ -96,7 +64,7 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
         setLoading(false);
       }
     };
-
+    
     initializeDevice();
   }, []);
 
@@ -105,7 +73,7 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
     loading,
     isFirstSession,
   };
-
+  
   return <DeviceContext.Provider value={value}>{children}</DeviceContext.Provider>;
 }
 
