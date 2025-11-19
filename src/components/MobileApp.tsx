@@ -716,162 +716,163 @@ const MobileApp: React.FC = () => {
   };
 
   return (
-  <div className={`fixed inset-0 ${!isMobile ? "overflow-hidden" : ""}`}>
-    {currentView === "loading" && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
-        <Skeleton className="w-full h-full" />
-      </div>
-    )}
-
-    <Suspense fallback={<Skeleton className="w-full h-full" />}>
-      <HomePage
-        currentSlide={currentSlide}
-        currentView={currentView === "loading" ? "main" : currentView}
-        selectedBusiness={selectedBusiness}
-        onBusinessSelect={handleBusinessClick}
-        posts={posts}
-        onBusinessStoriesClick={handleBusinessStoriesClick}
-        onPostClick={(post) => {
-          setExpandedPost(post.id);
-        }}
-        onRoleVote={handleRoleVote}
-        onLocationSave={handleLocationSave}
-        votingRoles={votingRoles}
-        showBusinessDetails={showBusinessDetails}
-        onShowBusinessDetails={() => setShowBusinessDetails(true)}
-        onBackToPreview={() => setShowBusinessDetails(false)}
-      />
-    </Suspense>
-
-    {shouldRenderSettingsCard() && (
-      <motion.div
-        animate={{ x: getSettingsCardPosition() }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="absolute inset-0 z-20"
-        style={{
-          pointerEvents: getSettingsCardPosition() === "-200%" ? "none" : "auto",
-        }}
-        drag={isMobile ? "x" : false}
-        dragConstraints={{
-          left: currentSlide === 0 ? -200 : 0,
-          right: currentSlide === 1 ? 200 : 0,
-        }}
-        dragElastic={0.2}
-        onDragEnd={(event, info) => {
-          if (currentSlide === 0 && info.offset.x < -100) {
-            setCurrentSlide(1);
-          } else if (currentSlide === 1 && info.offset.x > 100) {
-            setCurrentSlide(0);
-          }
-        }}
-      >
-        <Suspense fallback={<Skeleton className="w-full h-full" />}>
-          <SettingsPage
-            initialData={userData || { salary: "", role: "", location: "", businessName: "", timePeriod: "HR" }}
-            onStoriesClick={handleUserStoriesClick}
-            onPostClick={(post) => {
-              setExpandedPost(post.id);
-              setCurrentSlide(2);
-            }}
-            onJobUpdate={handleJobUpdate}
-            onSearchTrigger={(searchTerm) => {
+    <div className={`fixed inset-0 ${!isMobile ? "overflow-hidden" : ""}`}>
+      {currentView === "loading" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
+          <Skeleton className="w-full h-full" />
+        </div>
+      )}
+  
+      <Suspense fallback={<Skeleton className="w-full h-full" />}>
+        <HomePage
+          currentSlide={currentSlide}
+          currentView={currentView === "loading" ? "main" : currentView}
+          selectedBusiness={selectedBusiness}
+          onBusinessSelect={handleBusinessClick}
+          posts={posts}
+          onBusinessStoriesClick={handleBusinessStoriesClick}
+          onPostClick={(post) => {
+            setExpandedPost(post.id);
+          }}
+          onRoleVote={handleRoleVote}
+          onLocationSave={handleLocationSave}
+          votingRoles={votingRoles}
+          showBusinessDetails={showBusinessDetails}
+          onShowBusinessDetails={() => setShowBusinessDetails(true)}
+          onBackToPreview={() => setShowBusinessDetails(false)}
+        />
+      </Suspense>
+  
+      {shouldRenderSettingsCard() && (
+        <motion.div
+          animate={{ x: getSettingsCardPosition() }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          className="absolute inset-0 z-20"
+          style={{
+            pointerEvents: getSettingsCardPosition() === "-200%" ? "none" : "auto",
+          }}
+          drag={isMobile ? "x" : false}
+          dragConstraints={{
+            left: currentSlide === 0 ? -200 : 0,
+            right: currentSlide === 1 ? 200 : 0,
+          }}
+          dragElastic={0.2}
+          onDragEnd={(event, info) => {
+            if (currentSlide === 0 && info.offset.x < -100) {
               setCurrentSlide(1);
-              setTimeout(() => {
-                const searchEvent = new CustomEvent("triggerSearch", { detail: searchTerm });
-                window.dispatchEvent(searchEvent);
-              }, 100);
-            }}
-          />
-        </Suspense>
-      </motion.div>
-    )}
-
-    {shouldRenderExploreCard() && (
-      <motion.div
-        animate={{ x: getExploreCardPosition() }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="absolute inset-0 z-20"
-        style={{
-          pointerEvents: getExploreCardPosition() === "200%" ? "none" : "auto",
-        }}
-        drag={isMobile ? "x" : false}
-        dragConstraints={{
-          left: currentSlide === 1 ? -200 : 0,
-          right: currentSlide === 2 ? 200 : 0,
-        }}
-        dragElastic={0.2}
-        onDragEnd={(event, info) => {
-          if (currentSlide === 2 && info.offset.x > 100) {
-            setCurrentSlide(1);
-          } else if (currentSlide === 1 && info.offset.x < -100) {
-            setCurrentSlide(2);
-          }
-        }}
-      >
-        <Suspense fallback={<Skeleton className="w-full h-full" />}>
-          <ExplorePage
-            currentSlide={currentSlide}
-            filteredBusinessId={filteredBusinessId || undefined}
-            filteredUserStories={filteredUserStories}
-            onBusinessView={(businessId) => {
-              const business = businesses.find((b) => b.id === businessId);
-              if (business) {
-                setSelectedBusiness(business);
+            } else if (currentSlide === 1 && info.offset.x > 100) {
+              setCurrentSlide(0);
+            }
+          }}
+        >
+          <Suspense fallback={<Skeleton className="w-full h-full" />}>
+            <SettingsPage
+              initialData={userData || { salary: "", role: "", location: "", businessName: "", timePeriod: "HR" }}
+              onStoriesClick={handleUserStoriesClick}
+              onPostClick={(post) => {
+                setExpandedPost(post.id);
+                setCurrentSlide(2);
+              }}
+              onJobUpdate={handleJobUpdate}
+              onSearchTrigger={(searchTerm) => {
                 setCurrentSlide(1);
-              } else {
-                (async () => {
-                  const full = await fetchFullBusinessDetails(businessId);
-                  if (full) {
-                    setSelectedBusiness(full);
-                    setCurrentSlide(1);
-                  }
-                })();
-              }
-            }}
-            onExpandedPostChange={(postId) => {
-              setExpandedPost(postId);
-            }}
-            onCommentSubmit={(postId, comment) => {
-              setComments({
-                ...comments,
-                [postId]: [...(comments[postId] || []), comment],
-              });
-            }}
-            onBackToAllPosts={handleBackToAllPosts}
-            onNavigateToHomeBusiness={(businessId) => {
-              handleFlyToBusiness(businessId);
-            }}
-            onFlyToBusiness={handleFlyToBusiness}
-          />
-        </Suspense>
-      </motion.div>
-    )}
-
-    {/* MOVED TO END - Initiation page must render last to be on top */}
-    {currentView === "initiation" && (
-      <div className="fixed inset-0 z-[60]">
-        <InitiationPage onComplete={handleInitiationComplete} />
+                setTimeout(() => {
+                  const searchEvent = new CustomEvent("triggerSearch", { detail: searchTerm });
+                  window.dispatchEvent(searchEvent);
+                }, 100);
+              }}
+            />
+          </Suspense>
+        </motion.div>
+      )}
+  
+      {shouldRenderExploreCard() && (
+        <motion.div
+          animate={{ x: getExploreCardPosition() }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          className="absolute inset-0 z-20"
+          style={{
+            pointerEvents: getExploreCardPosition() === "200%" ? "none" : "auto",
+          }}
+          drag={isMobile ? "x" : false}
+          dragConstraints={{
+            left: currentSlide === 1 ? -200 : 0,
+            right: currentSlide === 2 ? 200 : 0,
+          }}
+          dragElastic={0.2}
+          onDragEnd={(event, info) => {
+            if (currentSlide === 2 && info.offset.x > 100) {
+              setCurrentSlide(1);
+            } else if (currentSlide === 1 && info.offset.x < -100) {
+              setCurrentSlide(2);
+            }
+          }}
+        >
+          <Suspense fallback={<Skeleton className="w-full h-full" />}>
+            <ExplorePage
+              currentSlide={currentSlide}
+              filteredBusinessId={filteredBusinessId || undefined}
+              filteredUserStories={filteredUserStories}
+              onBusinessView={(businessId) => {
+                const business = businesses.find((b) => b.id === businessId);
+                if (business) {
+                  setSelectedBusiness(business);
+                  setCurrentSlide(1);
+                } else {
+                  (async () => {
+                    const full = await fetchFullBusinessDetails(businessId);
+                    if (full) {
+                      setSelectedBusiness(full);
+                      setCurrentSlide(1);
+                    }
+                  })();
+                }
+              }}
+              onExpandedPostChange={(postId) => {
+                setExpandedPost(postId);
+              }}
+              onCommentSubmit={(postId, comment) => {
+                setComments({
+                  ...comments,
+                  [postId]: [...(comments[postId] || []), comment],
+                });
+              }}
+              onBackToAllPosts={handleBackToAllPosts}
+              onNavigateToHomeBusiness={(businessId) => {
+                handleFlyToBusiness(businessId);
+              }}
+              onFlyToBusiness={handleFlyToBusiness}
+            />
+          </Suspense>
+        </motion.div>
+      )}
+  
+      {/* MOVED TO END - Initiation page must render last to be on top */}
+      {currentView === "initiation" && (
+        <div className="fixed inset-0 z-[60]">
+          <InitiationPage onComplete={handleInitiationComplete} />
+        </div>
+      )}
+  
+      <div className="absolute inset-0 z-10 pointer-events-none">
+        {/* ... rest of touch handlers ... */}
       </div>
-    )}
-
-    <div className="absolute inset-0 z-10 pointer-events-none">
-      {/* ... rest of touch handlers ... */}
+  
+      {!isMobile && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-50">
+          {[0, 1, 2].map((index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentSlide(index)}
+              className={`w-3 h-3 rounded-full transition-colors ${
+                index === currentSlide ? "bg-app-yellow" : "bg-app-gray-light"
+              }`}
+            />
+          ))}
+        </div>
+      )}
     </div>
-
-    {!isMobile && (
-      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-50">
-        {[0, 1, 2].map((index) => (
-          <button
-            key={index}
-            onClick={() => setCurrentSlide(index)}
-            className={`w-3 h-3 rounded-full transition-colors ${
-              index === currentSlide ? "bg-app-yellow" : "bg-app-gray-light"
-            }`}
-          />
-        ))}
-      </div>
-    )}
-  </div>
-);
+  );
+}
 
 export default MobileApp;
