@@ -112,10 +112,10 @@ const MobileApp: React.FC = () => {
       try {
         const profileExists = await hasProfile();
         const hasJob = await hasCurrentJob();
-
+    
         console.log("Profile exists:", profileExists);
         console.log("Current job exists:", hasJob);
-
+    
         if (hasJob) {
           const { getCurrentJob } = await import("../services/currentJobs");
           const currentJob = await getCurrentJob(deviceId);
@@ -135,15 +135,16 @@ const MobileApp: React.FC = () => {
         } else if (!profileExists) {
           // First session - create profile row and go to main view
           console.log("No profile row found - creating profile and going to main view");
-
+    
           const { error } = await supabase.from("profiles").insert({ id: deviceId });
-
+    
           if (error) {
             console.error("❌ Error creating profile row:", error);
           } else {
             console.log("✅ Profile row created for device:", deviceId);
           }
-
+    
+          // Go directly to main view (don't show initiation on first visit)
           setCurrentView("main");
         } else {
           // Has profile but no job - show initiation page
