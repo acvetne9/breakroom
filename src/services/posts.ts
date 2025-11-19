@@ -276,26 +276,39 @@ export const getUserVotes = async (postIds: string[]): Promise<{ [postId: string
     return {};
   }
 
-  console.log("🔍 Fetching votes for user:", deviceId);
+  console.log("🔍 Fetching votes for user:", deviceId, "for", postIds.length, "posts");
+  console.log("🔍 Post IDs being queried:", postIds);
+  console.log("🔍 First post ID type:", typeof postIds[0], postIds[0]);
 
-  const { data: votes, error } = await supabase
-    .from("votes")
-    .select("post_id, vote_type")
-    .eq("user_id", deviceId)
-    .in("post_id", postIds);
+  try {
+    const { data: votes, error } = await supabase
+      .from("votes")
+      .select("post_id, vote_type")
+      .eq("user_id", deviceId)
+      .in("post_id", postIds);
 
-  if (error) {
-    console.error("❌ Error fetching user votes:", error);
+    if (error) {
+      console.error("❌ Error fetching user votes:", error);
+      // Return empty object instead of throwing
+      return {};
+    }
+
+    if (!votes) {
+      console.log("ℹ️ No votes found");
+      return {};
+    }
+
+    const userVotes: { [postId: string]: "up" | "down" } = {};
+    votes.forEach((vote) => {
+      userVotes[vote.post_id] = vote.vote_type === "upvote" ? "up" : "down";
+    });
+
+    console.log("✅ Fetched user votes:", Object.keys(userVotes).length, "votes");
+    return userVotes;
+  } catch (error) {
+    console.error("❌ Exception fetching user votes:", error);
     return {};
   }
-
-  const userVotes: { [postId: string]: "up" | "down" } = {};
-  votes?.forEach((vote) => {
-    userVotes[vote.post_id] = vote.vote_type === "upvote" ? "up" : "down";
-  });
-
-  console.log("✅ Fetched user votes:", userVotes);
-  return userVotes;
 };
 
 // Delete a post
