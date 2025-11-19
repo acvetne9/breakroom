@@ -599,7 +599,18 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   const handleCurrentJobSalaryBlur = () => {
-    // No additional formatting needed - formatSalaryDisplay handles it
+    // Format to 2 decimal places on blur
+    if (currentJob && currentJob.salary > 0) {
+      const formattedValue = currentJob.salary.toFixed(2);
+      setCurrentJob((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          salaryDisplay: `$${formattedValue}`,
+          isDirty: true
+        };
+      });
+    }
   };
 
   const handleCurrentJobRoleChange = (value: string) => {
@@ -767,7 +778,18 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   const handlePastJobSalaryBlur = (jobId: string) => {
-    // No additional formatting needed - formatSalaryDisplay handles it
+    // Format to 2 decimal places on blur
+    const job = pastJobs.find((j) => j.id === jobId);
+    if (job && job.salary > 0) {
+      const formattedValue = job.salary.toFixed(2);
+      setPastJobs((prev) =>
+        prev.map((j) =>
+          j.id === jobId
+            ? { ...j, salaryDisplay: `$${formattedValue}`, isDirty: true }
+            : j
+        )
+      );
+    }
   };
 
   const handlePastJobRoleChange = (jobId: string, value: string) => {
