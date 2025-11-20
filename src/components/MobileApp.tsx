@@ -54,7 +54,6 @@ const MobileApp: React.FC = () => {
   const [filteredBusinessId, setFilteredBusinessId] = useState<string | null>(null);
   const [filteredUserStories, setFilteredUserStories] = useState(false);
   const [votingRoles, setVotingRoles] = useState<Set<string>>(new Set());
-  const [dragDirection, setDragDirection] = useState<'horizontal' | 'vertical' | null>(null);
 
   const constraintsRef = useRef(null);
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
@@ -62,6 +61,14 @@ const MobileApp: React.FC = () => {
 
   // Ref to prevent double initialization in React 18 StrictMode
   const hasInitialized = useRef(false);
+
+  // Touch/Drag tracking refs
+  const touchStartXRef = useRef(0);
+  const touchStartYRef = useRef(0);
+  const touchStartScrollTopRef = useRef(0);
+  const isDraggingHorizontallyRef = useRef(false);
+  const hasScrolledRef = useRef(false);
+  const dragStartTimeRef = useRef(0);
 
   const hasProfile = useCallback(async (): Promise<boolean> => {
     if (!deviceId) return false;
@@ -644,98 +651,87 @@ const MobileApp: React.FC = () => {
     }));
   }, []);
 
-  const settingsStyle = useMemo(() => {
-    const position = getSettingsCardPosition();
+  // ==================== SMART TOUCH HANDLERS ====================
+  
+  const handleTouchStart = useCallback((e: React.TouchEvent, cardType: 'settings' | 'explore') => {
+    const touch = e.touches[0];
+    touchStartXRef.current = touch.clientX;
+    touchStartYRef.current = touch.clientY;
+    dragStartTimeRef.current = Date.now();
     
-    return {
-      pointerEvents: (position === "-200%" ? "none" : "auto") as any,
-      overflowY: (dragDirection === 'horizontal' ? 'hidden' : 'auto') as any,
-      touchAction: (dragDirection === 'vertical' ? 'pan-y' : dragDirection === 'horizontal' ? 'pan-x' : 'auto') as any,
-    };
-  }, [getSettingsCardPosition, dragDirection]);
-
-  const exploreStyle = useMemo(() => {
-    const position = getExploreCardPosition();
+    // Track initial scroll position
+    const scrollableElement = e.currentTarget.querySelector('[data-scrollable]');
+    if (scrollableElement) {
+      touchStartScrollTopRef.current = scrollableElement.scrollTop;
+    }
     
-    return {
-      pointerEvents: (position === "200%" ? "none" : "auto") as any,
-      overflowY: (dragDirection === 'horizontal' ? 'hidden' : 'auto') as any,
-      touchAction: (dragDirection === 'vertical' ? 'pan-y' : dragDirection === 'horizontal' ? 'pan-x' : 'auto') as any,
-    };
-  }, [getExploreCardPosition, dragDirection]);
-
-  const dragStartXRef = useRef(0);
-  const dragStartYRef = useRef(0);
-  const dragDirectionLockedRef = useRef<'horizontal' | 'vertical' | null>(null);
-
-  const handleDragStart = useCallback((event: any, info: any) => {
-    dragStartXRef.current = info.point.x;
-    dragStartYRef.current = info.point.y;
-    dragDirectionLockedRef.current = null;
-    setDragDirection(null);
+    isDraggingHorizontallyRef.current = false;
+    hasScrolledRef.current = false;
   }, []);
 
-  const handleDrag = useCallback((event: any, info: any) => {
-    // Only check direction once at the start of drag
-    if (dragDirectionLockedRef.current === null) {
-      const deltaX = Math.abs(info.point.x - dragStartXRef.current);
-      const deltaY = Math.abs(info.point.y - dragStartYRef.current);
-      
-      // Only lock direction after significant movement (increased threshold)
-      if (deltaX > 10 || deltaY > 10) {
-        // Only lock to vertical if it's CLEARLY vertical (3x more vertical than horizontal)
-        if (deltaY > deltaX * 3) {
-          dragDirectionLockedRef.current = 'vertical';
-          setDragDirection('vertical');
-        } else if (deltaX > deltaY) {
-          // Lock to horizontal if more horizontal than vertical
-          dragDirectionLockedRef.current = 'horizontal';
-          setDragDirection('horizontal');
+  const handleTouchMove = useCallback((e: React.TouchEvent, cardType: 'settings' | 'explore') => {
+    const touch = e.touches[0];
+    const deltaX = Math.abs(touch.clientX - touchStartXRef.current);
+    const deltaY = Math.abs(touch.clientY - touchStartYRef.current);
+    
+    // Determine intent VERY early (after just 5px)
+    if (!isDraggingHorizontallyRef.current && !hasScrolledRef.current && (deltaX > 5 || deltaY > 5)) {
+      // If more horizontal than vertical, treat as swipe
+      if (deltaX > deltaY * 1.5) {
+        isDraggingHorizontallyRef.current = true;
+        // Prevent scrolling during horizontal swipe
+        e.preventDefault();
+      } else {
+        // More vertical - allow scroll
+        hasScrolledRef.current = true;
+      }
+    }
+    
+    // Continue preventing scroll if we're swiping horizontally
+    if (isDraggingHorizontallyRef.current) {
+      e.preventDefault();
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent, cardType: 'settings' | 'explore') => {
+    if (!isDraggingHorizontallyRef.current) {
+      return;
+    }
+    
+    const touch = e.changedTouches[0];
+    const deltaX = touch.clientX - touchStartXRef.current;
+    const deltaTime = Date.now() - dragStartTimeRef.current;
+    const velocity = Math.abs(deltaX) / deltaTime; // px/ms
+    
+    // Very forgiving thresholds for mobile
+    const DISTANCE_THRESHOLD = 30; // Just 30px
+    const VELOCITY_THRESHOLD = 0.3; // 0.3 px/ms (300 px/s)
+    
+    const isQuickSwipe = velocity > VELOCITY_THRESHOLD;
+    const isLongSwipe = Math.abs(deltaX) > DISTANCE_THRESHOLD;
+    
+    if (isQuickSwipe || isLongSwipe) {
+      if (cardType === 'settings') {
+        // Settings card: swipe left to go to home, swipe right from home to go to settings
+        if (currentSlide === 0 && deltaX < -15) {
+          setCurrentSlide(1);
+        } else if (currentSlide === 1 && deltaX > 15) {
+          setCurrentSlide(0);
+        }
+      } else {
+        // Explore card: swipe right to go to home, swipe left from home to go to explore
+        if (currentSlide === 2 && deltaX > 15) {
+          setCurrentSlide(1);
+        } else if (currentSlide === 1 && deltaX < -15) {
+          setCurrentSlide(2);
         }
       }
     }
-  }, []);
-
-  const handleSettingsDragEnd = useCallback((event: any, info: any) => {
-  // Only process if horizontal drag was detected
-  if (dragDirectionLockedRef.current === 'horizontal') {
-    // Reduced threshold for easier swiping
-    const SWIPE_THRESHOLD = 30;
     
-    // When ON settings page (slide 0), swipe LEFT (negative offset) goes to home (slide 1)
-    if (currentSlide === 0 && info.offset.x < -SWIPE_THRESHOLD) {
-      setCurrentSlide(1);
-    }
-    // When ON home page (slide 1), swipe RIGHT (positive offset) goes to settings (slide 0)
-    else if (currentSlide === 1 && info.offset.x > SWIPE_THRESHOLD) {
-      setCurrentSlide(0);
-    }
-  }
-  
-  // Reset
-  dragDirectionLockedRef.current = null;
-  setDragDirection(null);
-}, [currentSlide]);
-
-const handleExploreDragEnd = useCallback((event: any, info: any) => {
-  // Only process if horizontal drag was detected
-  if (dragDirectionLockedRef.current === 'horizontal') {
-    const SWIPE_THRESHOLD = 30;
-    
-    // When ON explore page (slide 2), swipe RIGHT (positive offset) goes to home (slide 1)
-    if (currentSlide === 2 && info.offset.x > SWIPE_THRESHOLD) {
-      setCurrentSlide(1);
-    }
-    // When ON home page (slide 1), swipe LEFT (negative offset) goes to explore (slide 2)
-    else if (currentSlide === 1 && info.offset.x < -SWIPE_THRESHOLD) {
-      setCurrentSlide(2);
-    }
-  }
-  
-  // Reset
-  dragDirectionLockedRef.current = null;
-  setDragDirection(null);
-}, [currentSlide]);
+    // Reset
+    isDraggingHorizontallyRef.current = false;
+    hasScrolledRef.current = false;
+  }, [currentSlide]);
 
   return (
     <div className={`fixed inset-0 ${!isMobile ? "overflow-hidden" : ""}`}>
@@ -766,58 +762,56 @@ const handleExploreDragEnd = useCallback((event: any, info: any) => {
       {shouldRenderSettingsCard && currentView !== "initiation" && (
         <motion.div
           animate={{ x: getSettingsCardPosition() }}
-          transition={{ type: "spring", stiffness: 250, damping: 28, duration: 0.3 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
           className="absolute inset-0 z-20"
-          style={settingsStyle as any}
-          drag={isMobile ? "x" : false}
-          dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-          dragElastic={{ x: 0.2, y: 0 }}
-          dragDirectionLock={true}
-          dragMomentum={false} // Prevent momentum scrolling interference
-          onDragStart={handleDragStart}
-          onDrag={handleDrag}
-          onDragEnd={handleSettingsDragEnd}
+          style={{
+            pointerEvents: currentSlide === 0 || (isMobile && currentSlide === 1) ? "auto" : "none",
+          }}
+          onTouchStart={(e) => handleTouchStart(e, 'settings')}
+          onTouchMove={(e) => handleTouchMove(e, 'settings')}
+          onTouchEnd={(e) => handleTouchEnd(e, 'settings')}
         >
-          <Suspense fallback={<Skeleton className="w-full h-full" />}>
-            <SettingsPage
-              initialData={userData || { salary: "", role: "", location: "", businessName: "", timePeriod: "HR" }}
-              onStoriesClick={handleUserStoriesClick}
-              onPostClick={handleSettingsPostClick}
-              onJobUpdate={handleJobUpdate}
-              onSearchTrigger={handleSearchTrigger}
-            />
-          </Suspense>
+          <div data-scrollable className="h-full overflow-y-auto">
+            <Suspense fallback={<Skeleton className="w-full h-full" />}>
+              <SettingsPage
+                initialData={userData || { salary: "", role: "", location: "", businessName: "", timePeriod: "HR" }}
+                onStoriesClick={handleUserStoriesClick}
+                onPostClick={handleSettingsPostClick}
+                onJobUpdate={handleJobUpdate}
+                onSearchTrigger={handleSearchTrigger}
+              />
+            </Suspense>
+          </div>
         </motion.div>
       )}
   
       {shouldRenderExploreCard && currentView !== "initiation" && (
         <motion.div
           animate={{ x: getExploreCardPosition() }}
-          transition={{ type: "spring", stiffness: 250, damping: 28, duration: 0.3 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
           className="absolute inset-0 z-20"
-          style={exploreStyle as any}
-          drag={isMobile ? "x" : false}
-          dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-          dragElastic={{ x: 0.2, y: 0 }}
-          dragDirectionLock={true}
-          dragMomentum={false} // Prevent momentum scrolling interference
-          onDragStart={handleDragStart}
-          onDrag={handleDrag}
-          onDragEnd={handleExploreDragEnd}
+          style={{
+            pointerEvents: currentSlide === 2 || (isMobile && currentSlide === 1) ? "auto" : "none",
+          }}
+          onTouchStart={(e) => handleTouchStart(e, 'explore')}
+          onTouchMove={(e) => handleTouchMove(e, 'explore')}
+          onTouchEnd={(e) => handleTouchEnd(e, 'explore')}
         >
-          <Suspense fallback={<Skeleton className="w-full h-full" />}>
-            <ExplorePage
-              currentSlide={currentSlide}
-              filteredBusinessId={filteredBusinessId || undefined}
-              filteredUserStories={filteredUserStories}
-              onBusinessView={handleExploreBusinessView}
-              onExpandedPostChange={handleExpandedPostChange}
-              onCommentSubmit={handleCommentSubmit}
-              onBackToAllPosts={handleBackToAllPosts}
-              onNavigateToHomeBusiness={handleFlyToBusiness}
-              onFlyToBusiness={handleFlyToBusiness}
-            />
-          </Suspense>
+          <div data-scrollable className="h-full overflow-y-auto">
+            <Suspense fallback={<Skeleton className="w-full h-full" />}>
+              <ExplorePage
+                currentSlide={currentSlide}
+                filteredBusinessId={filteredBusinessId || undefined}
+                filteredUserStories={filteredUserStories}
+                onBusinessView={handleExploreBusinessView}
+                onExpandedPostChange={handleExpandedPostChange}
+                onCommentSubmit={handleCommentSubmit}
+                onBackToAllPosts={handleBackToAllPosts}
+                onNavigateToHomeBusiness={handleFlyToBusiness}
+                onFlyToBusiness={handleFlyToBusiness}
+              />
+            </Suspense>
+          </div>
         </motion.div>
       )}
   
@@ -826,10 +820,6 @@ const handleExploreDragEnd = useCallback((event: any, info: any) => {
           <InitiationPage onComplete={handleInitiationComplete} />
         </div>
       )}
-  
-      <div className="absolute inset-0 z-10 pointer-events-none">
-        {/* ... rest of touch handlers ... */}
-      </div>
   
       {!isMobile && (
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-50">
