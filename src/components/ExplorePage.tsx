@@ -299,7 +299,7 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   }
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full" style={{ opacity: currentSlide === 2 ? 1 : 0 }}>
       <div className={`h-full overflow-y-auto pb-20 ${filteredBusinessId || filteredUserStories ? "pt-20" : "pt-20"}`}>
         <div className="space-y-4 px-4 flex flex-col items-center">
           {paginatedPosts.map((post) => (
