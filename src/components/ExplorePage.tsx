@@ -53,8 +53,6 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   onFlyToBusiness,
   currentSlide = 2, // Default to 2 (fully on explore page)
 }) => {
-  console.log("🔍 ExplorePage component initializing...");
-
   const { posts, loading, hasMore, submitPost, votePost, removePost, loadMore, trackCommentedPost } = usePosts();
   const isMobile = useIsMobile();
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
@@ -339,7 +337,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   }
 
   return (
-    <div className="relative w-full h-full" style={{ opacity: currentSlide === 2 ? 1 : 0 }}>
+    <div className="relative w-full h-full">
       {/* Posts list */}
       <div className={`h-full overflow-y-auto pb-20 ${filteredBusinessId || filteredUserStories ? "pt-20" : "pt-20"}`}>
         <div className="space-y-4 px-4 flex flex-col items-center">
