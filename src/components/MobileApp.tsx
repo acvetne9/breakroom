@@ -55,6 +55,7 @@ const MobileApp: React.FC = () => {
   const [filteredBusinessId, setFilteredBusinessId] = useState<string | null>(null);
   const [filteredUserStories, setFilteredUserStories] = useState(false);
   const [votingRoles, setVotingRoles] = useState<Set<string>>(new Set());
+  const [dragDirection, setDragDirection] = useState<'horizontal' | 'vertical' | null>(null);
 
   const constraintsRef = useRef(null);
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
@@ -751,6 +752,8 @@ const MobileApp: React.FC = () => {
           className="absolute inset-0 z-20"
           style={{
             pointerEvents: getSettingsCardPosition() === "-200%" ? "none" : "auto",
+            overflowY: dragDirection === 'horizontal' ? 'hidden' : 'auto',
+            touchAction: dragDirection === 'vertical' ? 'pan-y' : dragDirection === 'horizontal' ? 'pan-x' : 'auto',
           }}
           drag={isMobile ? "x" : false}
           dragConstraints={{
@@ -758,12 +761,31 @@ const MobileApp: React.FC = () => {
             right: currentSlide === 1 ? 200 : 0,
           }}
           dragElastic={0.2}
-          onDragEnd={(event, info) => {
-            if (currentSlide === 0 && info.offset.x < -100) {
-              setCurrentSlide(1);
-            } else if (currentSlide === 1 && info.offset.x > 100) {
-              setCurrentSlide(0);
+          onDragStart={(event, info) => {
+            const absX = Math.abs(info.offset.x);
+            const absY = Math.abs(info.offset.y);
+            if (absX > 5 || absY > 5) {
+              if (absX > absY * 1.5) {
+                setDragDirection('horizontal');
+              } else if (absY > absX * 1.5) {
+                setDragDirection('vertical');
+              }
             }
+          }}
+          onDrag={(event, info) => {
+            if (dragDirection === 'vertical') {
+              return false;
+            }
+          }}
+          onDragEnd={(event, info) => {
+            if (dragDirection === 'horizontal') {
+              if (currentSlide === 0 && info.offset.x < -100) {
+                setCurrentSlide(1);
+              } else if (currentSlide === 1 && info.offset.x > 100) {
+                setCurrentSlide(0);
+              }
+            }
+            setDragDirection(null);
           }}
         >
           <Suspense fallback={<Skeleton className="w-full h-full" />}>
@@ -794,6 +816,8 @@ const MobileApp: React.FC = () => {
           className="absolute inset-0 z-20"
           style={{
             pointerEvents: getExploreCardPosition() === "200%" ? "none" : "auto",
+            overflowY: dragDirection === 'horizontal' ? 'hidden' : 'auto',
+            touchAction: dragDirection === 'vertical' ? 'pan-y' : dragDirection === 'horizontal' ? 'pan-x' : 'auto',
           }}
           drag={isMobile ? "x" : false}
           dragConstraints={{
@@ -801,12 +825,31 @@ const MobileApp: React.FC = () => {
             right: currentSlide === 2 ? 200 : 0,
           }}
           dragElastic={0.2}
-          onDragEnd={(event, info) => {
-            if (currentSlide === 2 && info.offset.x > 100) {
-              setCurrentSlide(1);
-            } else if (currentSlide === 1 && info.offset.x < -100) {
-              setCurrentSlide(2);
+          onDragStart={(event, info) => {
+            const absX = Math.abs(info.offset.x);
+            const absY = Math.abs(info.offset.y);
+            if (absX > 5 || absY > 5) {
+              if (absX > absY * 1.5) {
+                setDragDirection('horizontal');
+              } else if (absY > absX * 1.5) {
+                setDragDirection('vertical');
+              }
             }
+          }}
+          onDrag={(event, info) => {
+            if (dragDirection === 'vertical') {
+              return false;
+            }
+          }}
+          onDragEnd={(event, info) => {
+            if (dragDirection === 'horizontal') {
+              if (currentSlide === 2 && info.offset.x > 100) {
+                setCurrentSlide(1);
+              } else if (currentSlide === 1 && info.offset.x < -100) {
+                setCurrentSlide(2);
+              }
+            }
+            setDragDirection(null);
           }}
         >
           <Suspense fallback={<Skeleton className="w-full h-full" />}>
