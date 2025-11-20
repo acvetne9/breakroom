@@ -67,6 +67,7 @@ export interface PostData {
   votes_total: number;
   created_at: string;
   is_comment?: string;
+  is_deleted?: boolean;
 }
 
 export interface Post {
@@ -123,7 +124,7 @@ export const transformPost = async (
   };
 };
 
-// Get posts with pagination
+// Get posts with pagination (excludes soft-deleted posts)
 export const getPosts = async (
   limit: number = 1000,
   offset: number = 0,
@@ -138,6 +139,7 @@ export const getPosts = async (
       businesses(id, name, lat, lng)
     `,
     )
+    .or('is_deleted.is.null,is_deleted.eq.false') // Exclude deleted posts
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
@@ -198,6 +200,7 @@ export const createPost = async (
       time_period: timePeriod,
       salary,
       is_comment: isComment,
+      created_at: new Date().toISOString(), // Explicitly set timestamp
     })
     .select(
       `
@@ -312,8 +315,47 @@ export const getUserVotes = async (postIds: string[]): Promise<{ [postId: string
   }
 };
 
-// Delete a post
+// Soft delete a post (marks as deleted)
 export const deletePost = async (postId: string): Promise<{ success: boolean; error?: any }> => {
+  // Get current user's profile ID
+  const { profileId: currentProfileId } = await getUserProfile();
+
+  // Get the post to check ownership
+  const { data: post, error: fetchError } = await supabase
+    .from("posts")
+    .select("user_id, is_deleted")
+    .eq("id", postId)
+    .maybeSingle();
+
+  if (fetchError) {
+    return { success: false, error: fetchError };
+  }
+
+  if (!post) {
+    return { success: false, error: "Post not found" };
+  }
+
+  // Prevent deletion of default posts (system posts)
+  if (post.user_id === "00000000-0000-0000-0000-000000000000") {
+    return { success: false, error: "Default posts cannot be deleted" };
+  }
+
+  // Check if user owns the post by comparing profile IDs
+  if (post.user_id !== currentProfileId) {
+    return { success: false, error: "Not authorized to delete this post" };
+  }
+
+  // Soft delete: mark as deleted
+  const { error } = await supabase
+    .from("posts")
+    .update({ is_deleted: true })
+    .eq("id", postId);
+
+  return { success: !error, error };
+};
+
+// Hard delete a post (permanently removes from database)
+export const hardDeletePost = async (postId: string): Promise<{ success: boolean; error?: any }> => {
   // Get current user's profile ID
   const { profileId: currentProfileId } = await getUserProfile();
 
@@ -342,7 +384,7 @@ export const deletePost = async (postId: string): Promise<{ success: boolean; er
     return { success: false, error: "Not authorized to delete this post" };
   }
 
-  // Delete the post (RLS will also enforce this)
+  // Hard delete: permanently remove from database
   const { error } = await supabase.from("posts").delete().eq("id", postId);
 
   return { success: !error, error };
