@@ -731,11 +731,11 @@ const handleExploreDragEnd = useCallback((event: any, info: any) => {
       setCurrentSlide(2);
     }
   }
-    
-    // Reset
-    dragDirectionLockedRef.current = null;
-    setDragDirection(null);
-  }, [currentSlide]);
+  
+  // Reset
+  dragDirectionLockedRef.current = null;
+  setDragDirection(null);
+}, [currentSlide]);
 
   return (
     <div className={`fixed inset-0 ${!isMobile ? "overflow-hidden" : ""}`}>
@@ -770,13 +770,10 @@ const handleExploreDragEnd = useCallback((event: any, info: any) => {
           className="absolute inset-0 z-20"
           style={settingsStyle as any}
           drag={isMobile ? "x" : false}
-          dragConstraints={{
-            // On settings page (0): allow dragging left to go home
-            // On home page (1): allow dragging right to bring settings back
-            left: -200,
-            right: 200,
-          }}
-          dragElastic={0.2}
+          dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+          dragElastic={{ x: 0.2, y: 0 }}
+          dragDirectionLock={true}
+          dragMomentum={false} // Prevent momentum scrolling interference
           onDragStart={handleDragStart}
           onDrag={handleDrag}
           onDragEnd={handleSettingsDragEnd}
@@ -800,13 +797,10 @@ const handleExploreDragEnd = useCallback((event: any, info: any) => {
           className="absolute inset-0 z-20"
           style={exploreStyle as any}
           drag={isMobile ? "x" : false}
-          dragConstraints={{
-            // On explore page (2): allow dragging right to go home  
-            // On home page (1): allow dragging left to bring explore
-            left: -200,
-            right: 200,
-          }}
-          dragElastic={0.2}
+          dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+          dragElastic={{ x: 0.2, y: 0 }}
+          dragDirectionLock={true}
+          dragMomentum={false} // Prevent momentum scrolling interference
           onDragStart={handleDragStart}
           onDrag={handleDrag}
           onDragEnd={handleExploreDragEnd}
