@@ -2,24 +2,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { getPosts, createPost, voteOnPost, deletePost, getUserVotes, transformPost, getUserProfile, Post, PostData } from '@/services/posts';
 import { supabase } from '@/integrations/supabase/client';
 
-// Module-level cache - survives component remounts
-let modulePostsCache: Post[] = [];
-let moduleCacheInitialized = false;
-let moduleIsLoading = false;
-
-// SessionStorage cache for persistence across page reloads
+// SessionStorage cache for posts
 const POSTS_CACHE_KEY = 'posts_cache';
 const POSTS_CACHE_VERSION_KEY = 'posts_cache_version';
 const POSTS_CACHE_VERSION = '1.0';
 
 const getCachedPosts = (): Post[] => {
-  // First check module cache (faster)
-  if (moduleCacheInitialized && modulePostsCache.length > 0) {
-    console.log('📦 Using module cache:', modulePostsCache.length, 'posts');
-    return modulePostsCache;
-  }
-
-  // Then check sessionStorage
   try {
     const version = sessionStorage.getItem(POSTS_CACHE_VERSION_KEY);
     if (version !== POSTS_CACHE_VERSION) {
@@ -31,17 +19,10 @@ const getCachedPosts = (): Post[] => {
     if (!cached) return [];
     
     const parsed = JSON.parse(cached);
-    const posts = parsed.map((p: any) => ({
+    return parsed.map((p: any) => ({
       ...p,
       createdAt: new Date(p.createdAt)
     }));
-    
-    // Populate module cache
-    modulePostsCache = posts;
-    moduleCacheInitialized = true;
-    
-    console.log('📦 Loaded from sessionStorage:', posts.length, 'posts');
-    return posts;
   } catch (error) {
     console.warn('Failed to read posts cache:', error);
     return [];
@@ -49,10 +30,6 @@ const getCachedPosts = (): Post[] => {
 };
 
 const saveCachedPosts = (posts: Post[]) => {
-  // Save to both module cache and sessionStorage
-  modulePostsCache = posts;
-  moduleCacheInitialized = true;
-  
   try {
     sessionStorage.setItem(POSTS_CACHE_KEY, JSON.stringify(posts));
   } catch (error) {
@@ -62,62 +39,40 @@ const saveCachedPosts = (posts: Post[]) => {
 
 const POSTS_PER_PAGE = 1000;
 
-// Global subscription management
-let globalSubscription: any = null;
-let subscriptionCount = 0;
-
 export const usePosts = () => {
   const [posts, setPosts] = useState<Post[]>(() => getCachedPosts());
-  const [loading, setLoading] = useState(!moduleCacheInitialized);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
   
-  // Track if THIS instance has fetched
+  // Track if initial fetch has happened
   const hasFetchedRef = useRef(false);
-  const mountedRef = useRef(true);
+  const isSubscribedRef = useRef(false);
 
   // Memoized fetch function
   const fetchPosts = useCallback(async (isLoadMore: boolean = false) => {
-    // Prevent duplicate loads across ALL instances
-    if (moduleIsLoading) {
-      console.log('⏭️ Already loading posts globally, skipping...');
+    // Prevent duplicate initial loads
+    if (!isLoadMore && hasFetchedRef.current) {
+      console.log('⏭️ Skipping duplicate initial fetch');
       return;
     }
 
-    // If we have cache and this isn't a load-more, skip
-    if (!isLoadMore && moduleCacheInitialized && modulePostsCache.length > 0) {
-      console.log('✅ Using existing cached posts:', modulePostsCache.length);
-      if (mountedRef.current) {
-        setPosts(modulePostsCache);
-        setLoading(false);
-        hasFetchedRef.current = true;
-      }
-      return;
-    }
-
-    moduleIsLoading = true;
-    if (mountedRef.current) {
-      setLoading(true);
-      setError(null);
-    }
+    setLoading(true);
+    setError(null);
     
     try {
       const currentOffset = isLoadMore ? offset : 0;
       
-      console.log(`🔄 Fetching posts (offset: ${currentOffset}, loadMore: ${isLoadMore})...`);
-      
       const { data: postsData, error: postsError } = await getPosts(POSTS_PER_PAGE, currentOffset);
       
       if (postsError) {
-        if (mountedRef.current) {
-          setError('Failed to fetch posts');
-        }
+        setError('Failed to fetch posts');
         console.error('❌ Posts fetch error:', postsError);
         return;
       }
 
-      if (postsData && mountedRef.current) {
+      if (postsData) {
         setHasMore(postsData.length === POSTS_PER_PAGE);
 
         const { profileId: currentUserId } = await getUserProfile();
@@ -127,9 +82,7 @@ export const usePosts = () => {
         );
         
         const postIds = transformedPosts.map(p => p.id);
-        console.log('🗳️ Fetching user votes for', postIds.length, 'posts...');
         const userVotes = await getUserVotes(postIds);
-        console.log('✅ Fetched user votes:', Object.keys(userVotes).length, 'votes');
         
         const postsWithVotes = transformedPosts.map(post => ({
           ...post,
@@ -153,20 +106,15 @@ export const usePosts = () => {
         }
       }
     } catch (err) {
-      if (mountedRef.current) {
-        setError('Failed to load posts');
-      }
+      setError('Failed to load posts');
       console.error('❌ Posts loading error:', err);
     } finally {
-      moduleIsLoading = false;
-      if (mountedRef.current) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   }, [offset]);
 
   const loadMorePosts = useCallback(() => {
-    if (!loading && hasMore && !moduleIsLoading) {
+    if (!loading && hasMore) {
       fetchPosts(true);
     }
   }, [loading, hasMore, fetchPosts]);
@@ -237,27 +185,23 @@ export const usePosts = () => {
     const previousVotesTotal = post.votesTotal;
     const previousUserVote = post.userVote;
 
-    setPosts(prevPosts => {
-      const updated = prevPosts.map(p =>
+    setPosts(prevPosts =>
+      prevPosts.map(p =>
         p.id === postId
           ? { ...p, votesTotal: newTotal, userVote: newUserVote }
           : p
-      );
-      saveCachedPosts(updated);
-      return updated;
-    });
+      )
+    );
 
     const dbVoteType = newUserVote === 'up' ? 'upvote' : newUserVote === 'down' ? 'downvote' : null;
     persistVote('votes', 'post_id', postId, dbVoteType).catch(() => {
-      setPosts(prevPosts => {
-        const reverted = prevPosts.map(p =>
+      setPosts(prevPosts =>
+        prevPosts.map(p =>
           p.id === postId
             ? { ...p, votesTotal: previousVotesTotal, userVote: previousUserVote }
             : p
-        );
-        saveCachedPosts(reverted);
-        return reverted;
-      });
+        )
+      );
     });
 
     return true;
@@ -295,56 +239,49 @@ export const usePosts = () => {
 
   // Single effect for initialization and subscription
   useEffect(() => {
-    mountedRef.current = true;
-
-    // If already cached, just use it
-    if (moduleCacheInitialized && modulePostsCache.length > 0) {
-      console.log('✅ Using module cache on mount:', modulePostsCache.length);
-      setPosts(modulePostsCache);
-      setLoading(false);
-      hasFetchedRef.current = true;
-    } else if (!hasFetchedRef.current && !moduleIsLoading) {
-      // Only fetch if no cache exists and we haven't fetched yet
-      fetchPosts(false);
+    // Only run once
+    if (hasFetchedRef.current) {
+      console.log('⏭️ Skipping duplicate useEffect run');
+      return;
     }
 
-    // Global subscription - only create once
-    if (!globalSubscription) {
-      subscriptionCount++;
-      console.log('🔌 Creating realtime subscription (instance', subscriptionCount, ')');
+    // Load from cache immediately if available
+    const cachedPosts = getCachedPosts();
+    if (cachedPosts.length > 0) {
+      console.log(`📦 Loaded ${cachedPosts.length} posts from cache`);
+      setPosts(cachedPosts);
+      setLoading(false);
+    }
+    
+    // Fetch fresh data
+    fetchPosts(false);
+
+    // Subscribe to real-time changes only once
+    if (!isSubscribedRef.current) {
+      isSubscribedRef.current = true;
       
-      globalSubscription = supabase
+      const channel = supabase
         .channel('posts-changes')
         .on('postgres_changes', 
           { event: 'INSERT', schema: 'public', table: 'posts' },
           (payload) => {
             console.log('📨 New post received via realtime');
-            // Clear cache and refetch for all instances
-            if (!moduleIsLoading) {
-              moduleCacheInitialized = false;
-              modulePostsCache = [];
+            // Only refetch if we're not already loading
+            if (!loading) {
+              setOffset(0);
+              hasFetchedRef.current = false; // Allow refetch
               fetchPosts(false);
             }
           }
         )
         .subscribe();
-    } else {
-      subscriptionCount++;
-      console.log('🔌 Reusing existing subscription (instance', subscriptionCount, ')');
-    }
 
-    return () => {
-      mountedRef.current = false;
-      subscriptionCount--;
-      
-      // Only cleanup subscription when last instance unmounts
-      if (subscriptionCount === 0 && globalSubscription) {
-        console.log('🔌 Cleaning up realtime subscription');
-        supabase.removeChannel(globalSubscription);
-        globalSubscription = null;
-      }
-    };
-  }, []); // Empty deps - run only once per mount
+      return () => {
+        supabase.removeChannel(channel);
+        isSubscribedRef.current = false;
+      };
+    }
+  }, []); // Empty deps - run only once
 
   const getBusinessPosts = useCallback((businessId: string) => {
     return posts.filter(post => post.businessId === businessId);
@@ -377,8 +314,6 @@ export const usePosts = () => {
   }, []);
 
   const refetch = useCallback(() => {
-    moduleCacheInitialized = false;
-    modulePostsCache = [];
     hasFetchedRef.current = false;
     setOffset(0);
     fetchPosts(false);
