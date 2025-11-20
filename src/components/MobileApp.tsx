@@ -697,35 +697,40 @@ const MobileApp: React.FC = () => {
   }, []);
 
   const handleSettingsDragEnd = useCallback((event: any, info: any) => {
-    // Only process if horizontal drag
-    if (dragDirectionLockedRef.current === 'horizontal') {
-      // When ON settings page (slide 0), swipe LEFT (negative offset) goes to home (slide 1)
-      if (currentSlide === 0 && info.offset.x < -50) {
-        setCurrentSlide(1);
-      }
-      // When ON home page (slide 1), swipe RIGHT (positive offset) goes to settings (slide 0)
-      else if (currentSlide === 1 && info.offset.x > 50) {
-        setCurrentSlide(0);
-      }
-    }
+  // Only process if horizontal drag was detected
+  if (dragDirectionLockedRef.current === 'horizontal') {
+    // Reduced threshold for easier swiping
+    const SWIPE_THRESHOLD = 30;
     
-    // Reset
-    dragDirectionLockedRef.current = null;
-    setDragDirection(null);
-  }, [currentSlide]);
-
-  const handleExploreDragEnd = useCallback((event: any, info: any) => {
-    // Only process if horizontal drag
-    if (dragDirectionLockedRef.current === 'horizontal') {
-      // When ON explore page (slide 2), swipe RIGHT (positive offset) goes to home (slide 1)
-      if (currentSlide === 2 && info.offset.x > 50) {
-        setCurrentSlide(1);
-      }
-      // When ON home page (slide 1), swipe LEFT (negative offset) goes to explore (slide 2)
-      else if (currentSlide === 1 && info.offset.x < -50) {
-        setCurrentSlide(2);
-      }
+    // When ON settings page (slide 0), swipe LEFT (negative offset) goes to home (slide 1)
+    if (currentSlide === 0 && info.offset.x < -SWIPE_THRESHOLD) {
+      setCurrentSlide(1);
     }
+    // When ON home page (slide 1), swipe RIGHT (positive offset) goes to settings (slide 0)
+    else if (currentSlide === 1 && info.offset.x > SWIPE_THRESHOLD) {
+      setCurrentSlide(0);
+    }
+  }
+  
+  // Reset
+  dragDirectionLockedRef.current = null;
+  setDragDirection(null);
+}, [currentSlide]);
+
+const handleExploreDragEnd = useCallback((event: any, info: any) => {
+  // Only process if horizontal drag was detected
+  if (dragDirectionLockedRef.current === 'horizontal') {
+    const SWIPE_THRESHOLD = 30;
+    
+    // When ON explore page (slide 2), swipe RIGHT (positive offset) goes to home (slide 1)
+    if (currentSlide === 2 && info.offset.x > SWIPE_THRESHOLD) {
+      setCurrentSlide(1);
+    }
+    // When ON home page (slide 1), swipe LEFT (negative offset) goes to explore (slide 2)
+    else if (currentSlide === 1 && info.offset.x < -SWIPE_THRESHOLD) {
+      setCurrentSlide(2);
+    }
+  }
     
     // Reset
     dragDirectionLockedRef.current = null;
