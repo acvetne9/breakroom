@@ -33,69 +33,20 @@ export const clearProfileCache = () => {
   profilePromise = null;
 };
 
-// Get user profile (fetch only, doesn't create)
-export const getUserProfile = async (): Promise<{ profileId: string; wasCreated: boolean }> => {
-  console.log("🔐 getUserProfile called - cached:", !!cachedProfileId);
-
-  // Return cached profile if available
+export const getUserProfile = async (): Promise<{ profileId: string }> => {
   if (cachedProfileId) {
-    console.log("✅ Returning cached profile:", cachedProfileId);
-    return { profileId: cachedProfileId, wasCreated: false };
+    return { profileId: cachedProfileId };
   }
 
-  // Return existing promise if one is in progress
-  if (profilePromise) {
-    console.log("⏳ Returning existing profile promise");
-    return profilePromise;
+  // Just get deviceId - that's the profile ID
+  const deviceId = localStorage.getItem("device_id");
+
+  if (!deviceId) {
+    throw new Error("Device ID not found");
   }
 
-  // Create new promise for profile fetch
-  profilePromise = (async () => {
-    console.log("🚀 Fetching user profile");
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (user) {
-      console.log("👤 Authenticated user detected:", user.id);
-      const { data: profile } = await supabase.from("profiles").select("id").eq("user_id", user.id).maybeSingle();
-
-      if (!profile) {
-        throw new Error("Profile not found for authenticated user");
-      }
-
-      cachedProfileId = profile.id;
-      console.log("💾 Cached profile ID:", cachedProfileId);
-      return { profileId: profile.id, wasCreated: false };
-    } else {
-      console.log("👻 [getUserProfile] Unauthenticated user - using device ID as profile ID");
-      let deviceId = localStorage.getItem("device_id");
-      console.log("🔍 [getUserProfile] device_id from localStorage:", deviceId);
-
-      if (!deviceId) {
-        console.error("❌ [getUserProfile] No device_id in localStorage!");
-        throw new Error("Device ID not found");
-      }
-
-      // For anonymous users, the device_id IS the profile id
-      // No need to query - just use it directly
-      cachedProfileId = deviceId;
-      console.log("💾 [getUserProfile] Using device_id as profile ID:", cachedProfileId);
-      return { profileId: deviceId, wasCreated: false };
-    }
-  })();
-
-  try {
-    const result = await profilePromise;
-    profilePromise = null;
-    console.log("✅ getUserProfile completed:", result);
-    return result;
-  } catch (error) {
-    profilePromise = null;
-    cachedProfileId = null;
-    console.error("❌ getUserProfile failed:", error);
-    throw error;
-  }
+  cachedProfileId = deviceId;
+  return { profileId: deviceId };
 };
 
 // Retrieve authenticated user ID or temporary ID for backwards compatibility
@@ -317,21 +268,48 @@ export const getUserVotes = async (postIds: string[]): Promise<{ [postId: string
     return {};
   }
 
-  // Get authenticated or temp user ID
-  const userId = await getUserId();
+  // Get device ID directly
+  const deviceId = localStorage.getItem("device_id");
+  
+  if (!deviceId) {
+    console.warn("No device ID found, cannot fetch user votes");
+    return {};
+  }
 
-  const { data: votes } = await supabase
-    .from("votes")
-    .select("post_id, vote_type")
-    .eq("user_id", userId)
-    .in("post_id", postIds);
+  console.log("🔍 Fetching votes for user:", deviceId, "for", postIds.length, "posts");
 
-  const userVotes: { [postId: string]: "up" | "down" } = {};
-  votes?.forEach((vote) => {
-    userVotes[vote.post_id] = vote.vote_type === "upvote" ? "up" : "down";
-  });
+  try {
+    // Batch requests in chunks of 100 to avoid URL length limits
+    const BATCH_SIZE = 100;
+    const allVotes: { [postId: string]: "up" | "down" } = {};
 
-  return userVotes;
+    for (let i = 0; i < postIds.length; i += BATCH_SIZE) {
+      const batch = postIds.slice(i, i + BATCH_SIZE);
+      
+      const { data: votes, error } = await supabase
+        .from("votes")
+        .select("post_id, vote_type")
+        .eq("user_id", deviceId)
+        .in("post_id", batch);
+
+      if (error) {
+        console.error("❌ Error fetching user votes batch:", error);
+        continue; // Skip this batch but continue with others
+      }
+
+      if (votes) {
+        votes.forEach((vote) => {
+          allVotes[vote.post_id] = vote.vote_type === "upvote" ? "up" : "down";
+        });
+      }
+    }
+
+    console.log("✅ Fetched user votes:", Object.keys(allVotes).length, "votes");
+    return allVotes;
+  } catch (error) {
+    console.error("❌ Exception fetching user votes:", error);
+    return {};
+  }
 };
 
 // Delete a post

@@ -43,7 +43,7 @@ const MobileApp: React.FC = () => {
   console.log("🚀 MobileApp component rendering");
   const isMobile = useIsMobile();
   const { user } = useAuth();
-  const { deviceId, isFirstSession, loading: deviceLoading } = useDevice();
+  const { deviceId, loading: deviceLoading } = useDevice();
   const [currentView, setCurrentView] = useState<"initiation" | "main" | "loading">("loading");
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -55,6 +55,7 @@ const MobileApp: React.FC = () => {
   const [filteredBusinessId, setFilteredBusinessId] = useState<string | null>(null);
   const [filteredUserStories, setFilteredUserStories] = useState(false);
   const [votingRoles, setVotingRoles] = useState<Set<string>>(new Set());
+  const [dragDirection, setDragDirection] = useState<'horizontal' | 'vertical' | null>(null);
 
   const constraintsRef = useRef(null);
   const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
@@ -62,6 +63,24 @@ const MobileApp: React.FC = () => {
 
   // Ref to prevent double initialization in React 18 StrictMode
   const hasInitialized = useRef(false);
+
+  // Add this near hasCurrentJob helper (around line 62)
+  const hasProfile = async (): Promise<boolean> => {
+    if (!deviceId) return false;
+    try {
+      const { data, error } = await supabase.from("profiles").select("id").eq("id", deviceId).maybeSingle();
+
+      if (error) {
+        console.error("Error checking profile:", error);
+        return false;
+      }
+
+      return !!data;
+    } catch (error) {
+      console.error("Error checking profile:", error);
+      return false;
+    }
+  };
 
   // Helper function to check if current job exists
   const hasCurrentJob = async (): Promise<boolean> => {
@@ -92,11 +111,12 @@ const MobileApp: React.FC = () => {
 
     const initializeApp = async () => {
       try {
-        console.log("Debug - isFirstSession:", isFirstSession);
-
+        const profileExists = await hasProfile();
         const hasJob = await hasCurrentJob();
-        console.log("Current job check:", hasJob);
-
+    
+        console.log("Profile exists:", profileExists);
+        console.log("Current job exists:", hasJob);
+    
         if (hasJob) {
           const { getCurrentJob } = await import("../services/currentJobs");
           const currentJob = await getCurrentJob(deviceId);
@@ -113,11 +133,23 @@ const MobileApp: React.FC = () => {
           }
           console.log("Job found - going to main view");
           setCurrentView("main");
-        } else if (isFirstSession) {
-          console.log("First session, no job - going to main view");
+        } else if (!profileExists) {
+          // First session - create profile row and go to main view
+          console.log("No profile row found - creating profile and going to main view");
+    
+          const { error } = await supabase.from("profiles").insert({ id: deviceId });
+    
+          if (error) {
+            console.error("❌ Error creating profile row:", error);
+          } else {
+            console.log("✅ Profile row created for device:", deviceId);
+          }
+    
+          // Go directly to main view (don't show initiation on first visit)
           setCurrentView("main");
         } else {
-          console.log("Not first session, no job - showing initiation page");
+          // Has profile but no job - show initiation page
+          console.log("Profile exists but no job - showing initiation page");
           setCurrentView("initiation");
         }
       } catch (error) {
@@ -127,7 +159,7 @@ const MobileApp: React.FC = () => {
     };
 
     initializeApp();
-  }, [isFirstSession, deviceLoading, deviceId]);
+  }, [deviceLoading, deviceId]);
 
   // Re-check current job when returning to home page
   useEffect(() => {
@@ -692,7 +724,7 @@ const MobileApp: React.FC = () => {
           <Skeleton className="w-full h-full" />
         </div>
       )}
-
+  
       <Suspense fallback={<Skeleton className="w-full h-full" />}>
         <HomePage
           currentSlide={currentSlide}
@@ -712,16 +744,16 @@ const MobileApp: React.FC = () => {
           onBackToPreview={() => setShowBusinessDetails(false)}
         />
       </Suspense>
-
-      {currentView === "initiation" && <InitiationPage onComplete={handleInitiationComplete} />}
-
-      {shouldRenderSettingsCard() && (
+  
+      {shouldRenderSettingsCard() && currentView !== "initiation" && (
         <motion.div
           animate={{ x: getSettingsCardPosition() }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
           className="absolute inset-0 z-20"
           style={{
             pointerEvents: getSettingsCardPosition() === "-200%" ? "none" : "auto",
+            overflowY: dragDirection === 'horizontal' ? 'hidden' : 'auto',
+            touchAction: dragDirection === 'vertical' ? 'pan-y' : dragDirection === 'horizontal' ? 'pan-x' : 'auto',
           }}
           drag={isMobile ? "x" : false}
           dragConstraints={{
@@ -729,12 +761,31 @@ const MobileApp: React.FC = () => {
             right: currentSlide === 1 ? 200 : 0,
           }}
           dragElastic={0.2}
-          onDragEnd={(event, info) => {
-            if (currentSlide === 0 && info.offset.x < -100) {
-              setCurrentSlide(1);
-            } else if (currentSlide === 1 && info.offset.x > 100) {
-              setCurrentSlide(0);
+          onDragStart={(event, info) => {
+            const absX = Math.abs(info.offset.x);
+            const absY = Math.abs(info.offset.y);
+            if (absX > 5 || absY > 5) {
+              if (absX > absY * 1.5) {
+                setDragDirection('horizontal');
+              } else if (absY > absX * 1.5) {
+                setDragDirection('vertical');
+              }
             }
+          }}
+          onDrag={(event, info) => {
+            if (dragDirection === 'vertical') {
+              return false;
+            }
+          }}
+          onDragEnd={(event, info) => {
+            if (dragDirection === 'horizontal') {
+              if (currentSlide === 0 && info.offset.x < -100) {
+                setCurrentSlide(1);
+              } else if (currentSlide === 1 && info.offset.x > 100) {
+                setCurrentSlide(0);
+              }
+            }
+            setDragDirection(null);
           }}
         >
           <Suspense fallback={<Skeleton className="w-full h-full" />}>
@@ -757,14 +808,16 @@ const MobileApp: React.FC = () => {
           </Suspense>
         </motion.div>
       )}
-
-      {shouldRenderExploreCard() && (
+  
+      {shouldRenderExploreCard() && currentView !== "initiation" && (
         <motion.div
           animate={{ x: getExploreCardPosition() }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
           className="absolute inset-0 z-20"
           style={{
             pointerEvents: getExploreCardPosition() === "200%" ? "none" : "auto",
+            overflowY: dragDirection === 'horizontal' ? 'hidden' : 'auto',
+            touchAction: dragDirection === 'vertical' ? 'pan-y' : dragDirection === 'horizontal' ? 'pan-x' : 'auto',
           }}
           drag={isMobile ? "x" : false}
           dragConstraints={{
@@ -772,12 +825,31 @@ const MobileApp: React.FC = () => {
             right: currentSlide === 2 ? 200 : 0,
           }}
           dragElastic={0.2}
-          onDragEnd={(event, info) => {
-            if (currentSlide === 2 && info.offset.x > 100) {
-              setCurrentSlide(1);
-            } else if (currentSlide === 1 && info.offset.x < -100) {
-              setCurrentSlide(2);
+          onDragStart={(event, info) => {
+            const absX = Math.abs(info.offset.x);
+            const absY = Math.abs(info.offset.y);
+            if (absX > 5 || absY > 5) {
+              if (absX > absY * 1.5) {
+                setDragDirection('horizontal');
+              } else if (absY > absX * 1.5) {
+                setDragDirection('vertical');
+              }
             }
+          }}
+          onDrag={(event, info) => {
+            if (dragDirection === 'vertical') {
+              return false;
+            }
+          }}
+          onDragEnd={(event, info) => {
+            if (dragDirection === 'horizontal') {
+              if (currentSlide === 2 && info.offset.x > 100) {
+                setCurrentSlide(1);
+              } else if (currentSlide === 1 && info.offset.x < -100) {
+                setCurrentSlide(2);
+              }
+            }
+            setDragDirection(null);
           }}
         >
           <Suspense fallback={<Skeleton className="w-full h-full" />}>
@@ -818,69 +890,18 @@ const MobileApp: React.FC = () => {
           </Suspense>
         </motion.div>
       )}
-
+  
+      {/* MOVED TO END - Initiation page must render last to be on top */}
+      {currentView === "initiation" && (
+        <div className="fixed inset-0 z-[60]">
+          <InitiationPage onComplete={handleInitiationComplete} />
+        </div>
+      )}
+  
       <div className="absolute inset-0 z-10 pointer-events-none">
-        <div
-          className="absolute left-0 top-0 w-12 h-full pointer-events-auto"
-          onTouchStart={(e) => {
-            if (currentSlide > 0 && e.touches.length === 1) {
-              const touch = e.touches[0];
-              const startX = touch.clientX;
-              const handleTouchMove = (moveEvent: TouchEvent) => {
-                if (moveEvent.touches.length !== 1) {
-                  document.removeEventListener("touchmove", handleTouchMove);
-                  document.removeEventListener("touchend", handleTouchEnd);
-                  return;
-                }
-                const moveTouch = moveEvent.touches[0];
-                const deltaX = moveTouch.clientX - startX;
-                if (deltaX > 100) {
-                  setCurrentSlide(currentSlide - 1);
-                  document.removeEventListener("touchmove", handleTouchMove);
-                  document.removeEventListener("touchend", handleTouchEnd);
-                }
-              };
-              const handleTouchEnd = () => {
-                document.removeEventListener("touchmove", handleTouchMove);
-                document.removeEventListener("touchend", handleTouchEnd);
-              };
-              document.addEventListener("touchmove", handleTouchMove);
-              document.addEventListener("touchend", handleTouchEnd);
-            }
-          }}
-        />
-
-        <div
-          className="absolute right-0 top-0 w-12 h-full pointer-events-auto"
-          onTouchStart={(e) => {
-            if (currentSlide < 2 && e.touches.length === 1) {
-              const touch = e.touches[0];
-              const startX = touch.clientX;
-              const handleTouchMove = (moveEvent: TouchEvent) => {
-                if (moveEvent.touches.length !== 1) {
-                  document.removeEventListener("touchmove", handleTouchMove);
-                  document.removeEventListener("touchend", handleTouchEnd);
-                  return;
-                }
-                const moveTouch = moveEvent.touches[0];
-                const deltaX = startX - moveTouch.clientX;
-                if (deltaX > 100) {
-                  setCurrentSlide(currentSlide + 1);
-                  document.removeEventListener("touchmove", handleTouchMove);
-                  document.removeEventListener("touchend", handleTouchEnd);
-                }
-              };
-              const handleTouchEnd = () => {
-                document.removeEventListener("touchmove", handleTouchMove);
-                document.removeEventListener("touchend", handleTouchEnd);
-              };
-              document.addEventListener("touchmove", handleTouchMove);
-              document.addEventListener("touchend", handleTouchEnd);
-            }
-          }}
-        />
+        {/* ... rest of touch handlers ... */}
       </div>
-
+  
       {!isMobile && (
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-50">
           {[0, 1, 2].map((index) => (
@@ -896,6 +917,6 @@ const MobileApp: React.FC = () => {
       )}
     </div>
   );
-};
+}
 
 export default MobileApp;

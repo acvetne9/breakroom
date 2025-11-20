@@ -25,6 +25,7 @@ interface CurrentJobState {
   addressInput: string;
   addressError: string;
   isManualAddress: boolean;
+  salaryDisplay: string; // For tracking what user is typing
 
   // Sync state
   isDirty: boolean;
@@ -49,6 +50,7 @@ interface PastJobState {
   showAddressInput: boolean;
   addressInput: string;
   addressError: string;
+  salaryDisplay: string; // For tracking what user is typing
 
   // Sync state
   isDirty: boolean;
@@ -244,9 +246,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
       if (currentJobData) {
         const isManualAddress = currentJobData.business_name === currentJobData.location;
+        const salary = currentJobData.salary || 0;
         const newCurrentJob = {
           role: currentJobData.role || "",
-          salary: currentJobData.salary || 0,
+          salary: salary,
           location: currentJobData.location || "",
           business_name: currentJobData.business_name || "",
           time_period: currentJobData.time_period || "HR",
@@ -256,6 +259,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           addressInput: isManualAddress ? currentJobData.location || "" : "",
           addressError: "",
           isManualAddress,
+          salaryDisplay: salary > 0 ? `$${salary.toFixed(2)}` : "",
           isDirty: false,
           isSaving: false,
           hasError: false,
@@ -278,6 +282,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           addressInput: "",
           addressError: "",
           isManualAddress: false,
+          salaryDisplay: "",
           isDirty: false,
           isSaving: false,
           hasError: false,
@@ -298,10 +303,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           // We have complete jobs - show only those
           const formattedJobs: PastJobState[] = completeJobs.map((job) => {
             const isManualAddress = job.business_name === job.location;
+            const salary = job.salary || 0;
             return {
               id: job.id!,
               role: job.role,
-              salary: job.salary,
+              salary: salary,
               location: job.location || "",
               business_name: job.business_name || "",
               time_period: job.time_period || "HR",
@@ -310,6 +316,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
               showAddressInput: false,
               addressInput: isManualAddress ? job.location || "" : "",
               addressError: "",
+              salaryDisplay: salary > 0 ? `$${salary.toFixed(2)}` : "",
               isDirty: false,
               isSaving: false,
               hasError: false,
@@ -346,6 +353,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         addressInput: "",
         addressError: "",
         isManualAddress: false,
+        salaryDisplay: "",
         isDirty: false,
         isSaving: false,
         hasError: false,
@@ -531,7 +539,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const formatSalaryDisplay = (salary: number): string => {
     if (salary === 0) return "";
-    return `${salary.toFixed(2)}`;
+    return `$${salary.toFixed(2)}`;
   };
 
   const parseSalaryInput = (value: string): number => {
@@ -555,28 +563,53 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     [scheduleAutoSave],
   );
 
-  const handleCurrentJobSalaryChange = (value: string) => {
-    // Remove everything except numbers and decimal point
-    let cleanValue = value.replace(/[^0-9.]/g, "");
-
-    // Ensure only one decimal point
-    const parts = cleanValue.split(".");
-    if (parts.length > 2) {
-      cleanValue = parts[0] + "." + parts.slice(1).join("");
+  const handleCurrentJobSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/[^0-9.]/g, '');
+    if (value.includes('.')) {
+      const parts = value.split('.');
+      if (parts.length > 2) value = parts[0] + '.' + parts.slice(1).join('');
+      if (parts[1]?.length > 2) value = parts[0] + '.' + parts[1].substring(0, 2);
     }
-
-    // Limit to 2 decimal places
-    if (parts[1] && parts[1].length > 2) {
-      cleanValue = parts[0] + "." + parts[1].substring(0, 2);
+    const displayValue = value ? `$${value}` : '';
+    const numericValue = parseFloat(value) || 0;
+    
+    // Direct state update like InitiationPage does
+    setCurrentJob((prev) => {
+      if (!prev) return prev;
+      return { 
+        ...prev, 
+        salary: numericValue, 
+        salaryDisplay: displayValue,
+        isDirty: true
+      };
+    });
+    
+    // Schedule auto-save separately
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
     }
-
-    updateCurrentJob({ salary: parseFloat(cleanValue) || 0 });
+    saveTimeoutRef.current = setTimeout(() => {
+      setCurrentJob((prev) => {
+        if (prev && isCurrentJobComplete(prev)) {
+          saveCurrentJobToDatabase(prev);
+        }
+        return prev;
+      });
+    }, AUTO_SAVE_DELAY);
   };
 
   const handleCurrentJobSalaryBlur = () => {
     // Format to 2 decimal places on blur
     if (currentJob && currentJob.salary > 0) {
-      updateCurrentJob({ salary: parseFloat(currentJob.salary.toFixed(2)) });
+      const formattedValue = currentJob.salary.toFixed(2);
+      setCurrentJob((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          salaryDisplay: `$${formattedValue}`,
+          isDirty: true
+        };
+      });
     }
   };
 
@@ -681,6 +714,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     showAddressInput: false,
     addressInput: "",
     addressError: "",
+    salaryDisplay: "",
     isDirty: false,
     isSaving: false,
     hasError: false,
@@ -712,29 +746,49 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     deletePastJobFromDatabase(jobId);
   };
 
-  const handlePastJobSalaryChange = (jobId: string, value: string) => {
-    // Remove everything except numbers and decimal point
-    let cleanValue = value.replace(/[^0-9.]/g, "");
-
-    // Ensure only one decimal point
-    const parts = cleanValue.split(".");
-    if (parts.length > 2) {
-      cleanValue = parts[0] + "." + parts.slice(1).join("");
+  const handlePastJobSalaryChange = (jobId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/[^0-9.]/g, '');
+    if (value.includes('.')) {
+      const parts = value.split('.');
+      if (parts.length > 2) value = parts[0] + '.' + parts.slice(1).join('');
+      if (parts[1]?.length > 2) value = parts[0] + '.' + parts[1].substring(0, 2);
     }
-
-    // Limit to 2 decimal places
-    if (parts[1] && parts[1].length > 2) {
-      cleanValue = parts[0] + "." + parts[1].substring(0, 2);
+    const displayValue = value ? `$${value}` : '';
+    const numericValue = parseFloat(value) || 0;
+    
+    // Direct state update like InitiationPage does
+    setPastJobs((prev) => 
+      prev.map((job) => 
+        job.id === jobId 
+          ? { ...job, salary: numericValue, salaryDisplay: displayValue, isDirty: true }
+          : job
+      )
+    );
+    
+    // Schedule auto-save separately
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
     }
-
-    updatePastJob(jobId, { salary: parseFloat(cleanValue) || 0 });
+    saveTimeoutRef.current = setTimeout(() => {
+      const job = pastJobs.find(j => j.id === jobId);
+      if (job && isPastJobComplete(job)) {
+        savePastJobToDatabase(job);
+      }
+    }, AUTO_SAVE_DELAY);
   };
 
   const handlePastJobSalaryBlur = (jobId: string) => {
     // Format to 2 decimal places on blur
     const job = pastJobs.find((j) => j.id === jobId);
     if (job && job.salary > 0) {
-      updatePastJob(jobId, { salary: parseFloat(job.salary.toFixed(2)) });
+      const formattedValue = job.salary.toFixed(2);
+      setPastJobs((prev) =>
+        prev.map((j) =>
+          j.id === jobId
+            ? { ...j, salaryDisplay: `$${formattedValue}`, isDirty: true }
+            : j
+        )
+      );
     }
   };
 
@@ -966,8 +1020,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   <input
                     type="text"
                     inputMode="decimal"
-                    value={formatSalaryDisplay(currentJob.salary)}
-                    onChange={(e) => handleCurrentJobSalaryChange(e.target.value)}
+                    value={currentJob.salaryDisplay}
+                    onChange={handleCurrentJobSalaryChange}
                     onBlur={handleCurrentJobSalaryBlur}
                     className="app-input flex-1"
                     placeholder="$14.00"
@@ -1065,8 +1119,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     <input
                       type="text"
                       inputMode="decimal"
-                      value={formatSalaryDisplay(job.salary)}
-                      onChange={(e) => handlePastJobSalaryChange(job.id, e.target.value)}
+                      value={job.salaryDisplay}
+                      onChange={(e) => handlePastJobSalaryChange(job.id, e)}
                       onBlur={() => handlePastJobSalaryBlur(job.id)}
                       className="app-input flex-1"
                       placeholder="$17.00"

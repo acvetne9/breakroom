@@ -3,33 +3,41 @@
  * Uses efficient UPSERT operations to minimize database queries
  */
 
-import { supabase } from '@/integrations/supabase/client';
-import { getUserProfile } from './posts';
+import { supabase } from "@/integrations/supabase/client";
+import { getUserProfile } from "./posts";
 
-export type VoteTable = 'votes' | 'role_votes';
-export type VoteItemField = 'post_id' | 'business_role_id';
+export type VoteTable = "votes" | "role_votes";
+export type VoteItemField = "post_id" | "business_role_id";
 
 /**
  * Persist a vote to the database using UPSERT
  * - If voteType is null, removes the vote
  * - Otherwise, inserts or updates the vote
- * 
+ *
  * This uses a single query instead of 3-4 separate queries
  */
 export async function persistVote(
   tableName: VoteTable,
   itemIdField: VoteItemField,
   itemId: string,
-  voteType: 'upvote' | 'downvote' | null
+  voteType: "upvote" | "downvote" | null,
 ): Promise<{ success: boolean; error?: any }> {
-  // Input validation
-  if (!itemId || typeof itemId !== 'string') {
-    console.error('❌ Invalid itemId provided to persistVote');
-    return { success: false, error: new Error('Invalid itemId') };
+  if (!itemId || typeof itemId !== "string") {
+    console.error("❌ Invalid itemId provided to persistVote");
+    return { success: false, error: new Error("Invalid itemId") };
   }
 
   try {
     const { profileId: userId } = await getUserProfile();
+
+    // DEBUG: Check what we're sending
+    console.log("🔍 DEBUG persistVote:", {
+      userId,
+      deviceIdFromLocalStorage: localStorage.getItem("device_id"),
+      tableName,
+      itemId,
+      voteType,
+    });
 
     if (voteType === null) {
       // Remove vote
@@ -37,23 +45,27 @@ export async function persistVote(
         .from(tableName as any)
         .delete()
         .eq(itemIdField, itemId)
-        .eq('user_id', userId);
+        .eq("user_id", userId);
 
       if (error) {
         console.error(`❌ Error removing vote from ${tableName}:`, error);
         return { success: false, error };
       }
     } else {
+      // Determine the correct conflict columns based on table
+      const conflictColumns = tableName === "votes" ? "user_id,post_id" : "user_id,business_role_id";
+
       // Upsert vote (insert or update)
-      const { error } = await supabase
-        .from(tableName as any)
-        .upsert({
+      const { error } = await supabase.from(tableName as any).upsert(
+        {
           [itemIdField]: itemId,
           user_id: userId,
-          vote_type: voteType
-        } as any, {
-          onConflict: `user_id,${itemIdField}`
-        });
+          vote_type: voteType,
+        } as any,
+        {
+          onConflict: conflictColumns,
+        },
+      );
 
       if (error) {
         console.error(`❌ Error upserting vote in ${tableName}:`, error);
