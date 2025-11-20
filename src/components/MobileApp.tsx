@@ -681,23 +681,18 @@ const MobileApp: React.FC = () => {
       const deltaX = Math.abs(info.point.x - dragStartXRef.current);
       const deltaY = Math.abs(info.point.y - dragStartYRef.current);
       
-      // Only lock direction after significant movement
-      if (deltaX > 5 || deltaY > 5) {
-        // Only lock to vertical if it's CLEARLY vertical (2x more vertical than horizontal)
-        if (deltaY > deltaX * 2) {
+      // Only lock direction after significant movement (increased threshold)
+      if (deltaX > 10 || deltaY > 10) {
+        // Only lock to vertical if it's CLEARLY vertical (3x more vertical than horizontal)
+        if (deltaY > deltaX * 3) {
           dragDirectionLockedRef.current = 'vertical';
           setDragDirection('vertical');
-        } else {
-          // Otherwise allow horizontal (even if slightly diagonal)
+        } else if (deltaX > deltaY) {
+          // Lock to horizontal if more horizontal than vertical
           dragDirectionLockedRef.current = 'horizontal';
           setDragDirection('horizontal');
         }
       }
-    }
-    
-    // If locked to vertical, prevent horizontal drag
-    if (dragDirectionLockedRef.current === 'vertical') {
-      return false;
     }
   }, []);
 
