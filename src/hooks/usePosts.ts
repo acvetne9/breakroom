@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getPosts, createPost, voteOnPost, deletePost, getUserVotes, transformPost, getUserProfile, Post, PostData } from '@/services/posts';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -19,7 +19,6 @@ const getCachedPosts = (): Post[] => {
     if (!cached) return [];
     
     const parsed = JSON.parse(cached);
-    // Convert date strings back to Date objects
     return parsed.map((p: any) => ({
       ...p,
       createdAt: new Date(p.createdAt)
@@ -41,21 +40,30 @@ const saveCachedPosts = (posts: Post[]) => {
 const POSTS_PER_PAGE = 1000;
 
 export const usePosts = () => {
-  const [posts, setPosts] = useState<Post[]>(getCachedPosts());
+  const [posts, setPosts] = useState<Post[]>(() => getCachedPosts());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
+  
+  // Track if initial fetch has happened
+  const hasFetchedRef = useRef(false);
+  const isSubscribedRef = useRef(false);
 
-  // Fetch posts from backend with pagination
+  // Memoized fetch function
   const fetchPosts = useCallback(async (isLoadMore: boolean = false) => {
+    // Prevent duplicate initial loads
+    if (!isLoadMore && hasFetchedRef.current) {
+      console.log('⏭️ Skipping duplicate initial fetch');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     
     try {
       const currentOffset = isLoadMore ? offset : 0;
       
-      // ✅ getPosts now returns posts WITH businesses joined (including lat/lng)
       const { data: postsData, error: postsError } = await getPosts(POSTS_PER_PAGE, currentOffset);
       
       if (postsError) {
@@ -65,13 +73,10 @@ export const usePosts = () => {
       }
 
       if (postsData) {
-        // Check if we've reached the end
         setHasMore(postsData.length === POSTS_PER_PAGE);
 
-        // Get current user ID once to avoid race conditions
         const { profileId: currentUserId } = await getUserProfile();
 
-        // Transform posts - businesses data is already joined and flattened in postsData
         const transformedPosts = await Promise.all(
           postsData.map(post => transformPost(post, [], currentUserId))
         );
@@ -79,26 +84,12 @@ export const usePosts = () => {
         const postIds = transformedPosts.map(p => p.id);
         const userVotes = await getUserVotes(postIds);
         
-        // Apply user votes to posts
         const postsWithVotes = transformedPosts.map(post => ({
           ...post,
           userVote: userVotes[post.id] || null
         }));
         
-        console.log('🎯 FINAL POSTS WITH VOTES:', {
-          totalPosts: postsWithVotes.length,
-          firstThree: postsWithVotes.slice(0, 3).map(p => ({
-            id: p.id,
-            text: p.text?.substring(0, 30),
-            businessId: p.businessId,
-            businessName: p.businessName,
-            votesTotal: p.votesTotal,
-            author: p.author
-          }))
-        });
-        
         if (isLoadMore) {
-          // Append to existing posts using functional update
           setPosts(prevPosts => {
             const updatedPosts = [...prevPosts, ...postsWithVotes];
             saveCachedPosts(updatedPosts);
@@ -107,11 +98,11 @@ export const usePosts = () => {
           });
           setOffset(currentOffset + POSTS_PER_PAGE);
         } else {
-          // Replace posts (initial load or refresh)
           setPosts(postsWithVotes);
           saveCachedPosts(postsWithVotes);
           setOffset(POSTS_PER_PAGE);
           console.log(`✅ Loaded ${postsWithVotes.length} posts (initial)`);
+          hasFetchedRef.current = true;
         }
       }
     } catch (err) {
@@ -128,8 +119,7 @@ export const usePosts = () => {
     }
   }, [loading, hasMore, fetchPosts]);
 
-  // Submit a new post
-  const submitPost = async (
+  const submitPost = useCallback(async (
     text: string,
     businessId?: string,
     isJobUpdate: boolean = false,
@@ -139,7 +129,6 @@ export const usePosts = () => {
     isComment?: string
   ): Promise<boolean> => {
     try {
-      // Always use 'story' as post_type since that's what the database allows
       const postType = 'story';
       
       const { data, error } = await createPost(
@@ -158,19 +147,14 @@ export const usePosts = () => {
       }
 
       if (data) {
-        // Get current user ID and transform the new post
         const { profileId: currentUserId } = await getUserProfile();
-        
-        // Transform the post (business data is already flattened in the response)
         const newPost = await transformPost(data, [], currentUserId);
         
-        // Verify the post has a proper createdAt date
         if (!(newPost.createdAt instanceof Date) || isNaN(newPost.createdAt.getTime())) {
           console.error('⚠️ Post created without valid date:', newPost);
-          newPost.createdAt = new Date(); // Fallback to current time
+          newPost.createdAt = new Date();
         }
         
-        // Add to posts list and save to cache
         setPosts(prevPosts => {
           const updatedPosts = [newPost, ...prevPosts];
           saveCachedPosts(updatedPosts);
@@ -183,29 +167,24 @@ export const usePosts = () => {
       console.error('Post submission error:', err);
     }
     return false;
-  };
+  }, []);
 
-  // Vote on a post with optimistic updates
-  const votePost = async (postId: string, voteType: 'up' | 'down'): Promise<boolean> => {
+  const votePost = useCallback(async (postId: string, voteType: 'up' | 'down'): Promise<boolean> => {
     const post = posts.find(p => p.id === postId);
     if (!post) return false;
 
-    // Import vote calculation utility
     const { calculateVoteChange } = await import('@/utils/voteCalculations');
     const { persistVote } = await import('@/services/voting');
 
-    // Calculate new state optimistically
     const { newUserVote, newTotal } = calculateVoteChange(
       post.userVote,
       voteType,
       post.votesTotal
     );
 
-    // Store previous state for rollback
     const previousVotesTotal = post.votesTotal;
     const previousUserVote = post.userVote;
 
-    // Update UI immediately
     setPosts(prevPosts =>
       prevPosts.map(p =>
         p.id === postId
@@ -214,10 +193,8 @@ export const usePosts = () => {
       )
     );
 
-    // Persist in background (don't await!)
     const dbVoteType = newUserVote === 'up' ? 'upvote' : newUserVote === 'down' ? 'downvote' : null;
     persistVote('votes', 'post_id', postId, dbVoteType).catch(() => {
-      // Rollback on error
       setPosts(prevPosts =>
         prevPosts.map(p =>
           p.id === postId
@@ -228,10 +205,9 @@ export const usePosts = () => {
     });
 
     return true;
-  };
+  }, [posts]);
 
-  // Delete a post
-  const removePost = async (postId: string): Promise<boolean> => {
+  const removePost = useCallback(async (postId: string): Promise<boolean> => {
     try {
       const { success, error } = await deletePost(postId);
 
@@ -240,10 +216,12 @@ export const usePosts = () => {
         return false;
       }
 
-      // Remove from local state
-      setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
+      setPosts(prevPosts => {
+        const filtered = prevPosts.filter(post => post.id !== postId);
+        saveCachedPosts(filtered);
+        return filtered;
+      });
       
-      // Clean up from "My Stories" tracking
       try {
         const commentedPostIds = JSON.parse(localStorage.getItem('userCommentedPosts') || '[]');
         const updatedIds = commentedPostIds.filter((id: string) => id !== postId);
@@ -257,72 +235,89 @@ export const usePosts = () => {
       console.error('Delete error:', err);
       return false;
     }
-  };
+  }, []);
 
-  // Set up real-time subscription
+  // Single effect for initialization and subscription
   useEffect(() => {
+    // Only run once
+    if (hasFetchedRef.current) {
+      console.log('⏭️ Skipping duplicate useEffect run');
+      return;
+    }
+
     // Load from cache immediately if available
     const cachedPosts = getCachedPosts();
     if (cachedPosts.length > 0) {
       console.log(`📦 Loaded ${cachedPosts.length} posts from cache`);
+      setPosts(cachedPosts);
       setLoading(false);
     }
     
+    // Fetch fresh data
     fetchPosts(false);
 
-    // Subscribe to real-time changes for new posts only
-    const channel = supabase
-      .channel('posts-changes')
-      .on('postgres_changes', 
-        { event: 'INSERT', schema: 'public', table: 'posts' },
-        () => {
-          // Refetch initial batch when new posts are added
-          setOffset(0);
-          fetchPosts(false);
-        }
-      )
-      .subscribe();
+    // Subscribe to real-time changes only once
+    if (!isSubscribedRef.current) {
+      isSubscribedRef.current = true;
+      
+      const channel = supabase
+        .channel('posts-changes')
+        .on('postgres_changes', 
+          { event: 'INSERT', schema: 'public', table: 'posts' },
+          (payload) => {
+            console.log('📨 New post received via realtime');
+            // Only refetch if we're not already loading
+            if (!loading) {
+              setOffset(0);
+              hasFetchedRef.current = false; // Allow refetch
+              fetchPosts(false);
+            }
+          }
+        )
+        .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
+      return () => {
+        supabase.removeChannel(channel);
+        isSubscribedRef.current = false;
+      };
+    }
+  }, []); // Empty deps - run only once
 
-  // Filter posts by business
-  const getBusinessPosts = (businessId: string) => {
+  const getBusinessPosts = useCallback((businessId: string) => {
     return posts.filter(post => post.businessId === businessId);
-  };
+  }, [posts]);
 
-  // Filter user's posts and posts they've commented on
-  const getUserPostsAndCommented = () => {
+  const getUserPostsAndCommented = useCallback(() => {
     const userPosts = posts.filter(post => post.author === 'You');
     
-    // Get posts that user has commented on from localStorage
     const commentedPostIds = JSON.parse(localStorage.getItem('userCommentedPosts') || '[]');
     const commentedPosts = posts.filter(post => 
       post.author !== 'You' && commentedPostIds.includes(post.id)
     );
     
-    // Combine and sort by creation date (newest first)
     const allUserRelatedPosts = [...userPosts, ...commentedPosts];
     return allUserRelatedPosts.sort((a, b) => 
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
-  };
+  }, [posts]);
 
-  // Filter user's posts only (original function for backward compatibility)
-  const getUserPosts = () => {
+  const getUserPosts = useCallback(() => {
     return posts.filter(post => post.author === 'You');
-  };
+  }, [posts]);
 
-  // Track when user comments on a post
-  const trackCommentedPost = (postId: string) => {
+  const trackCommentedPost = useCallback((postId: string) => {
     const commentedPostIds = JSON.parse(localStorage.getItem('userCommentedPosts') || '[]');
     if (!commentedPostIds.includes(postId)) {
       commentedPostIds.push(postId);
       localStorage.setItem('userCommentedPosts', JSON.stringify(commentedPostIds));
     }
-  };
+  }, []);
+
+  const refetch = useCallback(() => {
+    hasFetchedRef.current = false;
+    setOffset(0);
+    fetchPosts(false);
+  }, [fetchPosts]);
 
   return {
     posts,
@@ -332,7 +327,7 @@ export const usePosts = () => {
     submitPost,
     votePost,
     removePost,
-    refetch: () => fetchPosts(false),
+    refetch,
     loadMore: loadMorePosts,
     getBusinessPosts,
     getUserPosts,
