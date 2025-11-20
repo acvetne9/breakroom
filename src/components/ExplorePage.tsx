@@ -1,28 +1,14 @@
-import React, { useState, useRef, useEffect, Suspense } from "react";
-import { motion, PanInfo } from "framer-motion";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useIsMobile } from "@/hooks/use-mobile";
-import InitiationPage from "./InitiationPage";
+import React, { useState, useMemo, memo, useEffect } from "react";
+import { Eye } from "lucide-react";
+import { isProfane } from "../utils/profanityFilter";
+import { usePosts } from "@/hooks/usePosts";
+import VotingComponent from "./VotingComponent";
+import { formatTimeAgo } from "../utils/timeAgo";
+import { TranslatedText } from "./TranslatedText";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
-import { useDevice } from "@/contexts/DeviceContext";
-
-const HomePage = React.lazy(() => import("./HomePage"));
-const SettingsPage = React.lazy(() => import("./SettingsPage"));
-const ExplorePage = React.lazy(() => import("./ExplorePage"));
-
-import { useBusinessesData } from "../hooks/useBusinessesData";
-import { Business } from "@/types/business";
-import { usePostsContext } from "./PostsProvider";
-
-interface UserData {
-  salary: string;
-  role: string;
-  location: string;
-  fullLocation?: string;
-  businessName?: string;
-  timePeriod: string;
-}
+import { CommenterBadge } from "./CommenterBadge";
+import { getCommenterIdentity } from "@/utils/commenterIdentity";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Post {
   id: string;
@@ -37,886 +23,518 @@ interface Post {
   votesTotal: number;
   userVote?: "up" | "down" | null;
   createdAt: Date;
+  timestamp?: string;
+  isComment?: string;
+  userId?: string;
 }
 
-const MobileApp: React.FC = () => {
-  console.log("🚀 MobileApp component rendering");
+interface ExplorePageProps {
+  filteredBusinessId?: string;
+  filteredUserStories?: boolean;
+  onBusinessView?: (businessId: string) => void;
+  onExpandedPostChange?: (postId: string | null) => void;
+  onCommentSubmit?: (postId: string, comment: string) => void;
+  onBackToAllPosts?: () => void;
+  onNavigateToHomeBusiness?: (businessId: string) => void;
+  onBusinessPreview?: (businessId: string) => void;
+  onFlyToBusiness?: (businessId: string, post?: any) => void; // 🚀 NEW - accepts optional post for cached coordinates
+  currentSlide?: number; // Add currentSlide to control input visibility
+}
+
+const ExplorePage: React.FC<ExplorePageProps> = ({
+  filteredBusinessId,
+  filteredUserStories,
+  onBusinessView,
+  onExpandedPostChange,
+  onCommentSubmit,
+  onBackToAllPosts,
+  onNavigateToHomeBusiness,
+  onBusinessPreview,
+  onFlyToBusiness,
+  currentSlide = 2, // Default to 2 (fully on explore page)
+}) => {
+  console.log("🔍 ExplorePage component initializing...");
+
+  const { posts, loading, hasMore, submitPost, votePost, removePost, loadMore, trackCommentedPost } = usePosts();
   const isMobile = useIsMobile();
-  const { user } = useAuth();
-  const { deviceId, loading: deviceLoading } = useDevice();
-  const [currentView, setCurrentView] = useState<"initiation" | "main" | "loading">("loading");
-  const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
-  const [userData, setUserData] = useState<UserData | null>(null);
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
-  const [comments, setComments] = useState<{ [postId: string]: string[] }>({});
-  const [selectedBusiness, setSelectedBusiness] = useState<any>(null);
-  const [showBusinessDetails, setShowBusinessDetails] = useState(false);
-  const [previouslySelectedBusiness, setPreviouslySelectedBusiness] = useState<any>(null);
-  const [filteredBusinessId, setFilteredBusinessId] = useState<string | null>(null);
-  const [filteredUserStories, setFilteredUserStories] = useState(false);
-  const [votingRoles, setVotingRoles] = useState<Set<string>>(new Set());
-  const [dragDirection, setDragDirection] = useState<'horizontal' | 'vertical' | null>(null);
+  const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
+  const [hideSystemPost, setHideSystemPost] = useState(false);
+  const [isSwipingOrTransitioning, setIsSwipingOrTransitioning] = useState(true); // Start as true
+  const [inputBoxVisible, setInputBoxVisible] = useState(false);
 
-  const constraintsRef = useRef(null);
-  const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
-  const { posts } = usePostsContext();
-
-  // Ref to prevent double initialization in React 18 StrictMode
-  const hasInitialized = useRef(false);
-
-  // Add this near hasCurrentJob helper (around line 62)
-  const hasProfile = async (): Promise<boolean> => {
-    if (!deviceId) return false;
-    try {
-      const { data, error } = await supabase.from("profiles").select("id").eq("id", deviceId).maybeSingle();
-
-      if (error) {
-        console.error("Error checking profile:", error);
-        return false;
-      }
-
-      return !!data;
-    } catch (error) {
-      console.error("Error checking profile:", error);
-      return false;
-    }
-  };
-
-  // Helper function to check if current job exists
-  const hasCurrentJob = async (): Promise<boolean> => {
-    if (!deviceId) return false;
-    try {
-      const { getCurrentJob } = await import("../services/currentJobs");
-      const job = await getCurrentJob(deviceId);
-      return job !== null;
-    } catch (error) {
-      console.error("Error checking current job:", error);
-      return false;
-    }
-  };
-
+  // Detect when user is swiping/transitioning between pages
   useEffect(() => {
-    if (hasInitialized.current) {
-      console.log("Skipping duplicate initialization (StrictMode)");
-      return;
+    console.log("🔄 ExplorePage currentSlide changed:", currentSlide);
+
+    // If not fully on explore page (currentSlide !== 2), we're transitioning
+    if (currentSlide !== 2) {
+      setIsSwipingOrTransitioning(true);
+      setInputBoxVisible(false);
+      console.log("🚫 Blocking interactions - not on explore page");
+    } else {
+      // Add a small delay before allowing clicks after reaching explore page
+      const timer = setTimeout(() => {
+        setIsSwipingOrTransitioning(false);
+        setInputBoxVisible(true);
+        console.log("✅ Interactions enabled - on explore page");
+      }, 200);
+      return () => clearTimeout(timer);
     }
+  }, [currentSlide]);
 
-    if (deviceLoading || !deviceId) {
-      console.log("Waiting for device initialization...", { deviceLoading, deviceId });
-      return;
-    }
+  // Infinite scroll - load more posts when scrolling to bottom
+  useEffect(() => {
+    const handleScroll = () => {
+      // Check if user is near bottom (within 500px)
+      const scrollHeight = document.documentElement.scrollHeight;
+      const scrollTop = document.documentElement.scrollTop;
+      const clientHeight = document.documentElement.clientHeight;
 
-    hasInitialized.current = true;
-    console.log("MobileApp initialization starting with deviceId:", deviceId);
-
-    const initializeApp = async () => {
-      try {
-        const profileExists = await hasProfile();
-        const hasJob = await hasCurrentJob();
-    
-        console.log("Profile exists:", profileExists);
-        console.log("Current job exists:", hasJob);
-    
-        if (hasJob) {
-          const { getCurrentJob } = await import("../services/currentJobs");
-          const currentJob = await getCurrentJob(deviceId);
-          if (currentJob) {
-            setUserData({
-              salary: `$${currentJob.salary.toFixed(2)}`,
-              role: currentJob.role,
-              location: currentJob.location,
-              fullLocation: currentJob.location,
-              businessName: currentJob.business_name || "",
-              timePeriod: currentJob.time_period || "HR",
-            });
-            console.log("Loaded user data:", currentJob);
-          }
-          console.log("Job found - going to main view");
-          setCurrentView("main");
-        } else if (!profileExists) {
-          // First session - create profile row and go to main view
-          console.log("No profile row found - creating profile and going to main view");
-    
-          const { error } = await supabase.from("profiles").insert({ id: deviceId });
-    
-          if (error) {
-            console.error("❌ Error creating profile row:", error);
-          } else {
-            console.log("✅ Profile row created for device:", deviceId);
-          }
-    
-          // Go directly to main view (don't show initiation on first visit)
-          setCurrentView("main");
-        } else {
-          // Has profile but no job - show initiation page
-          console.log("Profile exists but no job - showing initiation page");
-          setCurrentView("initiation");
-        }
-      } catch (error) {
-        console.error("Error during app initialization:", error);
-        setCurrentView("main");
+      if (scrollHeight - scrollTop - clientHeight < 500 && !loading && hasMore) {
+        console.log("📜 Near bottom, loading more posts...");
+        loadMore();
       }
     };
 
-    initializeApp();
-  }, [deviceLoading, deviceId]);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [loading, hasMore, loadMore]);
 
-  // Re-check current job when returning to home page
+  const defaultPlaceholder = filteredBusinessId ? "Thoughts about this business?" : "How's work?";
+  const [postPlaceholder, setPostPlaceholder] = useState(defaultPlaceholder);
+
+  // 2️⃣ Reset placeholder whenever filteredBusinessId changes
   useEffect(() => {
-    if (currentSlide === 1 && currentView === "initiation" && deviceId) {
-      const recheckCurrentJob = async () => {
-        try {
-          const hasJob = await hasCurrentJob();
+    setPostPlaceholder(filteredBusinessId ? "Thoughts about this business?" : "How's work?");
+  }, [filteredBusinessId]);
 
-          if (hasJob) {
-            const { getCurrentJob } = await import("../services/currentJobs");
-            const currentJob = await getCurrentJob(deviceId);
-            if (currentJob) {
-              setUserData({
-                salary: `$${currentJob.salary.toFixed(2)}`,
-                role: currentJob.role,
-                location: currentJob.location,
-                fullLocation: currentJob.location,
-                businessName: currentJob.business_name || "",
-                timePeriod: currentJob.time_period || "HR",
-              });
-              setCurrentView("main");
-              console.log("Re-checked job on home page return - found job, switching to main view");
-            }
-          }
-        } catch (error) {
-          console.error("Error re-checking current job:", error);
-        }
+  interface Comment {
+    id: string;
+    author: string;
+    text: string;
+    createdAt: Date;
+  }
+
+  const [comments, setComments] = useState<{ [postId: string]: Comment[] }>({});
+  const [postText, setPostText] = useState("");
+  const [commentText, setCommentText] = useState("");
+  const [commentPlaceholder, setCommentPlaceholder] = useState("Leave a comment!");
+
+  // Check if we need to fade out the system post when real posts are added
+  const realPosts = useMemo(() => {
+    return filteredBusinessId
+      ? posts.filter((post) => post.businessId === filteredBusinessId && !post.isJobUpdate && post.author !== "System")
+      : filteredUserStories
+        ? posts.filter((post) => post.author === "You" && !post.isJobUpdate)
+        : posts.filter((post) => post.author !== "System");
+  }, [posts, filteredBusinessId, filteredUserStories]);
+
+  useEffect(() => {
+    if (filteredBusinessId && realPosts.length > 0 && !fadeOutSystemPost && !hideSystemPost) {
+      // Start fade out animation
+      setFadeOutSystemPost(true);
+
+      // After animation completes, hide the system post
+      setTimeout(() => {
+        setHideSystemPost(true);
+        setFadeOutSystemPost(false);
+      }, 500); // Match the animation duration
+    }
+
+    // Reset states when switching to different business or no filter
+    if (!filteredBusinessId || realPosts.length === 0) {
+      setFadeOutSystemPost(false);
+      setHideSystemPost(false);
+    }
+  }, [realPosts.length, filteredBusinessId, fadeOutSystemPost, hideSystemPost]);
+
+  const handlePostSubmit = async () => {
+    if (!postText.trim()) return;
+
+    if (isProfane(postText)) {
+      setPostText("");
+      setPostPlaceholder("Post blocked: Inappropriate content detected");
+      return;
+    }
+
+    const success = await submitPost(postText, filteredBusinessId);
+    if (success) {
+      setPostText("");
+      setPostPlaceholder(filteredBusinessId ? "Thoughts about this business?" : "How's work?");
+    } else {
+      setPostText("");
+      setPostPlaceholder("Failed to create post. Please try again.");
+    }
+  };
+
+  const handleCommentSubmit = async () => {
+    if (!commentText.trim() || !expandedPost) return;
+
+    if (isProfane(commentText)) {
+      setCommentText("");
+      return;
+    }
+
+    // Save comment to database
+    const success = await submitPost(commentText, undefined, false, undefined, undefined, undefined, expandedPost);
+
+    if (success) {
+      // Track that user commented on this post
+      trackCommentedPost(expandedPost);
+      setCommentText("");
+      setCommentPlaceholder("Leave a comment!");
+      // No need to call onCommentSubmit since comments are now in the database
+    } else {
+      setCommentPlaceholder("Connection error. Please try again.");
+      setCommentText("");
+    }
+  };
+
+  const handleCommentDelete = (postId: string, commentId: string) => {
+    setComments({
+      ...comments,
+      [postId]: (comments[postId] || []).filter((c) => c.id !== commentId),
+    });
+  };
+
+  const handlePostClick = (postId: string) => {
+    // Prevent opening posts during swipe/transition
+    if (isSwipingOrTransitioning) {
+      console.log("🚫 Blocked post click during swipe/transition");
+      return;
+    }
+
+    // If clicking the same post, toggle closed
+    setExpandedPost((prev) => (prev === postId ? null : postId));
+    onExpandedPostChange?.(expandedPost === postId ? null : postId);
+  };
+
+  const handleBusinessView = (e: React.MouseEvent, businessId: string, post?: any) => {
+    e.stopPropagation();
+    console.log("👀 Eye clicked - navigating and flying to business:", businessId);
+
+    // Call flyTo handler with post for cached coordinates (no duplicate calls)
+    if (onFlyToBusiness) {
+      onFlyToBusiness(businessId, post);
+    } else if (onNavigateToHomeBusiness) {
+      onNavigateToHomeBusiness(businessId);
+    } else {
+      onBusinessView?.(businessId);
+    }
+  };
+
+  const handlePostVote = async (postId: string, voteType: "up" | "down") => {
+    await votePost(postId, voteType);
+  };
+
+  const handlePostDelete = async (postId: string) => {
+    const success = await removePost(postId);
+
+    if (!success) {
+      return;
+    }
+
+    if (expandedPost === postId) {
+      setExpandedPost(null);
+      setCommentText("");
+    }
+  };
+
+  useEffect(() => {
+    if (!expandedPost) {
+      setCommentText("");
+      setPostPlaceholder(filteredBusinessId ? "Thoughts about this business?" : "How's work?");
+    }
+  }, [expandedPost, filteredBusinessId]);
+
+  const displayPosts = useMemo(() => {
+    console.log("📱 EXPLORE PAGE - Computing displayPosts:", {
+      totalPosts: posts.length,
+      filteredBusinessId,
+      filteredUserStories,
+      firstThreePosts: posts.slice(0, 3).map((p) => ({
+        id: p.id,
+        text: p.text?.substring(0, 30),
+        businessId: p.businessId,
+        author: p.author,
+      })),
+    });
+
+    let filtered: Post[] = [];
+
+    if (filteredBusinessId) {
+      // Include all posts for this business (including system) but exclude comments
+      filtered = posts.filter((post) => post.businessId === filteredBusinessId && !post.isJobUpdate && !post.isComment);
+    } else if (filteredUserStories) {
+      filtered = posts.filter((post) => post.author === "You" && !post.isJobUpdate && !post.isComment);
+    } else {
+      // Filter out comments from main feed
+      filtered = posts.filter((post) => !post.isComment);
+    }
+
+    console.log("📱 EXPLORE PAGE - After filtering:", {
+      filteredCount: filtered.length,
+      filter: filteredBusinessId ? "business" : filteredUserStories ? "userStories" : "all",
+    });
+
+    // Check for real (non-system) posts for this business
+    const realBusinessPosts = filtered.filter((post) => post.author !== "System");
+
+    // Add default system post if business has no real posts
+    if (filteredBusinessId && realBusinessPosts.length === 0) {
+      const defaultPost: Post = {
+        id: `default-${filteredBusinessId}`,
+        author: "System",
+        text: "Share a thought about this business 💭",
+        businessId: filteredBusinessId,
+        isStory: true,
+        votesTotal: 0,
+        userVote: null,
+        createdAt: new Date(),
       };
-
-      recheckCurrentJob();
-    }
-  }, [currentSlide, currentView, deviceId]);
-
-  const handleInitiationComplete = async (data: UserData) => {
-    console.log("🎯 handleInitiationComplete called with:", data);
-
-    if (!deviceId) {
-      console.error("❌ No deviceId available");
-      return;
+      filtered = [defaultPost, ...filtered];
     }
 
-    setUserData(data);
-    setCurrentView("main");
+    return filtered;
+  }, [posts, filteredBusinessId, filteredUserStories]);
 
-    try {
-      const { saveCurrentJob } = await import("../services/currentJobs");
-      const salary = parseFloat(data.salary.replace(/[^0-9.]/g, "")) || 0;
-
-      console.log("💾 Attempting to save current job...");
-
-      // STEP 1: Always save current job to database
-      await saveCurrentJob(deviceId, {
-        role: data.role,
-        salary: salary,
-        location: data.location,
-        business_name: data.businessName || "",
-        time_period: data.timePeriod || "HR",
-      });
-      console.log("✅ Current job saved to database successfully");
-
-      let businessId: string | undefined;
-
-      // STEP 2: Check if business exists (don't create if missing)
-      try {
-        const { data: existingBusiness } = await supabase
-          .from("businesses")
-          .select("id")
-          .ilike("name", data.location)
-          .maybeSingle();
-
-        if (existingBusiness) {
-          businessId = existingBusiness.id;
-
-          // STEP 3: Create business role only if business exists
-          const { createOrUpdateBusinessRole } = await import("../services/businesses");
-          await createOrUpdateBusinessRole(data.location, data.role, data.salary);
-          console.log("✅ Business role created");
-        } else {
-          console.log("ℹ️ Business not in database, skipping role creation");
-        }
-      } catch (roleError) {
-        console.error("Error with business role:", roleError);
-      }
-
-      // STEP 4: Always create post
-      const { createPost } = await import("../services/posts");
-      await createPost(
-        `New Job Update! ${data.salary}/${data.timePeriod || "HR"} for ${data.role} 😳`,
-        "job_update",
-        businessId,
-        data.role,
-        data.timePeriod,
-        salary,
-      );
-      console.log("✅ Post created");
-    } catch (error) {
-      console.error("❌ Error saving job data:", error);
-    }
+  // Get comments for a specific post
+  const getPostComments = (postId: string) => {
+    return posts.filter((post) => post.isComment === postId);
   };
 
-  const handleJobUpdate = async (jobData: {
-    salary: string;
-    role: string;
-    location: string;
-    businessName?: string;
-    timePeriod: string;
-  }) => {
-    console.log("🎯 handleJobUpdate called with:", jobData);
+  // Proper pagination hook at top level
+  const [visibleCount, setVisibleCount] = useState(1000);
 
-    if (!deviceId) {
-      console.error("❌ No deviceId available");
-      return;
-    }
-
-    try {
-      const { saveCurrentJob } = await import("../services/currentJobs");
-      const salary = parseFloat(jobData.salary.replace(/[^0-9.]/g, "")) || 0;
-
-      console.log("💾 Attempting to update current job...");
-
-      // STEP 1: Always save current job
-      await saveCurrentJob(deviceId, {
-        role: jobData.role,
-        salary: salary,
-        location: jobData.location,
-        business_name: jobData.businessName || jobData.location,
-        time_period: jobData.timePeriod,
-      });
-      console.log("✅ Current job updated in database successfully");
-
-      // Update userData state to reflect changes
-      setUserData((prev) =>
-        prev
-          ? {
-              ...prev,
-              salary: jobData.salary,
-              role: jobData.role,
-              location: jobData.location,
-              businessName: jobData.businessName || jobData.location,
-              timePeriod: jobData.timePeriod,
-            }
-          : null,
-      );
-      console.log("✅ userData state updated");
-
-      let businessId: string | undefined;
-
-      // STEP 2: Check if business exists
-      try {
-        const { data: existingBusiness } = await supabase
-          .from("businesses")
-          .select("id")
-          .ilike("name", jobData.location)
-          .maybeSingle();
-
-        if (existingBusiness) {
-          businessId = existingBusiness.id;
-
-          // STEP 3: Create business role only if business exists
-          const { createOrUpdateBusinessRole } = await import("../services/businesses");
-          await createOrUpdateBusinessRole(jobData.location, jobData.role, jobData.salary);
-          console.log("✅ Business role updated");
-        } else {
-          console.log("ℹ️ Business not in database, skipping role creation");
-        }
-      } catch (roleError) {
-        console.error("Error with business role:", roleError);
-      }
-
-      // STEP 4: Always create post
-      const { createPost } = await import("../services/posts");
-      await createPost(
-        `New Job Update! ${jobData.salary}/${jobData.timePeriod} for ${jobData.role} 😳`,
-        "job_update",
-        businessId,
-        jobData.role,
-        jobData.timePeriod,
-        salary,
-      );
-      console.log("✅ Post created");
-    } catch (error) {
-      console.error("Error updating job:", error);
-    }
-  };
-
-  // NEW: Handle saving location when user clicks on a business
-  const handleLocationSave = (location: string, fullLocation: string) => {
-    console.log("Saving clicked business location:", { location, fullLocation });
-    setUserData((prev) => {
-      if (prev) {
-        return {
-          ...prev,
-          location: location,
-          fullLocation: fullLocation,
-        };
-      }
-      return prev;
-    });
-  };
-
-  const handleBusinessClick = async (business: any) => {
-    // Handle null business (close action)
-    if (!business) {
-      setSelectedBusiness(null);
-      setFilteredBusinessId(null);
-      setShowBusinessDetails(false);
-      return;
-    }
-
-    // Set business IMMEDIATELY to show preview right away
-    setSelectedBusiness(business);
-    setFilteredBusinessId(null);
-
-    // Save the clicked business location
-    if (business.name) {
-      handleLocationSave(business.name, business.name);
-    }
-
-    // Check if we need full details: missing atmosphere, missing roles, OR roles without IDs
-    const needsFullDetails =
-      !business.atmosphere?.length ||
-      !business.roles?.length ||
-      (business.roles && business.roles.length > 0 && !business.roles[0]?.id);
-
-    // Fetch full details in background if needed
-    if (needsFullDetails) {
-      fetchFullBusinessDetails(business.id).then((fullBusiness) => {
-        if (fullBusiness) {
-          setSelectedBusiness(fullBusiness);
-        }
-      });
-    }
-  };
-
-  const handleBusinessStoriesClick = (businessId: string) => {
-    setFilteredBusinessId(businessId);
-    setCurrentSlide(2); // Navigate to explore page
-  };
-
-  const handleUserStoriesClick = () => {
-    setFilteredUserStories(true);
-    setCurrentSlide(2); // Navigate to explore page
-  };
-
-  const handleBackToAllPosts = () => {
-    setFilteredBusinessId(null);
-    setFilteredUserStories(false);
-  };
-
-  const handleFlyToBusiness = async (businessId: string, post?: any) => {
-    console.log("🎯 handleFlyToBusiness called for:", businessId);
-    const startTime = performance.now();
-
-    // Change slide immediately
-    setCurrentSlide(1);
-
-    // Find business in local state
-    let business = businesses.find((b) => b.id === businessId);
-
-    // Check if business needs full details loaded
-    const needsFullDetails =
-      !business?.roles?.length ||
-      !business?.atmosphere?.length ||
-      (business?.roles && business.roles.length > 0 && !business.roles[0]?.id);
-
-    // Start loading full details IMMEDIATELY in background if needed
-    let detailsPromise: Promise<any> | null = null;
-    if (needsFullDetails) {
-      console.log("🔄 Starting background load of business details during fly...");
-      detailsPromise = fetchFullBusinessDetails(businessId).then((fullBusiness) => {
-        if (fullBusiness) {
-          console.log("✅ Background load completed, updating business");
-          setSelectedBusiness(fullBusiness);
-        }
-        return fullBusiness;
-      });
-    }
-
-    // Fast path: Use coordinates from post if available
-    if (post?.businessLat && post?.businessLng) {
-      console.log(`⚡ Fast fly-to using post coordinates in ${performance.now() - startTime}ms`);
-
-      // Create minimal business object from post if not in state
-      if (!business && post.businessName) {
-        business = {
-          id: businessId,
-          name: post.businessName,
-          position: { lat: post.businessLat, lng: post.businessLng },
-          atmosphere: [],
-          roles: [],
-        };
-      }
-
-      // Set business immediately to show preview right away
-      if (business) {
-        setSelectedBusiness(business);
-        setShowBusinessDetails(true);
-      }
-
-      window.dispatchEvent(
-        new CustomEvent("flyToBusiness", {
-          detail: {
-            lat: post.businessLat,
-            lng: post.businessLng,
-            businessId: businessId,
-          },
-        }),
-      );
-
-      // Details are loading in background already
-      return;
-    }
-
-    console.log("📍 Found business in state:", {
-      found: !!business,
-      hasPosition: !!business?.position,
-      hasLat: !!business?.position?.lat,
-      hasLng: !!business?.position?.lng,
-      coords: business?.position,
-    });
-
-    if (business?.position?.lat && business?.position?.lng) {
-      console.log("✅ Using cached business coordinates", performance.now() - startTime, "ms");
-      setSelectedBusiness(business);
-      setShowBusinessDetails(true);
-      window.dispatchEvent(
-        new CustomEvent("flyToBusiness", {
-          detail: {
-            lat: business.position.lat,
-            lng: business.position.lng,
-            businessId: businessId,
-          },
-        }),
-      );
-
-      // Details are loading in background already
-      return;
-    }
-
-    // Coordinates missing - try to fetch full details
-    console.log("⏳ Coordinates missing, fetching full business details...", performance.now() - startTime, "ms");
-
-    // Set partial business immediately if available
-    if (business) {
-      setSelectedBusiness(business);
-    }
-
-    try {
-      const fullBusiness = await fetchFullBusinessDetails(businessId);
-
-      if (!fullBusiness) {
-        console.error("❌ Failed to fetch business details (returned null)", performance.now() - startTime, "ms");
-        return;
-      }
-
-      if (!fullBusiness.position?.lat || !fullBusiness.position?.lng) {
-        console.error("❌ Business details missing coordinates", performance.now() - startTime, "ms");
-        return;
-      }
-
-      console.log("✅ Successfully fetched details, dispatching flyTo", performance.now() - startTime, "ms");
-      setSelectedBusiness(fullBusiness);
-      setShowBusinessDetails(true);
-      window.dispatchEvent(
-        new CustomEvent("flyToBusiness", {
-          detail: {
-            lat: fullBusiness.position.lat,
-            lng: fullBusiness.position.lng,
-            businessId: businessId,
-          },
-        }),
-      );
-    } catch (error) {
-      console.error("❌ Error in handleFlyToBusiness:", error, performance.now() - startTime, "ms");
-    }
-  };
-
-  const handleRoleVote = async (businessId: string, roleIndex: number, voteType: "up" | "down") => {
-    console.log("🗳️ MobileApp.handleRoleVote called:", { businessId, roleIndex, voteType });
-
-    // Find the role ID from the business
-    let business = selectedBusiness?.id === businessId ? selectedBusiness : businesses.find((b) => b.id === businessId);
-
-    console.log("📍 Found business:", {
-      found: !!business,
-      hasRoles: !!business?.roles,
-      roleCount: business?.roles?.length,
-      targetRole: business?.roles?.[roleIndex],
-      hasRoleId: !!business?.roles?.[roleIndex]?.id,
-    });
-
-    if (!business?.roles?.[roleIndex]?.id) {
-      console.error("❌ Role missing ID - this should not happen!", {
-        businessId,
-        roleIndex,
-        business: business,
-        role: business?.roles?.[roleIndex],
-      });
-      alert("Unable to vote: Role data is incomplete. Please try closing and reopening the business details.");
-      return;
-    }
-
-    const roleId = business.roles[roleIndex].id;
-    console.log("✅ Role ID found:", roleId);
-    const role = business.roles[roleIndex];
-
-    // Mark role as voting
-    setVotingRoles((prev) => new Set(prev).add(roleId));
-
-    try {
-      const { calculateVoteChange } = await import("@/utils/voteCalculations");
-      const { persistVote } = await import("@/services/voting");
-
-      const { newUserVote, newTotal } = calculateVoteChange(role.userVote, voteType, role.votesTotal);
-
-      const previousVotesTotal = role.votesTotal;
-      const previousUserVote = role.userVote;
-
-      let updatedBusinessForSelection: Business | null = null;
-
-      setBusinesses((prev) =>
-        prev.map((b) => {
-          if (b.id === businessId && b.roles) {
-            const updatedBusiness = {
-              ...b,
-              roles: b.roles.map((r, idx) =>
-                idx === roleIndex ? { ...r, votesTotal: newTotal, userVote: newUserVote } : r,
-              ),
-            };
-
-            if (selectedBusiness?.id === businessId) {
-              updatedBusinessForSelection = updatedBusiness;
-            }
-
-            return updatedBusiness;
-          }
-          return b;
-        }),
-      );
-
-      if (updatedBusinessForSelection) {
-        setSelectedBusiness(updatedBusinessForSelection);
-      }
-
-      const dbVoteType = newUserVote === "up" ? "upvote" : newUserVote === "down" ? "downvote" : null;
-      const result = await persistVote("role_votes", "business_role_id", roleId, dbVoteType);
-
-      if (!result.success) {
-        console.error("❌ Failed to persist vote:", result.error);
-        alert("Vote failed to save. Please try again.");
-
-        let rolledBackBusinessForSelection: Business | null = null;
-
-        setBusinesses((prev) =>
-          prev.map((b) => {
-            if (b.id === businessId && b.roles) {
-              const rolledBackBusiness = {
-                ...b,
-                roles: b.roles.map((r, idx) =>
-                  idx === roleIndex ? { ...r, votesTotal: previousVotesTotal, userVote: previousUserVote } : r,
-                ),
-              };
-
-              if (selectedBusiness?.id === businessId) {
-                rolledBackBusinessForSelection = rolledBackBusiness;
-              }
-
-              return rolledBackBusiness;
-            }
-            return b;
-          }),
-        );
-
-        if (rolledBackBusinessForSelection) {
-          setSelectedBusiness(rolledBackBusinessForSelection);
-        }
-      } else {
-        console.log("✅ Vote persisted, syncing with database...");
-
-        try {
-          const refreshedBusiness = await fetchFullBusinessDetails(businessId);
-
-          if (refreshedBusiness) {
-            setBusinesses((prev) => prev.map((b) => (b.id === businessId ? refreshedBusiness : b)));
-
-            if (selectedBusiness?.id === businessId) {
-              setSelectedBusiness(refreshedBusiness);
-            }
-
-            console.log("✅ Business synced with database:", {
-              roleIndex,
-              dbVotesTotal: refreshedBusiness.roles?.[roleIndex]?.votesTotal,
-              dbUserVote: refreshedBusiness.roles?.[roleIndex]?.userVote,
-            });
-          }
-        } catch (syncError) {
-          console.warn("⚠️ Failed to sync with database after vote:", syncError);
-        }
-      }
-    } finally {
-      setVotingRoles((prev) => {
-        const next = new Set(prev);
-        next.delete(roleId);
-        return next;
-      });
-    }
-  };
-
-  // Sync selectedBusiness when businesses data changes
   useEffect(() => {
-    if (selectedBusiness) {
-      const updatedBusiness = businesses.find((b) => b.id === selectedBusiness.id);
-      if (updatedBusiness && updatedBusiness !== selectedBusiness) {
-        setSelectedBusiness(updatedBusiness);
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+      // If close to bottom, load more
+      if (scrollTop + clientHeight >= scrollHeight - 50) {
+        setVisibleCount((prev) => Math.min(prev + 1000, displayPosts.length));
       }
-    }
-  }, [businesses, selectedBusiness]);
+    };
 
-  // Handle business state when sliding to explore/settings and back
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [displayPosts.length]);
+
+  // Reset visible count when posts change
   useEffect(() => {
-    if (currentSlide === 2 || currentSlide === 0) {
-      if (selectedBusiness) {
-        setPreviouslySelectedBusiness(selectedBusiness);
-        setSelectedBusiness(null);
-      }
-    } else if (currentSlide === 1 && previouslySelectedBusiness) {
-      setSelectedBusiness(previouslySelectedBusiness);
-      setPreviouslySelectedBusiness(null);
-    }
+    setVisibleCount(1000);
+  }, [displayPosts]);
 
-    if (currentSlide !== 2 && filteredUserStories) {
-      setFilteredUserStories(false);
-    }
-  }, [currentSlide, selectedBusiness, previouslySelectedBusiness, filteredUserStories]);
+  const paginatedPosts = displayPosts.slice(0, visibleCount);
 
-  const getSettingsCardPosition = () => {
-    if (!isMobile) return currentSlide === 0 ? "0%" : "-100%";
-    if (currentSlide === 0) return "0%";
-    if (currentSlide === 1) return "-92.75%";
-    return "-200%";
-  };
-
-  const getExploreCardPosition = () => {
-    if (!isMobile) return currentSlide === 2 ? "0%" : "100%";
-    if (currentSlide === 2) return "0%";
-    if (currentSlide === 1) return "92.75%";
-    return "200%";
-  };
-
-  const shouldRenderSettingsCard = () => {
-    return isMobile || currentSlide === 0;
-  };
-
-  const shouldRenderExploreCard = () => {
-    return isMobile || currentSlide === 2;
-  };
+  if (loading) {
+    return (
+      <div className="relative w-full h-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-app-yellow mx-auto mb-4"></div>
+          <p className="text-app-gray-medium">Loading posts...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={`fixed inset-0 ${!isMobile ? "overflow-hidden" : ""}`}>
-      {currentView === "loading" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
-          <Skeleton className="w-full h-full" />
-        </div>
-      )}
-  
-      <Suspense fallback={<Skeleton className="w-full h-full" />}>
-        <HomePage
-          currentSlide={currentSlide}
-          currentView={currentView === "loading" ? "main" : currentView}
-          selectedBusiness={selectedBusiness}
-          onBusinessSelect={handleBusinessClick}
-          posts={posts}
-          onBusinessStoriesClick={handleBusinessStoriesClick}
-          onPostClick={(post) => {
-            setExpandedPost(post.id);
-          }}
-          onRoleVote={handleRoleVote}
-          onLocationSave={handleLocationSave}
-          votingRoles={votingRoles}
-          showBusinessDetails={showBusinessDetails}
-          onShowBusinessDetails={() => setShowBusinessDetails(true)}
-          onBackToPreview={() => setShowBusinessDetails(false)}
-        />
-      </Suspense>
-  
-      {shouldRenderSettingsCard() && currentView !== "initiation" && (
-        <motion.div
-          animate={{ x: getSettingsCardPosition() }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="absolute inset-0 z-20"
-          style={{
-            pointerEvents: getSettingsCardPosition() === "-200%" ? "none" : "auto",
-            overflowY: dragDirection === 'horizontal' ? 'hidden' : 'auto',
-            touchAction: dragDirection === 'vertical' ? 'pan-y' : dragDirection === 'horizontal' ? 'pan-x' : 'auto',
-          }}
-          drag={isMobile ? "x" : false}
-          dragConstraints={{
-            left: currentSlide === 0 ? -200 : 0,
-            right: currentSlide === 1 ? 200 : 0,
-          }}
-          dragElastic={0.2}
-          onDragStart={(event, info) => {
-            const absX = Math.abs(info.offset.x);
-            const absY = Math.abs(info.offset.y);
-            if (absX > 5 || absY > 5) {
-              if (absX > absY * 1.5) {
-                setDragDirection('horizontal');
-              } else if (absY > absX * 1.5) {
-                setDragDirection('vertical');
-              }
-            }
-          }}
-          onDrag={(event, info) => {
-            if (dragDirection === 'vertical') {
-              return false;
-            }
-          }}
-          onDragEnd={(event, info) => {
-            if (dragDirection === 'horizontal') {
-              if (currentSlide === 0 && info.offset.x < -100) {
-                setCurrentSlide(1);
-              } else if (currentSlide === 1 && info.offset.x > 100) {
-                setCurrentSlide(0);
-              }
-            }
-            setDragDirection(null);
-          }}
-        >
-          <Suspense fallback={<Skeleton className="w-full h-full" />}>
-            <SettingsPage
-              initialData={userData || { salary: "", role: "", location: "", businessName: "", timePeriod: "HR" }}
-              onStoriesClick={handleUserStoriesClick}
-              onPostClick={(post) => {
-                setExpandedPost(post.id);
-                setCurrentSlide(2);
-              }}
-              onJobUpdate={handleJobUpdate}
-              onSearchTrigger={(searchTerm) => {
-                setCurrentSlide(1);
-                setTimeout(() => {
-                  const searchEvent = new CustomEvent("triggerSearch", { detail: searchTerm });
-                  window.dispatchEvent(searchEvent);
-                }, 100);
-              }}
-            />
-          </Suspense>
-        </motion.div>
-      )}
-  
-      {shouldRenderExploreCard() && currentView !== "initiation" && (
-        <motion.div
-          animate={{ x: getExploreCardPosition() }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="absolute inset-0 z-20"
-          style={{
-            pointerEvents: getExploreCardPosition() === "200%" ? "none" : "auto",
-            overflowY: dragDirection === 'horizontal' ? 'hidden' : 'auto',
-            touchAction: dragDirection === 'vertical' ? 'pan-y' : dragDirection === 'horizontal' ? 'pan-x' : 'auto',
-          }}
-          drag={isMobile ? "x" : false}
-          dragConstraints={{
-            left: currentSlide === 1 ? -200 : 0,
-            right: currentSlide === 2 ? 200 : 0,
-          }}
-          dragElastic={0.2}
-          onDragStart={(event, info) => {
-            const absX = Math.abs(info.offset.x);
-            const absY = Math.abs(info.offset.y);
-            if (absX > 5 || absY > 5) {
-              if (absX > absY * 1.5) {
-                setDragDirection('horizontal');
-              } else if (absY > absX * 1.5) {
-                setDragDirection('vertical');
-              }
-            }
-          }}
-          onDrag={(event, info) => {
-            if (dragDirection === 'vertical') {
-              return false;
-            }
-          }}
-          onDragEnd={(event, info) => {
-            if (dragDirection === 'horizontal') {
-              if (currentSlide === 2 && info.offset.x > 100) {
-                setCurrentSlide(1);
-              } else if (currentSlide === 1 && info.offset.x < -100) {
-                setCurrentSlide(2);
-              }
-            }
-            setDragDirection(null);
-          }}
-        >
-          <Suspense fallback={<Skeleton className="w-full h-full" />}>
-            <ExplorePage
-              currentSlide={currentSlide}
-              filteredBusinessId={filteredBusinessId || undefined}
-              filteredUserStories={filteredUserStories}
-              onBusinessView={(businessId) => {
-                const business = businesses.find((b) => b.id === businessId);
-                if (business) {
-                  setSelectedBusiness(business);
-                  setCurrentSlide(1);
-                } else {
-                  (async () => {
-                    const full = await fetchFullBusinessDetails(businessId);
-                    if (full) {
-                      setSelectedBusiness(full);
-                      setCurrentSlide(1);
-                    }
-                  })();
-                }
-              }}
-              onExpandedPostChange={(postId) => {
-                setExpandedPost(postId);
-              }}
-              onCommentSubmit={(postId, comment) => {
-                setComments({
-                  ...comments,
-                  [postId]: [...(comments[postId] || []), comment],
-                });
-              }}
-              onBackToAllPosts={handleBackToAllPosts}
-              onNavigateToHomeBusiness={(businessId) => {
-                handleFlyToBusiness(businessId);
-              }}
-              onFlyToBusiness={handleFlyToBusiness}
-            />
-          </Suspense>
-        </motion.div>
-      )}
-  
-      {/* MOVED TO END - Initiation page must render last to be on top */}
-      {currentView === "initiation" && (
-        <div className="fixed inset-0 z-[60]">
-          <InitiationPage onComplete={handleInitiationComplete} />
-        </div>
-      )}
-  
-      <div className="absolute inset-0 z-10 pointer-events-none">
-        {/* ... rest of touch handlers ... */}
-      </div>
-  
-      {!isMobile && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-50">
-          {[0, 1, 2].map((index) => (
-            <button
-              key={index}
-              onClick={() => setCurrentSlide(index)}
-              className={`w-3 h-3 rounded-full transition-colors ${
-                index === currentSlide ? "bg-app-yellow" : "bg-app-gray-light"
-              }`}
-            />
+    <div className="relative w-full h-full" style={{ opacity: currentSlide === 2 ? 1 : 0 }}>
+      {/* Posts list */}
+      <div className={`h-full overflow-y-auto pb-20 ${filteredBusinessId || filteredUserStories ? "pt-20" : "pt-20"}`}>
+        <div className="space-y-4 px-4 flex flex-col items-center">
+          {paginatedPosts.map((post) => (
+            <div key={post.id} className="relative w-full max-w-2xl">
+              {/* Post with background collage if business has 5+ photos */}
+              <div
+                className={`app-popup-transparent p-4 cursor-pointer ${post.images && post.images.length >= 5 ? "relative overflow-hidden" : ""} ${
+                  post.author === "System" && fadeOutSystemPost
+                    ? "animate-fade-out opacity-0 transition-opacity duration-500"
+                    : ""
+                }`}
+                onClick={() => handlePostClick(post.id)}
+                style={{
+                  backgroundImage: post.images && post.images.length >= 5 ? `url(${post.images[0]})` : undefined,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                }}
+              >
+                {/* Background collage overlay */}
+                {post.images && post.images.length >= 5 && (
+                  <div className="absolute inset-0 opacity-30">
+                    <div className="grid grid-cols-3 h-full">
+                      {post.images.slice(0, 6).map((img, idx) => (
+                        <div key={idx} className="bg-cover bg-center" style={{ backgroundImage: `url(${img})` }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Post content */}
+                <div
+                  className={`relative z-10 pb-10 ${post.images && post.images.length >= 5 ? "post-overlay rounded-lg p-3" : ""}`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <TranslatedText
+                      text={post.text}
+                      className={`flex-1 pr-4 break-words overflow-wrap-break-word ${
+                        post.author === "System" ? "text-app-gray-medium italic" : "text-app-black"
+                      }`}
+                    />
+                    <div className="flex-shrink-0 w-16 flex justify-end mt-1 my-0">
+                      {post.businessId && (
+                        <button
+                          onClick={(e) => handleBusinessView(e, post.businessId!, post)}
+                          className="text-2xl hover:scale-110 transition-transform"
+                          title="View business location and details"
+                        >
+                          👀
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Timestamp in bottom left */}
+                  <div className="absolute bottom-1 left-1">
+                    <span className="text-xs text-gray-400">
+                      {post.author === "System" ? "Click to share!" : formatTimeAgo(post.createdAt)}
+                    </span>
+                  </div>
+
+                  {/* Voting component in bottom right */}
+                  {post.author !== "System" && (
+                    <div className="absolute bottom-1 right-1">
+                      <VotingComponent
+                        votesTotal={post.votesTotal}
+                        userVote={post.userVote}
+                        onVote={(voteType) => handlePostVote(post.id, voteType)}
+                        isOwner={post.userId === "00000000-0000-0000-0000-000000000000" ? false : post.author === "You"}
+                        onDelete={() => handlePostDelete(post.id)}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Expanded view */}
+                {expandedPost === post.id && (
+                  <div className="mt-4 pt-4 border-t border-app-gray-light space-y-2">
+                    {(() => {
+                      // Get comments from database instead of local state
+                      const postComments = getPostComments(post.id);
+
+                      // Order comments: post author's comments first
+                      const orderedComments = postComments.slice().sort((a, b) => {
+                        if (a.author === post.author && b.author !== post.author) return -1;
+                        if (b.author === post.author && a.author !== post.author) return 1;
+                        return a.createdAt.getTime() - b.createdAt.getTime();
+                      });
+
+                      if (orderedComments.length === 0) {
+                        return (
+                          <h4 className="text-sm font-medium mb-2 text-slate-500 text-left">
+                            Be the first to share! 😉
+                          </h4>
+                        );
+                      }
+
+                      // Track used combinations for this post's comment thread
+                      const usedCombinations = new Set<string>();
+
+                      return orderedComments.map((comment) => {
+                        // Generate unique deterministic identity based on comment ID
+                        const identity = getCommenterIdentity(
+                          comment.id,
+                          comment.author === post.author,
+                          usedCombinations,
+                        );
+
+                        return (
+                          <div key={comment.id} className="flex items-center gap-2 py-2">
+                            {/* Unique emoji badge or OP badge */}
+                            <CommenterBadge label={identity.label} color={identity.color} isOP={identity.isOP} />
+
+                            {/* Comment content and voting */}
+                            <div className="flex-1 flex items-center justify-between gap-2">
+                              <TranslatedText text={comment.text} className="text-sm text-app-gray-dark flex-1" />
+                              <div className="flex-shrink-0">
+                                <VotingComponent
+                                  votesTotal={comment.votesTotal}
+                                  userVote={comment.userVote}
+                                  onVote={(voteType) => handlePostVote(comment.id, voteType)}
+                                  isOwner={comment.author === "You"}
+                                  onDelete={() => removePost(comment.id)}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                )}
+              </div>
+            </div>
           ))}
+        </div>
+
+        {/* Loading indicator when fetching more posts */}
+        {loading && posts.length > 0 && (
+          <div className="flex justify-center py-6">
+            <div className="text-muted-foreground">Loading more posts...</div>
+          </div>
+        )}
+      </div>
+
+      {/* Input bar at bottom - only show when fully on explore page */}
+      {currentSlide === 2 && (
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
+          {expandedPost ? (
+            // Comment input when post is expanded
+            <div className="relative">
+              <input
+                type="text"
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                placeholder={commentPlaceholder}
+                className="search-bar pr-14"
+                onKeyPress={(e) => {
+                  if (e.key === "Enter") {
+                    handleCommentSubmit();
+                  }
+                }}
+              />
+              <button
+                onClick={handleCommentSubmit}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-lg bg-transparent"
+              >
+                🗣️
+              </button>
+            </div>
+          ) : (
+            // Post input for explore page
+            <div className="relative">
+              <input
+                type="text"
+                value={postText}
+                onChange={(e) => setPostText(e.target.value)}
+                placeholder={postPlaceholder}
+                className="search-bar pr-14"
+                onKeyPress={(e) => {
+                  if (e.key === "Enter") handlePostSubmit();
+                }}
+              />
+              <button
+                onClick={handlePostSubmit}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-lg bg-transparent"
+              >
+                🗣️
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
-}
+};
 
-export default MobileApp;
+export default ExplorePage;
