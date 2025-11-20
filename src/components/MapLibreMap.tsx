@@ -175,6 +175,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const viewportUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasInitialLoadRef = useRef(false);
   const isUserInteractingRef = useRef(false);
+  const tileErrorCountRef = useRef(0);
 
   // CRITICAL FIX: Stable references for arrays to prevent re-renders
   const businessesRef = useRef<Business[]>([]);
@@ -465,12 +466,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     lastLoadTimeRef.current = now;
 
     try {
-      const limit = getBusinessLimitForViewport(zoom);
+      const limit = searchFilters ? 
+        (zoom < 10 ? BUSINESS_LIMITS.SEARCH.ZOOM_10 :
+         zoom < 12 ? BUSINESS_LIMITS.SEARCH.ZOOM_12 :
+         zoom < 14 ? BUSINESS_LIMITS.SEARCH.ZOOM_14 :
+         BUSINESS_LIMITS.SEARCH.DEFAULT) :
+        (zoom < 10 ? BUSINESS_LIMITS.NORMAL.ZOOM_10 :
+         zoom < 12 ? BUSINESS_LIMITS.NORMAL.ZOOM_12 :
+         zoom < 14 ? BUSINESS_LIMITS.NORMAL.ZOOM_14 :
+         zoom < 16 ? BUSINESS_LIMITS.NORMAL.ZOOM_16 :
+         zoom < 18 ? BUSINESS_LIMITS.NORMAL.ZOOM_18 :
+         BUSINESS_LIMITS.NORMAL.DEFAULT);
+      
       await loadBusinessesInViewport?.(viewportBounds, limit, true);
     } catch (err) {
       console.error("❌ Error loading businesses:", err);
     }
-  }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport]);
+  }, [mapLoaded, loadBusinessesInViewport, searchFilters]);
 
   useEffect(() => {
     const initializeMap = async () => {
@@ -506,6 +518,26 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       }
 
       const { tiles, glyphs } = getTileAndGlyphURLs();
+
+      console.log("🗺️ Tile URL configured:", tiles);
+      console.log("🗺️ Glyphs URL configured:", glyphs);
+
+      // Validate tile URL on web (skip on Capacitor)
+      if (!isCapacitor()) {
+        fetch(tiles.replace('{z}', '12').replace('{x}', '1205').replace('{y}', '1539'))
+          .then(response => {
+            if (!response.ok) {
+              console.error("⚠️ Sample tile fetch failed - tiles may not exist at:", tiles);
+              console.error("⚠️ Make sure tiles are in public/data/tiles/ directory");
+            } else {
+              console.log("✅ Tile validation successful");
+            }
+          })
+          .catch(err => {
+            console.error("⚠️ Tile validation failed:", err);
+            console.error("⚠️ Tiles path:", tiles);
+          });
+      }
 
       const vectorSource = {
         type: "vector" as const,
@@ -558,8 +590,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       window.addEventListener("flyToBusiness", handleFlyToBusiness as EventListener);
 
+      const maxTileErrors = 10;
+
       mapInstance.on("error", (e) => {
         console.error("🗺️ Map error:", e.error || e);
+
+        // Track tile errors to prevent infinite loop
+        if (e.error?.message?.includes("fetch") || e.error?.message?.includes("tile")) {
+          tileErrorCountRef.current++;
+          
+          if (tileErrorCountRef.current >= maxTileErrors) {
+            console.error("❌ Too many tile errors, stopping retries");
+            // Still mark as loaded to prevent infinite loop
+            if (!mapLoaded) {
+              setMapLoaded(true);
+              callbackRefs.current.onMapLoaded?.();
+            }
+            return;
+          }
+        }
 
         if (isCapacitor() && e.error?.message?.includes("Unable to parse the tile")) {
           setTimeout(() => {
@@ -582,15 +631,40 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
         try {
           if (!layersAddedRef.current) {
+            // Call addVectorLayers directly with mapInstance
             addVectorLayers(mapInstance);
           }
         } catch (err) {
           console.error("❌ Error adding layers:", err);
         }
 
+        // Call viewport change after a delay
         setTimeout(() => {
-          if (mapRef.current && !loading) {
-            handleViewportChange();
+          if (mapRef.current) {
+            const map = mapRef.current;
+            const zoom = map.getZoom();
+            setCurrentZoom(zoom);
+            const bounds = map.getBounds();
+            const viewportBounds = {
+              north: bounds.getNorth(),
+              south: bounds.getSouth(),
+              east: bounds.getEast(),
+              west: bounds.getWest(),
+            };
+            
+            const limit = searchFilters ? 
+              (zoom < 10 ? BUSINESS_LIMITS.SEARCH.ZOOM_10 :
+               zoom < 12 ? BUSINESS_LIMITS.SEARCH.ZOOM_12 :
+               zoom < 14 ? BUSINESS_LIMITS.SEARCH.ZOOM_14 :
+               BUSINESS_LIMITS.SEARCH.DEFAULT) :
+              (zoom < 10 ? BUSINESS_LIMITS.NORMAL.ZOOM_10 :
+               zoom < 12 ? BUSINESS_LIMITS.NORMAL.ZOOM_12 :
+               zoom < 14 ? BUSINESS_LIMITS.NORMAL.ZOOM_14 :
+               zoom < 16 ? BUSINESS_LIMITS.NORMAL.ZOOM_16 :
+               zoom < 18 ? BUSINESS_LIMITS.NORMAL.ZOOM_18 :
+               BUSINESS_LIMITS.NORMAL.DEFAULT);
+            
+            loadBusinessesInViewport?.(viewportBounds, limit, true);
           }
         }, 1000);
       });
@@ -619,7 +693,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
 
     initializeMap();
-  }, [addVectorLayers, handleViewportChange, loading]);
+  }, []); // Empty deps - should only initialize once
 
   // CRITICAL FIX: Single debounced deck overlay update
   useEffect(() => {
@@ -670,12 +744,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         east: bounds.getEast(),
         west: bounds.getWest(),
       };
-      const limit = getBusinessLimitForViewport(zoom);
+      
+      const limit = searchFilters ? 
+        (zoom < 10 ? BUSINESS_LIMITS.SEARCH.ZOOM_10 :
+         zoom < 12 ? BUSINESS_LIMITS.SEARCH.ZOOM_12 :
+         zoom < 14 ? BUSINESS_LIMITS.SEARCH.ZOOM_14 :
+         BUSINESS_LIMITS.SEARCH.DEFAULT) :
+        (zoom < 10 ? BUSINESS_LIMITS.NORMAL.ZOOM_10 :
+         zoom < 12 ? BUSINESS_LIMITS.NORMAL.ZOOM_12 :
+         zoom < 14 ? BUSINESS_LIMITS.NORMAL.ZOOM_14 :
+         zoom < 16 ? BUSINESS_LIMITS.NORMAL.ZOOM_16 :
+         zoom < 18 ? BUSINESS_LIMITS.NORMAL.ZOOM_18 :
+         BUSINESS_LIMITS.NORMAL.DEFAULT);
+      
       loadBusinessesInViewport?.(viewportBounds, limit, true);
       
       callbackRefs.current.onBusinessesLoaded?.();
     }
-  }, [mapLoaded, loadBusinessesInViewport, getBusinessLimitForViewport]);
+  }, [mapLoaded, loadBusinessesInViewport, searchFilters]);
 
   // CRITICAL FIX: Use hash for search filters comparison
   const searchFiltersHash = useMemo(() => {
