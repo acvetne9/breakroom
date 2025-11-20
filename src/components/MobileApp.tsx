@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, Suspense } from "react";
+import React, { useState, useRef, useEffect, Suspense, useCallback, useMemo } from "react";
 import { motion, PanInfo } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -40,7 +40,6 @@ interface Post {
 }
 
 const MobileApp: React.FC = () => {
-  console.log("🚀 MobileApp component rendering");
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const { deviceId, loading: deviceLoading } = useDevice();
@@ -681,19 +680,27 @@ const MobileApp: React.FC = () => {
   // Handle business state when sliding to explore/settings and back
   useEffect(() => {
     if (currentSlide === 2 || currentSlide === 0) {
-      if (selectedBusiness) {
-        setPreviouslySelectedBusiness(selectedBusiness);
-        setSelectedBusiness(null);
-      }
-    } else if (currentSlide === 1 && previouslySelectedBusiness) {
-      setSelectedBusiness(previouslySelectedBusiness);
-      setPreviouslySelectedBusiness(null);
+      setSelectedBusiness((prev) => {
+        if (prev) {
+          setPreviouslySelectedBusiness(prev);
+          return null;
+        }
+        return prev;
+      });
+    } else if (currentSlide === 1) {
+      setPreviouslySelectedBusiness((prev) => {
+        if (prev) {
+          setSelectedBusiness(prev);
+          return null;
+        }
+        return prev;
+      });
     }
 
     if (currentSlide !== 2 && filteredUserStories) {
       setFilteredUserStories(false);
     }
-  }, [currentSlide, selectedBusiness, previouslySelectedBusiness, filteredUserStories]);
+  }, [currentSlide, filteredUserStories]);
 
   const getSettingsCardPosition = () => {
     if (!isMobile) return currentSlide === 0 ? "0%" : "-100%";
@@ -717,6 +724,58 @@ const MobileApp: React.FC = () => {
     return isMobile || currentSlide === 2;
   };
 
+  const handlePostClick = useCallback((post: Post) => {
+    setExpandedPost(post.id);
+  }, []);
+
+  const handleShowBusinessDetails = useCallback(() => {
+    setShowBusinessDetails(true);
+  }, []);
+
+  const handleBackToPreview = useCallback(() => {
+    setShowBusinessDetails(false);
+  }, []);
+
+  const handleSettingsPostClick = useCallback((post: Post) => {
+    setExpandedPost(post.id);
+    setCurrentSlide(2);
+  }, []);
+
+  const handleSearchTrigger = useCallback((searchTerm: string) => {
+    setCurrentSlide(1);
+    setTimeout(() => {
+      const searchEvent = new CustomEvent("triggerSearch", { detail: searchTerm });
+      window.dispatchEvent(searchEvent);
+    }, 100);
+  }, []);
+
+  const handleExploreBusinessView = useCallback((businessId: string) => {
+    const business = businesses.find((b) => b.id === businessId);
+    if (business) {
+      setSelectedBusiness(business);
+      setCurrentSlide(1);
+    } else {
+      (async () => {
+        const full = await fetchFullBusinessDetails(businessId);
+        if (full) {
+          setSelectedBusiness(full);
+          setCurrentSlide(1);
+        }
+      })();
+    }
+  }, [businesses, fetchFullBusinessDetails]);
+
+  const handleExpandedPostChange = useCallback((postId: string | null) => {
+    setExpandedPost(postId);
+  }, []);
+
+  const handleCommentSubmit = useCallback((postId: string, comment: string) => {
+    setComments((prev) => ({
+      ...prev,
+      [postId]: [...(prev[postId] || []), comment],
+    }));
+  }, []);
+
   return (
     <div className={`fixed inset-0 ${!isMobile ? "overflow-hidden" : ""}`}>
       {currentView === "loading" && (
@@ -733,15 +792,13 @@ const MobileApp: React.FC = () => {
           onBusinessSelect={handleBusinessClick}
           posts={posts}
           onBusinessStoriesClick={handleBusinessStoriesClick}
-          onPostClick={(post) => {
-            setExpandedPost(post.id);
-          }}
+          onPostClick={handlePostClick}
           onRoleVote={handleRoleVote}
           onLocationSave={handleLocationSave}
           votingRoles={votingRoles}
           showBusinessDetails={showBusinessDetails}
-          onShowBusinessDetails={() => setShowBusinessDetails(true)}
-          onBackToPreview={() => setShowBusinessDetails(false)}
+          onShowBusinessDetails={handleShowBusinessDetails}
+          onBackToPreview={handleBackToPreview}
         />
       </Suspense>
   
@@ -792,18 +849,9 @@ const MobileApp: React.FC = () => {
             <SettingsPage
               initialData={userData || { salary: "", role: "", location: "", businessName: "", timePeriod: "HR" }}
               onStoriesClick={handleUserStoriesClick}
-              onPostClick={(post) => {
-                setExpandedPost(post.id);
-                setCurrentSlide(2);
-              }}
+              onPostClick={handleSettingsPostClick}
               onJobUpdate={handleJobUpdate}
-              onSearchTrigger={(searchTerm) => {
-                setCurrentSlide(1);
-                setTimeout(() => {
-                  const searchEvent = new CustomEvent("triggerSearch", { detail: searchTerm });
-                  window.dispatchEvent(searchEvent);
-                }, 100);
-              }}
+              onSearchTrigger={handleSearchTrigger}
             />
           </Suspense>
         </motion.div>
@@ -857,34 +905,11 @@ const MobileApp: React.FC = () => {
               currentSlide={currentSlide}
               filteredBusinessId={filteredBusinessId || undefined}
               filteredUserStories={filteredUserStories}
-              onBusinessView={(businessId) => {
-                const business = businesses.find((b) => b.id === businessId);
-                if (business) {
-                  setSelectedBusiness(business);
-                  setCurrentSlide(1);
-                } else {
-                  (async () => {
-                    const full = await fetchFullBusinessDetails(businessId);
-                    if (full) {
-                      setSelectedBusiness(full);
-                      setCurrentSlide(1);
-                    }
-                  })();
-                }
-              }}
-              onExpandedPostChange={(postId) => {
-                setExpandedPost(postId);
-              }}
-              onCommentSubmit={(postId, comment) => {
-                setComments({
-                  ...comments,
-                  [postId]: [...(comments[postId] || []), comment],
-                });
-              }}
+              onBusinessView={handleExploreBusinessView}
+              onExpandedPostChange={handleExpandedPostChange}
+              onCommentSubmit={handleCommentSubmit}
               onBackToAllPosts={handleBackToAllPosts}
-              onNavigateToHomeBusiness={(businessId) => {
-                handleFlyToBusiness(businessId);
-              }}
+              onNavigateToHomeBusiness={handleFlyToBusiness}
               onFlyToBusiness={handleFlyToBusiness}
             />
           </Suspense>
