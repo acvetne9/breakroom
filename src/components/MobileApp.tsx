@@ -644,59 +644,99 @@ const MobileApp: React.FC = () => {
     }));
   }, []);
 
-  const settingsStyle = useMemo(() => ({
-    pointerEvents: getSettingsCardPosition() === "-200%" ? "none" : "auto",
-    overflowY: dragDirection === 'horizontal' ? 'hidden' : 'auto',
-    touchAction: dragDirection === 'vertical' ? 'pan-y' : dragDirection === 'horizontal' ? 'pan-x' : 'auto',
-    visibility: currentSlide === 0 || (currentSlide === 1 && isMobile) ? 'visible' : 'hidden',
-  }), [getSettingsCardPosition, dragDirection, currentSlide, isMobile]);
+  const settingsStyle = useMemo(() => {
+    const position = getSettingsCardPosition();
+    const isVisible = currentSlide === 0 || (currentSlide === 1 && isMobile);
+    
+    return {
+      pointerEvents: (position === "-200%" ? "none" : "auto") as any,
+      overflowY: (dragDirection === 'horizontal' ? 'hidden' : 'auto') as any,
+      touchAction: (dragDirection === 'vertical' ? 'pan-y' : dragDirection === 'horizontal' ? 'pan-x' : 'auto') as any,
+      visibility: (isVisible ? 'visible' : 'hidden') as any,
+    };
+  }, [getSettingsCardPosition, dragDirection, currentSlide, isMobile]);
 
-  const exploreStyle = useMemo(() => ({
-    pointerEvents: getExploreCardPosition() === "200%" ? "none" : "auto",
-    overflowY: dragDirection === 'horizontal' ? 'hidden' : 'auto',
-    touchAction: dragDirection === 'vertical' ? 'pan-y' : dragDirection === 'horizontal' ? 'pan-x' : 'auto',
-    visibility: currentSlide === 2 || (currentSlide === 1 && isMobile) ? 'visible' : 'hidden',
-  }), [getExploreCardPosition, dragDirection, currentSlide, isMobile]);
+  const exploreStyle = useMemo(() => {
+    const position = getExploreCardPosition();
+    const isVisible = currentSlide === 2 || (currentSlide === 1 && isMobile);
+    
+    return {
+      pointerEvents: (position === "200%" ? "none" : "auto") as any,
+      overflowY: (dragDirection === 'horizontal' ? 'hidden' : 'auto') as any,
+      touchAction: (dragDirection === 'vertical' ? 'pan-y' : dragDirection === 'horizontal' ? 'pan-x' : 'auto') as any,
+      visibility: (isVisible ? 'visible' : 'hidden') as any,
+    };
+  }, [getExploreCardPosition, dragDirection, currentSlide, isMobile]);
+
+  const dragStartXRef = useRef(0);
+  const dragStartYRef = useRef(0);
+  const dragDirectionLockedRef = useRef<'horizontal' | 'vertical' | null>(null);
 
   const handleDragStart = useCallback((event: any, info: any) => {
-    const absX = Math.abs(info.offset.x);
-    const absY = Math.abs(info.offset.y);
-    if (absX > 5 || absY > 5) {
-      if (absX > absY * 1.5) {
-        setDragDirection('horizontal');
-      } else if (absY > absX * 1.5) {
-        setDragDirection('vertical');
-      }
-    }
+    dragStartXRef.current = info.point.x;
+    dragStartYRef.current = info.point.y;
+    dragDirectionLockedRef.current = null;
   }, []);
 
   const handleDrag = useCallback((event: any, info: any) => {
-    if (dragDirection === 'vertical') {
+    // Only check direction once at the start of drag
+    if (dragDirectionLockedRef.current === null) {
+      const deltaX = Math.abs(info.point.x - dragStartXRef.current);
+      const deltaY = Math.abs(info.point.y - dragStartYRef.current);
+      
+      // Only lock direction after significant movement
+      if (deltaX > 10 || deltaY > 10) {
+        if (deltaX > deltaY * 1.5) {
+          dragDirectionLockedRef.current = 'horizontal';
+          setDragDirection('horizontal');
+        } else if (deltaY > deltaX * 1.5) {
+          dragDirectionLockedRef.current = 'vertical';
+          setDragDirection('vertical');
+        }
+      }
+    }
+    
+    // If locked to vertical, prevent horizontal drag
+    if (dragDirectionLockedRef.current === 'vertical') {
       return false;
     }
-  }, [dragDirection]);
+  }, []);
 
   const handleSettingsDragEnd = useCallback((event: any, info: any) => {
-    if (dragDirection === 'horizontal') {
+    // Only process if horizontal drag
+    if (dragDirectionLockedRef.current === 'horizontal') {
+      // When ON settings page (slide 0), swipe LEFT (negative offset) goes to home (slide 1)
       if (currentSlide === 0 && info.offset.x < -100) {
         setCurrentSlide(1);
-      } else if (currentSlide === 1 && info.offset.x > 100) {
+      }
+      // When ON home page (slide 1), swipe RIGHT (positive offset) goes to settings (slide 0)
+      else if (currentSlide === 1 && info.offset.x > 100) {
         setCurrentSlide(0);
       }
     }
+    
+    // Reset
+    dragDirectionLockedRef.current = null;
     setDragDirection(null);
-  }, [dragDirection, currentSlide]);
+  }, [currentSlide]);
 
   const handleExploreDragEnd = useCallback((event: any, info: any) => {
-    if (dragDirection === 'horizontal') {
+    // Only process if horizontal drag
+    if (dragDirectionLockedRef.current === 'horizontal') {
+      // When ON explore page (slide 2), swipe RIGHT (positive offset) goes to home (slide 1)
       if (currentSlide === 2 && info.offset.x > 100) {
         setCurrentSlide(1);
-      } else if (currentSlide === 1 && info.offset.x < -100) {
+      }
+      // When ON home page (slide 1), swipe LEFT (negative offset) goes to explore (slide 2)
+      else if (currentSlide === 1 && info.offset.x < -100) {
         setCurrentSlide(2);
       }
     }
+    
+    // Reset
+    dragDirectionLockedRef.current = null;
     setDragDirection(null);
-  }, [dragDirection, currentSlide]);
+  }, [currentSlide]);
 
   return (
     <div className={`fixed inset-0 ${!isMobile ? "overflow-hidden" : ""}`}>
@@ -727,13 +767,15 @@ const MobileApp: React.FC = () => {
       {shouldRenderSettingsCard && currentView !== "initiation" && (
         <motion.div
           animate={{ x: getSettingsCardPosition() }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          transition={{ type: "spring", stiffness: 200, damping: 25 }}
           className="absolute inset-0 z-20"
           style={settingsStyle as any}
           drag={isMobile ? "x" : false}
           dragConstraints={{
-            left: currentSlide === 0 ? -200 : 0,
-            right: currentSlide === 1 ? 200 : 0,
+            // On settings page (0): allow dragging left to go home
+            // On home page (1): allow dragging right to bring settings back
+            left: -200,
+            right: 200,
           }}
           dragElastic={0.2}
           onDragStart={handleDragStart}
@@ -755,13 +797,15 @@ const MobileApp: React.FC = () => {
       {shouldRenderExploreCard && currentView !== "initiation" && (
         <motion.div
           animate={{ x: getExploreCardPosition() }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          transition={{ type: "spring", stiffness: 200, damping: 25 }}
           className="absolute inset-0 z-20"
           style={exploreStyle as any}
           drag={isMobile ? "x" : false}
           dragConstraints={{
-            left: currentSlide === 1 ? -200 : 0,
-            right: currentSlide === 2 ? 200 : 0,
+            // On explore page (2): allow dragging right to go home  
+            // On home page (1): allow dragging left to bring explore
+            left: -200,
+            right: 200,
           }}
           dragElastic={0.2}
           onDragStart={handleDragStart}
