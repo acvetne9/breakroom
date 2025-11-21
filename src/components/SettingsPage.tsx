@@ -1154,22 +1154,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
           {/* My Stories & Comments */}
           <div className="mt-8">
-            <div className="flex items-center justify-between w-full mb-2">
-              <h3 className="text-lg font-medium text-app-black">My Stories 📖</h3>
-              {userPosts.length > 0 && (
-                <button
-                  onClick={onStoriesClick}
-                  className="text-sm text-app-yellow hover:text-app-yellow/80 transition-colors"
-                >
-                  View All ({userPosts.length})
-                </button>
-              )}
-            </div>
             <button
               onClick={() => setIsStoriesExpanded(!isStoriesExpanded)}
-              className="text-sm text-app-gray-medium hover:text-app-gray-dark transition-colors mb-2"
+              className="flex items-center justify-between w-full mb-2 hover:opacity-80 transition-opacity"
             >
-              {isStoriesExpanded ? '▼ Hide preview' : '▶ Show preview'}
+              <h3 className="text-lg font-medium text-app-black">My Stories 📖</h3>
+              <span className="text-sm text-app-gray-medium">
+                {isStoriesExpanded ? '▼' : '▶'}
+              </span>
             </button>
             {isStoriesExpanded && (
               <div className="mt-4 space-y-2">
@@ -1183,7 +1175,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                       <div
                         key={post.id}
                         className="story-item border-l-2 border-app-gray-light pl-4 cursor-pointer hover:bg-app-gray-light/30 p-2 rounded"
-                        onClick={() => onPostClick?.(post)}
+                        onClick={() => {
+                          onPostClick?.(post);
+                          onStoriesClick?.();
+                        }}
                       >
                         <div className="flex items-center gap-2 mb-1">
                           <p className="text-xs text-app-gray-medium">
