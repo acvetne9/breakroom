@@ -1,4 +1,4 @@
-import React, { useState, useMemo, memo, useEffect } from "react";
+import React, { useState, useMemo, memo, useEffect, useCallback, useRef } from "react";
 import { Eye } from "lucide-react";
 import { isProfane } from "../utils/profanityFilter";
 import { usePosts } from "@/hooks/usePosts";
@@ -37,11 +37,11 @@ interface ExplorePageProps {
   onBackToAllPosts?: () => void;
   onNavigateToHomeBusiness?: (businessId: string) => void;
   onBusinessPreview?: (businessId: string) => void;
-  onFlyToBusiness?: (businessId: string, post?: any) => void; // 🚀 NEW - accepts optional post for cached coordinates
-  currentSlide?: number; // Add currentSlide to control input visibility
+  onFlyToBusiness?: (businessId: string, post?: any) => void;
+  currentSlide?: number;
 }
 
-const ExplorePage: React.FC<ExplorePageProps> = ({
+const ExplorePage: React.FC<ExplorePageProps> = memo(({
   filteredBusinessId,
   filteredUserStories,
   onBusinessView,
@@ -51,77 +51,71 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   onNavigateToHomeBusiness,
   onBusinessPreview,
   onFlyToBusiness,
-  currentSlide = 2, // Default to 2 (fully on explore page)
+  currentSlide = 2,
 }) => {
-  console.log("🔍 ExplorePage component initializing...");
-
   const { posts, loading, hasMore, submitPost, votePost, removePost, loadMore, trackCommentedPost } = usePosts();
   const isMobile = useIsMobile();
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
   const [hideSystemPost, setHideSystemPost] = useState(false);
-  const [isSwipingOrTransitioning, setIsSwipingOrTransitioning] = useState(true); // Start as true
+  const [isSwipingOrTransitioning, setIsSwipingOrTransitioning] = useState(true);
   const [inputBoxVisible, setInputBoxVisible] = useState(false);
 
-  // Detect when user is swiping/transitioning between pages
-  useEffect(() => {
-    console.log("🔄 ExplorePage currentSlide changed:", currentSlide);
+  const defaultPlaceholder = filteredBusinessId ? "Thoughts about this business?" : "How's work?";
+  const [postPlaceholder, setPostPlaceholder] = useState(defaultPlaceholder);
+  const [comments, setComments] = useState<{ [postId: string]: any[] }>({});
+  const [postText, setPostText] = useState("");
+  const [commentText, setCommentText] = useState("");
+  const [commentPlaceholder, setCommentPlaceholder] = useState("Leave a comment!");
+  const [visibleCount, setVisibleCount] = useState(1000);
 
-    // If not fully on explore page (currentSlide !== 2), we're transitioning
+  // Use ref to track if scroll handler is attached
+  const scrollHandlerAttached = useRef(false);
+  const infiniteScrollHandlerAttached = useRef(false);
+
+  useEffect(() => {
     if (currentSlide !== 2) {
       setIsSwipingOrTransitioning(true);
       setInputBoxVisible(false);
-      console.log("🚫 Blocking interactions - not on explore page");
     } else {
-      // Add a small delay before allowing clicks after reaching explore page
       const timer = setTimeout(() => {
         setIsSwipingOrTransitioning(false);
         setInputBoxVisible(true);
-        console.log("✅ Interactions enabled - on explore page");
       }, 200);
       return () => clearTimeout(timer);
     }
   }, [currentSlide]);
 
-  // Infinite scroll - load more posts when scrolling to bottom
-  useEffect(() => {
-    const handleScroll = () => {
-      // Check if user is near bottom (within 500px)
-      const scrollHeight = document.documentElement.scrollHeight;
-      const scrollTop = document.documentElement.scrollTop;
-      const clientHeight = document.documentElement.clientHeight;
+  // Memoized infinite scroll handler
+  const handleInfiniteScroll = useCallback(() => {
+    const scrollHeight = document.documentElement.scrollHeight;
+    const scrollTop = document.documentElement.scrollTop;
+    const clientHeight = document.documentElement.clientHeight;
 
-      if (scrollHeight - scrollTop - clientHeight < 500 && !loading && hasMore) {
-        console.log("📜 Near bottom, loading more posts...");
-        loadMore();
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    if (scrollHeight - scrollTop - clientHeight < 500 && !loading && hasMore) {
+      loadMore();
+    }
   }, [loading, hasMore, loadMore]);
 
-  const defaultPlaceholder = filteredBusinessId ? "Thoughts about this business?" : "How's work?";
-  const [postPlaceholder, setPostPlaceholder] = useState(defaultPlaceholder);
+  // Attach infinite scroll listener only once
+  useEffect(() => {
+    if (!infiniteScrollHandlerAttached.current) {
+      window.addEventListener("scroll", handleInfiniteScroll);
+      infiniteScrollHandlerAttached.current = true;
+    }
 
-  // 2️⃣ Reset placeholder whenever filteredBusinessId changes
+    return () => {
+      if (infiniteScrollHandlerAttached.current) {
+        window.removeEventListener("scroll", handleInfiniteScroll);
+        infiniteScrollHandlerAttached.current = false;
+      }
+    };
+  }, [handleInfiniteScroll]);
+
   useEffect(() => {
     setPostPlaceholder(filteredBusinessId ? "Thoughts about this business?" : "How's work?");
   }, [filteredBusinessId]);
 
-  interface Comment {
-    id: string;
-    author: string;
-    text: string;
-    createdAt: Date;
-  }
-
-  const [comments, setComments] = useState<{ [postId: string]: Comment[] }>({});
-  const [postText, setPostText] = useState("");
-  const [commentText, setCommentText] = useState("");
-  const [commentPlaceholder, setCommentPlaceholder] = useState("Leave a comment!");
-
-  // Check if we need to fade out the system post when real posts are added
   const realPosts = useMemo(() => {
     return filteredBusinessId
       ? posts.filter((post) => post.businessId === filteredBusinessId && !post.isJobUpdate && post.author !== "System")
@@ -132,24 +126,20 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
 
   useEffect(() => {
     if (filteredBusinessId && realPosts.length > 0 && !fadeOutSystemPost && !hideSystemPost) {
-      // Start fade out animation
       setFadeOutSystemPost(true);
-
-      // After animation completes, hide the system post
       setTimeout(() => {
         setHideSystemPost(true);
         setFadeOutSystemPost(false);
-      }, 500); // Match the animation duration
+      }, 500);
     }
 
-    // Reset states when switching to different business or no filter
     if (!filteredBusinessId || realPosts.length === 0) {
       setFadeOutSystemPost(false);
       setHideSystemPost(false);
     }
   }, [realPosts.length, filteredBusinessId, fadeOutSystemPost, hideSystemPost]);
 
-  const handlePostSubmit = async () => {
+  const handlePostSubmit = useCallback(async () => {
     if (!postText.trim()) return;
 
     if (isProfane(postText)) {
@@ -166,9 +156,9 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
       setPostText("");
       setPostPlaceholder("Failed to create post. Please try again.");
     }
-  };
+  }, [postText, submitPost, filteredBusinessId]);
 
-  const handleCommentSubmit = async () => {
+  const handleCommentSubmit = useCallback(async () => {
     if (!commentText.trim() || !expandedPost) return;
 
     if (isProfane(commentText)) {
@@ -176,45 +166,30 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
       return;
     }
 
-    // Save comment to database
     const success = await submitPost(commentText, undefined, false, undefined, undefined, undefined, expandedPost);
 
     if (success) {
-      // Track that user commented on this post
       trackCommentedPost(expandedPost);
       setCommentText("");
       setCommentPlaceholder("Leave a comment!");
-      // No need to call onCommentSubmit since comments are now in the database
     } else {
       setCommentPlaceholder("Connection error. Please try again.");
       setCommentText("");
     }
-  };
+  }, [commentText, expandedPost, submitPost, trackCommentedPost]);
 
-  const handleCommentDelete = (postId: string, commentId: string) => {
-    setComments({
-      ...comments,
-      [postId]: (comments[postId] || []).filter((c) => c.id !== commentId),
-    });
-  };
-
-  const handlePostClick = (postId: string) => {
-    // Prevent opening posts during swipe/transition
+  const handlePostClick = useCallback((postId: string) => {
     if (isSwipingOrTransitioning) {
-      console.log("🚫 Blocked post click during swipe/transition");
       return;
     }
 
-    // If clicking the same post, toggle closed
     setExpandedPost((prev) => (prev === postId ? null : postId));
     onExpandedPostChange?.(expandedPost === postId ? null : postId);
-  };
+  }, [isSwipingOrTransitioning, expandedPost, onExpandedPostChange]);
 
-  const handleBusinessView = (e: React.MouseEvent, businessId: string, post?: any) => {
+  const handleBusinessView = useCallback((e: React.MouseEvent, businessId: string, post?: any) => {
     e.stopPropagation();
-    console.log("👀 Eye clicked - navigating and flying to business:", businessId);
 
-    // Call flyTo handler with post for cached coordinates (no duplicate calls)
     if (onFlyToBusiness) {
       onFlyToBusiness(businessId, post);
     } else if (onNavigateToHomeBusiness) {
@@ -222,13 +197,13 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     } else {
       onBusinessView?.(businessId);
     }
-  };
+  }, [onFlyToBusiness, onNavigateToHomeBusiness, onBusinessView]);
 
-  const handlePostVote = async (postId: string, voteType: "up" | "down") => {
+  const handlePostVote = useCallback(async (postId: string, voteType: "up" | "down") => {
     await votePost(postId, voteType);
-  };
+  }, [votePost]);
 
-  const handlePostDelete = async (postId: string) => {
+  const handlePostDelete = useCallback(async (postId: string) => {
     const success = await removePost(postId);
 
     if (!success) {
@@ -239,7 +214,7 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
       setExpandedPost(null);
       setCommentText("");
     }
-  };
+  }, [removePost, expandedPost]);
 
   useEffect(() => {
     if (!expandedPost) {
@@ -249,39 +224,18 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   }, [expandedPost, filteredBusinessId]);
 
   const displayPosts = useMemo(() => {
-    console.log("📱 EXPLORE PAGE - Computing displayPosts:", {
-      totalPosts: posts.length,
-      filteredBusinessId,
-      filteredUserStories,
-      firstThreePosts: posts.slice(0, 3).map((p) => ({
-        id: p.id,
-        text: p.text?.substring(0, 30),
-        businessId: p.businessId,
-        author: p.author,
-      })),
-    });
-
     let filtered: Post[] = [];
 
     if (filteredBusinessId) {
-      // Include all posts for this business (including system) but exclude comments
       filtered = posts.filter((post) => post.businessId === filteredBusinessId && !post.isJobUpdate && !post.isComment);
     } else if (filteredUserStories) {
       filtered = posts.filter((post) => post.author === "You" && !post.isJobUpdate && !post.isComment);
     } else {
-      // Filter out comments from main feed
       filtered = posts.filter((post) => !post.isComment);
     }
 
-    console.log("📱 EXPLORE PAGE - After filtering:", {
-      filteredCount: filtered.length,
-      filter: filteredBusinessId ? "business" : filteredUserStories ? "userStories" : "all",
-    });
-
-    // Check for real (non-system) posts for this business
     const realBusinessPosts = filtered.filter((post) => post.author !== "System");
 
-    // Add default system post if business has no real posts
     if (filteredBusinessId && realBusinessPosts.length === 0) {
       const defaultPost: Post = {
         id: `default-${filteredBusinessId}`,
@@ -299,35 +253,41 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
     return filtered;
   }, [posts, filteredBusinessId, filteredUserStories]);
 
-  // Get comments for a specific post
-  const getPostComments = (postId: string) => {
+  const getPostComments = useCallback((postId: string) => {
     return posts.filter((post) => post.isComment === postId);
-  };
+  }, [posts]);
 
-  // Proper pagination hook at top level
-  const [visibleCount, setVisibleCount] = useState(1000);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
-      // If close to bottom, load more
-      if (scrollTop + clientHeight >= scrollHeight - 50) {
-        setVisibleCount((prev) => Math.min(prev + 1000, displayPosts.length));
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+  // Memoized pagination handler
+  const handlePaginationScroll = useCallback(() => {
+    const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+    if (scrollTop + clientHeight >= scrollHeight - 50) {
+      setVisibleCount((prev) => Math.min(prev + 1000, displayPosts.length));
+    }
   }, [displayPosts.length]);
 
-  // Reset visible count when posts change
+  useEffect(() => {
+    if (!scrollHandlerAttached.current) {
+      window.addEventListener("scroll", handlePaginationScroll);
+      scrollHandlerAttached.current = true;
+    }
+
+    return () => {
+      if (scrollHandlerAttached.current) {
+        window.removeEventListener("scroll", handlePaginationScroll);
+        scrollHandlerAttached.current = false;
+      }
+    };
+  }, [handlePaginationScroll]);
+
   useEffect(() => {
     setVisibleCount(1000);
   }, [displayPosts]);
 
-  const paginatedPosts = displayPosts.slice(0, visibleCount);
+  const paginatedPosts = useMemo(() => {
+    return displayPosts.slice(0, visibleCount);
+  }, [displayPosts, visibleCount]);
 
-  if (loading) {
+  if (loading && posts.length === 0) {
     return (
       <div className="relative w-full h-full flex items-center justify-center">
         <div className="text-center">
@@ -339,13 +299,29 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
   }
 
   return (
-    <div className="relative w-full h-full" style={{ opacity: currentSlide === 2 ? 1 : 0 }}>
-      {/* Posts list */}
+    <div className="relative w-full h-full">
+      {/* Header for filtered views */}
+      {(filteredBusinessId || filteredUserStories) && (
+        <div className="absolute top-0 left-0 right-0 z-30 bg-white border-b border-app-gray-light">
+          <div className="flex items-center justify-between p-4">
+            <button
+              onClick={onBackToAllPosts}
+              className="text-app-gray-dark hover:text-app-black transition-colors"
+            >
+              ← Back
+            </button>
+            <h2 className="text-lg font-medium text-app-black">
+              {filteredUserStories ? "My Stories" : "Business Stories"}
+            </h2>
+            <div className="w-16"></div> {/* Spacer for centering */}
+          </div>
+        </div>
+      )}
+
       <div className={`h-full overflow-y-auto pb-20 ${filteredBusinessId || filteredUserStories ? "pt-20" : "pt-20"}`}>
         <div className="space-y-4 px-4 flex flex-col items-center">
           {paginatedPosts.map((post) => (
             <div key={post.id} className="relative w-full max-w-2xl">
-              {/* Post with background collage if business has 5+ photos */}
               <div
                 className={`app-popup-transparent p-4 cursor-pointer ${post.images && post.images.length >= 5 ? "relative overflow-hidden" : ""} ${
                   post.author === "System" && fadeOutSystemPost
@@ -359,7 +335,6 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                   backgroundPosition: "center",
                 }}
               >
-                {/* Background collage overlay */}
                 {post.images && post.images.length >= 5 && (
                   <div className="absolute inset-0 opacity-30">
                     <div className="grid grid-cols-3 h-full">
@@ -370,7 +345,6 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                   </div>
                 )}
 
-                {/* Post content */}
                 <div
                   className={`relative z-10 pb-10 ${post.images && post.images.length >= 5 ? "post-overlay rounded-lg p-3" : ""}`}
                 >
@@ -394,14 +368,12 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                     </div>
                   </div>
 
-                  {/* Timestamp in bottom left */}
                   <div className="absolute bottom-1 left-1">
                     <span className="text-xs text-gray-400">
                       {post.author === "System" ? "Click to share!" : formatTimeAgo(post.createdAt)}
                     </span>
                   </div>
 
-                  {/* Voting component in bottom right */}
                   {post.author !== "System" && (
                     <div className="absolute bottom-1 right-1">
                       <VotingComponent
@@ -415,14 +387,11 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                   )}
                 </div>
 
-                {/* Expanded view */}
                 {expandedPost === post.id && (
                   <div className="mt-4 pt-4 border-t border-app-gray-light space-y-2">
                     {(() => {
-                      // Get comments from database instead of local state
                       const postComments = getPostComments(post.id);
 
-                      // Order comments: post author's comments first
                       const orderedComments = postComments.slice().sort((a, b) => {
                         if (a.author === post.author && b.author !== post.author) return -1;
                         if (b.author === post.author && a.author !== post.author) return 1;
@@ -437,11 +406,9 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
                         );
                       }
 
-                      // Track used combinations for this post's comment thread
                       const usedCombinations = new Set<string>();
 
                       return orderedComments.map((comment) => {
-                        // Generate unique deterministic identity based on comment ID
                         const identity = getCommenterIdentity(
                           comment.id,
                           comment.author === post.author,
@@ -450,10 +417,8 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
 
                         return (
                           <div key={comment.id} className="flex items-center gap-2 py-2">
-                            {/* Unique emoji badge or OP badge */}
                             <CommenterBadge label={identity.label} color={identity.color} isOP={identity.isOP} />
 
-                            {/* Comment content and voting */}
                             <div className="flex-1 flex items-center justify-between gap-2">
                               <TranslatedText text={comment.text} className="text-sm text-app-gray-dark flex-1" />
                               <div className="flex-shrink-0">
@@ -477,7 +442,6 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
           ))}
         </div>
 
-        {/* Loading indicator when fetching more posts */}
         {loading && posts.length > 0 && (
           <div className="flex justify-center py-6">
             <div className="text-muted-foreground">Loading more posts...</div>
@@ -485,11 +449,9 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
         )}
       </div>
 
-      {/* Input bar at bottom - only show when fully on explore page */}
       {currentSlide === 2 && (
         <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
           {expandedPost ? (
-            // Comment input when post is expanded
             <div className="relative">
               <input
                 type="text"
@@ -511,7 +473,6 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
               </button>
             </div>
           ) : (
-            // Post input for explore page
             <div className="relative">
               <input
                 type="text"
@@ -535,6 +496,8 @@ const ExplorePage: React.FC<ExplorePageProps> = ({
       )}
     </div>
   );
-};
+});
+
+ExplorePage.displayName = 'ExplorePage';
 
 export default ExplorePage;
