@@ -1155,13 +1155,22 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           {/* My Stories & Comments */}
           <div className="mt-8">
             <div className="flex items-center justify-between w-full mb-2">
-              <button
-                onClick={() => setIsStoriesExpanded(!isStoriesExpanded)}
-                className="flex items-center gap-2 text-left"
-              >
-                <h3 className="text-lg font-medium text-app-black">My Stories 📖</h3>
-              </button>
+              <h3 className="text-lg font-medium text-app-black">My Stories 📖</h3>
+              {userPosts.length > 0 && (
+                <button
+                  onClick={onStoriesClick}
+                  className="text-sm text-app-yellow hover:text-app-yellow/80 transition-colors"
+                >
+                  View All ({userPosts.length})
+                </button>
+              )}
             </div>
+            <button
+              onClick={() => setIsStoriesExpanded(!isStoriesExpanded)}
+              className="text-sm text-app-gray-medium hover:text-app-gray-dark transition-colors mb-2"
+            >
+              {isStoriesExpanded ? '▼ Hide preview' : '▶ Show preview'}
+            </button>
             {isStoriesExpanded && (
               <div className="mt-4 space-y-2">
                 {userPosts.length === 0 ? (
