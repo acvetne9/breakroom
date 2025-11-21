@@ -1156,7 +1156,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           <div className="mt-8">
             <button
               onClick={() => setIsStoriesExpanded(!isStoriesExpanded)}
-              className="flex items-center justify-between w-full mb-2 hover:opacity-80 transition-opacity"
+              className="flex items-center gap-2 mb-2 hover:opacity-80 transition-opacity"
             >
               <h3 className="text-lg font-medium text-app-black">My Stories 📖</h3>
               <span className="text-sm text-app-gray-medium">
