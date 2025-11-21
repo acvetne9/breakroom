@@ -300,6 +300,24 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
 
   return (
     <div className="relative w-full h-full">
+      {/* Header for filtered views */}
+      {(filteredBusinessId || filteredUserStories) && (
+        <div className="absolute top-0 left-0 right-0 z-30 bg-white border-b border-app-gray-light">
+          <div className="flex items-center justify-between p-4">
+            <button
+              onClick={onBackToAllPosts}
+              className="text-app-gray-dark hover:text-app-black transition-colors"
+            >
+              ← Back
+            </button>
+            <h2 className="text-lg font-medium text-app-black">
+              {filteredUserStories ? "My Stories" : "Business Stories"}
+            </h2>
+            <div className="w-16"></div> {/* Spacer for centering */}
+          </div>
+        </div>
+      )}
+
       <div className={`h-full overflow-y-auto pb-20 ${filteredBusinessId || filteredUserStories ? "pt-20" : "pt-20"}`}>
         <div className="space-y-4 px-4 flex flex-col items-center">
           {paginatedPosts.map((post) => (
