@@ -274,6 +274,36 @@ export const usePosts = () => {
             }
           }
         )
+        .on('postgres_changes', 
+          { event: 'UPDATE', schema: 'public', table: 'posts' },
+          (payload) => {
+            console.log('📝 Post updated via realtime');
+            const updatedPost = payload.new as PostData;
+            // If post was soft deleted, remove it from local state
+            if (updatedPost.is_deleted) {
+              setPosts(prev => {
+                const filtered = prev.filter(p => p.id !== updatedPost.id);
+                saveCachedPosts(filtered);
+                console.log(`🗑️ Removed soft-deleted post ${updatedPost.id} from state`);
+                return filtered;
+              });
+            }
+          }
+        )
+        .on('postgres_changes', 
+          { event: 'DELETE', schema: 'public', table: 'posts' },
+          (payload) => {
+            console.log('🗑️ Post hard deleted via realtime');
+            const deletedPost = payload.old as PostData;
+            // Remove hard deleted post from local state
+            setPosts(prev => {
+              const filtered = prev.filter(p => p.id !== deletedPost.id);
+              saveCachedPosts(filtered);
+              console.log(`🗑️ Removed hard-deleted post ${deletedPost.id} from state`);
+              return filtered;
+            });
+          }
+        )
         .subscribe();
 
       return () => {
