@@ -241,7 +241,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
               {/* Anonymous message */}
               <div className="text-center">
                 <p className="text-app-black text-sm">
-                  <span>Answers Kept Anonymous 🤐</span>
+                  <span>Make A Difference! ❤️</span>
                 </p>
               </div>
 
@@ -259,7 +259,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
               {/* Make a difference message */}
               <div className="text-center">
                 <p className="text-app-black text-sm font-normal">
-                  <span>Make A Difference! ❤️</span>
+                  <span>Don't worry, your boss won't find out 😉</span>
                 </p>
               </div>
 
@@ -294,12 +294,6 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
               </div>
 
               {/* Anonymous reassurance */}
-              <div className="text-center">
-                <p className="text-app-black text-sm">
-                  <span className="hidden sm:inline">Don't worry, your boss won't find out 😉</span>
-                  <span className="sm:hidden">Don't worry, it's anonymous 😉</span>
-                </p>
-              </div>
             </div>
           </div>
         </div>
