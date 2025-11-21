@@ -181,10 +181,9 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
     setAddressError('');
     scheduleAutoSave();
   };
-
+  
   const handleTimePeriodChange = (value: string) => {
     setTimePeriod(value);
-    scheduleAutoSave();
   };
 
   // Cleanup on unmount
