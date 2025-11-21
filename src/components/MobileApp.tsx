@@ -339,15 +339,19 @@ const MobileApp: React.FC = () => {
 
   const handleBusinessStoriesClick = useCallback((businessId: string) => {
     setFilteredBusinessId(businessId);
+    setFilteredUserStories(false); // Clear user stories filter
     setCurrentSlide(2);
   }, []);
 
   const handleUserStoriesClick = useCallback(() => {
+    console.log('📖 My Stories clicked - setting filteredUserStories to true');
     setFilteredUserStories(true);
+    setFilteredBusinessId(null); // Clear any business filter
     setCurrentSlide(2);
   }, []);
 
   const handleBackToAllPosts = useCallback(() => {
+    console.log('⬅️ Back to all posts clicked');
     setFilteredBusinessId(null);
     setFilteredUserStories(false);
   }, []);
@@ -572,10 +576,9 @@ const MobileApp: React.FC = () => {
       setPreviouslySelectedBusiness(null);
     }
 
-    if (currentSlide !== 2 && filteredUserStories) {
-      setFilteredUserStories(false);
-    }
-  }, [currentSlide, selectedBusiness, previouslySelectedBusiness, filteredUserStories]);
+    // Only clear filteredUserStories if moving away from slide 2 AND it wasn't just set
+    // This prevents race conditions where the state is cleared right after being set
+  }, [currentSlide, selectedBusiness, previouslySelectedBusiness]);
 
   const getSettingsCardPosition = useCallback(() => {
     if (!isMobile) return currentSlide === 0 ? "0%" : "-100%";
