@@ -11,7 +11,6 @@ const HomePage = React.lazy(() => import("./HomePage"));
 const SettingsPage = React.lazy(() => import("./SettingsPage"));
 const ExplorePage = React.lazy(() => import("./ExplorePage"));
 
-import { useBusinessesData } from "../hooks/useBusinessesData";
 import { Business } from "@/types/business";
 import { usePostsContext } from "./PostsProvider";
 
@@ -56,7 +55,6 @@ const MobileApp: React.FC = () => {
   const [votingRoles, setVotingRoles] = useState<Set<string>>(new Set());
 
   const constraintsRef = useRef(null);
-  const { businesses, loading, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
   const { posts } = usePostsContext();
 
   // Ref to prevent double initialization in React 18 StrictMode

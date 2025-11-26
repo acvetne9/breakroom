@@ -181,10 +181,9 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
     setAddressError('');
     scheduleAutoSave();
   };
-
+  
   const handleTimePeriodChange = (value: string) => {
     setTimePeriod(value);
-    scheduleAutoSave();
   };
 
   // Cleanup on unmount
@@ -207,8 +206,15 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
           </div>
 
           {/* Content - vertically centered */}
-          <div className="flex-1 flex items-center">
+          <div className="flex-1 flex items-center justify-center">
             <div className="w-full space-y-4">
+              {/* Make a difference message - ABOVE inputs */}
+              <div className="text-center mb-2">
+                <p className="text-app-black text-sm">
+                  <span>Make A Difference! ❤️</span>
+                </p>
+              </div>
+
               {/* Business Location */}
               <div>
                 <UnifiedBusinessSearch 
@@ -238,13 +244,6 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                 )}
               </div>
 
-              {/* Anonymous message */}
-              <div className="text-center">
-                <p className="text-app-black text-sm">
-                  <span>Answers Kept Anonymous 🤐</span>
-                </p>
-              </div>
-
               {/* Job Role */}
               <div>
                 <JobSearchDropdown 
@@ -254,13 +253,6 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                   placeholder="Share your job!..." 
                   className="app-input" 
                 />
-              </div>
-
-              {/* Make a difference message */}
-              <div className="text-center">
-                <p className="text-app-black text-sm font-normal">
-                  <span>Make A Difference! ❤️</span>
-                </p>
               </div>
 
               {/* Salary + Time Period */}
@@ -293,15 +285,16 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                 </div>
               </div>
 
-              {/* Anonymous reassurance */}
-              <div className="text-center">
-                <p className="text-app-black text-sm">
-                  <span className="hidden sm:inline">Don't worry, your boss won't find out 😉</span>
-                  <span className="sm:hidden">Don't worry, it's anonymous 😉</span>
+              {/* Boss reassurance message - BELOW inputs */}
+              <div className="text-center mt-2">
+                <p className="text-app-black text-sm font-normal">
+                  <span>Don't worry, your boss won't find out 😉</span>
                 </p>
               </div>
+              
             </div>
           </div>
+          
         </div>
       </div>
     </div>

@@ -38,30 +38,33 @@ interface Bounds {
 }
 
 const VIEWPORT_THROTTLE = {
-  VERY_FAR_ZOOM: 1500,
-  FAR_ZOOM: 1000,
-  MID_ZOOM: 500,
+  VERY_FAR_ZOOM: 2000,  // Increased from 1500
+  FAR_ZOOM: 1500,       // Increased from 1000
+  MID_ZOOM: 800,        // Increased from 500
   CLOSE_ZOOM: 300,
 } as const;
 
+// OPTIMIZED: Significantly reduced limits for better performance
 const BUSINESS_LIMITS = {
   SEARCH: {
-    ZOOM_10: 10000,
-    ZOOM_12: 20000,
-    ZOOM_14: 35000,
-    DEFAULT: 60000,
+    ZOOM_10: 5000,     // Reduced from 10000
+    ZOOM_12: 10000,    // Reduced from 20000
+    ZOOM_14: 20000,    // Reduced from 35000
+    DEFAULT: 40000,    // Reduced from 60000
   },
   NORMAL: {
-    ZOOM_10: 2000,
-    ZOOM_12: 8000,
-    ZOOM_14: 25000,
-    ZOOM_16: 60000,
-    ZOOM_18: 100000,
-    DEFAULT: 150000,
+    ZOOM_10: 500,      // Reduced from 2000
+    ZOOM_12: 2000,     // Reduced from 8000
+    ZOOM_14: 8000,     // Reduced from 25000
+    ZOOM_16: 25000,    // Reduced from 60000
+    ZOOM_18: 50000,    // Reduced from 100000
+    DEFAULT: 75000,    // Reduced from 150000
   },
 } as const;
 
 const DISPLAY_LIMITS_BY_ZOOM = {
+  ZOOM_10: 200,      // Reduced from implicit calculation
+  ZOOM_11: 300,      // New
   ZOOM_12: 500,
   ZOOM_13: 1000,
   ZOOM_14: 2000,
@@ -81,12 +84,45 @@ const MAP_DEFAULTS = {
 
 let overlayInstance: MapboxOverlay | null = null;
 
-const featureToLatLon = (feature: Feature<Point> | { lat: number; lon: number }) => {
+const featureToLatLon = (feature: Feature | { lat: number; lon: number }) => {
   if ("geometry" in feature && feature.geometry?.type === "Point") {
-    return { lat: feature.geometry.coordinates[1], lon: feature.geometry.coordinates[0] };
+    return {
+      lat: feature.geometry.coordinates[1],
+      lon: feature.geometry.coordinates[0]
+    };
   }
   if ("lat" in feature && "lon" in feature) return feature;
   throw new Error("Invalid feature for conversion to lat/lon");
+};
+
+// NEW: Clustering function for low zoom levels
+const clusterBusinesses = (businesses: Business[], zoom: number): Business[] => {
+  if (zoom >= 13) return businesses;
+  
+  const gridSize = zoom < 10 ? 10 : zoom < 11 ? 20 : zoom < 12 ? 40 : 80;
+  const grid = new Map<string, Business[]>();
+  
+  businesses.forEach((b) => {
+    if (!b?.position?.lat || !b?.position?.lng) return;
+    
+    const gridKey = `${Math.floor(b.position.lat * gridSize)}_${Math.floor(b.position.lng * gridSize)}`;
+    if (!grid.has(gridKey)) {
+      grid.set(gridKey, []);
+    }
+    grid.get(gridKey)!.push(b);
+  });
+  
+  // Return one representative per cluster (prefer higher rated businesses)
+  return Array.from(grid.values()).map(cluster => {
+    if (cluster.length === 1) return cluster[0];
+    
+    // Sort by some quality metric if available, otherwise take first
+    return cluster.sort((a, b) => {
+      const aScore = a.roles?.reduce((sum, r) => sum + (r.votesTotal || 0), 0) || 0;
+      const bScore = b.roles?.reduce((sum, r) => sum + (r.votesTotal || 0), 0) || 0;
+      return bScore - aScore;
+    })[0];
+  });
 };
 
 const createOptimizedGridSampling = (
@@ -103,25 +139,34 @@ const createOptimizedGridSampling = (
     const latStep = (bounds.north - bounds.south) / gridSize;
     const lngStep = (bounds.east - bounds.west) / gridSize;
 
-    const grid = Array.from({ length: gridSize }, () => Array.from({ length: gridSize }, () => [] as Business[]));
+    const grid = Array.from({ length: gridSize }, () =>
+      Array.from({ length: gridSize }, () => [] as Business[])
+    );
 
     validBusinesses.forEach((business) => {
       if (!business?.position?.lat || !business?.position?.lng) return;
+
       const latIndex = Math.min(
         gridSize - 1,
         Math.max(0, Math.floor((business.position.lat - bounds.south) / latStep)),
       );
-      const lngIndex = Math.min(gridSize - 1, Math.max(0, Math.floor((business.position.lng - bounds.west) / lngStep)));
+      const lngIndex = Math.min(
+        gridSize - 1,
+        Math.max(0, Math.floor((business.position.lng - bounds.west) / lngStep))
+      );
+
       grid[latIndex][lngIndex].push(business);
     });
 
     const businessesPerCell = Math.ceil(maxBusinesses / (gridSize * gridSize * 0.7));
     const result: Business[] = [];
+
     grid.forEach((row) =>
       row.forEach((cell) => {
         if (cell.length) result.push(...cell.slice(0, businessesPerCell));
       }),
     );
+
     return result.slice(0, maxBusinesses);
   }
 
@@ -129,16 +174,22 @@ const createOptimizedGridSampling = (
   const latStep = (bounds.north - bounds.south) / gridSize;
   const lngStep = (bounds.east - bounds.west) / gridSize;
 
-  const grid = Array.from({ length: gridSize }, () => Array.from({ length: gridSize }, () => [] as Business[]));
+  const grid = Array.from({ length: gridSize }, () =>
+    Array.from({ length: gridSize }, () => [] as Business[])
+  );
+
   validBusinesses.forEach((business) => {
     if (!business?.position?.lat || !business?.position?.lng) return;
+
     const latIndex = Math.min(gridSize - 1, Math.max(0, Math.floor((business.position.lat - bounds.south) / latStep)));
     const lngIndex = Math.min(gridSize - 1, Math.max(0, Math.floor((business.position.lng - bounds.west) / lngStep)));
+
     grid[latIndex][lngIndex].push(business);
   });
 
   const businessesPerCell = Math.ceil(maxBusinesses / (gridSize * gridSize));
   const result: Business[] = [];
+
   grid.forEach((row) =>
     row.forEach((cell) => {
       if (!cell.length) return;
@@ -165,32 +216,42 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [deckOverlay, setDeckOverlay] = useState<MapboxOverlay | null>(null);
   const [overlayReady, setOverlayReady] = useState(false);
-  const [currentZoom, setCurrentZoom] = useState<number>(MAP_DEFAULTS.ZOOM);
+  const [currentZoom, setCurrentZoom] = useState(MAP_DEFAULTS.ZOOM);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const layersAddedRef = useRef(false);
-  const lastBoundsRef = useRef<string>("");
+  const lastBoundsRef = useRef("");
   const lastLoadTimeRef = useRef(0);
   const viewportUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasInitialLoadRef = useRef(false);
   const isUserInteractingRef = useRef(false);
   const tileErrorCountRef = useRef(0);
 
-  // CRITICAL FIX: Stable references for arrays to prevent re-renders
+  // Stable references for arrays to prevent re-renders
   const businessesRef = useRef<Business[]>([]);
   const landmarksRef = useRef<{ lat: number; lng: number; emoji: string }[]>([]);
   const searchFiltersRef = useRef<any>(null);
 
-  const callbackRefs = useRef({ onBusinessClick, onMapLoaded, onBusinessesLoaded, onBusinessesUpdate });
+  const callbackRefs = useRef({
+    onBusinessClick,
+    onMapLoaded,
+    onBusinessesLoaded,
+    onBusinessesUpdate
+  });
+
   useEffect(() => {
-    callbackRefs.current = { onBusinessClick, onMapLoaded, onBusinessesLoaded, onBusinessesUpdate };
+    callbackRefs.current = {
+      onBusinessClick,
+      onMapLoaded,
+      onBusinessesLoaded,
+      onBusinessesUpdate
+    };
   }, [onBusinessClick, onMapLoaded, onBusinessesLoaded, onBusinessesUpdate]);
 
-  const { businesses, loading, loadBusinessesInViewport, fetchFullBusinessDetails, isSearching } =
-    useViewportBusinesses(searchFilters);
+  const { businesses, loading, loadBusinessesInViewport, fetchFullBusinessDetails, isSearching } = useViewportBusinesses(searchFilters);
 
-  // CRITICAL FIX: Update refs only when data actually changes (deep comparison)
+  // Update refs only when data actually changes
   useEffect(() => {
     if (businesses && JSON.stringify(businesses) !== JSON.stringify(businessesRef.current)) {
       businessesRef.current = businesses;
@@ -234,7 +295,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: "fill",
           source: "nyc-tiles",
           "source-layer": "examplepoints",
-          paint: { "fill-color": "#F5F5DC", "fill-opacity": 1.0 },
+          paint: {
+            "fill-color": "#F5F5DC",
+            "fill-opacity": 1.0
+          },
           filter: ["all", ["==", ["geometry-type"], "Polygon"]],
         },
         {
@@ -242,7 +306,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: "fill",
           source: "nyc-tiles",
           "source-layer": "examplepoints",
-          paint: { "fill-color": "#87C17A", "fill-opacity": 1.0 },
+          paint: {
+            "fill-color": "#87C17A",
+            "fill-opacity": 1.0
+          },
           filter: [
             "all",
             ["==", ["geometry-type"], "Polygon"],
@@ -267,7 +334,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: "fill",
           source: "nyc-tiles",
           "source-layer": "examplepoints",
-          paint: { "fill-color": "#6CA4E1", "fill-opacity": 1.0 },
+          paint: {
+            "fill-color": "#6CA4E1",
+            "fill-opacity": 1.0
+          },
           filter: ["all", ["==", ["geometry-type"], "Polygon"], ["has", "natural"]],
         },
         {
@@ -275,6 +345,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: "line",
           source: "nyc-tiles",
           "source-layer": "examplepoints",
+          minzoom: 12, // OPTIMIZED: Don't render roads below zoom 12
           paint: {
             "line-color": "#666666",
             "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.5, 14, 1.5, 16, 3],
@@ -289,7 +360,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           if (layer.type === "symbol" && !("layout" in layer)) {
             (layer as any).layout = { "text-field": "" };
           }
-
           if (!map.getLayer(layer.id)) {
             map.addLayer(layer);
           }
@@ -312,7 +382,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         if (zoom < 14) return BUSINESS_LIMITS.SEARCH.ZOOM_14;
         return BUSINESS_LIMITS.SEARCH.DEFAULT;
       }
-      
+
       if (zoom < 10) return BUSINESS_LIMITS.NORMAL.ZOOM_10;
       if (zoom < 12) return BUSINESS_LIMITS.NORMAL.ZOOM_12;
       if (zoom < 14) return BUSINESS_LIMITS.NORMAL.ZOOM_14;
@@ -358,11 +428,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     [fetchFullBusinessDetails],
   );
 
-  // CRITICAL FIX: Use refs instead of props in dependencies
+  // OPTIMIZED: Use refs and apply clustering
   const deckGLLayers = useMemo(() => {
     const layers: any[] = [];
-    
-    // Use refs to get current data without causing re-renders
     const currentLandmarks = landmarksRef.current;
     const currentBusinesses = businessesRef.current;
     const currentSearchFilters = searchFiltersRef.current;
@@ -370,7 +438,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     // 1. Emojis FIRST (render behind)
     if (currentLandmarks?.length > 0) {
       try {
-        layers.push(createEmojiLandmarkLayer({ landmarks: currentLandmarks }));
+        layers.push(createEmojiLandmarkLayer({ 
+          landmarks: currentLandmarks,
+          zoom: currentZoom // OPTIMIZED: Pass zoom for dynamic sizing
+        }));
       } catch (err) {
         console.error("❌ Failed to create emoji layer", err);
       }
@@ -378,29 +449,40 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     // 2. Business dots LAST (render on top)
     const shouldRenderBusinesses = currentZoom >= 11 || !!currentSearchFilters;
-    
+
     if (currentBusinesses?.length > 0 && shouldRenderBusinesses) {
-      let validBusinesses = currentBusinesses.filter((b) => b != null && b?.position?.lat != null && b?.position?.lng != null);
+      let validBusinesses = currentBusinesses.filter(
+        (b) => b != null && b?.position?.lat != null && b?.position?.lng != null
+      );
 
       // Filter by neighborhood boundary
       if (currentSearchFilters?.neighborhoodFilter?.boundary?.length) {
-        const coords = currentSearchFilters.neighborhoodFilter.boundary.map((p: any) => featureToLatLon(p));
+        const coords = currentSearchFilters.neighborhoodFilter.boundary.map((p: any) =>
+          featureToLatLon(p)
+        );
         if (coords.length) {
           const polygon = turf.polygon([coords.map((p) => [p.lon, p.lat])]);
-          validBusinesses = validBusinesses.filter((b) => 
+          validBusinesses = validBusinesses.filter((b) =>
             turf.booleanPointInPolygon(turf.point([b.position.lng, b.position.lat]), polygon)
           );
         }
       }
 
+      // OPTIMIZED: Apply clustering for low zoom levels
+      if (currentZoom < 13 && validBusinesses.length > 1000) {
+        validBusinesses = clusterBusinesses(validBusinesses, currentZoom);
+      }
+
       // Apply zoom-based display limits for performance
       if (currentZoom < 15 && validBusinesses.length > 0 && mapRef.current) {
-        const maxDisplay = 
+        const maxDisplay =
+          currentZoom < 10 ? DISPLAY_LIMITS_BY_ZOOM.ZOOM_10 :
+          currentZoom < 11 ? DISPLAY_LIMITS_BY_ZOOM.ZOOM_11 :
           currentZoom < 12 ? DISPLAY_LIMITS_BY_ZOOM.ZOOM_12 :
           currentZoom < 13 ? DISPLAY_LIMITS_BY_ZOOM.ZOOM_13 :
           currentZoom < 14 ? DISPLAY_LIMITS_BY_ZOOM.ZOOM_14 :
           DISPLAY_LIMITS_BY_ZOOM.ZOOM_15;
-        
+
         if (validBusinesses.length > maxDisplay) {
           const bounds = mapRef.current.getBounds();
           const viewportBounds = {
@@ -409,19 +491,28 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             east: bounds.getEast(),
             west: bounds.getWest(),
           };
-          validBusinesses = createOptimizedGridSampling(viewportBounds, validBusinesses, maxDisplay, true);
+
+          validBusinesses = createOptimizedGridSampling(
+            viewportBounds,
+            validBusinesses,
+            maxDisplay,
+            true
+          );
         }
       }
 
       if (validBusinesses.length > 0) {
         try {
-          layers.push(createBusinessScatterplotLayer({
-            businesses: validBusinesses,
-            selectedBusinessId: selectedBusiness?.id,
-            onBusinessClick: handleBusinessClick,
-            neighborhoodBoundary: currentSearchFilters?.neighborhoodFilter?.boundary || null,
-            searchActive: !!currentSearchFilters,
-          }));
+          layers.push(
+            createBusinessScatterplotLayer({
+              businesses: validBusinesses,
+              selectedBusinessId: selectedBusiness?.id,
+              onBusinessClick: handleBusinessClick,
+              neighborhoodBoundary: currentSearchFilters?.neighborhoodFilter?.boundary || null,
+              searchActive: !!currentSearchFilters,
+              zoom: currentZoom // OPTIMIZED: Pass zoom for dynamic sizing
+            })
+          );
         } catch (err) {
           console.error("❌ Failed to create scatterplot layer", err);
         }
@@ -431,12 +522,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return layers;
   }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, currentZoom]);
 
+  // OPTIMIZED: Skip viewport updates during interaction
   const handleViewportChange = useCallback(async () => {
     if (!mapRef.current || !mapLoaded) return;
+    
+    // OPTIMIZED: Skip if user is actively interacting
+    if (isUserInteractingRef.current) {
+      return;
+    }
 
     const map = mapRef.current;
     const zoom = map.getZoom();
     setCurrentZoom(zoom);
+
     const bounds = map.getBounds();
     const viewportBounds = {
       north: bounds.getNorth(),
@@ -447,14 +545,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     const boundsKey = `${viewportBounds.north.toFixed(4)}-${viewportBounds.south.toFixed(4)}-${viewportBounds.east.toFixed(4)}-${viewportBounds.west.toFixed(4)}`;
 
-    const throttleMs = 
+    const throttleMs =
       zoom < 10 ? VIEWPORT_THROTTLE.VERY_FAR_ZOOM :
-      zoom < 12 ? VIEWPORT_THROTTLE.FAR_ZOOM : 
-      zoom < 14 ? VIEWPORT_THROTTLE.MID_ZOOM : 
+      zoom < 12 ? VIEWPORT_THROTTLE.FAR_ZOOM :
+      zoom < 14 ? VIEWPORT_THROTTLE.MID_ZOOM :
       VIEWPORT_THROTTLE.CLOSE_ZOOM;
-    
+
     const now = Date.now();
-    if (lastBoundsRef.current === boundsKey && now - lastLoadTimeRef.current < throttleMs) {
+    if (
+      lastBoundsRef.current === boundsKey &&
+      now - lastLoadTimeRef.current < throttleMs
+    ) {
       return;
     }
 
@@ -466,18 +567,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     lastLoadTimeRef.current = now;
 
     try {
-      const limit = searchFilters ? 
-        (zoom < 10 ? BUSINESS_LIMITS.SEARCH.ZOOM_10 :
-         zoom < 12 ? BUSINESS_LIMITS.SEARCH.ZOOM_12 :
-         zoom < 14 ? BUSINESS_LIMITS.SEARCH.ZOOM_14 :
-         BUSINESS_LIMITS.SEARCH.DEFAULT) :
-        (zoom < 10 ? BUSINESS_LIMITS.NORMAL.ZOOM_10 :
-         zoom < 12 ? BUSINESS_LIMITS.NORMAL.ZOOM_12 :
-         zoom < 14 ? BUSINESS_LIMITS.NORMAL.ZOOM_14 :
-         zoom < 16 ? BUSINESS_LIMITS.NORMAL.ZOOM_16 :
-         zoom < 18 ? BUSINESS_LIMITS.NORMAL.ZOOM_18 :
-         BUSINESS_LIMITS.NORMAL.DEFAULT);
-      
+      const limit = searchFilters
+        ? (zoom < 10 ? BUSINESS_LIMITS.SEARCH.ZOOM_10 :
+           zoom < 12 ? BUSINESS_LIMITS.SEARCH.ZOOM_12 :
+           zoom < 14 ? BUSINESS_LIMITS.SEARCH.ZOOM_14 :
+           BUSINESS_LIMITS.SEARCH.DEFAULT)
+        : (zoom < 10 ? BUSINESS_LIMITS.NORMAL.ZOOM_10 :
+           zoom < 12 ? BUSINESS_LIMITS.NORMAL.ZOOM_12 :
+           zoom < 14 ? BUSINESS_LIMITS.NORMAL.ZOOM_14 :
+           zoom < 16 ? BUSINESS_LIMITS.NORMAL.ZOOM_16 :
+           zoom < 18 ? BUSINESS_LIMITS.NORMAL.ZOOM_18 :
+           BUSINESS_LIMITS.NORMAL.DEFAULT);
+
       await loadBusinessesInViewport?.(viewportBounds, limit, true);
     } catch (err) {
       console.error("❌ Error loading businesses:", err);
@@ -496,7 +597,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       } else {
         let attempts = 0;
         const maxAttempts = 50;
-
         while (!(window as any).__SW_READY__ && attempts < maxAttempts) {
           await new Promise((resolve) => setTimeout(resolve, 100));
           attempts++;
@@ -519,23 +619,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       const { tiles, glyphs } = getTileAndGlyphURLs();
 
-      console.log("🗺️ Tile URL configured:", tiles);
-      console.log("🗺️ Glyphs URL configured:", glyphs);
-
-      // Validate tile URL on web (skip on Capacitor)
       if (!isCapacitor()) {
         fetch(tiles.replace('{z}', '12').replace('{x}', '1205').replace('{y}', '1539'))
           .then(response => {
             if (!response.ok) {
-              console.error("⚠️ Sample tile fetch failed - tiles may not exist at:", tiles);
-              console.error("⚠️ Make sure tiles are in public/data/tiles/ directory");
+              console.error("⚠️ Sample tile fetch failed");
             } else {
               console.log("✅ Tile validation successful");
             }
           })
           .catch(err => {
             console.error("⚠️ Tile validation failed:", err);
-            console.error("⚠️ Tiles path:", tiles);
           });
       }
 
@@ -550,7 +644,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const style = {
         version: 8 as const,
         glyphs: glyphs,
-        sources: { "nyc-tiles": vectorSource },
+        sources: {
+          "nyc-tiles": vectorSource
+        },
         layers: [
           {
             id: "background",
@@ -572,7 +668,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       } as any);
 
       mapInstance.setMaxBounds(MAP_DEFAULTS.BOUNDS as any);
-
       mapRef.current = mapInstance;
 
       const handleFlyToBusiness = (event: CustomEvent) => {
@@ -591,17 +686,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       window.addEventListener("flyToBusiness", handleFlyToBusiness as EventListener);
 
       const maxTileErrors = 10;
-
       mapInstance.on("error", (e) => {
         console.error("🗺️ Map error:", e.error || e);
 
-        // Track tile errors to prevent infinite loop
         if (e.error?.message?.includes("fetch") || e.error?.message?.includes("tile")) {
           tileErrorCountRef.current++;
-          
           if (tileErrorCountRef.current >= maxTileErrors) {
             console.error("❌ Too many tile errors, stopping retries");
-            // Still mark as loaded to prevent infinite loop
             if (!mapLoaded) {
               setMapLoaded(true);
               callbackRefs.current.onMapLoaded?.();
@@ -631,19 +722,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
         try {
           if (!layersAddedRef.current) {
-            // Call addVectorLayers directly with mapInstance
             addVectorLayers(mapInstance);
           }
         } catch (err) {
           console.error("❌ Error adding layers:", err);
         }
 
-        // Call viewport change after a delay
         setTimeout(() => {
           if (mapRef.current) {
             const map = mapRef.current;
             const zoom = map.getZoom();
             setCurrentZoom(zoom);
+
             const bounds = map.getBounds();
             const viewportBounds = {
               north: bounds.getNorth(),
@@ -651,19 +741,19 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               east: bounds.getEast(),
               west: bounds.getWest(),
             };
-            
-            const limit = searchFilters ? 
-              (zoom < 10 ? BUSINESS_LIMITS.SEARCH.ZOOM_10 :
-               zoom < 12 ? BUSINESS_LIMITS.SEARCH.ZOOM_12 :
-               zoom < 14 ? BUSINESS_LIMITS.SEARCH.ZOOM_14 :
-               BUSINESS_LIMITS.SEARCH.DEFAULT) :
-              (zoom < 10 ? BUSINESS_LIMITS.NORMAL.ZOOM_10 :
-               zoom < 12 ? BUSINESS_LIMITS.NORMAL.ZOOM_12 :
-               zoom < 14 ? BUSINESS_LIMITS.NORMAL.ZOOM_14 :
-               zoom < 16 ? BUSINESS_LIMITS.NORMAL.ZOOM_16 :
-               zoom < 18 ? BUSINESS_LIMITS.NORMAL.ZOOM_18 :
-               BUSINESS_LIMITS.NORMAL.DEFAULT);
-            
+
+            const limit = searchFilters
+              ? (zoom < 10 ? BUSINESS_LIMITS.SEARCH.ZOOM_10 :
+                 zoom < 12 ? BUSINESS_LIMITS.SEARCH.ZOOM_12 :
+                 zoom < 14 ? BUSINESS_LIMITS.SEARCH.ZOOM_14 :
+                 BUSINESS_LIMITS.SEARCH.DEFAULT)
+              : (zoom < 10 ? BUSINESS_LIMITS.NORMAL.ZOOM_10 :
+                 zoom < 12 ? BUSINESS_LIMITS.NORMAL.ZOOM_12 :
+                 zoom < 14 ? BUSINESS_LIMITS.NORMAL.ZOOM_14 :
+                 zoom < 16 ? BUSINESS_LIMITS.NORMAL.ZOOM_16 :
+                 zoom < 18 ? BUSINESS_LIMITS.NORMAL.ZOOM_18 :
+                 BUSINESS_LIMITS.NORMAL.DEFAULT);
+
             loadBusinessesInViewport?.(viewportBounds, limit, true);
           }
         }, 1000);
@@ -677,7 +767,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         mapInstance.addControl(overlay as any);
         setDeckOverlay(overlay);
         overlayInstance = overlay;
-
         setTimeout(() => setOverlayReady(true), 100);
       } catch (overlayError) {
         console.error("❌ Failed to initialize Deck.GL overlay:", overlayError);
@@ -693,26 +782,31 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
 
     initializeMap();
-  }, []); // Empty deps - should only initialize once
+  }, []);
 
-  // CRITICAL FIX: Single debounced deck overlay update
+  // OPTIMIZED: Debounced deck overlay update with zoom-based delays
   useEffect(() => {
     if (!deckOverlay || !overlayReady) return;
-    
+
+    // OPTIMIZED: Longer debounce at low zoom levels
+    const debounceTime = 
+      currentZoom < 11 ? 400 :
+      currentZoom < 12 ? 300 :
+      currentZoom < 14 ? 200 : 
+      100;
+
     const timeoutId = setTimeout(() => {
       deckOverlay.setProps({ layers: deckGLLayers });
-    }, 100);
-    
-    return () => clearTimeout(timeoutId);
-  }, [deckOverlay, overlayReady, deckGLLayers]);
+    }, debounceTime);
 
-  // REMOVED: Duplicate deck overlay effect that was causing spam
+    return () => clearTimeout(timeoutId);
+  }, [deckOverlay, overlayReady, deckGLLayers, currentZoom]);
 
   const debouncedViewportChange = useCallback(() => {
     if (viewportUpdateTimeoutRef.current) {
       clearTimeout(viewportUpdateTimeoutRef.current);
     }
-    
+
     viewportUpdateTimeoutRef.current = setTimeout(() => {
       handleViewportChange();
     }, 800);
@@ -735,6 +829,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (mapLoaded && !hasInitialLoadRef.current && mapRef.current) {
       hasInitialLoadRef.current = true;
+
       const map = mapRef.current;
       const zoom = map.getZoom();
       const bounds = map.getBounds();
@@ -744,26 +839,24 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         east: bounds.getEast(),
         west: bounds.getWest(),
       };
-      
-      const limit = searchFilters ? 
-        (zoom < 10 ? BUSINESS_LIMITS.SEARCH.ZOOM_10 :
-         zoom < 12 ? BUSINESS_LIMITS.SEARCH.ZOOM_12 :
-         zoom < 14 ? BUSINESS_LIMITS.SEARCH.ZOOM_14 :
-         BUSINESS_LIMITS.SEARCH.DEFAULT) :
-        (zoom < 10 ? BUSINESS_LIMITS.NORMAL.ZOOM_10 :
-         zoom < 12 ? BUSINESS_LIMITS.NORMAL.ZOOM_12 :
-         zoom < 14 ? BUSINESS_LIMITS.NORMAL.ZOOM_14 :
-         zoom < 16 ? BUSINESS_LIMITS.NORMAL.ZOOM_16 :
-         zoom < 18 ? BUSINESS_LIMITS.NORMAL.ZOOM_18 :
-         BUSINESS_LIMITS.NORMAL.DEFAULT);
-      
+
+      const limit = searchFilters
+        ? (zoom < 10 ? BUSINESS_LIMITS.SEARCH.ZOOM_10 :
+           zoom < 12 ? BUSINESS_LIMITS.SEARCH.ZOOM_12 :
+           zoom < 14 ? BUSINESS_LIMITS.SEARCH.ZOOM_14 :
+           BUSINESS_LIMITS.SEARCH.DEFAULT)
+        : (zoom < 10 ? BUSINESS_LIMITS.NORMAL.ZOOM_10 :
+           zoom < 12 ? BUSINESS_LIMITS.NORMAL.ZOOM_12 :
+           zoom < 14 ? BUSINESS_LIMITS.NORMAL.ZOOM_14 :
+           zoom < 16 ? BUSINESS_LIMITS.NORMAL.ZOOM_16 :
+           zoom < 18 ? BUSINESS_LIMITS.NORMAL.ZOOM_18 :
+           BUSINESS_LIMITS.NORMAL.DEFAULT);
+
       loadBusinessesInViewport?.(viewportBounds, limit, true);
-      
       callbackRefs.current.onBusinessesLoaded?.();
     }
   }, [mapLoaded, loadBusinessesInViewport, searchFilters]);
 
-  // CRITICAL FIX: Use hash for search filters comparison
   const searchFiltersHash = useMemo(() => {
     if (!searchFilters) return 'none';
     return JSON.stringify({
@@ -778,7 +871,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return;
-    
+
     if (prevHashRef.current !== searchFiltersHash && hasInitialLoadRef.current) {
       prevHashRef.current = searchFiltersHash;
       lastBoundsRef.current = "";
@@ -788,19 +881,27 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   useEffect(() => {
     if (!mapRef.current || !mapLoaded) return;
+
     const map = mapRef.current;
 
     const onDragStart = () => {
       isUserInteractingRef.current = true;
     };
+
     const onDragEnd = () => {
       isUserInteractingRef.current = false;
+      // OPTIMIZED: Trigger update after interaction ends
+      setTimeout(() => handleViewportChange(), 300);
     };
+
     const onZoomStart = () => {
       isUserInteractingRef.current = true;
     };
+
     const onZoomEnd = () => {
       isUserInteractingRef.current = false;
+      // OPTIMIZED: Trigger update after interaction ends
+      setTimeout(() => handleViewportChange(), 300);
     };
 
     map.on("dragstart", onDragStart);
@@ -815,6 +916,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: "symbol",
           source: "nyc-tiles",
           "source-layer": "examplepoints",
+          minzoom: 13, // OPTIMIZED: Only show labels at higher zoom
           filter: [
             "all",
             ["has", "name"],
@@ -865,10 +967,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       map.off("zoomstart", onZoomStart);
       map.off("zoomend", onZoomEnd);
     };
-  }, [mapLoaded]);
+  }, [mapLoaded, handleViewportChange]);
 
   useEffect(() => {
-    if (!mapRef.current || !mapLoaded || !searchFilters?.neighborhoodFilter || !neighborhoodCenter) return;
+    if (
+      !mapRef.current ||
+      !mapLoaded ||
+      !searchFilters?.neighborhoodFilter ||
+      !neighborhoodCenter
+    )
+      return;
 
     if (isUserInteractingRef.current) {
       return;
@@ -898,20 +1006,11 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   return (
     <div
       ref={mapContainerRef}
-      className="map-container maplibre-map"
       style={{
         position: "absolute",
         top: 0,
         bottom: 0,
-        left: 0,
-        right: 0,
         width: "100%",
-        height: "100%",
-        minWidth: "250px",
-        minHeight: "300px",
-        zIndex: 1,
-        backgroundColor: "#B3E5FC",
-        overflow: "hidden",
       }}
     />
   );

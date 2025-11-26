@@ -55,6 +55,16 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
 }) => {
   const { posts, loading, hasMore, submitPost, votePost, removePost, loadMore, trackCommentedPost } = usePosts();
   const isMobile = useIsMobile();
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('🎯 ExplorePage props changed:', {
+      filteredBusinessId,
+      filteredUserStories,
+      currentSlide
+    });
+  }, [filteredBusinessId, filteredUserStories, currentSlide]);
+  
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
   const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
   const [hideSystemPost, setHideSystemPost] = useState(false);
@@ -224,14 +234,24 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   }, [expandedPost, filteredBusinessId]);
 
   const displayPosts = useMemo(() => {
+    console.log('🔍 ExplorePage displayPosts recalculating:', {
+      filteredBusinessId,
+      filteredUserStories,
+      totalPosts: posts.length,
+      userPosts: posts.filter(p => p.author === "You").length
+    });
+
     let filtered: Post[] = [];
 
     if (filteredBusinessId) {
       filtered = posts.filter((post) => post.businessId === filteredBusinessId && !post.isJobUpdate && !post.isComment);
+      console.log('📍 Filtering by business:', filteredBusinessId, 'Found:', filtered.length);
     } else if (filteredUserStories) {
       filtered = posts.filter((post) => post.author === "You" && !post.isJobUpdate && !post.isComment);
+      console.log('👤 Filtering by user stories - Found:', filtered.length, 'posts');
     } else {
       filtered = posts.filter((post) => !post.isComment);
+      console.log('📋 Showing all posts:', filtered.length);
     }
 
     const realBusinessPosts = filtered.filter((post) => post.author !== "System");
