@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useBusinessesData } from '@/hooks/useBusinessesData';
 import { isProfane } from '@/utils/profanityFilter';
 import { createOrUpdateBusinessRole } from '@/services/businesses';
+import { useBusinessSearch } from '@/hooks/useBusinessSearch';
+import { Business } from '@/types/business';
 
 interface BusinessSearchDropdownProps {
   value: string;
@@ -19,6 +20,8 @@ interface BusinessSearchDropdownProps {
   isCreatingBusiness?: boolean;
   onSelect?: (business: any) => void;
   onSearchResultsChange?: (hasResults: boolean, searchValue: string) => void;
+  businesses?: Business[];
+  setBusinesses?: (businesses: Business[] | ((prev: Business[]) => Business[])) => void;
 }
 
 const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
@@ -36,14 +39,17 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
   onCreateBusiness: externalCreateBusiness,
   isCreatingBusiness: externalIsCreating = false,
   onSelect,
-  onSearchResultsChange
+  onSearchResultsChange,
+  businesses = [],
+  setBusinesses
 }) => {
-  const { businesses, setBusinesses } = useBusinessesData();
+  const { searchBusinesses, debouncedSearch } = useBusinessSearch();
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [internalShowAddForm, setInternalShowAddForm] = useState(false);
   const [internalAddress, setInternalAddress] = useState('');
   const [internalIsCreating, setInternalIsCreating] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   
   // Use external props if provided, otherwise use internal state
   const showAddForm = externalShowAddForm || internalShowAddForm;
@@ -52,8 +58,8 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
   
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const resultsCache = useRef<Map<string, any[]>>(new Map());
   const isScrolling = useRef(false);
+  const searchAbortController = useRef<AbortController | null>(null);
 
   useEffect(() => {
     let scrollTimeout: NodeJS.Timeout;
@@ -87,68 +93,51 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
         dropdown.removeEventListener('scroll', handleScroll);
       }
       clearTimeout(scrollTimeout);
+      // Cancel any pending searches on unmount
+      if (searchAbortController.current) {
+        searchAbortController.current.abort();
+      }
     };
   }, []);
 
-  const handleInputChange = (inputValue: string) => {
+  // OPTIMIZATION: Debounced search handler - waits 200ms after user stops typing
+  const handleInputChange = async (inputValue: string) => {
     onChange(inputValue);
+
+    // Cancel previous search if still running
+    if (searchAbortController.current) {
+      searchAbortController.current.abort();
+    }
 
     if (inputValue.length === 0) {
       setSearchResults([]);
       onSearchResultsChange?.(false, inputValue);
       setShowDropdown(false);
-      setInternalShowAddForm(false);
+      setIsSearching(false);
       return;
     }
 
     if (inputValue.length > 2) {
-      console.log('🔍 BusinessSearchDropdown searching for:', inputValue);
-      console.log('📦 Available businesses:', businesses.length);
+      setIsSearching(true);
+      searchAbortController.current = new AbortController();
       
-      // Check cache first
-      const cachedResults = resultsCache.current.get(inputValue.toLowerCase());
-      if (cachedResults) {
-        console.log('✅ Using cached results:', cachedResults.length);
-        setSearchResults(cachedResults.slice(0, 5));
+      try {
+        // OPTIMIZATION: Use debounced search to avoid excessive queries
+        const startTime = performance.now();
+        const results = await debouncedSearch(inputValue, 10, 200); // 200ms debounce
+        
+        console.log(`🔍 Search completed in ${(performance.now() - startTime).toFixed(0)}ms`);
+        
+        setSearchResults(results);
+        onSearchResultsChange?.(results.length > 0, inputValue);
         setShowDropdown(true);
-        setInternalShowAddForm(false);
-        return;
+      } catch (error) {
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.error('Search error:', error);
+        }
+      } finally {
+        setIsSearching(false);
       }
-      
-      // Check if businesses are loaded
-      if (businesses.length === 0) {
-        console.warn('⚠️ No businesses loaded yet');
-        setSearchResults([]);
-        setShowDropdown(false);
-        return;
-      }
-      
-      // Simple inline search
-      const query = inputValue.toLowerCase();
-      const filteredBusinesses = businesses.filter(b => 
-        b.name?.toLowerCase().includes(query) || 
-        b.businessType?.toLowerCase().includes(query)
-      );
-      console.log('🎯 Search results:', filteredBusinesses.length);
-      const results = filteredBusinesses.slice(0, 5);
-      
-      // Cache the results
-      resultsCache.current.set(inputValue.toLowerCase(), results);
-      
-      // Limit cache size
-      if (resultsCache.current.size > 30) {
-        const firstKey = resultsCache.current.keys().next().value;
-        resultsCache.current.delete(firstKey);
-      }
-      
-      setSearchResults(results);
-      onSearchResultsChange?.(results.length > 0, inputValue);
-      setShowDropdown(true);
-      setInternalShowAddForm(false);
-    } else {
-      setSearchResults([]);
-      setShowDropdown(false);
-      setInternalShowAddForm(false);
     }
   };
 
@@ -257,7 +246,9 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
         }]
       };
 
-      setBusinesses(prev => [...prev, newBusiness]);
+      if (setBusinesses) {
+        setBusinesses(prev => [...prev, newBusiness]);
+      }
 
       setInternalShowAddForm(false);
       setInternalAddress('');
@@ -311,7 +302,11 @@ const BusinessSearchDropdown: React.FC<BusinessSearchDropdownProps> = ({
               setTimeout(() => { isScrolling.current = false; }, 200);
             }}
           >
-            {searchResults.length === 0 ? (
+            {isSearching ? (
+              <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+                <div className="animate-pulse">Searching...</div>
+              </div>
+            ) : searchResults.length === 0 ? (
               <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
                 No businesses found
               </div>

@@ -6,6 +6,7 @@ import InitiationPage from "./InitiationPage";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDevice } from "@/contexts/DeviceContext";
+import { useViewportBusinesses } from "../hooks/useViewportBusinesses";
 
 const HomePage = React.lazy(() => import("./HomePage"));
 const SettingsPage = React.lazy(() => import("./SettingsPage"));
@@ -56,6 +57,9 @@ const MobileApp: React.FC = () => {
 
   const constraintsRef = useRef(null);
   const { posts } = usePostsContext();
+
+  // Get businesses and fetchFullBusinessDetails from the hook
+  const { businesses, fetchFullBusinessDetails, setBusinesses } = useViewportBusinesses(null);
 
   // Ref to prevent double initialization in React 18 StrictMode
   const hasInitialized = useRef(false);
@@ -326,7 +330,7 @@ const MobileApp: React.FC = () => {
       !business.roles?.length ||
       (business.roles && business.roles.length > 0 && !business.roles[0]?.id);
 
-    if (needsFullDetails) {
+    if (needsFullDetails && fetchFullBusinessDetails) {
       fetchFullBusinessDetails(business.id).then((fullBusiness) => {
         if (fullBusiness) {
           setSelectedBusiness(fullBusiness);
@@ -365,7 +369,7 @@ const MobileApp: React.FC = () => {
       !business?.atmosphere?.length ||
       (business?.roles && business.roles.length > 0 && !business.roles[0]?.id);
 
-    if (needsFullDetails) {
+    if (needsFullDetails && fetchFullBusinessDetails) {
       fetchFullBusinessDetails(businessId).then((fullBusiness) => {
         if (fullBusiness) {
           setSelectedBusiness(fullBusiness);
@@ -421,6 +425,11 @@ const MobileApp: React.FC = () => {
     }
 
     try {
+      if (!fetchFullBusinessDetails) {
+        console.error("❌ fetchFullBusinessDetails is not available");
+        return;
+      }
+
       const fullBusiness = await fetchFullBusinessDetails(businessId);
 
       if (!fullBusiness) {
@@ -532,13 +541,15 @@ const MobileApp: React.FC = () => {
         }
       } else {
         try {
-          const refreshedBusiness = await fetchFullBusinessDetails(businessId);
+          if (fetchFullBusinessDetails) {
+            const refreshedBusiness = await fetchFullBusinessDetails(businessId);
 
-          if (refreshedBusiness) {
-            setBusinesses((prev) => prev.map((b) => (b.id === businessId ? refreshedBusiness : b)));
+            if (refreshedBusiness) {
+              setBusinesses((prev) => prev.map((b) => (b.id === businessId ? refreshedBusiness : b)));
 
-            if (selectedBusiness?.id === businessId) {
-              setSelectedBusiness(refreshedBusiness);
+              if (selectedBusiness?.id === businessId) {
+                setSelectedBusiness(refreshedBusiness);
+              }
             }
           }
         } catch (syncError) {
@@ -631,13 +642,15 @@ const MobileApp: React.FC = () => {
       setSelectedBusiness(business);
       setCurrentSlide(1);
     } else {
-      (async () => {
-        const full = await fetchFullBusinessDetails(businessId);
-        if (full) {
-          setSelectedBusiness(full);
-          setCurrentSlide(1);
-        }
-      })();
+      if (fetchFullBusinessDetails) {
+        (async () => {
+          const full = await fetchFullBusinessDetails(businessId);
+          if (full) {
+            setSelectedBusiness(full);
+            setCurrentSlide(1);
+          }
+        })();
+      }
     }
   }, [businesses, fetchFullBusinessDetails]);
 
@@ -749,6 +762,7 @@ const MobileApp: React.FC = () => {
           selectedBusiness={selectedBusiness}
           onBusinessSelect={handleBusinessClick}
           posts={posts}
+          businesses={businesses}
           onBusinessStoriesClick={handleBusinessStoriesClick}
           onPostClick={handlePostClick}
           onRoleVote={handleRoleVote}
