@@ -186,7 +186,6 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
     setTimePeriod(value);
   };
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) {
