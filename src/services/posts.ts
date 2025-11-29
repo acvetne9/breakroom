@@ -11,7 +11,7 @@ export const debugProfileStatus = async () => {
   console.log("🔍 Debug: authenticated user:", user?.id);
 
   if (user) {
-    const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle();
+    const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
     console.log("🔍 Debug: profile for auth user:", profile);
   } else if (deviceId) {
     const { data: profile } = await supabase.from("profiles").select("*").eq("id", deviceId).maybeSingle();
@@ -139,7 +139,7 @@ export const getPosts = async (
       businesses(id, name, lat, lng)
     `,
     )
-    .or('is_deleted.is.null,is_deleted.eq.false') // Exclude deleted posts
+    .eq('is_deleted', false)
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 

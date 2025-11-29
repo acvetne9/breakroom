@@ -6,7 +6,6 @@ import { MapboxOverlay } from "@deck.gl/mapbox";
 import { createBusinessScatterplotLayer, createEmojiLandmarkLayer } from "@/utils/deckGLLayers";
 import { useViewportMapData } from "../hooks/useViewportMapData";
 import { useViewportBusinesses } from "../hooks/useViewportBusinesses";
-import { useBusinessSearch } from "@/hooks/useBusinessSearch";
 import { createTileBlobUrl, isCapacitor } from "@/utils/tileDecompression";
 import { patchTileLoading } from "@/utils/capacitorTileHandler";
 import { addTileDebugLogs, logCapacitorEnvironment } from "@/utils/debugCapacitorTiles";
@@ -39,37 +38,37 @@ interface Bounds {
 }
 
 const VIEWPORT_THROTTLE = {
-  VERY_FAR_ZOOM: 2000,  // Increased from 1500
-  FAR_ZOOM: 1500,       // Increased from 1000
-  MID_ZOOM: 800,        // Increased from 500
-  CLOSE_ZOOM: 300,
+  VERY_FAR_ZOOM: 800,
+  FAR_ZOOM: 500,
+  MID_ZOOM: 300,
+  CLOSE_ZOOM: 150,
 } as const;
 
-// OPTIMIZED: Increased limits to fill map with dots at all zoom levels
+// Restored limits for proper business loading
 const BUSINESS_LIMITS = {
   SEARCH: {
-    ZOOM_10: 15000,    // Increased to fill far zoom
-    ZOOM_12: 25000,    // Increased to fill medium zoom
-    ZOOM_14: 40000,    // Increased to fill closer zoom
-    DEFAULT: 60000,    // Increased for closest zoom
+    ZOOM_10: 10000,
+    ZOOM_12: 20000,
+    ZOOM_14: 35000,
+    DEFAULT: 60000,
   },
   NORMAL: {
-    ZOOM_10: 10000,    // Significantly increased from 500
-    ZOOM_12: 20000,    // Significantly increased from 2000
-    ZOOM_14: 35000,    // Significantly increased from 8000
-    ZOOM_16: 60000,    // Significantly increased from 25000
-    ZOOM_18: 100000,   // Significantly increased from 50000
-    DEFAULT: 150000,   // Significantly increased from 75000
+    ZOOM_10: 3000,
+    ZOOM_12: 10000,
+    ZOOM_14: 25000,
+    ZOOM_16: 60000,
+    ZOOM_18: 100000,
+    DEFAULT: 150000,
   },
 } as const;
 
 const DISPLAY_LIMITS_BY_ZOOM = {
-  ZOOM_10: 2000,     // Significantly increased to fill far zoom
-  ZOOM_11: 3000,     // Increased to fill map
-  ZOOM_12: 5000,     // Increased to ensure good coverage
-  ZOOM_13: 8000,     // Increased for medium zoom
-  ZOOM_14: 12000,    // Increased for closer zoom
-  ZOOM_15: 20000,    // Increased for close zoom
+  ZOOM_10: 1000,
+  ZOOM_11: 2000,
+  ZOOM_12: 4000,
+  ZOOM_13: 8000,
+  ZOOM_14: 15000,
+  ZOOM_15: 30000,
 } as const;
 
 const MAP_DEFAULTS = {
@@ -96,13 +95,12 @@ const featureToLatLon = (feature: Feature | { lat: number; lon: number }) => {
   throw new Error("Invalid feature for conversion to lat/lon");
 };
 
-// NEW: Clustering function for low zoom levels - adjusted for better coverage
+// Clustering function for very low zoom levels only
 const clusterBusinesses = (businesses: Business[], zoom: number): Business[] => {
-  // Only cluster at very far zoom levels (< 11)
+  // Only cluster at very low zoom levels
   if (zoom >= 11) return businesses;
   
-  // Smaller grid size means more representatives shown
-  const gridSize = zoom < 10 ? 20 : 40;
+  const gridSize = zoom < 9 ? 15 : zoom < 10 ? 30 : 60;
   const grid = new Map<string, Business[]>();
   
   businesses.forEach((b) => {
@@ -115,16 +113,10 @@ const clusterBusinesses = (businesses: Business[], zoom: number): Business[] => 
     grid.get(gridKey)!.push(b);
   });
   
-  // Return one representative per cluster (prefer higher rated businesses)
+  // Return one representative per cluster
   return Array.from(grid.values()).map(cluster => {
     if (cluster.length === 1) return cluster[0];
-    
-    // Sort by some quality metric if available, otherwise take first
-    return cluster.sort((a, b) => {
-      const aScore = a.roles?.reduce((sum, r) => sum + (r.votesTotal || 0), 0) || 0;
-      const bScore = b.roles?.reduce((sum, r) => sum + (r.votesTotal || 0), 0) || 0;
-      return bScore - aScore;
-    })[0];
+    return cluster[0]; // Just take first, faster than sorting
   });
 };
 
@@ -132,105 +124,76 @@ const createOptimizedGridSampling = (
   bounds: Bounds,
   businesses: Business[],
   maxBusinesses: number = 1000000,
+  prioritizeVisible: boolean = false,
 ): Business[] => {
   const validBusinesses = businesses.filter(b => b != null);
   if (!validBusinesses || validBusinesses.length <= maxBusinesses) return validBusinesses;
 
-  // OPTIMIZED: Uniform spatial distribution instead of grid-based sampling
-  // This ensures businesses are spread evenly across the entire map
-  
-  // Calculate the area and density
-  const area = (bounds.north - bounds.south) * (bounds.east - bounds.west);
-  const targetDensity = maxBusinesses / area;
-  
-  // Sort businesses by a spatial hash to ensure even distribution
-  const spatialHash = (b: Business) => {
-    if (!b?.position?.lat || !b?.position?.lng) return 0;
-    
-    // Create a consistent spatial hash based on coordinates
-    const latNorm = (b.position.lat - bounds.south) / (bounds.north - bounds.south);
-    const lngNorm = (b.position.lng - bounds.west) / (bounds.east - bounds.west);
-    
-    // Use a prime number multiplier for better distribution
-    return Math.floor(latNorm * 73856093) ^ Math.floor(lngNorm * 19349663);
-  };
-  
-  // Sort by spatial hash to get pseudo-random but consistent ordering
-  const sortedBusinesses = [...validBusinesses].sort((a, b) => {
-    return spatialHash(a) - spatialHash(b);
+  if (prioritizeVisible) {
+    const gridSize = Math.ceil(Math.sqrt(maxBusinesses / 1.5));
+    const latStep = (bounds.north - bounds.south) / gridSize;
+    const lngStep = (bounds.east - bounds.west) / gridSize;
+
+    const grid = Array.from({ length: gridSize }, () =>
+      Array.from({ length: gridSize }, () => [] as Business[])
+    );
+
+    validBusinesses.forEach((business) => {
+      if (!business?.position?.lat || !business?.position?.lng) return;
+
+      const latIndex = Math.min(
+        gridSize - 1,
+        Math.max(0, Math.floor((business.position.lat - bounds.south) / latStep)),
+      );
+      const lngIndex = Math.min(
+        gridSize - 1,
+        Math.max(0, Math.floor((business.position.lng - bounds.west) / lngStep))
+      );
+
+      grid[latIndex][lngIndex].push(business);
+    });
+
+    const businessesPerCell = Math.ceil(maxBusinesses / (gridSize * gridSize * 0.7));
+    const result: Business[] = [];
+
+    grid.forEach((row) =>
+      row.forEach((cell) => {
+        if (cell.length) result.push(...cell.slice(0, businessesPerCell));
+      }),
+    );
+
+    return result.slice(0, maxBusinesses);
+  }
+
+  const gridSize = Math.ceil(Math.sqrt(maxBusinesses / 2));
+  const latStep = (bounds.north - bounds.south) / gridSize;
+  const lngStep = (bounds.east - bounds.west) / gridSize;
+
+  const grid = Array.from({ length: gridSize }, () =>
+    Array.from({ length: gridSize }, () => [] as Business[])
+  );
+
+  validBusinesses.forEach((business) => {
+    if (!business?.position?.lat || !business?.position?.lng) return;
+
+    const latIndex = Math.min(gridSize - 1, Math.max(0, Math.floor((business.position.lat - bounds.south) / latStep)));
+    const lngIndex = Math.min(gridSize - 1, Math.max(0, Math.floor((business.position.lng - bounds.west) / lngStep)));
+
+    grid[latIndex][lngIndex].push(business);
   });
-  
-  // Use Poisson Disk Sampling approach for uniform distribution
-  const selected: Business[] = [];
-  const minDistance = Math.sqrt(area / maxBusinesses) * 0.7; // Minimum distance between points
-  
-  // Quick spatial lookup grid for checking distances
-  const cellSize = minDistance;
-  const gridWidth = Math.ceil((bounds.east - bounds.west) / cellSize);
-  const gridHeight = Math.ceil((bounds.north - bounds.south) / cellSize);
-  const grid = new Map<string, Business>();
-  
-  const getCellKey = (lat: number, lng: number) => {
-    const row = Math.floor((lat - bounds.south) / cellSize);
-    const col = Math.floor((lng - bounds.west) / cellSize);
-    return `${row},${col}`;
-  };
-  
-  const isValidPoint = (business: Business): boolean => {
-    if (!business?.position?.lat || !business?.position?.lng) return false;
-    
-    const lat = business.position.lat;
-    const lng = business.position.lng;
-    const cellKey = getCellKey(lat, lng);
-    
-    // Check surrounding cells for nearby points
-    const row = Math.floor((lat - bounds.south) / cellSize);
-    const col = Math.floor((lng - bounds.west) / cellSize);
-    
-    for (let dRow = -2; dRow <= 2; dRow++) {
-      for (let dCol = -2; dCol <= 2; dCol++) {
-        const neighborKey = `${row + dRow},${col + dCol}`;
-        const neighbor = grid.get(neighborKey);
-        
-        if (neighbor && neighbor.position) {
-          const dx = (neighbor.position.lng - lng) * Math.cos(lat * Math.PI / 180);
-          const dy = neighbor.position.lat - lat;
-          const distSq = dx * dx + dy * dy;
-          
-          if (distSq < minDistance * minDistance) {
-            return false;
-          }
-        }
-      }
-    }
-    
-    return true;
-  };
-  
-  // Sample businesses with uniform spacing
-  for (const business of sortedBusinesses) {
-    if (selected.length >= maxBusinesses) break;
-    
-    if (isValidPoint(business)) {
-      selected.push(business);
-      if (business?.position?.lat && business?.position?.lng) {
-        const cellKey = getCellKey(business.position.lat, business.position.lng);
-        grid.set(cellKey, business);
-      }
-    }
-  }
-  
-  // If we don't have enough businesses, fill with remaining (can happen in sparse areas)
-  if (selected.length < maxBusinesses) {
-    for (const business of sortedBusinesses) {
-      if (selected.length >= maxBusinesses) break;
-      if (!selected.includes(business)) {
-        selected.push(business);
-      }
-    }
-  }
-  
-  return selected.slice(0, maxBusinesses);
+
+  const businessesPerCell = Math.ceil(maxBusinesses / (gridSize * gridSize));
+  const result: Business[] = [];
+
+  grid.forEach((row) =>
+    row.forEach((cell) => {
+      if (!cell.length) return;
+      const shuffled = cell.sort(() => Math.random() - 0.5);
+      result.push(...shuffled.slice(0, businessesPerCell));
+    }),
+  );
+
+  return result.slice(0, maxBusinesses);
 };
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
@@ -248,7 +211,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [deckOverlay, setDeckOverlay] = useState<MapboxOverlay | null>(null);
   const [overlayReady, setOverlayReady] = useState(false);
-  const [currentZoom, setCurrentZoom] = useState(MAP_DEFAULTS.ZOOM);
+  const [currentZoom, setCurrentZoom] = useState<number>(MAP_DEFAULTS.ZOOM);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -282,23 +245,22 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [onBusinessClick, onMapLoaded, onBusinessesLoaded, onBusinessesUpdate]);
 
   const { businesses, loading, loadBusinessesInViewport, fetchFullBusinessDetails, isSearching } = useViewportBusinesses(searchFilters);
-  const { searchBusinesses, searching } = useBusinessSearch();
 
-  // Update refs only when data actually changes - OPTIMIZED: Use reference equality instead of JSON.stringify
+  // Update refs only when data actually changes
   useEffect(() => {
-    if (businesses !== businessesRef.current) {
+    if (businesses && JSON.stringify(businesses) !== JSON.stringify(businessesRef.current)) {
       businessesRef.current = businesses;
     }
   }, [businesses]);
 
   useEffect(() => {
-    if (landmarks !== landmarksRef.current) {
+    if (landmarks && JSON.stringify(landmarks) !== JSON.stringify(landmarksRef.current)) {
       landmarksRef.current = landmarks;
     }
   }, [landmarks]);
 
   useEffect(() => {
-    if (searchFilters !== searchFiltersRef.current) {
+    if (JSON.stringify(searchFilters) !== JSON.stringify(searchFiltersRef.current)) {
       searchFiltersRef.current = searchFilters;
     }
   }, [searchFilters]);
@@ -461,113 +423,18 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     [fetchFullBusinessDetails],
   );
 
-  // NEW: Handle business search from triggerSearch event - OPTIMIZED for speed
-  const handleBusinessSearch = useCallback(async (searchTerm: string) => {
-    if (!searchTerm || searchTerm.length < 3) return;
-    
-    const searchStartTime = performance.now();
-    
-    try {
-      // OPTIMIZATION: Search with higher limit to get more options quickly
-      const results = await searchBusinesses(searchTerm, 15);
-      
-      console.log(`🔍 Search completed in ${(performance.now() - searchStartTime).toFixed(0)}ms, found ${results.length} results`);
-      
-      if (results.length === 0) {
-        console.log('⚠️ No results found for:', searchTerm);
-        return [];
-      }
-      
-      // OPTIMIZATION: Find first result with coordinates (don't wait for all)
-      const firstResultWithCoords = results.find(r => r.position?.lat && r.position?.lng);
-      
-      if (firstResultWithCoords && mapRef.current) {
-        // OPTIMIZATION: Fly to location immediately, fetch details in parallel
-        const flyPromise = mapRef.current.flyTo({
-          center: [firstResultWithCoords.position!.lng, firstResultWithCoords.position!.lat],
-          zoom: 16,
-          speed: 1.5, // Slightly faster
-          curve: 1.0, // Slightly more direct
-          essential: true,
-        });
-        
-        // Don't wait for flyTo animation - handle business click immediately
-        handleBusinessClick(firstResultWithCoords);
-        
-        console.log(`✅ Navigation started in ${(performance.now() - searchStartTime).toFixed(0)}ms`);
-      } else {
-        console.warn('⚠️ First result missing coordinates:', results[0]);
-      }
-      
-      return results;
-    } catch (error) {
-      console.error('❌ Error searching businesses:', error);
-      return [];
-    }
-  }, [searchBusinesses, handleBusinessClick]);
-
-  // OPTIMIZED: Memoize business filtering separately to avoid excessive recalculations
-  const filteredBusinesses = useMemo(() => {
-    const currentBusinesses = businessesRef.current;
-    const currentSearchFilters = searchFiltersRef.current;
-
-    console.log('🔍 Filtering businesses:', {
-      totalBusinesses: currentBusinesses?.length || 0,
-      hasSearchFilters: !!currentSearchFilters,
-      neighborhoodBoundary: currentSearchFilters?.neighborhoodFilter?.boundary?.length || 0
-    });
-
-    if (!currentBusinesses || currentBusinesses.length === 0) {
-      console.warn('⚠️ No businesses in businessesRef.current');
-      return [];
-    }
-
-    let validBusinesses = currentBusinesses.filter(
-      (b) => b != null && b?.position?.lat != null && b?.position?.lng != null
-    );
-
-    console.log('✅ Valid businesses with coordinates:', validBusinesses.length);
-
-    // Filter by neighborhood boundary
-    if (currentSearchFilters?.neighborhoodFilter?.boundary?.length) {
-      console.log('🗺️ Applying neighborhood filter...');
-      const coords = currentSearchFilters.neighborhoodFilter.boundary.map((p: any) =>
-        featureToLatLon(p)
-      );
-      if (coords.length) {
-        const polygon = turf.polygon([coords.map((p) => [p.lon, p.lat])]);
-        const beforeFilter = validBusinesses.length;
-        validBusinesses = validBusinesses.filter((b) =>
-          turf.booleanPointInPolygon(turf.point([b.position.lng, b.position.lat]), polygon)
-        );
-        console.log('🗺️ Neighborhood filter:', beforeFilter, '→', validBusinesses.length, 'businesses');
-      }
-    }
-
-    console.log('✅ Final filtered businesses:', validBusinesses.length);
-    return validBusinesses;
-  }, [businessesRef.current, searchFiltersRef.current?.neighborhoodFilter?.boundary]);
-
-  // OPTIMIZED: Use refs and apply clustering - removed handleBusinessClick from dependencies
+  // Create DeckGL layers - use businesses state directly for reactivity
   const deckGLLayers = useMemo(() => {
     const layers: any[] = [];
-    const currentLandmarks = landmarksRef.current;
-    const currentSearchFilters = searchFiltersRef.current;
-
-    // DEBUG: Log current state
-    console.log('🎨 Rendering layers:', {
-      zoom: currentZoom,
-      filteredBusinesses: filteredBusinesses.length,
-      landmarks: currentLandmarks?.length || 0,
-      hasSearchFilters: !!currentSearchFilters
-    });
+    const currentLandmarks = landmarks;
+    const currentBusinesses = businesses;
+    const currentSearchFilters = searchFilters;
 
     // 1. Emojis FIRST (render behind)
     if (currentLandmarks?.length > 0) {
       try {
         layers.push(createEmojiLandmarkLayer({ 
-          landmarks: currentLandmarks,
-          zoom: currentZoom // OPTIMIZED: Pass zoom for dynamic sizing
+          landmarks: currentLandmarks
         }));
       } catch (err) {
         console.error("❌ Failed to create emoji layer", err);
@@ -575,20 +442,30 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
 
     // 2. Business dots LAST (render on top)
-    // FIXED: Render at all zoom levels (removed zoom >= 10 restriction)
-    const shouldRenderBusinesses = currentZoom >= 8 || !!currentSearchFilters;
+    // Render businesses at all zoom levels
+    const shouldRenderBusinesses = currentZoom >= 9 || !!currentSearchFilters;
 
-    console.log('🔍 Should render businesses?', shouldRenderBusinesses, 'zoom:', currentZoom);
+    if (currentBusinesses?.length > 0 && shouldRenderBusinesses) {
+      let validBusinesses = currentBusinesses.filter(
+        (b) => b != null && b?.position?.lat != null && b?.position?.lng != null
+      );
 
-    if (filteredBusinesses.length > 0 && shouldRenderBusinesses) {
-      let validBusinesses = filteredBusinesses;
+      // Filter by neighborhood boundary
+      if (currentSearchFilters?.neighborhoodFilter?.boundary?.length) {
+        const coords = currentSearchFilters.neighborhoodFilter.boundary.map((p: any) =>
+          featureToLatLon(p)
+        );
+        if (coords.length) {
+          const polygon = turf.polygon([coords.map((p) => [p.lon, p.lat])]);
+          validBusinesses = validBusinesses.filter((b) =>
+            turf.booleanPointInPolygon(turf.point([b.position.lng, b.position.lat]), polygon)
+          );
+        }
+      }
 
-      console.log('📍 Starting with', validBusinesses.length, 'businesses');
-
-      // OPTIMIZED: Apply clustering only at very far zoom levels with many businesses
-      if (currentZoom < 11 && validBusinesses.length > 5000) {
+      // Only cluster at very low zoom levels
+      if (currentZoom < 11 && validBusinesses.length > 3000) {
         validBusinesses = clusterBusinesses(validBusinesses, currentZoom);
-        console.log('🔄 After clustering:', validBusinesses.length, 'businesses');
       }
 
       // Apply zoom-based display limits for performance
@@ -601,8 +478,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           currentZoom < 14 ? DISPLAY_LIMITS_BY_ZOOM.ZOOM_14 :
           DISPLAY_LIMITS_BY_ZOOM.ZOOM_15;
 
-        console.log('📊 Max display for zoom', currentZoom, ':', maxDisplay);
-
         if (validBusinesses.length > maxDisplay) {
           const bounds = mapRef.current.getBounds();
           const viewportBounds = {
@@ -612,20 +487,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
             west: bounds.getWest(),
           };
 
-          console.log('🎯 Sampling from', validBusinesses.length, 'to', maxDisplay);
-
           validBusinesses = createOptimizedGridSampling(
             viewportBounds,
             validBusinesses,
-            maxDisplay
+            maxDisplay,
+            true
           );
-          
-          console.log('✅ After sampling:', validBusinesses.length, 'businesses');
         }
       }
 
       if (validBusinesses.length > 0) {
-        console.log('🎨 Creating layer with', validBusinesses.length, 'businesses');
         try {
           layers.push(
             createBusinessScatterplotLayer({
@@ -633,26 +504,17 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               selectedBusinessId: selectedBusiness?.id,
               onBusinessClick: handleBusinessClick,
               neighborhoodBoundary: currentSearchFilters?.neighborhoodFilter?.boundary || null,
-              searchActive: !!currentSearchFilters,
-              zoom: currentZoom // OPTIMIZED: Pass zoom for dynamic sizing
+              searchActive: !!currentSearchFilters
             })
           );
         } catch (err) {
           console.error("❌ Failed to create scatterplot layer", err);
         }
-      } else {
-        console.warn('⚠️ No businesses to render after filtering');
       }
-    } else {
-      console.warn('⚠️ Not rendering businesses:', {
-        hasBusinesses: filteredBusinesses.length > 0,
-        shouldRender: shouldRenderBusinesses
-      });
     }
 
-    console.log('🎨 Total layers created:', layers.length);
     return layers;
-  }, [filteredBusinesses, selectedBusiness?.id, currentZoom, mapLoaded]);
+  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, currentZoom, businesses]);
 
   // OPTIMIZED: Skip viewport updates during interaction
   const handleViewportChange = useCallback(async () => {
@@ -815,12 +677,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         }
       };
 
-      const handleSearchEvent = (event: CustomEvent) => {
-        handleBusinessSearch(event.detail);
-      };
-
       window.addEventListener("flyToBusiness", handleFlyToBusiness as EventListener);
-      window.addEventListener("triggerSearch", handleSearchEvent as EventListener);
 
       const maxTileErrors = 10;
       mapInstance.on("error", (e) => {
@@ -891,9 +748,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
                  zoom < 18 ? BUSINESS_LIMITS.NORMAL.ZOOM_18 :
                  BUSINESS_LIMITS.NORMAL.DEFAULT);
 
-            loadBusinessesInViewport?.(viewportBounds, limit, true);
+            loadBusinessesInViewport?.(viewportBounds, limit, false);
           }
-        }, 1000);
+        }, 300);
       });
 
       try {
@@ -911,7 +768,6 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
       return () => {
         window.removeEventListener("flyToBusiness", handleFlyToBusiness as EventListener);
-        window.removeEventListener("triggerSearch", handleSearchEvent as EventListener);
         if (mapRef.current) {
           mapRef.current.remove();
           mapRef.current = null;
@@ -920,18 +776,14 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     };
 
     initializeMap();
-  }, [addVectorLayers, handleBusinessSearch, loadBusinessesInViewport, searchFilters]);
+  }, []);
 
-  // OPTIMIZED: Debounced deck overlay update with zoom-based delays
+  // Debounced deck overlay update
   useEffect(() => {
     if (!deckOverlay || !overlayReady) return;
 
-    // OPTIMIZED: Longer debounce at low zoom levels
-    const debounceTime = 
-      currentZoom < 11 ? 400 :
-      currentZoom < 12 ? 300 :
-      currentZoom < 14 ? 200 : 
-      100;
+    // Shorter debounce for faster updates
+    const debounceTime = currentZoom < 11 ? 200 : 100;
 
     const timeoutId = setTimeout(() => {
       deckOverlay.setProps({ layers: deckGLLayers });
@@ -940,33 +792,26 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     return () => clearTimeout(timeoutId);
   }, [deckOverlay, overlayReady, deckGLLayers, currentZoom]);
 
-  // OPTIMIZED: Separate debounce for different interaction types
-  const debouncedViewportChange = useCallback((interactionType: 'drag' | 'zoom' = 'drag') => {
+  const debouncedViewportChange = useCallback(() => {
     if (viewportUpdateTimeoutRef.current) {
       clearTimeout(viewportUpdateTimeoutRef.current);
     }
 
-    // OPTIMIZED: Different delays for different interactions
-    const delay = interactionType === 'drag' ? 400 : 600; // Drag faster, zoom medium
-
     viewportUpdateTimeoutRef.current = setTimeout(() => {
       handleViewportChange();
-    }, delay);
+    }, 200);
   }, [handleViewportChange]);
 
   useEffect(() => {
     if (!mapRef.current || !mapLoaded) return;
 
-    const handleMoveEnd = () => debouncedViewportChange('drag');
-    const handleZoomEnd = () => debouncedViewportChange('zoom');
-
-    mapRef.current.on("moveend", handleMoveEnd);
-    mapRef.current.on("zoomend", handleZoomEnd);
+    mapRef.current.on("moveend", debouncedViewportChange);
+    mapRef.current.on("zoomend", debouncedViewportChange);
 
     return () => {
       if (mapRef.current) {
-        mapRef.current.off("moveend", handleMoveEnd);
-        mapRef.current.off("zoomend", handleZoomEnd);
+        mapRef.current.off("moveend", debouncedViewportChange);
+        mapRef.current.off("zoomend", debouncedViewportChange);
       }
     };
   }, [mapLoaded, debouncedViewportChange]);

@@ -163,10 +163,10 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
       setBusinesses([]);
     }
 
-    // Only block if it's the exact same request (not just any loading)
-    if (loading && !isNewSearch && !isMoving) {
-      console.log('⏸️ Skipping duplicate request while loading');
-      return;
+    // Only block if it's the exact same request and not new search
+    if (loading && !isNewSearch) {
+      console.log('⏸️ Request in progress, queuing...');
+      // Don't return early for moving requests - let them queue
     }
 
     setIsSearching(!!searchFilters);
@@ -188,7 +188,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
     }
 
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
-    const delay = businesses.length ? (isMoving ? 400 : 150) : 0;
+    const delay = businesses.length ? (isMoving ? 150 : 50) : 0;
 
     loadTimeoutRef.current = setTimeout(async () => {
       setLoading(true);
