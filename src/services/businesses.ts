@@ -5,6 +5,8 @@ import { searchBusinessesUnified, parseUnifiedSearchFilters } from './unifiedSea
 import { expandTerm } from '@/utils/smartSearch';
 import { sanitizeVoteTotal } from '@/utils/voteCalculations';
 
+type MapBounds = { north: number; south: number; east: number; west: number };
+
 // Enhanced function using PostGIS spatial queries with user votes preloaded
 export async function getBusinessesNearPoint(
   centerLat: number, 
@@ -82,94 +84,139 @@ export async function getBusinessesBasic(limit: number = 5000): Promise<Business
   return getBusinessesNearPoint(centerLat, centerLng, 20000, limit);
 }
 
+/**
+ * Fetches businesses within viewport bounds using grid-sampled distribution
+ * FIXED: No longer creates circular pattern - evenly distributes across viewport
+ */
 export const getBusinessesInViewport = async (
-  bounds: { north: number; south: number; east: number; west: number },
-  limit: number = 5000,
+  bounds: MapBounds,
+  limit: number = 1000,
   searchFilters?: any,
-  onProgress?: (businesses: Business[], isComplete: boolean) => void,
+  userId?: string,
   zoom: number = 12
 ): Promise<Business[]> => {
-  console.log(`🗺️ [getBusinessesInViewport] Called with bounds:`, bounds);
-  console.log(`🗺️ [getBusinessesInViewport] Search filters:`, searchFilters);
-
   try {
-    // Use unified search if filters provided
-    if (searchFilters) {
-      console.log(`🔍 [getBusinessesInViewport] Using unified search with filters`);
-      
-      let unifiedFilters: any;
-      
-      // If filters are already parsed as an object, expand the terms
-      if (typeof searchFilters === 'object' && searchFilters !== null) {
-        // Expand textTerms if they exist
-        if (searchFilters.textTerms && Array.isArray(searchFilters.textTerms)) {
-          const expandedTerms = await Promise.all(
-            searchFilters.textTerms.map((term: string) => expandTerm(term))
-          );
-          // Flatten and deduplicate
-          const allExpandedTerms = [...new Set(expandedTerms.flat())];
-          unifiedFilters = {
-            ...searchFilters,
-            textTerms: allExpandedTerms
-          };
-          console.log(`🔍 [getBusinessesInViewport] Expanded ${searchFilters.textTerms.length} terms to ${allExpandedTerms.length} terms`);
-        } else {
-          unifiedFilters = searchFilters;
-        }
-      } else if (typeof searchFilters === 'string') {
-        // Parse string filters with semantic expansion
-        unifiedFilters = await parseUnifiedSearchFilters(searchFilters);
-      }
-      
-      if (!unifiedFilters) {
-        console.log('🔍 No valid filters parsed');
-        return [];
-      }
-      
-      const results = await searchBusinessesUnified(unifiedFilters, bounds, limit);
-      console.log(`🔍 [getBusinessesInViewport] Unified search returned ${results.length} businesses`);
-      
-      if (onProgress) {
-        onProgress(results, true);
-      }
-      
-      return results;
+    // Get current user if not provided
+    if (!userId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id;
     }
 
-    // Regular viewport load without search - simple database query
-    const { data: businesses, error } = await supabase
-      .from('businesses')
-      .select('id, name, lat, lng, business_type, atmosphere')
-      .gte('lat', bounds.south)
-      .lte('lat', bounds.north)
-      .gte('lng', bounds.west)
-      .lte('lng', bounds.east)
-      .limit(limit);
-    
+    console.log('🔍 Fetching businesses from Supabase:', {
+      bounds,
+      limit,
+      hasFilters: !!searchFilters,
+      zoom
+    });
+
+    // FIXED: Use grid-sampled function for even distribution
+    const { data, error } = await supabase.rpc(
+      'get_businesses_in_viewport_no_ordering',
+      {
+        min_lat: bounds.south,
+        max_lat: bounds.north,
+        min_lng: bounds.west,
+        max_lng: bounds.east,
+        result_limit: limit,
+        user_profile_id: userId || null
+      }
+    );
+
     if (error) {
-      console.error('Error loading businesses:', error);
+      console.error('❌ Supabase RPC error:', error);
+      throw error;
+    }
+
+    const rawData = data as Array<{
+      id: string;
+      name: string;
+      business_type: string;
+      address: string;
+      lat: number;
+      lng: number;
+      atmosphere: string[];
+      website: string;
+      roles: any[];
+    }> | null;
+
+    if (!rawData || rawData.length === 0) {
+      console.log('⚠️ No businesses returned from query');
       return [];
     }
 
-    // Transform to Business type with position object
-    const transformedBusinesses: Business[] = (businesses || []).map(b => ({
-      ...b,
-      position: { lat: b.lat, lng: b.lng },
-      businessType: b.business_type
-    }));
+    console.log(`✅ Raw data from Supabase: ${rawData.length} businesses`);
 
-    console.log(`✅ Viewport load completed with ${transformedBusinesses.length} businesses`);
-    return transformedBusinesses;
+    // Transform to Business type
+    const businesses: Business[] = rawData
+      .filter((b) => b.lat && b.lng) // Filter out invalid coordinates
+      .map((b) => ({
+        id: b.id,
+        name: b.name,
+        businessType: b.business_type,
+        address: b.address,
+        position: { lat: b.lat, lng: b.lng },
+        atmosphere: b.atmosphere || [],
+        website: b.website || undefined,
+        roles: Array.isArray(b.roles) ? b.roles : []
+      }));
+
+    // Apply search filters if provided
+    if (searchFilters?.keyword) {
+      const keyword = searchFilters.keyword.toLowerCase();
+      return businesses.filter(b => 
+        b.name?.toLowerCase().includes(keyword) ||
+        b.businessType?.toLowerCase().includes(keyword) ||
+        b.address?.toLowerCase().includes(keyword)
+      );
+    }
+
+    if (searchFilters?.role) {
+      const roleFilter = searchFilters.role.toLowerCase();
+      return businesses.filter(b =>
+        b.roles?.some(r => r.role?.toLowerCase().includes(roleFilter))
+      );
+    }
+
+    return businesses;
 
   } catch (error) {
-    console.error('❌ Critical error in getBusinessesInViewport:', error);
+    console.error('❌ Error in getBusinessesInViewport:', error);
+    return [];
+  }
+};
+
+export const searchBusinessesByName = async (
+  query: string,
+  limit: number = 5
+): Promise<Business[]> => {
+  if (query.length < 3) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from('businesses')
+      .select('id, name, business_type, address, lat, lng')
+      .ilike('name', `%${query}%`)
+      .limit(limit);
+
+    if (error) throw error;
+
+    return (data || []).map(b => ({
+      id: b.id,
+      name: b.name,
+      businessType: b.business_type,
+      address: b.address,
+      position: b.lat && b.lng ? { lat: b.lat, lng: b.lng } : undefined,
+      atmosphere: [],
+      roles: []
+    }));
+  } catch (error) {
+    console.error('Search error:', error);
     return [];
   }
 };
 
 export async function getFullBusinessDetails(businessId: string): Promise<Business | null> {
-  console.log('🔍🔍🔍 FETCHING FULL BUSINESS DETAILS FOR:', businessId);
-  console.trace('Call stack:');
+  console.log('🔍 FETCHING FULL BUSINESS DETAILS FOR:', businessId);
   const startTime = performance.now();
   
   // Fetch business data, user profile, and roles in PARALLEL
@@ -249,8 +296,8 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
     website: businessData.website,
   };
 
-  console.log(`✅✅✅ getFullBusinessDetails completed in ${performance.now() - startTime}ms`);
-  console.log(`✅✅✅ Returning ${businessRoles.length} roles for business:`, businessData.name);
+  console.log(`✅ getFullBusinessDetails completed in ${performance.now() - startTime}ms`);
+  console.log(`✅ Returning ${businessRoles.length} roles for business:`, businessData.name);
   return fullBusiness;
 }
 

@@ -340,11 +340,10 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           type: "line",
           source: "nyc-tiles",
           "source-layer": "examplepoints",
-          minzoom: 12, // OPTIMIZED: Don't render roads below zoom 12
           paint: {
             "line-color": "#666666",
-            "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.5, 14, 1.5, 16, 3],
-            "line-opacity": 0.8,
+            "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.3, 10, 0.5, 14, 1.5, 16, 3],
+            "line-opacity": ["interpolate", ["linear"], ["zoom"], 8, 0.5, 12, 0.8],
           },
           filter: ["all", ["==", ["geometry-type"], "LineString"], ["has", "highway"]],
         },
@@ -630,7 +629,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       const vectorSource = {
         type: "vector" as const,
         tiles: [tiles],
-        minzoom: 9,
+        minzoom: 6,
         maxzoom: 16,
         scheme: "xyz" as const,
       };

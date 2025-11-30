@@ -1,7 +1,8 @@
+// src/hooks/useViewportBusinesses.ts
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Business } from '@/types/business';
 import { getBusinessesInViewport, getFullBusinessDetails as getFullBusinessDetailsService } from '@/services/businesses';
-import { isPointInPolygon } from '@/utils/nyc_neighborhoods'
+import { isPointInPolygon } from '@/utils/nyc_neighborhoods';
 import { useTileCache } from './useTileCache';
 import { useMapWorker } from './useMapWorker';
 
@@ -14,10 +15,10 @@ class RequestQueue {
   private maxConcurrent = 3;
 
   setMaxConcurrent(zoom: number) {
-    if (zoom <= 10) this.maxConcurrent = 1; // Far zoom: 1 request at a time
-    else if (zoom <= 12) this.maxConcurrent = 2; // Medium zoom: 2 concurrent
-    else if (zoom <= 14) this.maxConcurrent = 3; // Close zoom: 3 concurrent
-    else this.maxConcurrent = 4; // Very close: 4 concurrent
+    if (zoom <= 10) this.maxConcurrent = 1;
+    else if (zoom <= 12) this.maxConcurrent = 2;
+    else if (zoom <= 14) this.maxConcurrent = 3;
+    else this.maxConcurrent = 4;
   }
 
   async run<T>(fn: () => Promise<T>): Promise<T> {
@@ -39,46 +40,30 @@ class RequestQueue {
 
 const requestQueue = new RequestQueue();
 
-// Persistent details cache using localStorage
+// Persistent details cache - using in-memory Map instead of localStorage
 class PersistentDetailsCache {
-  private static CACHE_KEY = 'business_details_cache';
-  private static MAX_CACHE_SIZE = 500; // increased limit
+  private static cache = new Map<string, Business>();
+  private static MAX_CACHE_SIZE = 500;
 
   static get(key: string): Business | null {
-    try {
-      const cache = localStorage.getItem(this.CACHE_KEY);
-      if (!cache) return null;
-      const parsed = JSON.parse(cache);
-      return parsed[key] || null;
-    } catch {
-      return null;
-    }
+    return this.cache.get(key) || null;
   }
 
   static set(key: string, business: Business): void {
-    try {
-      const cache = localStorage.getItem(this.CACHE_KEY);
-      const parsed = cache ? JSON.parse(cache) : {};
-      
-      // If over limit, remove oldest entries
-      const keys = Object.keys(parsed);
-      if (keys.length >= this.MAX_CACHE_SIZE) {
-        keys.slice(0, keys.length - this.MAX_CACHE_SIZE + 50).forEach(k => delete parsed[k]);
-      }
-      
-      parsed[key] = business;
-      localStorage.setItem(this.CACHE_KEY, JSON.stringify(parsed));
-    } catch (e) {
-      console.warn('Failed to cache business details:', e);
+    if (this.cache.size >= this.MAX_CACHE_SIZE) {
+      // Remove oldest entries (first 50)
+      const keysToRemove = Array.from(this.cache.keys()).slice(0, 50);
+      keysToRemove.forEach(k => this.cache.delete(k));
     }
+    this.cache.set(key, business);
   }
 
   static has(key: string): boolean {
-    return this.get(key) !== null;
+    return this.cache.has(key);
   }
 
   static clear(): void {
-    localStorage.removeItem(this.CACHE_KEY);
+    this.cache.clear();
   }
 }
 
@@ -98,38 +83,25 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
   const { getCachedBusinesses, setCachedBusinesses } = useTileCache();
   const { clusterBusinesses } = useMapWorker();
 
-  // ----------------- Helpers -----------------
-  const calculateBoundsFromPoints = (points: MapPoint[], padding = 0.02): MapBounds => {
-    const lats = points.map(p => p.lat);
-    const lons = points.map(p => p.lon);
-    return {
-      north: Math.max(...lats) + padding,
-      south: Math.min(...lats) - padding,
-      east: Math.max(...lons) + padding,
-      west: Math.min(...lons) - padding
-    };
-  };
-
   const schedulePreload = useCallback((bounds: MapBounds) => {
     if (preloadTimeoutRef.current) clearTimeout(preloadTimeoutRef.current);
-    if (searchFilters) return; // skip preloading during filtered search
+    if (searchFilters) return;
 
     preloadTimeoutRef.current = setTimeout(async () => {
       const latSize = bounds.north - bounds.south;
       const lonSize = bounds.east - bounds.west;
 
       const adjacentAreas: MapBounds[] = [
-        { north: bounds.north + latSize, south: bounds.north, east: bounds.east, west: bounds.west }, // North
-        { north: bounds.south, south: bounds.south - latSize, east: bounds.east, west: bounds.west }, // South
-        { north: bounds.north, south: bounds.south, east: bounds.east + lonSize, west: bounds.east }, // East
-        { north: bounds.north, south: bounds.south, east: bounds.west, west: bounds.west - lonSize }  // West
+        { north: bounds.north + latSize, south: bounds.north, east: bounds.east, west: bounds.west },
+        { north: bounds.south, south: bounds.south - latSize, east: bounds.east, west: bounds.west },
+        { north: bounds.north, south: bounds.south, east: bounds.east + lonSize, west: bounds.east },
+        { north: bounds.north, south: bounds.south, east: bounds.west, west: bounds.west - lonSize }
       ];
 
       for (const area of adjacentAreas) {
         if (!getCachedBusinesses(area)) {
-          // Skip preloading at far zooms to prioritize viewport
           if (zoom <= 12 && requestQueue.active > 0) {
-            console.log('⏭️ Skipping preload at far zoom - prioritizing viewport');
+            console.log('⏭️ Skipping preload at far zoom');
             continue;
           }
           
@@ -138,41 +110,41 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
               getBusinessesInViewport(area, 2000, undefined, undefined, zoom)
             );
             setCachedBusinesses(area, b);
-            console.log(`🔮 Preloaded ${b.length} businesses for adjacent area`);
+            console.log(`🔮 Preloaded ${b.length} businesses`);
           } catch (err) {
-            console.warn('Preload failed for area:', area, err);
+            console.warn('Preload failed:', err);
           }
         }
       }
     }, 1000);
   }, [getCachedBusinesses, setCachedBusinesses, searchFilters, zoom]);
 
-  const loadBusinessesInViewport = useCallback(async (viewportBounds: MapBounds, limit = 8000, isMoving = false) => {
+  const loadBusinessesInViewport = useCallback(async (
+    viewportBounds: MapBounds, 
+    limit = 8000, 
+    isMoving = false
+  ) => {
     let searchPolygon: MapPoint[] | null = null;
 
-    // If neighborhood filter exists, use its polygon
     if (searchFilters?.neighborhoodFilter?.boundary?.length) {
       searchPolygon = searchFilters.neighborhoodFilter.boundary;
     }
 
     const isNewSearch = JSON.stringify(searchFilters) !== JSON.stringify(lastSearchFilters);
 
-    // Clear businesses when transitioning from search to no search
     if (isNewSearch && lastSearchFilters && !searchFilters) {
-      console.log('🧹 Clearing search results, restoring full viewport');
+      console.log('🧹 Clearing search results');
       setBusinesses([]);
     }
 
-    // Only block if it's the exact same request and not new search
-    if (loading && !isNewSearch) {
-      console.log('⏸️ Request in progress, queuing...');
-      // Don't return early for moving requests - let them queue
+    if (loading && !isNewSearch && !isMoving) {
+      console.log('⏸️ Skipping duplicate request');
+      return;
     }
 
     setIsSearching(!!searchFilters);
     if (isNewSearch) setLastSearchFilters(searchFilters);
 
-    // Generate request key
     const filterKey = searchFilters ? JSON.stringify(searchFilters) : 'no-filter';
     const requestKey = `${viewportBounds.north}-${viewportBounds.south}-${viewportBounds.east}-${viewportBounds.west}-${limit}-${filterKey}`;
 
@@ -188,12 +160,11 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
     }
 
     if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
-    const delay = businesses.length ? (isMoving ? 150 : 50) : 0;
+    const delay = businesses.length ? (isMoving ? 400 : 150) : 0;
 
     loadTimeoutRef.current = setTimeout(async () => {
       setLoading(true);
       
-      // Set max concurrent requests based on zoom
       requestQueue.setMaxConcurrent(zoom);
       
       const requestPromise = requestQueue.run(() => 
@@ -204,12 +175,29 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
       try {
         let viewportBusinesses = await requestPromise;
 
-        // If a neighborhood polygon exists, only keep businesses inside
+        console.log('📍 Raw businesses from viewport:', {
+          count: viewportBusinesses.length,
+          first3: viewportBusinesses.slice(0, 3).map(b => ({ 
+            name: b.name, 
+            lat: b.position?.lat, 
+            lng: b.position?.lng 
+          })),
+          last3: viewportBusinesses.slice(-3).map(b => ({ 
+            name: b.name, 
+            lat: b.position?.lat, 
+            lng: b.position?.lng 
+          }))
+        });
+
+        // Apply neighborhood polygon filter if needed
         if (searchPolygon) {
           viewportBusinesses = viewportBusinesses.filter(b =>
             isPointInPolygon({ lat: b.position.lat, lon: b.position.lng }, searchPolygon)
           );
         }
+
+        // REMOVED: Center-out sorting (no longer needed with grid sampling)
+        // The SQL function now handles even distribution across viewport
 
         const updatedBusinesses = searchFilters ? viewportBusinesses : (() => {
           const existingIds = new Set(businesses.map(b => b.id));
@@ -217,17 +205,16 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
           return [...businesses, ...newBusinesses];
         })();
         
-        console.log('🔄 useViewportBusinesses: updating businesses state to:', updatedBusinesses.length, 'businesses');
+        console.log(`✅ Loaded ${updatedBusinesses.length} businesses (${viewportBusinesses.length} new)`);
         setBusinesses(updatedBusinesses);
 
         if (!searchFilters) setCachedBusinesses(viewportBounds, viewportBusinesses);
         setCurrentBounds(viewportBounds);
         if (!searchFilters) schedulePreload(viewportBounds);
 
-
         return viewportBusinesses;
       } catch (err) {
-        console.error('Error loading viewport businesses', err);
+        console.error('❌ Error loading businesses:', err);
         return [];
       } finally {
         inflightRequests.delete(requestKey);
@@ -236,8 +223,8 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
     }, delay);
   }, [loading, businesses, searchFilters, lastSearchFilters, getCachedBusinesses, setCachedBusinesses, schedulePreload, zoom]);
 
-  // ----------------- Full Details -----------------
-  const fetchFullBusinessDetails = async (businessId: string) => {
+  // FIXED: Properly memoize fetchFullBusinessDetails with stable dependencies
+  const fetchFullBusinessDetails = useCallback(async (businessId: string) => {
     if (PersistentDetailsCache.has(businessId)) {
       const cached = PersistentDetailsCache.get(businessId)!;
       setBusinesses(prev => prev.map(b => b.id === businessId ? cached : b));
@@ -252,10 +239,10 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
       setBusinesses(prev => prev.map(b => b.id === businessId ? fullBusiness : b));
       return fullBusiness;
     } catch (err) {
-      console.error('Error fetching business details', err);
+      console.error('❌ Error fetching business details:', err);
       return null;
     }
-  };
+  }, []); // No dependencies needed - uses service function and updates state
 
   const clearBusinesses = useCallback(() => {
     console.log('🧹 Clearing all businesses');
@@ -265,10 +252,11 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
     if (preloadTimeoutRef.current) clearTimeout(preloadTimeoutRef.current);
   }, []);
 
-  // Cleanup on filter changes
   useEffect(() => {
-    if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
-    if (preloadTimeoutRef.current) clearTimeout(preloadTimeoutRef.current);
+    return () => {
+      if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+      if (preloadTimeoutRef.current) clearTimeout(preloadTimeoutRef.current);
+    };
   }, [searchFilters]);
 
   return {
