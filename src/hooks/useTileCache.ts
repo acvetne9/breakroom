@@ -23,94 +23,48 @@ interface CachedTileData {
 const MAX_CACHE_SIZE = 5000; // increased tiles limit
 const TILE_ZOOM_LEVEL = 14; // Fixed zoom for tiling (higher = smaller tiles)
 
-// Persistent tile cache using localStorage
-class PersistentTileCache {
-  private static TILE_CACHE_KEY = 'tile_cache';
-  private static ACCESS_TIMES_KEY = 'tile_access_times';
+// In-memory tile cache - much faster than localStorage (Phase 4)
+class InMemoryTileCache {
+  private static cache = new Map<string, CachedTileData>();
+  private static accessTimes = new Map<string, number>();
 
   static get(key: string): CachedTileData | undefined {
-    try {
-      const cache = localStorage.getItem(this.TILE_CACHE_KEY);
-      if (!cache) return undefined;
-      const parsed = JSON.parse(cache);
-      return parsed[key];
-    } catch {
-      return undefined;
+    const data = this.cache.get(key);
+    if (data) {
+      this.accessTimes.set(key, Date.now()); // Update access time
     }
+    return data;
   }
 
   static set(key: string, data: CachedTileData): void {
-    try {
-      const cache = localStorage.getItem(this.TILE_CACHE_KEY);
-      const parsed = cache ? JSON.parse(cache) : {};
-      parsed[key] = data;
-      localStorage.setItem(this.TILE_CACHE_KEY, JSON.stringify(parsed));
-
-      // Update access time
-      const accessTimes = localStorage.getItem(this.ACCESS_TIMES_KEY);
-      const parsedTimes = accessTimes ? JSON.parse(accessTimes) : {};
-      parsedTimes[key] = Date.now();
-      localStorage.setItem(this.ACCESS_TIMES_KEY, JSON.stringify(parsedTimes));
-    } catch (e) {
-      console.warn('Failed to cache tile data:', e);
-    }
+    this.cache.set(key, data);
+    this.accessTimes.set(key, Date.now());
   }
 
   static has(key: string): boolean {
-    return this.get(key) !== undefined;
+    return this.cache.has(key);
   }
 
   static delete(key: string): void {
-    try {
-      const cache = localStorage.getItem(this.TILE_CACHE_KEY);
-      if (!cache) return;
-      const parsed = JSON.parse(cache);
-      delete parsed[key];
-      localStorage.setItem(this.TILE_CACHE_KEY, JSON.stringify(parsed));
-
-      const accessTimes = localStorage.getItem(this.ACCESS_TIMES_KEY);
-      if (accessTimes) {
-        const parsedTimes = JSON.parse(accessTimes);
-        delete parsedTimes[key];
-        localStorage.setItem(this.ACCESS_TIMES_KEY, JSON.stringify(parsedTimes));
-      }
-    } catch (e) {
-      console.warn('Failed to delete tile data:', e);
-    }
+    this.cache.delete(key);
+    this.accessTimes.delete(key);
   }
 
   static clear(): void {
-    localStorage.removeItem(this.TILE_CACHE_KEY);
-    localStorage.removeItem(this.ACCESS_TIMES_KEY);
+    this.cache.clear();
+    this.accessTimes.clear();
   }
 
   static size(): number {
-    try {
-      const cache = localStorage.getItem(this.TILE_CACHE_KEY);
-      return cache ? Object.keys(JSON.parse(cache)).length : 0;
-    } catch {
-      return 0;
-    }
+    return this.cache.size;
   }
 
-  static getAccessTimes(): Record<string, number> {
-    try {
-      const accessTimes = localStorage.getItem(this.ACCESS_TIMES_KEY);
-      return accessTimes ? JSON.parse(accessTimes) : {};
-    } catch {
-      return {};
-    }
+  static getAccessTimes(): Map<string, number> {
+    return this.accessTimes;
   }
 
   static forEach(callback: (data: CachedTileData, key: string) => void): void {
-    try {
-      const cache = localStorage.getItem(this.TILE_CACHE_KEY);
-      if (!cache) return;
-      const parsed = JSON.parse(cache);
-      Object.entries(parsed).forEach(([key, data]) => callback(data as CachedTileData, key));
-    } catch {
-      // Ignore errors
-    }
+    this.cache.forEach((data, key) => callback(data, key));
   }
 }
 
@@ -168,17 +122,17 @@ function getTilesForBounds(bounds: {
   return tiles;
 }
 
-// Cache cleanup - only remove excess entries if over limit
+// Cache cleanup - only remove excess entries if over limit (Phase 4 - optimized for in-memory)
 function cleanupCache(): void {
   // Only clean up if we're over the size limit
-  if (PersistentTileCache.size() > MAX_CACHE_SIZE) {
-    const accessTimes = PersistentTileCache.getAccessTimes();
-    const sortedByAccess = Object.entries(accessTimes)
+  if (InMemoryTileCache.size() > MAX_CACHE_SIZE) {
+    const accessTimes = InMemoryTileCache.getAccessTimes();
+    const sortedByAccess = Array.from(accessTimes.entries())
       .sort((a, b) => a[1] - b[1])
-      .slice(0, PersistentTileCache.size() - MAX_CACHE_SIZE + 100); // Remove extra for buffer
+      .slice(0, InMemoryTileCache.size() - MAX_CACHE_SIZE + 100); // Remove extra for buffer
     
     sortedByAccess.forEach(([key]) => {
-      PersistentTileCache.delete(key);
+      InMemoryTileCache.delete(key);
     });
   }
 }
@@ -203,7 +157,7 @@ export const useTileCache = () => {
     // Check if all required tiles are cached
     for (const tile of tiles) {
       const key = getTileKey(tile);
-      const cached = PersistentTileCache.get(key);
+      const cached = InMemoryTileCache.get(key);
       
       if (!cached) {
         // Missing tile, cache miss
@@ -222,10 +176,13 @@ export const useTileCache = () => {
       business.position.lng <= bounds.east
     );
     
-    // Remove duplicates (same business might be in multiple tiles)
-    const uniqueBusinesses = filteredBusinesses.filter((business, index, arr) => 
-      arr.findIndex(b => b.id === business.id) === index
-    );
+    // Remove duplicates using Set for O(n) performance
+    const seenIds = new Set<string>();
+    const uniqueBusinesses = filteredBusinesses.filter(business => {
+      if (seenIds.has(business.id)) return false;
+      seenIds.add(business.id);
+      return true;
+    });
     
     console.log(`🎯 Tile cache HIT! ${tiles.length} tiles, ${uniqueBusinesses.length} unique businesses`);
     return uniqueBusinesses; // Return empty array if no businesses - this is still a valid cache hit
@@ -257,7 +214,7 @@ export const useTileCache = () => {
       );
       
       // Cache tile data
-      PersistentTileCache.set(key, {
+      InMemoryTileCache.set(key, {
         businesses: tileBusinesses,
         timestamp: now,
         bounds: tileBounds
@@ -266,20 +223,24 @@ export const useTileCache = () => {
     
     console.log(`💾 Cached ${businesses.length} businesses across ${tiles.length} tiles`);
     
-    // Trigger cleanup if cache is getting full
-    if (PersistentTileCache.size() > MAX_CACHE_SIZE * 0.8) {
-      setTimeout(cleanupCache, 0);
+    // Trigger cleanup if cache is getting full (use requestIdleCallback - Phase 5)
+    if (InMemoryTileCache.size() > MAX_CACHE_SIZE * 0.8) {
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(cleanupCache, { timeout: 5000 });
+      } else {
+        setTimeout(cleanupCache, 100);
+      }
     }
   }, []);
   
   const clearCache = useCallback(() => {
-    PersistentTileCache.clear();
+    InMemoryTileCache.clear();
     console.log('🧹 Cleared tile cache');
   }, []);
   
   const getCacheStats = useCallback(() => {
     return {
-      size: PersistentTileCache.size(),
+      size: InMemoryTileCache.size(),
       maxSize: MAX_CACHE_SIZE,
       ttl: 'infinite',
       tileZoom: TILE_ZOOM_LEVEL

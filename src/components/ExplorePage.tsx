@@ -1,7 +1,7 @@
 import React, { useState, useMemo, memo, useEffect, useCallback, useRef } from "react";
 import { Eye } from "lucide-react";
 import { isProfane } from "../utils/profanityFilter";
-import { usePosts } from "@/hooks/usePosts";
+import { usePostsContext } from "./PostsProvider";
 import VotingComponent from "./VotingComponent";
 import { formatTimeAgo } from "../utils/timeAgo";
 import { TranslatedText } from "./TranslatedText";
@@ -53,7 +53,7 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   onFlyToBusiness,
   currentSlide = 2,
 }) => {
-  const { posts, loading, hasMore, submitPost, votePost, removePost, loadMore, trackCommentedPost } = usePosts();
+  const { posts, loading, hasMore, submitPost, votePost, removePost, loadMore, trackCommentedPost } = usePostsContext();
   const isMobile = useIsMobile();
   
   // Debug logging

@@ -130,10 +130,15 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
       searchPolygon = searchFilters.neighborhoodFilter.boundary;
     }
 
-    const isNewSearch = JSON.stringify(searchFilters) !== JSON.stringify(lastSearchFilters);
+    // Phase 3: Replace expensive JSON.stringify with shallow comparison
+    const isNewSearch = !searchFilters !== !lastSearchFilters ||
+      searchFilters?.keyword !== lastSearchFilters?.keyword ||
+      searchFilters?.role !== lastSearchFilters?.role ||
+      searchFilters?.neighborhoodFilter?.name !== lastSearchFilters?.neighborhoodFilter?.name;
 
-    if (isNewSearch && lastSearchFilters && !searchFilters) {
-      console.log('🧹 Clearing search results');
+    // Clear businesses when search changes (new search OR clearing search)
+    if (isNewSearch) {
+      console.log('🧹 Clearing businesses for new search state');
       setBusinesses([]);
     }
 

@@ -5,7 +5,7 @@ import UnifiedBusinessSearch from "./UnifiedBusinessSearch";
 import { isProfane } from "../utils/profanityFilter";
 import { useDevice } from "@/contexts/DeviceContext";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { usePosts } from "@/hooks/usePosts";
+import { usePostsContext } from "./PostsProvider";
 import { getPastJobs, savePastJob, deletePastJob, type PastJobData } from "@/services/pastJobs";
 import { getCurrentJob, saveCurrentJob, deleteCurrentJob, type CurrentJobData } from "@/services/currentJobs";
 
@@ -101,7 +101,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 }) => {
   const { deviceId } = useDevice();
   const isMobile = useIsMobile();
-  const { getUserPostsAndCommented } = usePosts();
+  const { getUserPostsAndCommented } = usePostsContext();
   const [userPosts, setUserPosts] = useState<Post[]>([]);
 
   // Also refresh when component mounts - FIXED: empty dependency array

@@ -67,29 +67,27 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   const wasClosedIntentionally = useRef(false);
   const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasUserInteracted = useRef(false);
+  const showDropdownRef = useRef(showDropdown);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    showDropdownRef.current = showDropdown;
+  }, [showDropdown]);
 
   // Handle clicks outside to close dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      console.log("🖱️ Click outside detected", {
-        isScrolling: isScrolling.current,
-        targetElement: event.target,
-        isInputClick: inputRef.current?.contains(event.target as Node),
-        isDropdownClick: dropdownRef.current?.contains(event.target as Node),
-      });
+      // Early exit if dropdown not open - prevents unnecessary logging
+      if (!showDropdownRef.current) return;
 
       // Don't close dropdown if we're scrolling within it
-      if (isScrolling.current) {
-        console.log("⏸️ Click ignored - scrolling");
-        return;
-      }
+      if (isScrolling.current) return;
 
       // Don't close if clicking on the input or dropdown
       if (
         (inputRef.current && inputRef.current.contains(event.target as Node)) ||
         (dropdownRef.current && dropdownRef.current.contains(event.target as Node))
       ) {
-        console.log("⏸️ Click ignored - inside component");
         return;
       }
 

@@ -221,6 +221,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const viewportUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasInitialLoadRef = useRef(false);
   const isUserInteractingRef = useRef(false);
+  // Phase 5: Track zoom for skipping intermediate levels
+  const lastProcessedZoomRef = useRef<number>(MAP_DEFAULTS.ZOOM);
+  const isZoomingRef = useRef(false);
   const tileErrorCountRef = useRef(0);
 
   // Stable references for arrays to prevent re-renders
@@ -246,24 +249,43 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
   const { businesses, loading, loadBusinessesInViewport, fetchFullBusinessDetails, isSearching } = useViewportBusinesses(searchFilters);
 
-  // Update refs only when data actually changes
+  // Phase 3: Lightweight comparison functions (no JSON.stringify)
+  const businessesChanged = useCallback((prev: Business[], next: Business[]) => {
+    if (!prev && !next) return false;
+    if (!prev || !next) return true;
+    if (prev.length !== next.length) return true;
+    if (prev.length === 0) return false;
+    // Compare first and last IDs as a quick hash
+    return prev[0]?.id !== next[0]?.id || prev[prev.length - 1]?.id !== next[next.length - 1]?.id;
+  }, []);
+
+  const filtersChanged = useCallback((prev: any, next: any) => {
+    if (!prev && !next) return false;
+    if (!prev || !next) return true;
+    return prev.keyword !== next.keyword ||
+           prev.role !== next.role ||
+           prev.neighborhoodFilter?.name !== next.neighborhoodFilter?.name;
+  }, []);
+
+  // Update refs only when data actually changes (Phase 3: no JSON.stringify)
   useEffect(() => {
-    if (businesses && JSON.stringify(businesses) !== JSON.stringify(businessesRef.current)) {
+    if (businesses && businessesChanged(businessesRef.current, businesses)) {
       businessesRef.current = businesses;
     }
-  }, [businesses]);
+  }, [businesses, businessesChanged]);
 
   useEffect(() => {
-    if (landmarks && JSON.stringify(landmarks) !== JSON.stringify(landmarksRef.current)) {
+    // Landmarks: simple reference + length check
+    if (landmarks && (landmarksRef.current !== landmarks && landmarksRef.current.length !== landmarks.length)) {
       landmarksRef.current = landmarks;
     }
   }, [landmarks]);
 
   useEffect(() => {
-    if (JSON.stringify(searchFilters) !== JSON.stringify(searchFiltersRef.current)) {
+    if (filtersChanged(searchFiltersRef.current, searchFilters)) {
       searchFiltersRef.current = searchFilters;
     }
-  }, [searchFilters]);
+  }, [searchFilters, filtersChanged]);
 
   useEffect(() => {
     if (businesses && businesses.length > 0) {
@@ -516,17 +538,25 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, currentZoom, businesses]);
 
   // OPTIMIZED: Skip viewport updates during interaction
-  const handleViewportChange = useCallback(async () => {
+  const handleViewportChange = useCallback(async (forceUpdate = false) => {
     if (!mapRef.current || !mapLoaded) return;
     
     // OPTIMIZED: Skip if user is actively interacting
-    if (isUserInteractingRef.current) {
+    if (isUserInteractingRef.current && !forceUpdate) {
       return;
     }
 
     const map = mapRef.current;
     const zoom = map.getZoom();
+    
+    // Phase 5: Skip intermediate zoom levels during continuous zooming
+    const zoomDelta = Math.abs(zoom - lastProcessedZoomRef.current);
+    if (isZoomingRef.current && zoomDelta < 0.5 && !forceUpdate) {
+      return; // Skip intermediate zoom levels
+    }
+    
     setCurrentZoom(zoom);
+    lastProcessedZoomRef.current = zoom;
 
     const bounds = map.getBounds();
     const viewportBounds = {
@@ -547,7 +577,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     const now = Date.now();
     if (
       lastBoundsRef.current === boundsKey &&
-      now - lastLoadTimeRef.current < throttleMs
+      now - lastLoadTimeRef.current < throttleMs &&
+      !forceUpdate
     ) {
       return;
     }
@@ -777,12 +808,12 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     initializeMap();
   }, []);
 
-  // Debounced deck overlay update
+  // Phase 3: More aggressive debouncing at low zoom for deckGL layers
   useEffect(() => {
     if (!deckOverlay || !overlayReady) return;
 
-    // Shorter debounce for faster updates
-    const debounceTime = currentZoom < 11 ? 200 : 100;
+    // Phase 3: Increased debounce at low zoom (500ms at <10, 300ms at <12)
+    const debounceTime = currentZoom < 10 ? 500 : currentZoom < 12 ? 300 : 100;
 
     const timeoutId = setTimeout(() => {
       deckOverlay.setProps({ layers: deckGLLayers });
@@ -879,18 +910,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
 
     const onDragEnd = () => {
       isUserInteractingRef.current = false;
-      // OPTIMIZED: Trigger update after interaction ends
-      setTimeout(() => handleViewportChange(), 300);
+      // Phase 3: Consolidated - let moveend handle this, remove duplicate
     };
 
     const onZoomStart = () => {
       isUserInteractingRef.current = true;
+      isZoomingRef.current = true; // Phase 5: Track zooming state
     };
 
     const onZoomEnd = () => {
       isUserInteractingRef.current = false;
-      // OPTIMIZED: Trigger update after interaction ends
-      setTimeout(() => handleViewportChange(), 300);
+      isZoomingRef.current = false; // Phase 5: Stop tracking zooming
+      // Phase 5: Force update after zoom ends using requestIdleCallback
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(() => handleViewportChange(true), { timeout: 500 });
+      } else {
+        setTimeout(() => handleViewportChange(true), 100);
+      }
     };
 
     map.on("dragstart", onDragStart);

@@ -4,6 +4,8 @@ import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods';
 import { searchBusinessesUnified, parseUnifiedSearchFilters } from './unifiedSearch';
 import { expandTerm } from '@/utils/smartSearch';
 import { sanitizeVoteTotal } from '@/utils/voteCalculations';
+import { applyBusinessFilters, SearchFilters } from './businessFiltering';
+import { calculateBusinessFuzzyScore } from '@/utils/fuzzySearch';
 
 type MapBounds = { north: number; south: number; east: number; west: number };
 
@@ -160,21 +162,38 @@ export const getBusinessesInViewport = async (
         roles: Array.isArray(b.roles) ? b.roles : []
       }));
 
-    // Apply search filters if provided
-    if (searchFilters?.keyword) {
-      const keyword = searchFilters.keyword.toLowerCase();
-      return businesses.filter(b => 
-        b.name?.toLowerCase().includes(keyword) ||
-        b.businessType?.toLowerCase().includes(keyword) ||
-        b.address?.toLowerCase().includes(keyword)
-      );
-    }
-
-    if (searchFilters?.role) {
-      const roleFilter = searchFilters.role.toLowerCase();
-      return businesses.filter(b =>
-        b.roles?.some(r => r.role?.toLowerCase().includes(roleFilter))
-      );
+    // Apply search filters if provided using proper filter function
+    if (searchFilters) {
+      const filters = searchFilters as SearchFilters;
+      
+      // Use the comprehensive filter function that handles all filter types
+      let filteredBusinesses = applyBusinessFilters(businesses, filters);
+      
+      // Apply fuzzy scoring threshold for text searches to ensure good matches
+      if (filters.textTerms && filters.textTerms.length > 0) {
+        const searchQuery = filters.textTerms.join(' ');
+        const MINIMUM_SCORE = 0.25; // Threshold for "good enough" match
+        
+        const scoredBusinesses = filteredBusinesses
+          .map(b => ({
+            business: b,
+            score: calculateBusinessFuzzyScore(
+              b.name || '',
+              b.businessType || '',
+              b.roles?.map(r => r.role) || [],
+              searchQuery
+            )
+          }))
+          .filter(({ score }) => score >= MINIMUM_SCORE)
+          .sort((a, b) => b.score - a.score)
+          .map(({ business }) => business);
+        
+        console.log(`🎯 Fuzzy score filter: ${filteredBusinesses.length} → ${scoredBusinesses.length} businesses (threshold: ${MINIMUM_SCORE})`);
+        return scoredBusinesses;
+      }
+      
+      console.log(`🎯 Search filter applied: ${businesses.length} → ${filteredBusinesses.length} businesses`);
+      return filteredBusinesses;
     }
 
     return businesses;
