@@ -929,15 +929,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   if (loadError) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-transparent">
-        <div className="app-card p-6 flex items-center gap-3 border-red-500">
-          <AlertCircle className="w-5 h-5 text-red-500" />
-          <div>
-            <p className="text-red-500 font-medium">Failed to load jobs</p>
-            <p className="text-sm text-app-gray-medium">{loadError}</p>
-            <button onClick={loadJobsFromDatabase} className="mt-2 text-sm text-app-yellow hover:underline">
-              Try again
-            </button>
-          </div>
+        <div className="app-card p-6 text-center">
+          <p className="text-app-black font-medium">
+            Error: Unable to load job data, please check your internet connection and try again.
+          </p>
         </div>
       </div>
     );
