@@ -1,21 +1,24 @@
 @import "maplibre-gl/dist/maplibre-gl.css";
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Caveat:wght@400..700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Mobile Web App Design System - Exact match to mockups */
+/* Enhanced Mobile Web App Design System - Retro Break Room Aesthetic */
 
 @layer base {
   :root {
-    /* App-specific colors from mockups */
+    /* App-specific colors - Warm & Inviting */
     --app-yellow: 45 100% 55%;
+    --app-yellow-warm: 43 96% 56%;
     --app-gray-light: 210 11% 71%;
     --app-gray-medium: 210 9% 53%;
     --app-gray-dark: 210 11% 15%;
     --app-black: 0 0% 0%;
     --app-white: 0 0% 100%;
     --app-shadow: 0 0% 0%;
+    --app-coffee: 25 47% 35%;
 
     /* Background and surfaces */
     --background: 0 0% 100%;
@@ -47,6 +50,7 @@
     --card-radius: 1rem;
     --popup-radius: 0.75rem;
     --app-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    --app-shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.12);
 
     /* Mobile-specific */
     --safe-area-top: env(safe-area-inset-top);
@@ -99,10 +103,25 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-optical-sizing: auto;
     overflow: hidden;
     height: 100vh;
     height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Enhanced typography scale */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  /* Playful accents with Caveat for special elements */
+  .font-handwritten {
+    font-family: 'Caveat', cursive;
   }
 
   /* Allow proper touch events for maps and other interactive elements */
@@ -131,14 +150,27 @@
 }
 
 @layer components {
-  /* App Card - large UI box matching mockups exactly */
+  /* App Card - Enhanced with subtle texture and depth */
   .app-card {
     @apply w-[90vw] h-[85vh] bg-white rounded-2xl relative mx-auto;
     border: 2px solid hsl(var(--app-yellow));
-    box-shadow: var(--app-shadow);
+    box-shadow:
+      var(--app-shadow-elevated),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8);
     max-width: 400px;
-    -webkit-transform: translateZ(0); /* Force hardware acceleration on iOS */
+    -webkit-transform: translateZ(0);
     transform: translateZ(0);
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    background-image:
+      radial-gradient(circle at 100% 0%, rgba(255, 250, 205, 0.1) 0%, transparent 40%),
+      radial-gradient(circle at 0% 100%, rgba(247, 220, 111, 0.08) 0%, transparent 40%);
+  }
+
+  .app-card:hover {
+    box-shadow:
+      0 12px 32px rgba(0, 0, 0, 0.2),
+      0 4px 12px rgba(0, 0, 0, 0.14),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
   }
 
   /* Remove auto margins on mobile for proper peeking alignment */
@@ -149,32 +181,53 @@
     }
   }
 
-  /* App Popup - smaller version of card */
+  /* App Popup - Enhanced version */
   .app-popup {
     @apply w-[90vw] bg-white rounded-xl relative mx-auto;
     border: 2px solid hsl(var(--app-yellow));
-    box-shadow: var(--app-shadow);
+    box-shadow: var(--app-shadow-elevated);
     max-width: 400px;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    background-image:
+      radial-gradient(circle at 100% 0%, rgba(255, 250, 205, 0.08) 0%, transparent 40%);
   }
 
   /* App Popup Transparent - transparent version for posts */
   .app-popup-transparent {
     @apply w-[90vw] bg-white/100 backdrop-blur-sm rounded-xl relative mx-auto;
     border: 2px solid hsl(var(--app-yellow));
-    box-shadow: var(--app-shadow);
+    box-shadow: var(--app-shadow-elevated);
     max-width: 400px;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
-  /* Input fields matching mockup styling */
+  /* Input fields with smooth transitions */
   .app-input {
     @apply w-full px-4 py-3 bg-white text-black;
     border: 2px solid hsl(var(--app-gray-light));
     border-radius: 0.5rem !important;
     font-size: 16px;
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  }
+
+  .app-input:focus {
+    outline: none;
+    border-color: hsl(var(--app-yellow));
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.08),
+      0 0 0 4px rgba(252, 217, 52, 0.15);
+    transform: translateY(-1px);
   }
 
   .app-input::placeholder {
     color: hsl(var(--app-gray-medium));
+    transition: color 0.2s ease;
+  }
+
+  .app-input:focus::placeholder {
+    color: hsl(var(--app-gray-light));
   }
 
   /* Search bar styling with button support - standardized to match card width */
@@ -183,7 +236,19 @@
     border: 2px solid hsl(var(--app-gray-light));
     border-radius: 0.5rem !important;
     font-size: 16px;
+    font-family: 'DM Sans', -apple-system, sans-serif;
     max-width: 400px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  }
+
+  .search-bar:focus {
+    outline: none;
+    border-color: hsl(var(--app-yellow));
+    box-shadow:
+      0 6px 16px rgba(0, 0, 0, 0.1),
+      0 0 0 4px rgba(252, 217, 52, 0.15);
+    transform: translateY(-1px);
   }
 
   .search-bar::placeholder {
@@ -196,9 +261,9 @@
     backdrop-filter: blur(2px);
   }
 
-  /* Smooth transitions */
+  /* Smooth transitions with elastic easing */
   .slide-transition {
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
   /* Hardware acceleration for animations */
@@ -210,11 +275,89 @@
     transform: translateZ(0);
   }
 
+  /* Enhanced button micro-interactions */
+  button, .button {
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+  }
+
+  button:active, .button:active {
+    transform: scale(0.96);
+  }
+
   /* Smooth scrolling optimization */
   .overflow-y-auto {
     -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
   }
+
+  /* Staggered animation utilities */
+  @keyframes slideInUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes fadeInScale {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .animate-slide-in-up {
+    animation: slideInUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  .animate-slide-in-left {
+    animation: slideInLeft 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  .animate-slide-in-right {
+    animation: slideInRight 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  .animate-fade-in-scale {
+    animation: fadeInScale 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  /* Stagger delays for sequential animations */
+  .stagger-1 { animation-delay: 0.1s; opacity: 0; }
+  .stagger-2 { animation-delay: 0.2s; opacity: 0; }
+  .stagger-3 { animation-delay: 0.3s; opacity: 0; }
+  .stagger-4 { animation-delay: 0.4s; opacity: 0; }
+  .stagger-5 { animation-delay: 0.5s; opacity: 0; }
 
   /* Scrollbar styling for dropdowns */
   .scrollbar-thin {

@@ -15,9 +15,6 @@ const config: CapacitorConfig = {
         },
       }
     : {}),
-  "ios": {
-    "path": "ios"
-  },
 };
 
 export default config;

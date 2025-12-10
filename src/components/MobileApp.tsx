@@ -765,10 +765,16 @@ const MobileApp: React.FC = () => {
       {shouldRenderSettingsCard && currentView !== "initiation" && (
         <motion.div
           animate={{ x: getSettingsCardPosition() }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          transition={{
+            type: "spring",
+            stiffness: 300,
+            damping: 30,
+            mass: 0.8,
+          }}
           className="absolute inset-0 z-20"
           style={{
             pointerEvents: currentSlide === 0 || (isMobile && currentSlide === 1) ? "auto" : "none",
+            filter: currentSlide === 0 ? 'none' : 'brightness(0.95)',
           }}
           onTouchStart={(e) => handleTouchStart(e, 'settings')}
           onTouchMove={(e) => handleTouchMove(e, 'settings')}
@@ -791,10 +797,16 @@ const MobileApp: React.FC = () => {
       {shouldRenderExploreCard && currentView !== "initiation" && (
         <motion.div
           animate={{ x: getExploreCardPosition() }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          transition={{
+            type: "spring",
+            stiffness: 300,
+            damping: 30,
+            mass: 0.8,
+          }}
           className="absolute inset-0 z-20"
           style={{
             pointerEvents: currentSlide === 2 || (isMobile && currentSlide === 1) ? "auto" : "none",
+            filter: currentSlide === 2 ? 'none' : 'brightness(0.95)',
           }}
           onTouchStart={(e) => handleTouchStart(e, 'explore')}
           onTouchMove={(e) => handleTouchMove(e, 'explore')}

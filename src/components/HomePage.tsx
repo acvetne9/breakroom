@@ -287,7 +287,7 @@ const HomePage: React.FC<HomePageProps> = ({
       </div>
 
       {/* Loading overlay on top */}
-      {showLoadingOverlay && <BreakroomLoading onComplete={handleLoadingComplete} />}
+      <BreakroomLoading onComplete={handleLoadingComplete} isLoaded={mapDataReady && businessDataReady} />
 
       {showWelcome && !showLoadingOverlay && (
         <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-30 w-[90%] max-w-lg transition-opacity duration-700">

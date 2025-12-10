@@ -1,15 +1,32 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
-const BreakroomLoading = ({ onComplete }: { onComplete?: () => void }) => {
+interface BreakroomLoadingProps {
+  onComplete?: () => void;
+  isLoaded?: boolean;
+}
+
+const BreakroomLoading = ({ onComplete, isLoaded = false }: BreakroomLoadingProps) => {
   const [isVisible, setIsVisible] = useState(true);
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+  const hasCompleted = useRef(false);
 
+  // Minimum display time of 2.5 seconds for full animation to complete
+  // (mug: 1.2s, text delay: 1.2s + 0.8s slide = 2s total)
   useEffect(() => {
     const timer = setTimeout(() => {
-      setIsVisible(false);
-      if (onComplete) setTimeout(onComplete, 500);
-    }, 3000);
+      setMinTimeElapsed(true);
+    }, 2500);
     return () => clearTimeout(timer);
-  }, [onComplete]);
+  }, []);
+
+  // Hide when both: min time elapsed AND content is loaded
+  useEffect(() => {
+    if (minTimeElapsed && isLoaded && !hasCompleted.current) {
+      hasCompleted.current = true;
+      setIsVisible(false);
+      if (onComplete) setTimeout(onComplete, 300);
+    }
+  }, [minTimeElapsed, isLoaded, onComplete]);
 
   if (!isVisible) return null;
 
@@ -180,7 +197,7 @@ const BreakroomLoading = ({ onComplete }: { onComplete?: () => void }) => {
             text-shadow: 2px 2px 0px rgba(178, 34, 34, 0.6), 0 0 25px rgba(178, 34, 34, 0.5) !important;
             transform: perspective(500px) rotateX(-5deg) translateX(0px) !important;
           }
-          
+
           div[style*="fontFamily"] span {
             font-weight: 900 !important;
           }
