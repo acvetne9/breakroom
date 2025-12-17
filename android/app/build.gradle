@@ -13,8 +13,8 @@ android {
         applicationId 'com.acvetne.breakroom'
         minSdkVersion 23
         targetSdkVersion 35
-        versionCode 2
-        versionName "1.01"
+        versionCode 4
+        versionName "1.03"
     }
 
     compileOptions {
