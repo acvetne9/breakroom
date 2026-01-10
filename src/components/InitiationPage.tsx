@@ -207,7 +207,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
 
           {/* Content - vertically centered */}
           <div className="flex-1 flex items-center justify-center w-full">
-            <div className="w-full max-w-xs space-y-5">
+            <div className="w-80 space-y-5">
               {/* Make a difference message - ABOVE inputs */}
               <div className="text-center mb-3">
                 <p className="text-gray-700 text-base font-medium">

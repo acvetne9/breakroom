@@ -1,4 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
+import { executeQuery, createCacheKey, queryCache } from "@/utils/databaseOptimizations";
+import { retryWithBackoff, isRetryableError } from "@/utils/retryWithBackoff";
 
 // Debug function to check profile status
 export const debugProfileStatus = async () => {
@@ -131,49 +133,64 @@ export const getPosts = async (
 ): Promise<{ data: PostData[] | null; error: any }> => {
   console.log(`🔍 getPosts - fetching ${limit} posts with coordinates...`);
 
-  const { data, error } = await supabase
-    .from("posts")
-    .select(
-      `
-      *,
-      businesses(id, name, lat, lng)
-    `,
-    )
-    .eq('is_deleted', false)
-    .order("created_at", { ascending: false })
-    .range(offset, offset + limit - 1);
+  // Use optimized query with caching
+  const cacheKey = createCacheKey('posts', { limit, offset });
 
-  console.log("📊 RAW SUPABASE RESPONSE:", {
-    dataLength: data?.length || 0,
-    error,
-    firstPost: data?.[0],
-  });
+  return executeQuery(
+    'getPosts',
+    async () => {
+      const { data, error } = await retryWithBackoff(
+        () => supabase
+          .from("posts")
+          .select(
+            `
+            *,
+            businesses(id, name, lat, lng)
+          `,
+          )
+          .eq('is_deleted', false)
+          .order("created_at", { ascending: false })
+          .range(offset, offset + limit - 1),
+        { shouldRetry: isRetryableError }
+      );
 
-  if (error) {
-    console.error("❌ Error fetching posts:", error);
-    return { data: null, error };
-  }
+      console.log("📊 RAW SUPABASE RESPONSE:", {
+        dataLength: data?.length || 0,
+        error,
+        firstPost: data?.[0],
+      });
 
-  // Transform data to flatten business coordinates (handle null businesses from left join)
-  const transformedData = data?.map((post: any) => ({
-    ...post,
-    business_lat: post.businesses?.lat || null,
-    business_lng: post.businesses?.lng || null,
-    business_name: post.businesses?.name || null,
-  }));
+      if (error) {
+        console.error("❌ Error fetching posts:", error);
+        return { data: null, error };
+      }
 
-  console.log(`✅ Fetched ${transformedData?.length || 0} posts with coordinates`);
-  console.log("🔍 TRANSFORMED DATA SAMPLE:", {
-    totalPosts: transformedData?.length,
-    firstThreePosts: transformedData?.slice(0, 3).map((p) => ({
-      id: p.id,
-      text: p.content?.substring(0, 30),
-      business_id: p.business_id,
-      business_name: p.business_name,
-      hasCoordinates: !!(p.business_lat && p.business_lng),
-    })),
-  });
-  return { data: transformedData as PostData[], error: null };
+      // Transform data to flatten business coordinates (handle null businesses from left join)
+      const transformedData = data?.map((post: any) => ({
+        ...post,
+        business_lat: post.businesses?.lat || null,
+        business_lng: post.businesses?.lng || null,
+        business_name: post.businesses?.name || null,
+      }));
+
+      console.log(`✅ Fetched ${transformedData?.length || 0} posts with coordinates`);
+      console.log("🔍 TRANSFORMED DATA SAMPLE:", {
+        totalPosts: transformedData?.length,
+        firstThreePosts: transformedData?.slice(0, 3).map((p) => ({
+          id: p.id,
+          text: p.content?.substring(0, 30),
+          business_id: p.business_id,
+          business_name: p.business_name,
+          hasCoordinates: !!(p.business_lat && p.business_lng),
+        })),
+      });
+      return { data: transformedData as PostData[], error: null };
+    },
+    {
+      cacheKey,
+      cacheTTL: 30000, // Cache for 30 seconds
+    }
+  );
 };
 
 // Create a new post
@@ -221,6 +238,9 @@ export const createPost = async (
     business_lng: data.businesses?.lng || null,
     business_name: data.businesses?.name || null,
   };
+
+  // Invalidate posts cache after creating a new post
+  queryCache.invalidatePattern('posts:');
 
   return { data: transformedData as PostData, error: null };
 };
@@ -271,8 +291,14 @@ export const getUserVotes = async (postIds: string[]): Promise<{ [postId: string
     return {};
   }
 
-  // Get device ID directly
-  const deviceId = localStorage.getItem("device_id");
+  // Use caching for user votes
+  const cacheKey = createCacheKey('user_votes', { postIds: postIds.sort() });
+
+  return executeQuery(
+    'getUserVotes',
+    async () => {
+      // Get device ID directly
+      const deviceId = localStorage.getItem("device_id");
   
   if (!deviceId) {
     console.warn("No device ID found, cannot fetch user votes");
@@ -313,6 +339,12 @@ export const getUserVotes = async (postIds: string[]): Promise<{ [postId: string
     console.error("❌ Exception fetching user votes:", error);
     return {};
   }
+    },
+    {
+      cacheKey,
+      cacheTTL: 60000, // Cache for 1 minute
+    }
+  );
 };
 
 // Soft delete a post (marks as deleted)

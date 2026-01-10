@@ -1,45 +1,18 @@
 import { Business } from '@/types/business';
-import { findNeighborhoodBoundaryByName, nycNeighborhoodBoundaries, filterBusinessesByNeighborhood } from '@/utils/nyc_neighborhoods';
+import { findNeighborhoodBoundaryByName, filterBusinessesByNeighborhood } from '@/utils/nyc_neighborhoods';
 import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods';
-import { expandTerm } from '@/utils/smartSearch';
-
-// Inline parseSearchTerms function
-function parseSearchTerms(query: string): { 
-  salaryQuery?: { min?: number; max?: number; isRange: boolean }; 
-  textTerms?: string[] 
-} {
-  const words = query.toLowerCase().split(/\s+/);
-  let salaryQuery: { min?: number; max?: number; isRange: boolean } | undefined;
-  const textTerms: string[] = [];
-
-  for (const word of words) {
-    // Salary patterns: $20, $20-30, 20-30, etc
-    if (word.includes('$') || /^\d+(-\d+)?$/.test(word)) {
-      const cleaned = word.replace(/\$/g, '');
-      if (cleaned.includes('-')) {
-        const [min, max] = cleaned.split('-').map(n => parseFloat(n));
-        if (!isNaN(min) && !isNaN(max)) {
-          salaryQuery = { min, max, isRange: true };
-          continue;
-        }
-      } else {
-        const num = parseFloat(cleaned);
-        if (!isNaN(num)) {
-          salaryQuery = { min: num, isRange: false };
-          continue;
-        }
-      }
-    }
-    // Everything else is a text search term
-    if (word.length > 1) textTerms.push(word);
-  }
-
-  return { salaryQuery, textTerms: textTerms.length > 0 ? textTerms : undefined };
-}
+import {
+  parseBasicSearchTerms,
+  parseSalaryToHourly,
+  COMMON_ROLES,
+  COMMON_BUSINESS_TYPES
+} from '@/utils/searchParsing';
+import { stripPunctuation } from '@/utils/searchUtils';
 
 export interface SearchFilters {
   textTerms: string[];
   originalTerms?: string[]; // Original search terms (for name/type matching)
+  isNeighborhoodSearch?: boolean; // Flag for tiered filtering
   salaryQuery?: {
     min?: number;
     max?: number;
@@ -71,37 +44,23 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
     };
   }
   
-  const { salaryQuery, textTerms } = parseSearchTerms(searchQuery);
-  
+  const { salaryQuery, textTerms } = parseBasicSearchTerms(searchQuery);
+
   let filteredTextTerms = textTerms;
   if (neighborhood && textTerms) {
     const neighborhoodNameLower = neighborhood.name.toLowerCase();
-    filteredTextTerms = textTerms.filter(term => 
-      !neighborhoodNameLower.includes(term.toLowerCase()) && 
+    filteredTextTerms = textTerms.filter(term =>
+      !neighborhoodNameLower.includes(term.toLowerCase()) &&
       !term.toLowerCase().includes(neighborhoodNameLower)
     );
   }
-  
-  const commonRoles = [
-    'barista','manager','cashier','server','cook','chef','waiter','waitress','host','hostess',
-    'bartender','barback','line cook','dishwasher','assistant','supervisor','lead','team',
-    'crew','staff','associate','representative','agent','coordinator','specialist','technician',
-    'receptionist','secretary','clerk','sales','service','customer','food','kitchen','front',
-    'back','house','floor','delivery','driver','cleaner','maintenance', 'intern', 'trainee'
-  ];
-  
-  const commonBusinessTypes = [
-    'restaurant','restaurants','cafe','cafes','coffee','shop','shops','bar','bars','store','stores',
-    'hotel','hotels','gym','gyms','salon','salons','bakery','bakeries','deli','delis','market',
-    'office','clinic','hospital','bank','retail','fast','food','chain','franchise','boutique'
-  ];
-  
-  let roleFilter = filteredTextTerms?.find(term => 
-    commonRoles.includes(term.toLowerCase())
+
+  let roleFilter = filteredTextTerms?.find(term =>
+    COMMON_ROLES.includes(term.toLowerCase())
   );
-  
+
   let businessTypeFilter = filteredTextTerms?.find(term =>
-    commonBusinessTypes.includes(term.toLowerCase())
+    COMMON_BUSINESS_TYPES.includes(term.toLowerCase())
   );
 
   if (salaryQuery) {
@@ -117,10 +76,15 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
     filters.neighborhoodFilter = neighborhood;
   }
 
-  const originalTerms = parseSearchTerms(searchQuery).textTerms || [];
+  const originalTerms = parseBasicSearchTerms(searchQuery).textTerms || [];
   if (originalTerms.length > 0) {
     filters.textTerms = originalTerms;
+    // Also store punctuation-stripped version for tiered filtering
+    filters.originalTerms = originalTerms.map(term => stripPunctuation(term)).filter(t => t.length > 0);
   }
+
+  // Set isNeighborhoodSearch flag for tiered filtering
+  filters.isNeighborhoodSearch = !!neighborhood;
 
   console.log('🔍 [parseSearchFilters] Final filters:', filters);
 
@@ -164,16 +128,8 @@ export function applyBusinessFilters(businesses: Business[], filters: SearchFilt
     return variants.some(v => h.includes(v));
   };
 
-  const toHourly = (salary: string): number | null => {
-    if (!salary) return null;
-    const s = salary.toLowerCase();
-    const num = parseFloat(s.replace(/[^0-9.]/g, ''));
-    if (isNaN(num)) return null;
-    if (s.includes('/hr') || s.includes('hour')) return num;
-    if (s.includes('/mo') || s.includes('month')) return Math.round(num / 173);
-    if (s.includes('/yr') || s.includes('/year') || s.includes('year') || s.includes('annual')) return Math.round(num / 2080);
-    return num; // assume hourly if unit missing
-  };
+  // Use shared salary parsing utility
+  const toHourly = parseSalaryToHourly;
 
   const filtered = filteredBusinesses.filter(business => {
     const name = business.name || '';

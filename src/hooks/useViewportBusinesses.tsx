@@ -131,15 +131,26 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
     }
 
     // Phase 3: Replace expensive JSON.stringify with shallow comparison
+    const prevTerms = lastSearchFilters?.textTerms?.join(',') || '';
+    const nextTerms = searchFilters?.textTerms?.join(',') || '';
+
     const isNewSearch = !searchFilters !== !lastSearchFilters ||
-      searchFilters?.keyword !== lastSearchFilters?.keyword ||
-      searchFilters?.role !== lastSearchFilters?.role ||
+      prevTerms !== nextTerms ||
+      searchFilters?.roleFilter !== lastSearchFilters?.roleFilter ||
+      searchFilters?.businessTypeFilter !== lastSearchFilters?.businessTypeFilter ||
       searchFilters?.neighborhoodFilter?.name !== lastSearchFilters?.neighborhoodFilter?.name;
 
     // Clear businesses when search changes (new search OR clearing search)
     if (isNewSearch) {
       console.log('🧹 Clearing businesses for new search state');
       setBusinesses([]);
+    }
+
+    // CRITICAL: When searching, only load businesses ONCE (on initial search)
+    // Don't load new businesses when scrolling during an active search
+    if (searchFilters && !isNewSearch) {
+      console.log('🔒 Search active - skipping viewport load to preserve tier filtering');
+      return;
     }
 
     if (loading && !isNewSearch && !isMoving) {
@@ -204,13 +215,18 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
         // REMOVED: Center-out sorting (no longer needed with grid sampling)
         // The SQL function now handles even distribution across viewport
 
-        const updatedBusinesses = searchFilters ? viewportBusinesses : (() => {
-          const existingIds = new Set(businesses.map(b => b.id));
-          const newBusinesses = viewportBusinesses.filter(b => !existingIds.has(b.id));
-          return [...businesses, ...newBusinesses];
-        })();
-        
-        console.log(`✅ Loaded ${updatedBusinesses.length} businesses (${viewportBusinesses.length} new)`);
+        // Search mode: REPLACE (tier filtering happens in MapLibreMap)
+        // Browse mode: ACCUMULATE (collect businesses as you scroll)
+        const updatedBusinesses = searchFilters
+          ? viewportBusinesses  // SEARCH: Replace with filtered results
+          : (() => {
+              // BROWSE: Accumulate as you scroll
+              const existingIds = new Set(businesses.map(b => b.id));
+              const newBusinesses = viewportBusinesses.filter(b => !existingIds.has(b.id));
+              return [...businesses, ...newBusinesses];
+            })();
+
+        console.log(`✅ Loaded ${updatedBusinesses.length} businesses (${viewportBusinesses.length} from query, search mode: ${!!searchFilters})`);
         setBusinesses(updatedBusinesses);
 
         if (!searchFilters) setCachedBusinesses(viewportBounds, viewportBusinesses);

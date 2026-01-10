@@ -1,10 +1,28 @@
 
 // Comprehensive profanity filter utility with block-only approach
 const profanityList = [
-  // Common profanity - keeping this list clean for demo purposes
-  'badword1', 'badword2', 'offensive1', 'offensive2',
-  // Add more words as needed - this would typically be a comprehensive list
-  'spam', 'scam', 'fake', 'fraud'
+  // Profanity (common variants)
+  'fuck', 'fuk', 'fck', 'shit', 'shit', 'damn', 'bitch', 'bastard', 'ass',
+  'asshole', 'cunt', 'dick', 'cock', 'pussy', 'whore', 'slut', 'piss',
+  'nigger', 'nigga', 'fag', 'faggot', 'retard', 'retarded',
+
+  // Scam/fraud related
+  'spam', 'scam', 'fake', 'fraud', 'phishing', 'ponzi', 'mlm',
+
+  // Hate speech
+  'nazi', 'hitler', 'kkk', 'terrorist', 'jihad',
+
+  // Sexual content
+  'porn', 'xxx', 'sex', 'nude', 'naked', 'nsfw',
+
+  // Violence
+  'kill', 'murder', 'rape', 'bomb', 'shoot', 'gun',
+
+  // Drug related (context dependent, but flagging for review)
+  'meth', 'cocaine', 'heroin', 'crack', 'dealer',
+
+  // Common leetspeak variants (will be caught by normalization)
+  'fuk', 'sh1t', 'b1tch', 'a55', 'a55hole'
 ];
 
 // Leetspeak and common character substitutions
@@ -15,7 +33,12 @@ const leetSpeakMap: { [key: string]: string } = {
 
 // Whitelist for words that might be falsely flagged
 const whitelist = [
-  'assessment', 'basement', 'class', 'assistant', 'grass', 'glass'
+  'assessment', 'basement', 'class', 'assistant', 'grass', 'glass',
+  'classic', 'classes', 'classified', 'passable', 'passageway',
+  'assassin', 'massage', 'passage', 'compass', 'trespass',
+  'cassette', 'cassock', 'dickens', 'dickinson', 'cockatoo',
+  'peacock', 'shuttle', 'button', 'county', 'country',
+  'scunthorpe', 'penistone', 'essex', 'sussex', 'middlesex'
 ];
 
 /**
@@ -44,33 +67,53 @@ function normalizeText(text: string): string {
 }
 
 /**
- * Checks if text contains profanity
+ * Checks if text contains profanity with word boundary detection
  * Returns true if profanity is detected, false otherwise
  */
 export function isProfane(text: string): boolean {
   if (!text || typeof text !== 'string') {
     return false;
   }
-  
+
   const normalizedText = normalizeText(text);
-  
+  const originalLower = text.toLowerCase();
+
+  // First check whitelist against original text
+  const isTextWhitelisted = whitelist.some(whitelistedWord =>
+    originalLower.includes(whitelistedWord.toLowerCase())
+  );
+
+  if (isTextWhitelisted) {
+    return false; // Early exit if whole phrase is whitelisted
+  }
+
   // Check each profanity word
   for (const profaneWord of profanityList) {
     const normalizedProfaneWord = normalizeText(profaneWord);
-    
+
     // Check if the profane word appears in the text
     if (normalizedText.includes(normalizedProfaneWord)) {
-      // Check if it's in the whitelist
-      const isWhitelisted = whitelist.some(whitelistedWord => 
-        normalizeText(whitelistedWord).includes(normalizedProfaneWord)
-      );
-      
-      if (!isWhitelisted) {
+      // Word boundary check: ensure it's not part of a larger word
+      // Create pattern to match as standalone word or with common separators
+      const wordIndex = normalizedText.indexOf(normalizedProfaneWord);
+      const beforeChar = wordIndex > 0 ? normalizedText[wordIndex - 1] : ' ';
+      const afterChar = wordIndex + normalizedProfaneWord.length < normalizedText.length
+        ? normalizedText[wordIndex + normalizedProfaneWord.length]
+        : ' ';
+
+      // Check if it's a standalone word (surrounded by spaces or at edges)
+      const isStandaloneOrRepeated =
+        wordIndex === 0 || // starts text
+        wordIndex + normalizedProfaneWord.length === normalizedText.length || // ends text
+        !/[a-z0-9]/.test(beforeChar) || // preceded by separator
+        !/[a-z0-9]/.test(afterChar); // followed by separator
+
+      if (isStandaloneOrRepeated) {
         return true;
       }
     }
   }
-  
+
   return false;
 }
 

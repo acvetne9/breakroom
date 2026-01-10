@@ -4,6 +4,9 @@ import { applyBusinessFilters, SearchFilters } from "./businessFiltering";
 import { expandTerm } from "@/utils/smartSearch";
 import { sanitizeVoteTotal } from "@/utils/voteCalculations";
 import { findNeighborhoodBoundaryByName } from "@/utils/nyc_neighborhoods";
+import { parseAdvancedSalaryPatterns } from "@/utils/searchParsing";
+import { retryWithBackoff, isRetryableError } from "@/utils/retryWithBackoff";
+import { stripPunctuation, filterMapResults } from "@/utils/searchUtils";
 
 // Search results cache to prevent repeated queries
 const searchCache = new Map<string, { results: Business[]; timestamp: number }>();
@@ -12,82 +15,25 @@ const MAX_CACHE_SIZE = 100;
 
 export interface UnifiedSearchFilters extends SearchFilters {}
 
-// Parse salary strings to hourly rate
-const parseSalaryToHourly = (salary: string): number | null => {
-  if (!salary) return null;
-
-  const numericValue = parseFloat(salary.replace(/[$,]/g, ""));
-  if (isNaN(numericValue)) return null;
-
-  const salaryLower = salary.toLowerCase();
-
-  if (salaryLower.includes("/hr") || salaryLower.includes("hour")) {
-    return numericValue;
-  } else if (salaryLower.includes("/month") || salaryLower.includes("monthly")) {
-    return numericValue / 160; // ~160 hours per month
-  } else if (salaryLower.includes("/year") || salaryLower.includes("yearly") || salaryLower.includes("annual")) {
-    return numericValue / 2080; // ~2080 hours per year
-  }
-
-  return numericValue; // Default to hourly
-};
-
 // Enhanced search term parsing with better AND logic - NOW ASYNC
 export const parseUnifiedSearchFilters = async (searchQuery: string): Promise<UnifiedSearchFilters | null> => {
   if (!searchQuery.trim()) return null;
 
-  const query = searchQuery.toLowerCase().trim();
+  // Extract salary patterns using shared utility
+  const { salaryQuery, remainingText } = parseAdvancedSalaryPatterns(searchQuery);
 
-  // Extract salary patterns first
-  const salaryPatterns = [
-    /\$(\d+(?:\.\d{1,2})?)\s*(?:[-–]\s*\$?(\d+(?:\.\d{1,2})?))?\s*(?:\/?\s*(hr|hour|month|year|annual))?/g,
-    /(\d+(?:\.\d{1,2})?)\s*(?:[-–]\s*(\d+(?:\.\d{1,2})?))?\s*\$?\s*(?:\/?\s*(hr|hour|month|year|annual))/g,
-  ];
-
-  let salaryQuery = null;
-  let remainingText = searchQuery;
-
-  for (const pattern of salaryPatterns) {
-    const match = query.match(pattern);
-    if (match) {
-      const fullMatch = match[0];
-      const parts = fullMatch.match(/(\d+(?:\.\d{1,2})?)/g);
-      if (parts) {
-        const min = parseFloat(parts[0]);
-        const max = parts[1] ? parseFloat(parts[1]) : undefined;
-        const unitMatch = fullMatch.match(/(hr|hour|month|year|annual)/);
-        const unit = unitMatch ? unitMatch[0] : "hr";
-
-        let minHourly = min;
-        let maxHourly = max;
-
-        if (unit.includes("month")) {
-          minHourly = min / 160;
-          maxHourly = max ? max / 160 : undefined;
-        } else if (unit.includes("year") || unit.includes("annual")) {
-          minHourly = min / 2080;
-          maxHourly = max ? max / 2080 : undefined;
-        }
-
-        salaryQuery = {
-          min: minHourly,
-          max: maxHourly,
-          isRange: !!max,
-        };
-
-        remainingText = remainingText.replace(new RegExp(fullMatch, "gi"), "").trim();
-        break;
-      }
-    }
-  }
-
-  // Parse remaining text terms
-  const textTerms = remainingText
+  // Parse remaining text terms and strip punctuation
+  const rawTerms = remainingText
     .split(/\s+/)
-    .filter((term) => term.length > 0)
-    .map((term) => term.toLowerCase());
+    .filter((term) => term.length > 0);
+
+  // Strip punctuation but keep original form for display
+  const textTerms = rawTerms.map((term) => stripPunctuation(term)).filter(t => t.length > 0);
 
   console.log(`🔍 [parseSearchFilters] Original terms: ${textTerms.join(", ")}`);
+
+  // Check if this is a neighborhood search
+  const isNeighborhoodSearch = textTerms.some(term => findNeighborhoodBoundaryByName(term));
 
   // Expand text terms with synonyms - skip neighborhoods
   const MAX_TOTAL_TERMS = 20; // Prevent overly broad searches
@@ -113,7 +59,8 @@ export const parseUnifiedSearchFilters = async (searchQuery: string): Promise<Un
 
   const filters: UnifiedSearchFilters = {
     textTerms: uniqueExpandedTerms, // Expanded terms for role matching
-    originalTerms: textTerms, // Original terms for name/type matching
+    originalTerms: textTerms, // Original terms (punctuation-stripped) for name/type matching
+    isNeighborhoodSearch, // Flag for tiered filtering
   };
 
   if (salaryQuery) filters.salaryQuery = salaryQuery;
@@ -151,10 +98,11 @@ export const searchBusinessesUnified = async (
         `🔍 [searchBusinessesUnified] Starting universal search for ${filters.textTerms.length} expanded terms: ${filters.textTerms.join(", ")}`,
       );
 
-      // Build search conditions - prioritize original terms for name/type/address
+      // Build search conditions - ONLY use original terms for business metadata
+      // (expanded terms are used only for role searches below)
       const searchConditions: string[] = [];
 
-      // First, search with original terms (exact intent - e.g., "amazon" for business name)
+      // Use ONLY original terms for name/type/address search (no expansion noise)
       if (filters.originalTerms && filters.originalTerms.length > 0) {
         filters.originalTerms.forEach((term) => {
           searchConditions.push(`name.ilike.%${term}%`);
@@ -162,16 +110,6 @@ export const searchBusinessesUnified = async (
           searchConditions.push(`address.ilike.%${term}%`);
         });
       }
-
-      // Then add expanded terms for additional matches (e.g., synonyms for roles)
-      filters.textTerms.forEach((term) => {
-        // Skip if already covered by original terms
-        if (!filters.originalTerms || !filters.originalTerms.includes(term)) {
-          searchConditions.push(`name.ilike.%${term}%`);
-          searchConditions.push(`business_type.ilike.%${term}%`);
-          searchConditions.push(`address.ilike.%${term}%`);
-        }
-      });
 
       console.log(`🔍 [searchBusinessesUnified] SQL conditions: ${searchConditions.join(" OR ")}`);
 
@@ -193,7 +131,10 @@ export const searchBusinessesUnified = async (
         const queryLimit = bounds ? Math.min(limit * 10, 10000) : 5000;
         textQuery = textQuery.limit(queryLimit);
 
-        const { data, error } = await textQuery;
+        const { data, error } = await retryWithBackoff(
+          () => textQuery,
+          { shouldRetry: isRetryableError }
+        );
         if (error) {
           console.error("❌ Business text search error:", error);
           return [];
@@ -208,11 +149,14 @@ export const searchBusinessesUnified = async (
 
         console.log(`🔍 [searchBusinessesUnified] Role SQL conditions: ${roleConditions}`);
 
-        const { data: matchingRoles, error } = await supabase
-          .from("business_roles")
-          .select("business_id")
-          .or(roleConditions)
-          .limit(3000);
+        const { data: matchingRoles, error } = await retryWithBackoff(
+          () => supabase
+            .from("business_roles")
+            .select("business_id")
+            .or(roleConditions)
+            .limit(3000),
+          { shouldRetry: isRetryableError }
+        );
 
         if (error) {
           console.error("❌ Role search error:", error);
@@ -247,7 +191,10 @@ export const searchBusinessesUnified = async (
               .lte("lng", bounds.east);
           }
 
-          const { data } = await query;
+          const { data } = await retryWithBackoff(
+            () => query,
+            { shouldRetry: isRetryableError }
+          );
           if (data) roleBusinesses.push(...data);
         }
 
@@ -293,55 +240,47 @@ export const searchBusinessesUnified = async (
 
     console.log(`🔍 Found ${businesses.length} businesses, loading all roles...`);
 
-    // Load roles in safe batches to avoid oversized URLs
+    // Load roles in safe batches with optimized parallelism
     const businessIds = businesses.map((b) => b.id);
     let allRoles: any[] = [];
 
     if (businessIds.length > 0) {
-      const BATCH_SIZE = 150; // keep URL well under limits
-      const CONCURRENCY = 6; // fast but safe parallelism
+      const BATCH_SIZE = 200; // Optimized batch size for better URL utilization
+      const CONCURRENCY = 8; // Increased parallelism for faster loading
       const chunks: string[][] = [];
       for (let i = 0; i < businessIds.length; i += BATCH_SIZE) {
         chunks.push(businessIds.slice(i, i + BATCH_SIZE));
       }
 
-      const executeBatch = async (ids: string[]) => {
-        const { data, error } = await supabase
-          .from("business_roles")
-          .select("business_id, id, role, salary, votes_total")
-          .in("business_id", ids)
-          .order("votes_total", { ascending: false })
-          .order("created_at", { ascending: true });
-        if (error) {
-          console.error("❌ Roles batch error:", error);
-          return [] as any[];
-        }
-        return (data || []) as any[];
-      };
+      // Use Promise.all for cleaner parallel execution
+      const batchPromises = chunks.map((chunk, index) =>
+        // Stagger batches to avoid overwhelming the server
+        new Promise<any[]>((resolve) => {
+          setTimeout(async () => {
+            try {
+              const { data, error } = await supabase
+                .from("business_roles")
+                .select("business_id, id, role, salary, votes_total")
+                .in("business_id", chunk)
+                .order("votes_total", { ascending: false })
+                .order("created_at", { ascending: true });
 
-      let active = 0;
-      let pointer = 0;
-      await new Promise<void>((resolve) => {
-        const launch = () => {
-          if (pointer >= chunks.length) {
-            if (active === 0) resolve();
-            return;
-          }
-          const ids = chunks[pointer++];
-          active++;
-          executeBatch(ids)
-            .then((rows) => {
-              allRoles.push(...rows);
-            })
-            .catch((e) => console.error("❌ Roles batch failed:", e))
-            .finally(() => {
-              active--;
-              launch();
-            });
-        };
-        const starters = Math.min(CONCURRENCY, chunks.length);
-        for (let i = 0; i < starters; i++) launch();
-      });
+              if (error) {
+                console.error("❌ Roles batch error:", error);
+                resolve([]);
+              } else {
+                resolve(data || []);
+              }
+            } catch (e) {
+              console.error("❌ Roles batch failed:", e);
+              resolve([]);
+            }
+          }, Math.floor(index / CONCURRENCY) * 50); // 50ms stagger per concurrency group
+        })
+      );
+
+      const results = await Promise.all(batchPromises);
+      allRoles = results.flat();
 
       console.log(`✅ Loaded ${allRoles.length} roles for ${businesses.length} businesses in ${chunks.length} batches`);
     }
@@ -431,14 +370,22 @@ export const searchBusinessesUnified = async (
       return { business, score };
     });
 
+    // Filter by minimum score threshold to remove irrelevant results
+    const MINIMUM_SCORE = 30; // Filters out weak/expanded-only matches
+    const relevantBusinesses = scoredBusinesses.filter(item => item.score >= MINIMUM_SCORE);
+
+    console.log(
+      `🎯 Filtered ${scoredBusinesses.length} -> ${relevantBusinesses.length} businesses (min score: ${MINIMUM_SCORE})`
+    );
+
     // Sort by score (highest first)
-    const sortedBusinesses = scoredBusinesses.sort((a, b) => b.score - a.score).map((item) => item.business);
+    const sortedBusinesses = relevantBusinesses.sort((a, b) => b.score - a.score).map((item) => item.business);
 
     console.log(
       `🎯 Top 5 scored results:`,
       sortedBusinesses.slice(0, 5).map((b) => ({
         name: b.name,
-        score: scoredBusinesses.find((sb) => sb.business.id === b.id)?.score,
+        score: relevantBusinesses.find((sb) => sb.business.id === b.id)?.score,
       })),
     );
 
@@ -480,6 +427,37 @@ export const searchBusinessesByQuery = async (
   if (!filters) return [];
 
   return searchBusinessesUnified(filters, bounds, limit);
+};
+
+/**
+ * Search businesses with progressive specificity for map display
+ * Returns both full results (for dropdown) and filtered results (for map)
+ */
+export const searchBusinessesForMap = async (
+  query: string,
+  bounds?: { north: number; south: number; east: number; west: number },
+  limit: number = 1000,
+): Promise<{ allResults: Business[]; mapResults: Business[] }> => {
+  if (!query.trim()) {
+    return { allResults: [], mapResults: [] };
+  }
+
+  const filters = await parseUnifiedSearchFilters(query);
+  if (!filters) {
+    return { allResults: [], mapResults: [] };
+  }
+
+  // Get all search results
+  const allResults = await searchBusinessesUnified(filters, bounds, limit);
+
+  // Apply tiered filtering for map display
+  const mapResults = filterMapResults(
+    allResults,
+    filters.originalTerms || [],
+    filters.isNeighborhoodSearch || false
+  );
+
+  return { allResults, mapResults };
 };
 
 // Clear search cache

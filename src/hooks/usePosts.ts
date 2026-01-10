@@ -1,51 +1,28 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getPosts, createPost, voteOnPost, deletePost, getUserVotes, transformPost, getUserProfile, Post, PostData } from '@/services/posts';
 import { supabase } from '@/integrations/supabase/client';
-
-// SessionStorage cache for posts
-const POSTS_CACHE_KEY = 'posts_cache';
-const POSTS_CACHE_VERSION_KEY = 'posts_cache_version';
-const POSTS_CACHE_VERSION = '1.0';
-
-const getCachedPosts = (): Post[] => {
-  try {
-    const version = sessionStorage.getItem(POSTS_CACHE_VERSION_KEY);
-    if (version !== POSTS_CACHE_VERSION) {
-      sessionStorage.removeItem(POSTS_CACHE_KEY);
-      sessionStorage.setItem(POSTS_CACHE_VERSION_KEY, POSTS_CACHE_VERSION);
-      return [];
-    }
-    const cached = sessionStorage.getItem(POSTS_CACHE_KEY);
-    if (!cached) return [];
-    
-    const parsed = JSON.parse(cached);
-    return parsed.map((p: any) => ({
-      ...p,
-      createdAt: new Date(p.createdAt)
-    }));
-  } catch (error) {
-    console.warn('Failed to read posts cache:', error);
-    return [];
-  }
-};
-
-const saveCachedPosts = (posts: Post[]) => {
-  try {
-    sessionStorage.setItem(POSTS_CACHE_KEY, JSON.stringify(posts));
-  } catch (error) {
-    console.warn('Failed to save posts cache:', error);
-  }
-};
+import { useSessionCache } from './useSessionCache';
+import { useReconnectionHandler } from './useReconnectionHandler';
 
 const POSTS_PER_PAGE = 1000;
 
 export const usePosts = () => {
-  const [posts, setPosts] = useState<Post[]>(() => getCachedPosts());
+  // Use reusable cache hook
+  const { cachedData: initialCachedPosts, saveToCache } = useSessionCache<Post[]>({
+    key: 'posts_cache',
+    version: '1.0',
+    deserialize: (data: any[]) => data.map((p: any) => ({
+      ...p,
+      createdAt: new Date(p.createdAt)
+    })),
+  });
+
+  const [posts, setPosts] = useState<Post[]>(initialCachedPosts || []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
-  
+
   // Track if initial fetch has happened
   const hasFetchedRef = useRef(false);
   const isSubscribedRef = useRef(false);
@@ -92,14 +69,14 @@ export const usePosts = () => {
         if (isLoadMore) {
           setPosts(prevPosts => {
             const updatedPosts = [...prevPosts, ...postsWithVotes];
-            saveCachedPosts(updatedPosts);
+            saveToCache(updatedPosts);
             console.log(`✅ Loaded ${postsWithVotes.length} more posts. Total: ${updatedPosts.length}`);
             return updatedPosts;
           });
           setOffset(currentOffset + POSTS_PER_PAGE);
         } else {
           setPosts(postsWithVotes);
-          saveCachedPosts(postsWithVotes);
+          saveToCache(postsWithVotes);
           setOffset(POSTS_PER_PAGE);
           console.log(`✅ Loaded ${postsWithVotes.length} posts (initial)`);
           hasFetchedRef.current = true;
@@ -157,7 +134,7 @@ export const usePosts = () => {
         
         setPosts(prevPosts => {
           const updatedPosts = [newPost, ...prevPosts];
-          saveCachedPosts(updatedPosts);
+          saveToCache(updatedPosts);
           return updatedPosts;
         });
         
@@ -218,7 +195,7 @@ export const usePosts = () => {
 
       setPosts(prevPosts => {
         const filtered = prevPosts.filter(post => post.id !== postId);
-        saveCachedPosts(filtered);
+        saveToCache(filtered);
         return filtered;
       });
       
@@ -246,10 +223,8 @@ export const usePosts = () => {
     }
 
     // Load from cache immediately if available
-    const cachedPosts = getCachedPosts();
-    if (cachedPosts.length > 0) {
-      console.log(`📦 Loaded ${cachedPosts.length} posts from cache`);
-      setPosts(cachedPosts);
+    if (initialCachedPosts && initialCachedPosts.length > 0) {
+      console.log(`📦 Loaded ${initialCachedPosts.length} posts from cache`);
       setLoading(false);
     }
     
@@ -283,7 +258,7 @@ export const usePosts = () => {
             if (updatedPost.is_deleted) {
               setPosts(prev => {
                 const filtered = prev.filter(p => p.id !== updatedPost.id);
-                saveCachedPosts(filtered);
+                saveToCache(filtered);
                 console.log(`🗑️ Removed soft-deleted post ${updatedPost.id} from state`);
                 return filtered;
               });
@@ -298,7 +273,7 @@ export const usePosts = () => {
             // Remove hard deleted post from local state
             setPosts(prev => {
               const filtered = prev.filter(p => p.id !== deletedPost.id);
-              saveCachedPosts(filtered);
+              saveToCache(filtered);
               console.log(`🗑️ Removed hard-deleted post ${deletedPost.id} from state`);
               return filtered;
             });
@@ -348,6 +323,11 @@ export const usePosts = () => {
     setOffset(0);
     fetchPosts(false);
   }, [fetchPosts]);
+
+  // Automatically refetch posts when connection is restored
+  useReconnectionHandler({
+    onReconnect: refetch
+  });
 
   return {
     posts,

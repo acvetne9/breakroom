@@ -1,11 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Business, BusinessRole } from '@/types/business';
-import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods';
-import { searchBusinessesUnified, parseUnifiedSearchFilters } from './unifiedSearch';
-import { expandTerm } from '@/utils/smartSearch';
 import { sanitizeVoteTotal } from '@/utils/voteCalculations';
 import { applyBusinessFilters, SearchFilters } from './businessFiltering';
 import { calculateBusinessFuzzyScore } from '@/utils/fuzzySearch';
+import { retryWithBackoff, isRetryableError } from '@/utils/retryWithBackoff';
 
 type MapBounds = { north: number; south: number; east: number; west: number };
 
@@ -112,16 +110,20 @@ export const getBusinessesInViewport = async (
     });
 
     // FIXED: Use grid-sampled function for even distribution
-    const { data, error } = await supabase.rpc(
-      'get_businesses_in_viewport_no_ordering',
-      {
-        min_lat: bounds.south,
-        max_lat: bounds.north,
-        min_lng: bounds.west,
-        max_lng: bounds.east,
-        result_limit: limit,
-        user_profile_id: userId || null
-      }
+    // Wrap with retry logic for connection resilience
+    const { data, error } = await retryWithBackoff(
+      () => supabase.rpc(
+        'get_businesses_in_viewport_no_ordering',
+        {
+          min_lat: bounds.south,
+          max_lat: bounds.north,
+          min_lng: bounds.west,
+          max_lng: bounds.east,
+          result_limit: limit,
+          user_profile_id: userId || null
+        }
+      ),
+      { shouldRetry: isRetryableError }
     );
 
     if (error) {
@@ -237,30 +239,33 @@ export const searchBusinessesByName = async (
 export async function getFullBusinessDetails(businessId: string): Promise<Business | null> {
   console.log('🔍 FETCHING FULL BUSINESS DETAILS FOR:', businessId);
   const startTime = performance.now();
-  
-  // Fetch business data, user profile, and roles in PARALLEL
-  const [businessResult, userProfileResult, rolesResult] = await Promise.all([
-    // Business data
-    supabase
-      .from('businesses')
-      .select('*')
-      .eq('id', businessId)
-      .maybeSingle(),
-    
-    // User profile (for votes)
-    (async () => {
-      const { getUserProfile } = await import('./posts');
-      return getUserProfile();
-    })(),
-    
-    // Roles data
-    supabase
-      .from('business_roles')
-      .select('*')
-      .eq('business_id', businessId)
-      .order('votes_total', { ascending: false })
-      .order('created_at', { ascending: true })
-  ]);
+
+  // Fetch business data, user profile, and roles in PARALLEL with retry logic
+  const [businessResult, userProfileResult, rolesResult] = await retryWithBackoff(
+    () => Promise.all([
+      // Business data
+      supabase
+        .from('businesses')
+        .select('*')
+        .eq('id', businessId)
+        .maybeSingle(),
+
+      // User profile (for votes)
+      (async () => {
+        const { getUserProfile } = await import('./posts');
+        return getUserProfile();
+      })(),
+
+      // Roles data
+      supabase
+        .from('business_roles')
+        .select('*')
+        .eq('business_id', businessId)
+        .order('votes_total', { ascending: false })
+        .order('created_at', { ascending: true })
+    ]),
+    { shouldRetry: isRetryableError }
+  );
 
   const { data: businessData, error: businessError } = businessResult;
   if (businessError) throw businessError;

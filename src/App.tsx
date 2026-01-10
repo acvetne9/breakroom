@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DeviceProvider } from "./contexts/DeviceContext";
 import { AuthProvider } from "./contexts/AuthContext";
+import { ConnectionProvider } from "./contexts/ConnectionContext";
 import { clearSearchCache } from "./services/unifiedSearch";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -16,15 +17,17 @@ const App = () => {
   
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <DeviceProvider>
-            <Index />
-          </DeviceProvider>
-        </TooltipProvider>
-      </AuthProvider>
+      <ConnectionProvider>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <DeviceProvider>
+              <Index />
+            </DeviceProvider>
+          </TooltipProvider>
+        </AuthProvider>
+      </ConnectionProvider>
     </QueryClientProvider>
   );
 };

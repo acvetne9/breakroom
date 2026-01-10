@@ -16,6 +16,7 @@ import * as turf from "@turf/turf";
 import type { Feature, Point } from "geojson";
 import type { MapGeoJSONFeature } from "maplibre-gl";
 import { Capacitor } from "@capacitor/core";
+import { filterMapResults } from "@/utils/searchUtils";
 
 interface MapLibreMapProps {
   onBusinessClick?: (business: any) => void;
@@ -262,9 +263,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const filtersChanged = useCallback((prev: any, next: any) => {
     if (!prev && !next) return false;
     if (!prev || !next) return true;
-    return prev.keyword !== next.keyword ||
-           prev.role !== next.role ||
-           prev.neighborhoodFilter?.name !== next.neighborhoodFilter?.name;
+
+    // Compare textTerms array
+    const prevTerms = prev.textTerms?.join(',') || '';
+    const nextTerms = next.textTerms?.join(',') || '';
+
+    return prevTerms !== nextTerms ||
+           prev.roleFilter !== next.roleFilter ||
+           prev.businessTypeFilter !== next.businessTypeFilter ||
+           prev.neighborhoodFilter?.name !== next.neighborhoodFilter?.name ||
+           prev.isNeighborhoodSearch !== next.isNeighborhoodSearch;
   }, []);
 
   // Update refs only when data actually changes (Phase 3: no JSON.stringify)
@@ -282,7 +290,13 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   }, [landmarks]);
 
   useEffect(() => {
-    if (filtersChanged(searchFiltersRef.current, searchFilters)) {
+    const hasFilterChanged = filtersChanged(searchFiltersRef.current, searchFilters);
+
+    if (hasFilterChanged) {
+      // When search changes, immediately clear displayed businesses
+      // This prevents old businesses from being shown with new filter
+      console.log('🔄 Search changed, clearing displayed businesses');
+      callbackRefs.current.onBusinessesUpdate?.([]);
       searchFiltersRef.current = searchFilters;
     }
   }, [searchFilters, filtersChanged]);
@@ -290,9 +304,23 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   useEffect(() => {
     if (businesses && businesses.length > 0) {
       callbackRefs.current.onBusinessesLoaded?.();
-      callbackRefs.current.onBusinessesUpdate?.(businesses);
+
+      // Apply tiered filtering for map display if search is active
+      let displayBusinesses = businesses;
+      if (searchFiltersRef.current && searchFiltersRef.current.originalTerms) {
+        displayBusinesses = filterMapResults(
+          businesses,
+          searchFiltersRef.current.originalTerms,
+          searchFiltersRef.current.isNeighborhoodSearch || false
+        );
+      }
+
+      callbackRefs.current.onBusinessesUpdate?.(displayBusinesses);
+    } else if (businesses && businesses.length === 0) {
+      // If businesses are explicitly cleared, update map with empty array
+      callbackRefs.current.onBusinessesUpdate?.([]);
     }
-  }, [businesses]);
+  }, [businesses]); // Only re-run when businesses change, not searchFilters
 
   useEffect(() => {
     const canvas = document.createElement("canvas");
