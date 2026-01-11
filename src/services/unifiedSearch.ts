@@ -21,6 +21,9 @@ export const parseUnifiedSearchFilters = async (searchQuery: string): Promise<Un
 
   // Extract salary patterns using shared utility
   const { salaryQuery, remainingText } = parseAdvancedSalaryPatterns(searchQuery);
+  if (salaryQuery) {
+    console.log(`💰 Salary pattern detected: ${salaryQuery.min ? `$${salaryQuery.min.toFixed(2)}/hr` : 'no min'}${salaryQuery.max ? ` - $${salaryQuery.max.toFixed(2)}/hr` : ' or better'}`);
+  }
 
   // Parse remaining text terms and strip punctuation
   const rawTerms = remainingText

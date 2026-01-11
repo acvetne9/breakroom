@@ -1,5 +1,18 @@
 import { Business } from "@/types/business";
 
+// Common business type keywords for detection (includes common plurals)
+const COMMON_BUSINESS_TYPES = [
+  'restaurant', 'restaurants', 'cafe', 'cafes', 'coffee', 'bar', 'bars',
+  'bakery', 'bakeries', 'deli', 'delis', 'pizzeria', 'pizzerias',
+  'shop', 'shops', 'store', 'stores', 'boutique', 'boutiques',
+  'market', 'markets', 'gym', 'gyms', 'studio', 'studios',
+  'salon', 'salons', 'spa', 'spas', 'hotel', 'hotels',
+  'hostel', 'hostels', 'club', 'clubs', 'lounge', 'lounges',
+  'pub', 'pubs', 'brewery', 'breweries', 'bodega', 'bodegas',
+  'grocery', 'groceries', 'bookstore', 'bookstores',
+  'gallery', 'galleries', 'theater', 'theaters', 'cinema', 'cinemas'
+];
+
 /**
  * Strips punctuation and extra whitespace from text for comparison
  */
@@ -86,16 +99,28 @@ export function getNameMatchTier(
 /**
  * Filter businesses for map display using progressive specificity
  * Tier priority: Name matches > Role matches > Neighborhood matches
+ * Special case: Neighborhood + Business Type (e.g., "restaurant williamsburg") shows all matching businesses
  */
 export function filterMapResults(
   businesses: Business[],
   originalTerms: string[],
   isNeighborhoodSearch: boolean
 ): Business[] {
-  console.log(`🎯 [filterMapResults] Called with originalTerms:`, originalTerms, `isNeighborhood:`, isNeighborhoodSearch, `total businesses:`, businesses.length);
+  console.log(`🎯 [filterMapResults] Called with originalTerms: [${originalTerms.join(', ')}] isNeighborhood:`, isNeighborhoodSearch, `total businesses:`, businesses.length);
 
   if (!originalTerms || originalTerms.length === 0) {
     console.log(`🎯 [filterMapResults] No search terms, returning all ${businesses.length} businesses`);
+    return businesses;
+  }
+
+  // Special case: If this is a neighborhood search AND contains a business type keyword,
+  // show ALL results (user wants "all restaurants in williamsburg", not just ones named "restaurant")
+  const hasBusinessTypeKeyword = originalTerms.some(term =>
+    COMMON_BUSINESS_TYPES.includes(stripPunctuation(term))
+  );
+
+  if (isNeighborhoodSearch && hasBusinessTypeKeyword) {
+    console.log(`🎯 [filterMapResults] Neighborhood + Business Type search detected, showing all ${businesses.length} matching businesses`);
     return businesses;
   }
 
@@ -150,13 +175,24 @@ export function filterMapResults(
 
   console.log(`🎯 [filterMapResults] Selected tier: ${selectedTier}`);
 
+  // SPECIAL BEHAVIOR: For neighborhood searches with role matches, show BOTH name and role matches
+  if (isNeighborhoodSearch && roleMatchCount > 0) {
+    console.log(`🎯 [filterMapResults] Neighborhood search with roles detected - showing BOTH name matches AND role matches`);
+  }
+
   // Filter based on selected tier
   const filtered = categorized.filter(item => {
+    // SPECIAL: For neighborhood searches, include BOTH name matches AND role matches
+    // This handles "barista williamsburg" showing both businesses named "Barista" AND barista jobs
+    if (isNeighborhoodSearch && item.isRole) {
+      return true; // Always include role matches in neighborhood searches
+    }
+
     // Tier 1-3: Name matches
     if (item.nameTier !== null && item.nameTier <= selectedTier) return true;
 
-    // Always include role matches (unless we have better name matches at tier 1-2)
-    if (item.isRole && selectedTier >= 3) return true;
+    // Include role matches for non-neighborhood searches (unless we have better name matches at tier 1-2)
+    if (!isNeighborhoodSearch && item.isRole && selectedTier >= 3) return true;
 
     // Include neighborhood matches only if no name/role matches exist (tier 4)
     if (item.isNeighborhoodMatch && selectedTier === 4) return true;
@@ -165,7 +201,7 @@ export function filterMapResults(
   }).map(item => item.business);
 
   console.log(`🎯 [filterMapResults] Filtered ${businesses.length} -> ${filtered.length} businesses for map display`);
-  console.log(`🎯 [filterMapResults] Kept businesses:`, filtered.slice(0, 10).map(b => b.name));
+  console.log(`🎯 [filterMapResults] Kept businesses:`, filtered.map(b => b.name));
 
   return filtered;
 }

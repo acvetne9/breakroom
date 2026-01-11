@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Business } from '@/types/business';
 import { getBusinessesInViewport, getFullBusinessDetails as getFullBusinessDetailsService } from '@/services/businesses';
+import { searchBusinessesUnified } from '@/services/unifiedSearch';
 import { isPointInPolygon } from '@/utils/nyc_neighborhoods';
 import { useTileCache } from './useTileCache';
 import { useMapWorker } from './useMapWorker';
@@ -180,29 +181,28 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
 
     loadTimeoutRef.current = setTimeout(async () => {
       setLoading(true);
-      
+
       requestQueue.setMaxConcurrent(zoom);
-      
-      const requestPromise = requestQueue.run(() => 
-        getBusinessesInViewport(viewportBounds, limit, searchFilters, undefined, zoom)
-      );
+
+      // FIXED: Use database-wide search when searchFilters are present
+      // Use viewport-only search when browsing (no filters)
+      const requestPromise = searchFilters
+        ? requestQueue.run(() =>
+            searchBusinessesUnified(searchFilters, viewportBounds, limit)
+          )
+        : requestQueue.run(() =>
+            getBusinessesInViewport(viewportBounds, limit, undefined, undefined, zoom)
+          );
+
       inflightRequests.set(requestKey, requestPromise);
 
       try {
         let viewportBusinesses = await requestPromise;
 
-        console.log('📍 Raw businesses from viewport:', {
+        console.log('📍 Raw businesses from query:', {
           count: viewportBusinesses.length,
-          first3: viewportBusinesses.slice(0, 3).map(b => ({ 
-            name: b.name, 
-            lat: b.position?.lat, 
-            lng: b.position?.lng 
-          })),
-          last3: viewportBusinesses.slice(-3).map(b => ({ 
-            name: b.name, 
-            lat: b.position?.lat, 
-            lng: b.position?.lng 
-          }))
+          searchMode: !!searchFilters,
+          allNames: viewportBusinesses.map(b => b.name)
         });
 
         // Apply neighborhood polygon filter if needed

@@ -3,6 +3,7 @@ import { findNeighborhoodBoundaryByName, filterBusinessesByNeighborhood } from '
 import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods';
 import {
   parseBasicSearchTerms,
+  parseAdvancedSalaryPatterns,
   parseSalaryToHourly,
   COMMON_ROLES,
   COMMON_BUSINESS_TYPES
@@ -25,15 +26,22 @@ export interface SearchFilters {
 
 export function parseSearchFilters(searchQuery: string): SearchFilters | null {
   console.log('🔍 [parseSearchFilters] Input query:', searchQuery);
-  
+
   if (!searchQuery.trim()) return null;
 
   let filters: SearchFilters = {
     textTerms: []
   };
 
-  // Check for neighborhood first
-  const neighborhood = findNeighborhoodBoundaryByName(searchQuery);
+  // Extract salary patterns first (supports /hr, /mo, /yr formats)
+  const { salaryQuery, remainingText } = parseAdvancedSalaryPatterns(searchQuery);
+  if (salaryQuery) {
+    console.log(`💰 Salary pattern detected: ${salaryQuery.min ? `$${salaryQuery.min.toFixed(2)}/hr` : 'no min'}${salaryQuery.max ? ` - $${salaryQuery.max.toFixed(2)}/hr` : ' or better'}`);
+    filters.salaryQuery = salaryQuery;
+  }
+
+  // Check for neighborhood in remaining text (after salary removed)
+  const neighborhood = findNeighborhoodBoundaryByName(remainingText);
   if (neighborhood) {
     filters.neighborhoodFilter = neighborhood;
     const lats = neighborhood.boundary.map(p => p.lat);
@@ -43,8 +51,14 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
       lon: (Math.min(...lons) + Math.max(...lons)) / 2,
     };
   }
-  
-  const { salaryQuery, textTerms } = parseBasicSearchTerms(searchQuery);
+
+  // Parse remaining text terms (salary already removed)
+  const rawTerms = remainingText
+    .split(/\s+/)
+    .filter((term) => term.length > 0);
+
+  // Strip punctuation for matching
+  const textTerms = rawTerms.map((term) => stripPunctuation(term)).filter(t => t.length > 0);
 
   let filteredTextTerms = textTerms;
   if (neighborhood && textTerms) {
@@ -63,24 +77,17 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
     COMMON_BUSINESS_TYPES.includes(term.toLowerCase())
   );
 
-  if (salaryQuery) {
-    filters.salaryQuery = salaryQuery;
-  }
   if (roleFilter?.trim()) {
     filters.roleFilter = roleFilter;
   }
   if (businessTypeFilter?.trim()) {
     filters.businessTypeFilter = businessTypeFilter;
   }
-  if (neighborhood) {
-    filters.neighborhoodFilter = neighborhood;
-  }
 
-  const originalTerms = parseBasicSearchTerms(searchQuery).textTerms || [];
-  if (originalTerms.length > 0) {
-    filters.textTerms = originalTerms;
+  if (textTerms.length > 0) {
+    filters.textTerms = textTerms;
     // Also store punctuation-stripped version for tiered filtering
-    filters.originalTerms = originalTerms.map(term => stripPunctuation(term)).filter(t => t.length > 0);
+    filters.originalTerms = textTerms; // Already stripped above
   }
 
   // Set isNeighborhoodSearch flag for tiered filtering
@@ -130,6 +137,12 @@ export function applyBusinessFilters(businesses: Business[], filters: SearchFilt
 
   // Use shared salary parsing utility
   const toHourly = parseSalaryToHourly;
+
+  // Log salary filtering if active
+  if (filters.salaryQuery) {
+    const { min, max } = filters.salaryQuery;
+    console.log(`💰 Salary filter active: ${min ? `$${min.toFixed(2)}/hr` : 'no min'}${max ? ` - $${max.toFixed(2)}/hr` : ' or better'}`);
+  }
 
   const filtered = filteredBusinesses.filter(business => {
     const name = business.name || '';

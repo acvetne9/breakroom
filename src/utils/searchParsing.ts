@@ -14,7 +14,7 @@ export interface ParsedSearchTerms {
 
 /**
  * Parse salary to hourly rate from various formats
- * Handles: /hr, /hour, /month, /monthly, /year, /yearly, annual
+ * Handles: /hr, /hour, /mo, /month, /monthly, /yr, /year, /yearly, annual
  */
 export const parseSalaryToHourly = (salary: string): number | null => {
   if (!salary) return null;
@@ -24,17 +24,22 @@ export const parseSalaryToHourly = (salary: string): number | null => {
 
   const salaryLower = salary.toLowerCase();
 
-  if (salaryLower.includes("/hr") || salaryLower.includes("hour")) {
+  if (salaryLower.includes("/hr") || salaryLower.includes("hour") || salaryLower.includes(" hr")) {
     return numericValue;
-  } else if (salaryLower.includes("/mo") || salaryLower.includes("month")) {
-    return Math.round(numericValue / 173); // ~173 hours per month (more accurate)
+  } else if (
+    salaryLower.includes("/mo") ||
+    salaryLower.includes("month") ||
+    salaryLower.includes(" mo")
+  ) {
+    return Math.round((numericValue / 173) * 100) / 100; // ~173 hours per month
   } else if (
     salaryLower.includes("/yr") ||
     salaryLower.includes("/year") ||
     salaryLower.includes("year") ||
-    salaryLower.includes("annual")
+    salaryLower.includes("annual") ||
+    salaryLower.includes(" yr")
   ) {
-    return Math.round(numericValue / 2080); // ~2080 hours per year
+    return Math.round((numericValue / 2080) * 100) / 100; // ~2080 hours per year
   }
 
   return numericValue; // Default to hourly
@@ -79,7 +84,8 @@ export const parseBasicSearchTerms = (query: string): ParsedSearchTerms => {
 
 /**
  * Parse advanced salary patterns with units
- * Handles: $20/hr, $20-30/hr, $3000/month, $60000/year, etc.
+ * Handles: $20/hr, 20/hr, $3000/mo, 60000/yr, 15/hour, $20-30/hr, etc.
+ * Shows jobs at that pay "or better" (minimum threshold)
  */
 export const parseAdvancedSalaryPatterns = (searchQuery: string): {
   salaryQuery: SalaryQuery | null;
@@ -87,43 +93,51 @@ export const parseAdvancedSalaryPatterns = (searchQuery: string): {
 } => {
   const query = searchQuery.toLowerCase().trim();
 
+  // Enhanced patterns to handle more variations including "mo" and "yr"
   const salaryPatterns = [
-    /\$(\d+(?:\.\d{1,2})?)\s*(?:[-–]\s*\$?(\d+(?:\.\d{1,2})?))?\s*(?:\/?\s*(hr|hour|month|year|annual))?/g,
-    /(\d+(?:\.\d{1,2})?)\s*(?:[-–]\s*(\d+(?:\.\d{1,2})?))?\s*\$?\s*(?:\/?\s*(hr|hour|month|year|annual))/g,
+    // With dollar sign: $20/hr, $20/hour, $3000/mo, $60000/yr
+    /\$\s*(\d+(?:,\d{3})*(?:\.\d{1,2})?)\s*(?:[-–]\s*\$?\s*(\d+(?:,\d{3})*(?:\.\d{1,2})?))?\s*(?:\/\s*)?(hr|hour|mo|month|yr|year|annual|annually)?/gi,
+    // Without dollar sign: 20/hr, 3000/mo, 60000/yr, 15 hr, 20-30/hr
+    /(\d+(?:,\d{3})*(?:\.\d{1,2})?)\s*(?:[-–]\s*(\d+(?:,\d{3})*(?:\.\d{1,2})?))?\s*\$?\s*(?:\/\s*)?(hr|hour|mo|month|yr|year|annual|annually)/gi,
   ];
 
   let salaryQuery: SalaryQuery | null = null;
   let remainingText = searchQuery;
 
   for (const pattern of salaryPatterns) {
-    const match = query.match(pattern);
+    pattern.lastIndex = 0; // Reset regex state
+    const match = pattern.exec(query);
     if (match) {
       const fullMatch = match[0];
-      const parts = fullMatch.match(/(\d+(?:\.\d{1,2})?)/g);
+      const parts = fullMatch.match(/(\d+(?:,\d{3})*(?:\.\d{1,2})?)/g);
       if (parts) {
-        const min = parseFloat(parts[0]);
-        const max = parts[1] ? parseFloat(parts[1]) : undefined;
-        const unitMatch = fullMatch.match(/(hr|hour|month|year|annual)/);
-        const unit = unitMatch ? unitMatch[0] : "hr";
+        const min = parseFloat(parts[0].replace(/,/g, ''));
+        const max = parts[1] ? parseFloat(parts[1].replace(/,/g, '')) : undefined;
+
+        // Extract unit, defaulting to "hr" if not specified
+        const unitMatch = fullMatch.match(/(hr|hour|mo|month|yr|year|annual)/i);
+        const unit = unitMatch ? unitMatch[0].toLowerCase() : "hr";
 
         let minHourly = min;
         let maxHourly = max;
 
-        if (unit.includes("month")) {
-          minHourly = min / 173;
+        // Convert to hourly rate based on unit
+        if (unit.includes("mo") || unit.includes("month")) {
+          minHourly = min / 173; // ~173 hours per month
           maxHourly = max ? max / 173 : undefined;
-        } else if (unit.includes("year") || unit.includes("annual")) {
-          minHourly = min / 2080;
+        } else if (unit.includes("yr") || unit.includes("year") || unit.includes("annual")) {
+          minHourly = min / 2080; // ~2080 hours per year
           maxHourly = max ? max / 2080 : undefined;
         }
 
         salaryQuery = {
-          min: minHourly,
-          max: maxHourly,
+          min: Math.round(minHourly * 100) / 100, // Round to 2 decimal places
+          max: maxHourly ? Math.round(maxHourly * 100) / 100 : undefined,
           isRange: !!max,
         };
 
-        remainingText = remainingText.replace(new RegExp(fullMatch, "gi"), "").trim();
+        // Remove the salary pattern from search query
+        remainingText = remainingText.replace(new RegExp(fullMatch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "gi"), "").trim();
         break;
       }
     }
