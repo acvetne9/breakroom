@@ -127,13 +127,14 @@ const MobileApp: React.FC = () => {
             });
           }
           setCurrentView("main");
-        } else if (!profileExists) {
-          const { error } = await supabase.from("profiles").insert({ id: deviceId });
-          if (error) {
-            console.error("❌ Error creating profile row:", error);
-          }
-          setCurrentView("main");
         } else {
+          // No current job - show initiation (create profile if needed)
+          if (!profileExists) {
+            const { error } = await supabase.from("profiles").insert({ id: deviceId });
+            if (error) {
+              console.error("❌ Error creating profile row:", error);
+            }
+          }
           setCurrentView("initiation");
         }
       } catch (error) {

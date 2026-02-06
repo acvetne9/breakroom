@@ -3,8 +3,8 @@ import { CapacitorConfig } from '@capacitor/cli';
 const isDev = process.env.CAP_ENV === 'dev';
 
 const config: CapacitorConfig = {
-    appId: 'com.acvetne.breakroom',
-    appName: 'breakroom',
+    appId: 'com.acvetne.workaround',
+    appName: 'workaround',
     webDir: 'dist',
     bundledWebRuntime: false,
     ...(isDev

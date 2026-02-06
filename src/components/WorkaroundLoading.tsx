@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 
-interface BreakroomLoadingProps {
+interface WorkaroundLoadingProps {
   onComplete?: () => void;
   isLoaded?: boolean;
 }
 
-const BreakroomLoading = ({ onComplete, isLoaded = false }: BreakroomLoadingProps) => {
+const WorkaroundLoading = ({ onComplete, isLoaded = false }: WorkaroundLoadingProps) => {
   const [isVisible, setIsVisible] = useState(true);
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
   const hasCompleted = useRef(false);
@@ -158,9 +158,9 @@ const BreakroomLoading = ({ onComplete, isLoaded = false }: BreakroomLoadingProp
         </div>
 
         <div style={styles.textContainer}>
-          <span style={{ ...styles.textSpanLeft, animationDelay: '1.2s' }}>break</span>
+          <span style={{ ...styles.textSpanLeft, animationDelay: '1.2s' }}>work</span>
           <span style={styles.textGap}></span>
-          <span style={{ ...styles.textSpanRight, animationDelay: '1.2s' }}>room</span>
+          <span style={{ ...styles.textSpanRight, animationDelay: '1.2s' }}>around</span>
         </div>
       </div>
 
@@ -207,4 +207,4 @@ const BreakroomLoading = ({ onComplete, isLoaded = false }: BreakroomLoadingProp
   );
 };
 
-export default BreakroomLoading;
+export default WorkaroundLoading;

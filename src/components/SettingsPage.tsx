@@ -945,7 +945,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
         className="app-card p-6 animate-fade-in flex flex-col max-h-[80vh] overflow-y-auto relative"
       >
         <div className="flex-1 overflow-y-auto pr-2">
-          <h1 className="text-xl font-medium text-app-black mb-2">Welcome to breakroom! 😊</h1>
+          <h1 className="text-xl font-medium text-app-black mb-2">Welcome to workaround! 😊</h1>
 
           <p className="text-xl text-app-black mb-2">
             <span className="font-medium">Tip:</span>{" "}

@@ -1,7 +1,7 @@
 # Translation & Profanity Filter System Guide
 
 ## Overview
-This document describes the translation and profanity filtering systems in the Breakroom application.
+This document describes the translation and profanity filtering systems in the Workaround application.
 
 ## Profanity Filter
 

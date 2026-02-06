@@ -201,7 +201,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
         <div className="flex flex-col h-full items-center">
           {/* Header - stays at top */}
           <div className="text-center space-y-2 mb-6 w-full">
-            <h1 className="text-3xl font-semibold text-gray-800 tracking-tight">Welcome to breakroom! 👋</h1>
+            <h1 className="text-3xl font-semibold text-gray-800 tracking-tight">Welcome to workaround! 👋</h1>
             <p className="text-base text-gray-600">Let's get started by sharing a few details</p>
           </div>
 

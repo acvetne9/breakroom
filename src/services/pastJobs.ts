@@ -7,6 +7,37 @@ export interface PastJobData {
   location: string;
   business_name: string;
   time_period: string;
+  business_id?: string | null;
+}
+
+/**
+ * Look up a business ID by name (case-insensitive exact match)
+ * Returns null if no matching business found
+ */
+async function findBusinessIdByName(businessName: string): Promise<string | null> {
+  if (!businessName || !businessName.trim()) return null;
+
+  console.log(`🔍 Looking up business ID for: "${businessName}"`);
+
+  const { data, error } = await supabase
+    .from("businesses")
+    .select("id")
+    .ilike("name", businessName.trim())
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("⚠️ Error looking up business:", error);
+    return null;
+  }
+
+  if (data) {
+    console.log(`✅ Found business ID: ${data.id}`);
+    return data.id;
+  }
+
+  console.log(`ℹ️ No matching business found for: "${businessName}"`);
+  return null;
 }
 
 export const getPastJobs = async (deviceId: string): Promise<PastJobData[]> => {
@@ -30,6 +61,12 @@ export const getPastJobs = async (deviceId: string): Promise<PastJobData[]> => {
 export const savePastJob = async (deviceId: string, jobData: PastJobData): Promise<string> => {
   console.log("💾 Saving past job for device:", deviceId, jobData);
 
+  // Look up business_id if business_name is provided
+  let businessId: string | null = null;
+  if (jobData.business_name) {
+    businessId = await findBusinessIdByName(jobData.business_name);
+  }
+
   if (jobData.id) {
     // Update existing record
     const { error } = await supabase
@@ -39,6 +76,7 @@ export const savePastJob = async (deviceId: string, jobData: PastJobData): Promi
         salary: jobData.salary,
         location: jobData.location,
         business_name: jobData.business_name,
+        business_id: businessId,
         time_period: jobData.time_period,
         updated_at: new Date().toISOString(),
       })
@@ -50,7 +88,7 @@ export const savePastJob = async (deviceId: string, jobData: PastJobData): Promi
       throw error;
     }
 
-    console.log("✅ Past job updated successfully");
+    console.log("✅ Past job updated successfully", businessId ? `(linked to business: ${businessId})` : "(no business link)");
     return jobData.id;
   } else {
     // Insert new record
@@ -62,6 +100,7 @@ export const savePastJob = async (deviceId: string, jobData: PastJobData): Promi
         salary: jobData.salary,
         location: jobData.location,
         business_name: jobData.business_name,
+        business_id: businessId,
         time_period: jobData.time_period,
       })
       .select("id")
@@ -72,7 +111,7 @@ export const savePastJob = async (deviceId: string, jobData: PastJobData): Promi
       throw error;
     }
 
-    console.log("✅ Past job inserted successfully");
+    console.log("✅ Past job inserted successfully", businessId ? `(linked to business: ${businessId})` : "(no business link)");
     return data.id;
   }
 };

@@ -99,6 +99,7 @@ export type Database = {
       }
       current_jobs: {
         Row: {
+          business_id: string | null
           business_name: string | null
           created_at: string | null
           id: string
@@ -110,6 +111,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          business_id?: string | null
           business_name?: string | null
           created_at?: string | null
           id?: string
@@ -121,6 +123,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          business_id?: string | null
           business_name?: string | null
           created_at?: string | null
           id?: string
@@ -135,6 +138,7 @@ export type Database = {
       }
       past_jobs: {
         Row: {
+          business_id: string | null
           business_name: string | null
           created_at: string | null
           id: string
@@ -146,6 +150,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          business_id?: string | null
           business_name?: string | null
           created_at?: string | null
           id?: string
@@ -157,6 +162,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          business_id?: string | null
           business_name?: string | null
           created_at?: string | null
           id?: string

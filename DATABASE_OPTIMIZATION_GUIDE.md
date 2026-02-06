@@ -1,7 +1,7 @@
 # Database & Language Detection Optimization Guide
 
 ## Overview
-This guide documents the comprehensive database optimizations and enhanced language detection implemented in the Breakroom application.
+This guide documents the comprehensive database optimizations and enhanced language detection implemented in the Workaround application.
 
 ---
 

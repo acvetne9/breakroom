@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import MapLibreMap from "./MapLibreMap";
 import BusinessPreview from "./BusinessPreview";
 import BusinessDetails from "./BusinessDetails";
-import BreakroomLoading from "./BreakroomLoading";
+import WorkaroundLoading from "./WorkaroundLoading";
 import UnifiedBusinessSearch from "./UnifiedBusinessSearch";
 import { EnhancedBusiness } from "@/types/search";
 import { parseSearchFilters } from "@/services/businessFiltering";
@@ -287,12 +287,12 @@ const HomePage: React.FC<HomePageProps> = ({
       </div>
 
       {/* Loading overlay on top */}
-      <BreakroomLoading onComplete={handleLoadingComplete} isLoaded={mapDataReady && businessDataReady} />
+      <WorkaroundLoading onComplete={handleLoadingComplete} isLoaded={mapDataReady && businessDataReady} />
 
       {showWelcome && !showLoadingOverlay && (
         <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-30 w-[90%] max-w-lg transition-opacity duration-700">
           <div className="bg-white rounded-2xl shadow-md px-4 py-3 text-center text-sm font-medium border border-gray-200">
-            <p>Welcome to breakroom!</p>
+            <p>Welcome to workaround!</p>
             <p>Click on a yellow dot to discover one of 54k businesses</p>
           </div>
         </div>

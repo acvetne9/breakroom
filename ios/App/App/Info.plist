@@ -5,9 +5,9 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.07</string>
+	<string>1.08</string>
 	<key>CFBundleDisplayName</key>
-	<string>breakroom</string>
+	<string>workaround</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
