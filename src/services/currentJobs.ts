@@ -55,10 +55,19 @@ export const getCurrentJob = async (profileId: string): Promise<CurrentJobData |
 
 export const saveCurrentJob = async (profileId: string, jobData: CurrentJobData): Promise<void> => {
   console.log("💾 Saving current job for device:", profileId);
+  console.log("   Input data:", {
+    role: jobData.role,
+    salary: jobData.salary,
+    location: jobData.location,
+    business_name: jobData.business_name,
+    time_period: jobData.time_period,
+    business_id: jobData.business_id,
+  });
 
-  // Look up business_id if business_name is provided
-  let businessId: string | null = null;
-  if (jobData.business_name) {
+  // Use provided business_id if available, otherwise look it up by name
+  let businessId: string | null = jobData.business_id || null;
+  if (!businessId && jobData.business_name) {
+    console.log("   No business_id provided, looking up by name...");
     businessId = await findBusinessIdByName(jobData.business_name);
   }
 
@@ -66,6 +75,12 @@ export const saveCurrentJob = async (profileId: string, jobData: CurrentJobData)
     ...jobData,
     business_id: businessId,
   };
+
+  console.log("   Final data to save:", {
+    ...dataToSave,
+    hasBusinessId: !!businessId,
+    hasLocation: !!dataToSave.location,
+  });
 
   // First check if a record exists
   const { data: existing } = (await supabase

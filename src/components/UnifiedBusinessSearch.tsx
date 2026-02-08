@@ -294,6 +294,13 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
 
   const handleResultClick = (result: SearchResult) => {
     if (disabled) return; // Prevent selection when disabled
+
+    // Cancel any pending blur timeout to prevent stale state issues
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
+
     if ("isNeighborhood" in result && result.isNeighborhood) {
       // Handle neighborhood click - search for all businesses in that neighborhood
       const neighborhoodName = result.name.replace(" - Search Neighborhood", "");
@@ -318,11 +325,14 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       // Handle business click
       const business = result as EnhancedBusiness;
 
-      // Update input to show the selected business name
-      onChange(business.name);
-
       // Call the business select callback so parent can handle the selection
-      onBusinessSelect?.(business);
+      // Parent is responsible for updating the input value via state
+      if (onBusinessSelect) {
+        onBusinessSelect(business);
+      } else {
+        // Fallback: update input value if no onBusinessSelect handler
+        onChange(business.name);
+      }
 
       // Save the clicked business location
       if (onLocationSave && business.name) {

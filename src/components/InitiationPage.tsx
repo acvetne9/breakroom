@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import JobSearchDropdown from './JobSearchDropdown';
 import UnifiedBusinessSearch from './UnifiedBusinessSearch';
 import { isProfane } from '@/utils/profanityFilter';
-import { JOB_OPTIONS } from './JobSearchDropdown';
 import { useDevice } from "@/contexts/DeviceContext";
 import { saveCurrentJob, type CurrentJobData } from "@/services/currentJobs";
 
@@ -28,8 +27,6 @@ const isValidAddress = (address: string): boolean => {
 
 const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   const { deviceId } = useDevice();
-  const saveTimeoutRef = useRef<NodeJS.Timeout>();
-  const AUTO_SAVE_DELAY = 1000;
 
   const [salary, setSalary] = useState(0);
   const [salaryDisplay, setSalaryDisplay] = useState('');
@@ -43,67 +40,16 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   const [addressError, setAddressError] = useState('');
   const [isManualAddress, setIsManualAddress] = useState(false);
   const [businessInput, setBusinessInput] = useState('');
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null);
 
-  const isJobComplete = useCallback(() => {
-    return !!(
-      salary > 0 &&
-      role.trim() &&
-      location.trim() &&
-      (businessSelected || (isManualAddress && manualAddress && isValidAddress(manualAddress)))
-    );
-  }, [salary, role, location, businessSelected, isManualAddress, manualAddress]);
-
-  const saveJobToDatabase = useCallback(async () => {
-    if (!deviceId) {
-      console.log("❌ No deviceId available for saving");
-      return;
-    }
-
-    if (!isJobComplete()) {
-      console.log("Job incomplete, skipping save");
-      return;
-    }
-
-    try {
-      const jobData: CurrentJobData = {
-        role: role,
-        salary: salary,
-        location: location,
-        business_name: businessName || location,
-        time_period: timePeriod,
-      };
-
-      console.log("💾 Saving current job to database:", jobData);
-      await saveCurrentJob(deviceId, jobData);
-      console.log("✅ Job saved successfully");
-
-      // Call onComplete to close initiation page
-      onComplete({
-        salary: salaryDisplay,
-        role: role,
-        location: location,
-        fullLocation: location,
-        businessName: businessName,
-        timePeriod: timePeriod,
-      });
-    } catch (error: any) {
-      console.error("❌ Failed to save current job:", error);
-    }
-  }, [deviceId, isJobComplete, salary, role, location, businessName, timePeriod, salaryDisplay, onComplete]);
-
-  const scheduleAutoSave = useCallback(() => {
-    // Clear existing timeout
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    // Only schedule save if job is complete
-    if (isJobComplete()) {
-      saveTimeoutRef.current = setTimeout(() => {
-        saveJobToDatabase();
-      }, AUTO_SAVE_DELAY);
-    }
-  }, [isJobComplete, saveJobToDatabase]);
+  // Use refs to avoid stale closure issues
+  const businessSelectedRef = useRef(false);
+  const hasSavedRef = useRef(false);
+  const selectedBusinessNameRef = useRef<string>('');
+  const salaryRef = useRef(0);
+  const roleRef = useRef('');
+  const isManualAddressRef = useRef(false);
+  const manualAddressRef = useRef('');
 
   const handleSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/[^0-9.]/g, '');
@@ -114,9 +60,50 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
     }
     const displayValue = value ? `$${value}` : '';
     const numericValue = parseFloat(value) || 0;
-    
+
     setSalary(numericValue);
     setSalaryDisplay(displayValue);
+    salaryRef.current = numericValue;
+  };
+
+  // Check if complete and save - uses refs for current values
+  const checkAndSave = () => {
+    const hasValidBusiness = businessSelectedRef.current || (isManualAddressRef.current && manualAddressRef.current && isValidAddress(manualAddressRef.current));
+    const isComplete = salaryRef.current > 0 && roleRef.current.trim() && hasValidBusiness;
+
+    if (!isComplete || !deviceId || hasSavedRef.current) {
+      return;
+    }
+
+    // Mark as saved immediately to prevent duplicate saves
+    hasSavedRef.current = true;
+
+    // Format salary for display
+    const formattedSalary = salaryRef.current > 0 ? `$${salaryRef.current.toFixed(2)}` : salaryDisplay;
+
+    // Optimistically close the card immediately
+    onComplete({
+      salary: formattedSalary,
+      role: roleRef.current,
+      location,
+      fullLocation: location,
+      businessName: businessName || location,
+      timePeriod,
+    });
+
+    // Save to database in background (don't wait)
+    const jobData: CurrentJobData = {
+      role: roleRef.current,
+      salary: salaryRef.current,
+      location,
+      business_name: businessName || location,
+      time_period: timePeriod,
+      business_id: selectedBusinessId,
+    };
+
+    saveCurrentJob(deviceId, jobData)
+      .then(() => console.log("✅ Job saved to database"))
+      .catch((error) => console.error("❌ Failed to save job:", error));
   };
 
   const handleSalaryBlur = () => {
@@ -124,34 +111,55 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
       const formattedValue = salary.toFixed(2);
       setSalaryDisplay(`$${formattedValue}`);
     }
-    scheduleAutoSave();
+    // Check completion after salary blur
+    checkAndSave();
   };
 
   const handleRoleChange = (value: string) => {
     if (!isProfane(value)) {
       setRole(value);
+      roleRef.current = value;
     }
   };
 
-  const handleRoleBlur = () => {
-    scheduleAutoSave();
-  };
-
   const handleBusinessInputChange = (value: string) => {
+    // If this value matches what we just selected, don't reset the selection
+    // This prevents the UnifiedBusinessSearch useEffect from resetting state
+    if (value === selectedBusinessNameRef.current && businessSelectedRef.current) {
+      setBusinessInput(value);
+      return;
+    }
+
     setBusinessInput(value);
     setBusinessSelected(false);
-    setShowAddressInput(true);
+    businessSelectedRef.current = false;
+    selectedBusinessNameRef.current = '';
+    isManualAddressRef.current = false;
+    manualAddressRef.current = '';
+    setShowAddressInput(false);
     setAddressError('');
+    setSelectedBusinessId(null);
+    setLocation('');
+  };
+
+  const handleBusinessBlur = () => {
+    // Use ref to get current value (avoids stale closure)
+    if (businessInput.trim() && !businessSelectedRef.current) {
+      setShowAddressInput(true);
+    }
   };
 
   const handleBusinessSelect = (business: any) => {
+    const locationValue = business.name || business.location || '';
     setBusinessSelected(true);
+    businessSelectedRef.current = true;
+    selectedBusinessNameRef.current = locationValue; // Track selected name to prevent reset
     setShowAddressInput(false);
     setIsManualAddress(false);
-    setLocation(business.name || business.location);
+    setLocation(locationValue);
     setBusinessName(business.name || '');
-    setBusinessInput(business.name || business.location);
-    scheduleAutoSave();
+    setBusinessInput(locationValue);
+    setSelectedBusinessId(business.id || null);
   };
 
   const handleAddressChange = (value: string) => {
@@ -161,39 +169,32 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
 
   const handleAddressBlur = () => {
     const address = manualAddress.trim();
-    if (!address) { 
-      setAddressError('Please enter a business address'); 
-      return; 
+    if (!address) {
+      setAddressError('Please enter a business address');
+      return;
     }
-    if (isProfane(address)) { 
-      setAddressError('Invalid address content'); 
-      return; 
+    if (isProfane(address)) {
+      setAddressError('Invalid address content');
+      return;
     }
-    if (!isValidAddress(address)) { 
-      setAddressError('Please enter a valid street address (e.g., "123 Main St, City, State")'); 
-      return; 
+    if (!isValidAddress(address)) {
+      setAddressError('Please enter a valid street address (e.g., "123 Main St, City, State")');
+      return;
     }
-    
+
     setLocation(address);
     setBusinessName(businessInput || address);
-    setBusinessSelected(false); // Don't mark as selected for manual address
+    setBusinessSelected(false);
+    businessSelectedRef.current = false;
     setIsManualAddress(true);
+    isManualAddressRef.current = true;
+    manualAddressRef.current = address;
     setAddressError('');
-    scheduleAutoSave();
   };
-  
+
   const handleTimePeriodChange = (value: string) => {
     setTimePeriod(value);
   };
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, []);
 
   return (
     <div className="w-full h-full flex items-center justify-center bg-transparent overflow-hidden p-4">
@@ -221,6 +222,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                   value={businessInput}
                   onChange={handleBusinessInputChange}
                   onBusinessSelect={handleBusinessSelect}
+                  onBlur={handleBusinessBlur}
                   placeholder="Where do you work?..."
                   className="w-full px-4 py-4 bg-white text-gray-800 border-2 border-gray-300 text-base transition-all duration-200 focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100 focus:outline-none"
                   variant="dropdown"
@@ -238,7 +240,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                     />
                     {addressError && <p className="text-red-500 text-sm px-1">{addressError}</p>}
                     <p className="text-gray-500 text-sm px-1">
-                      Must include street number, street name, city, and state
+                      Must include street number, street name and borough
                     </p>
                   </div>
                 )}
@@ -249,7 +251,6 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                 <JobSearchDropdown
                   value={role}
                   onChange={handleRoleChange}
-                  onBlur={handleRoleBlur}
                   placeholder="Share your job!..."
                   className="w-full px-4 py-4 bg-white text-gray-800 border-2 border-gray-300 text-base transition-all duration-200 focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100 focus:outline-none"
                 />
@@ -270,7 +271,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                   <select
                     value={timePeriod}
                     onChange={e => handleTimePeriodChange(e.target.value)}
-                    className="px-5 py-4 bg-white text-gray-800 border-2 border-gray-300 text-base font-medium transition-all duration-200 focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100 focus:outline-none cursor-pointer"
+                    className="px-5 h-[58px] bg-white text-gray-800 border-2 border-gray-300 text-base font-medium transition-all duration-200 focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100 focus:outline-none cursor-pointer"
                   >
                     <option value="HR">HR</option>
                     <option value="MO">MO</option>
@@ -285,10 +286,10 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                   <span>Don't worry, your boss won't find out 😉</span>
                 </p>
               </div>
-              
+
             </div>
           </div>
-          
+
         </div>
       </div>
     </div>
