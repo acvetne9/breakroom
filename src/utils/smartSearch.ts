@@ -5,7 +5,28 @@
  * @param enableLogging - Enable console logging (default: true)
  * @returns Array of normalized related job terms
  */
+// Cache DataMuse expansions across searches so repeated terms don't re-hit the network.
+const expansionCache = new Map<string, string[]>();
+const EXPANSION_CACHE_MAX = 300;
+const DATAMUSE_TIMEOUT_MS = 2500;
+
 export async function expandTerm(job: string, enableLogging: boolean = true): Promise<string[]> {
+  const cacheKey = job.trim().toLowerCase();
+  const cached = expansionCache.get(cacheKey);
+  if (cached) return cached;
+
+  const result = await expandTermUncached(job, enableLogging);
+
+  // Simple size-capped cache (drop oldest entry when full)
+  if (expansionCache.size >= EXPANSION_CACHE_MAX) {
+    const firstKey = expansionCache.keys().next().value;
+    if (firstKey !== undefined) expansionCache.delete(firstKey);
+  }
+  expansionCache.set(cacheKey, result);
+  return result;
+}
+
+async function expandTermUncached(job: string, enableLogging: boolean = true): Promise<string[]> {
   const log = (message: string, data: unknown = null) => {
     if (enableLogging) {
       const timestamp = new Date().toISOString();
@@ -162,8 +183,10 @@ export async function expandTerm(job: string, enableLogging: boolean = true): Pr
       const url = `https://api.datamuse.com/words?ml=${encodeURIComponent(variant)}&max=30`;
       log("Fetching from API", { variant });
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), DATAMUSE_TIMEOUT_MS);
       try {
-        const response = await fetch(url);
+        const response = await fetch(url, { signal: controller.signal });
 
         if (!response.ok) {
           log("API request failed", { variant, status: response.status });
@@ -177,6 +200,8 @@ export async function expandTerm(job: string, enableLogging: boolean = true): Pr
       } catch (error) {
         log("Fetch error for variant", { variant, error: (error as Error).message });
         return [];
+      } finally {
+        clearTimeout(timeoutId);
       }
     });
 

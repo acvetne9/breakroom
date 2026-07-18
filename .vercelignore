@@ -1,0 +1,10 @@
+# Native mobile projects — not part of the web deploy
+android
+ios
+
+# Build output (Vercel rebuilds from source)
+dist
+
+# Local/dev noise
+*.log
+.DS_Store

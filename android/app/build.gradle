@@ -6,11 +6,11 @@ plugins {
 
 // Android configuration
 android {
-    namespace "com.acvetne.workaround"
+    namespace "com.acvetne.breakroom"
     compileSdk 35
 
     defaultConfig {
-        applicationId 'com.acvetne.workaround'
+        applicationId 'com.acvetne.breakroom'
         minSdkVersion 23
         targetSdkVersion 35
         versionCode 4

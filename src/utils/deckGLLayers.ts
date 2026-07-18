@@ -1,4 +1,5 @@
 import { ScatterplotLayer, TextLayer } from '@deck.gl/layers';
+import { COORDINATE_SYSTEM } from '@deck.gl/core';
 import * as turf from '@turf/turf';
 import type { Business } from '@/types/business';
 
@@ -116,7 +117,7 @@ export const createBusinessScatterplotLayer = ({
     },
     
     // CRITICAL: Use LNGLAT coordinate system for proper viewport rendering
-    coordinateSystem: 1, // COORDINATE_SYSTEM.LNGLAT
+    coordinateSystem: COORDINATE_SYSTEM.LNGLAT,
     
     stroked: true,
     filled: true,
@@ -175,7 +176,7 @@ export const createEmojiLandmarkLayer = ({
     pickable: false,
     
     // CRITICAL: Use LNGLAT coordinate system
-    coordinateSystem: 1, // COORDINATE_SYSTEM.LNGLAT
+    coordinateSystem: COORDINATE_SYSTEM.LNGLAT,
     
     // Simple 2D coordinates
     getPosition: (d: { lat: number; lng: number; emoji: string }) => [d.lng, d.lat],

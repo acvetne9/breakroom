@@ -1,17 +1,17 @@
 {
   "images" : [
     {
-      "filename" : "2509_BreakroomLogo-1028x1028px.png",
+      "filename" : "2509_WorkaroundLogo-1028x1028px.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
-      "filename" : "2509_BreakroomLogo-1028x1028px 1.png",
+      "filename" : "2509_WorkaroundLogo-1028x1028px 1.png",
       "idiom" : "universal",
       "scale" : "2x"
     },
     {
-      "filename" : "2509_BreakroomLogo-1028x1028px 2.png",
+      "filename" : "2509_WorkaroundLogo-1028x1028px 2.png",
       "idiom" : "universal",
       "scale" : "3x"
     }

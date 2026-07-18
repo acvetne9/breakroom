@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import MapLibreMap from "./MapLibreMap";
 import BusinessPreview from "./BusinessPreview";
 import BusinessDetails from "./BusinessDetails";
@@ -6,7 +6,7 @@ import WorkaroundLoading from "./WorkaroundLoading";
 import UnifiedBusinessSearch from "./UnifiedBusinessSearch";
 import { EnhancedBusiness } from "@/types/search";
 import { parseSearchFilters } from "@/services/businessFiltering";
-import { clearSearchCache } from "@/services/unifiedSearch";
+import { clearSearchCache, expandFilterTerms } from "@/services/unifiedSearch";
 
 const LANDMARKS = [
   { lat: 40.690331, lng: -74.045414, emoji: "🗽" },
@@ -106,16 +106,39 @@ const HomePage: React.FC<HomePageProps> = ({
     [searchValue],
   );
 
-  // Memoize searchFilters to prevent recreation on every render
-  const searchFilters = useMemo(() => {
-    if (!debouncedSearchValue.trim()) return null;
-    const filters = parseSearchFilters(debouncedSearchValue);
-
-    if (filters?.neighborhoodFilter?.center) {
-      setNeighborhoodCenter(filters.neighborhoodFilter.center);
+  // Parse the debounced query into map search filters, then widen role terms with the
+  // same synonym expansion the dropdown uses (async) so the map and dropdown stay
+  // consistent. Neighborhood/role/type detection still comes from parseSearchFilters.
+  const [searchFilters, setSearchFilters] = useState<any>(null);
+  useEffect(() => {
+    if (!debouncedSearchValue.trim()) {
+      setSearchFilters(null);
+      return;
     }
 
-    return filters;
+    const base = parseSearchFilters(debouncedSearchValue);
+    if (!base) {
+      setSearchFilters(null);
+      return;
+    }
+
+    if (base.neighborhoodFilter?.center) {
+      setNeighborhoodCenter(base.neighborhoodFilter.center);
+    }
+
+    let cancelled = false;
+    expandFilterTerms(base)
+      .then((expanded) => {
+        if (!cancelled) setSearchFilters(expanded);
+      })
+      .catch(() => {
+        // On expansion failure fall back to the unexpanded filters
+        if (!cancelled) setSearchFilters(base);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [debouncedSearchValue]);
 
   // Listen for search triggers from other pages

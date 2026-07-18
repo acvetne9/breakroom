@@ -6,7 +6,7 @@ import { sanitizeVoteTotal } from "@/utils/voteCalculations";
 import { findNeighborhoodBoundaryByName } from "@/utils/nyc_neighborhoods";
 import { parseAdvancedSalaryPatterns } from "@/utils/searchParsing";
 import { retryWithBackoff, isRetryableError } from "@/utils/retryWithBackoff";
-import { stripPunctuation, filterMapResults } from "@/utils/searchUtils";
+import { stripPunctuation } from "@/utils/searchUtils";
 
 // Search results cache to prevent repeated queries
 const searchCache = new Map<string, { results: Business[]; timestamp: number }>();
@@ -15,62 +15,63 @@ const MAX_CACHE_SIZE = 100;
 
 export interface UnifiedSearchFilters extends SearchFilters {}
 
-// Enhanced search term parsing with better AND logic - NOW ASYNC
+/**
+ * Widen a parsed filter's role terms with synonyms (via DataMuse) for broader role
+ * matching. Keeps `originalTerms` (used for name/type/address matching) and every other
+ * field intact — it only expands `textTerms` (used for role matching).
+ *
+ * Shared by the dropdown parser below AND the map path (HomePage) so both match roles
+ * with the same breadth. This is the single source of truth for term expansion.
+ */
+export const expandFilterTerms = async <T extends SearchFilters>(filters: T): Promise<T> => {
+  const baseTerms =
+    filters.originalTerms && filters.originalTerms.length > 0
+      ? filters.originalTerms
+      : filters.textTerms;
+
+  if (!baseTerms || baseTerms.length === 0) return filters;
+
+  const MAX_TOTAL_TERMS = 20; // Prevent overly broad searches
+  const expandedTermsArrays = await Promise.all(
+    baseTerms.map(async (term) => {
+      // Skip expansion for neighborhood names
+      if (findNeighborhoodBoundaryByName(term)) return [term];
+      // Limit expansions per term to top 5 most relevant
+      const expanded = await expandTerm(term);
+      return expanded.slice(0, 5);
+    }),
+  );
+
+  const uniqueExpandedTerms = [...new Set(expandedTermsArrays.flat())].slice(0, MAX_TOTAL_TERMS);
+
+  return { ...filters, textTerms: uniqueExpandedTerms, originalTerms: baseTerms };
+};
+
+// Parse a raw query into filters for the search service (universal text + role search).
 export const parseUnifiedSearchFilters = async (searchQuery: string): Promise<UnifiedSearchFilters | null> => {
   if (!searchQuery.trim()) return null;
 
   // Extract salary patterns using shared utility
   const { salaryQuery, remainingText } = parseAdvancedSalaryPatterns(searchQuery);
-  if (salaryQuery) {
-    console.log(`💰 Salary pattern detected: ${salaryQuery.min ? `$${salaryQuery.min.toFixed(2)}/hr` : 'no min'}${salaryQuery.max ? ` - $${salaryQuery.max.toFixed(2)}/hr` : ' or better'}`);
-  }
 
   // Parse remaining text terms and strip punctuation
-  const rawTerms = remainingText
+  const originalTerms = remainingText
     .split(/\s+/)
-    .filter((term) => term.length > 0);
+    .filter((term) => term.length > 0)
+    .map((term) => stripPunctuation(term))
+    .filter((t) => t.length > 0);
 
-  // Strip punctuation but keep original form for display
-  const textTerms = rawTerms.map((term) => stripPunctuation(term)).filter(t => t.length > 0);
+  const isNeighborhoodSearch = originalTerms.some((term) => findNeighborhoodBoundaryByName(term));
 
-  console.log(`🔍 [parseSearchFilters] Original terms: ${textTerms.join(", ")}`);
-
-  // Check if this is a neighborhood search
-  const isNeighborhoodSearch = textTerms.some(term => findNeighborhoodBoundaryByName(term));
-
-  // Expand text terms with synonyms - skip neighborhoods
-  const MAX_TOTAL_TERMS = 20; // Prevent overly broad searches
-  const expandedTermsArrays = await Promise.all(
-    textTerms.map(async (term) => {
-      // Skip expansion for neighborhood names
-      const isNeighborhood = findNeighborhoodBoundaryByName(term);
-      if (isNeighborhood) {
-        console.log(`⏭️ Skipping expansion for neighborhood: ${term}`);
-        return [term]; // Return original term only
-      }
-
-      // Expand all other terms (will expand job roles AND other terms)
-      const expanded = await expandTerm(term);
-      // Limit expansions per term to top 5 most relevant
-      return expanded.slice(0, 5);
-    }),
-  );
-  const expandedTextTerms = expandedTermsArrays.flat();
-  const uniqueExpandedTerms = [...new Set(expandedTextTerms)].slice(0, MAX_TOTAL_TERMS);
-
-  console.log(`🔍 [parseSearchFilters] Expanded to: ${uniqueExpandedTerms.join(", ")}`);
-
-  const filters: UnifiedSearchFilters = {
-    textTerms: uniqueExpandedTerms, // Expanded terms for role matching
-    originalTerms: textTerms, // Original terms (punctuation-stripped) for name/type matching
-    isNeighborhoodSearch, // Flag for tiered filtering
+  const base: UnifiedSearchFilters = {
+    textTerms: originalTerms,
+    originalTerms,
+    isNeighborhoodSearch,
   };
+  if (salaryQuery) base.salaryQuery = salaryQuery;
 
-  if (salaryQuery) filters.salaryQuery = salaryQuery;
-
-  console.log("✅ [parseSearchFilters] Final filters:", filters);
-
-  return filters;
+  // Widen role matching with synonyms (shared with the map path)
+  return expandFilterTerms(base);
 };
 
 // Efficient database search with chunked role loading
@@ -78,8 +79,13 @@ export const searchBusinessesUnified = async (
   filters: UnifiedSearchFilters,
   bounds?: { north: number; south: number; east: number; west: number },
   limit: number = 1000,
+  options?: { loadRoles?: boolean },
 ): Promise<Business[]> => {
-  const cacheKey = JSON.stringify({ filters, bounds, limit });
+  // Roles are only needed when we actually render or score them (map display + salary
+  // filtering). The typeahead dropdown skips role loading to avoid dozens of extra
+  // round trips per keystroke. Salary searches always need roles regardless.
+  const shouldLoadRoles = (options?.loadRoles ?? true) || !!filters.salaryQuery;
+  const cacheKey = JSON.stringify({ filters, bounds, limit, shouldLoadRoles });
 
   // Check cache first
   const cached = searchCache.get(cacheKey);
@@ -247,7 +253,7 @@ export const searchBusinessesUnified = async (
     const businessIds = businesses.map((b) => b.id);
     let allRoles: any[] = [];
 
-    if (businessIds.length > 0) {
+    if (businessIds.length > 0 && shouldLoadRoles) {
       const BATCH_SIZE = 200; // Optimized batch size for better URL utilization
       const CONCURRENCY = 8; // Increased parallelism for faster loading
       const chunks: string[][] = [];
@@ -423,44 +429,14 @@ export const searchBusinessesByQuery = async (
   query: string,
   bounds?: { north: number; south: number; east: number; west: number },
   limit: number = 1000,
+  options?: { loadRoles?: boolean },
 ): Promise<Business[]> => {
   if (!query.trim()) return [];
 
   const filters = await parseUnifiedSearchFilters(query);
   if (!filters) return [];
 
-  return searchBusinessesUnified(filters, bounds, limit);
-};
-
-/**
- * Search businesses with progressive specificity for map display
- * Returns both full results (for dropdown) and filtered results (for map)
- */
-export const searchBusinessesForMap = async (
-  query: string,
-  bounds?: { north: number; south: number; east: number; west: number },
-  limit: number = 1000,
-): Promise<{ allResults: Business[]; mapResults: Business[] }> => {
-  if (!query.trim()) {
-    return { allResults: [], mapResults: [] };
-  }
-
-  const filters = await parseUnifiedSearchFilters(query);
-  if (!filters) {
-    return { allResults: [], mapResults: [] };
-  }
-
-  // Get all search results
-  const allResults = await searchBusinessesUnified(filters, bounds, limit);
-
-  // Apply tiered filtering for map display
-  const mapResults = filterMapResults(
-    allResults,
-    filters.originalTerms || [],
-    filters.isNeighborhoodSearch || false
-  );
-
-  return { allResults, mapResults };
+  return searchBusinessesUnified(filters, bounds, limit, options);
 };
 
 // Clear search cache

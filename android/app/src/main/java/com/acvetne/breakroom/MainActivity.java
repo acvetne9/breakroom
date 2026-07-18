@@ -1,4 +1,4 @@
-package com.acvetne.workaround;
+package com.acvetne.breakroom;
 
 import android.os.Bundle;
 import android.view.WindowManager;

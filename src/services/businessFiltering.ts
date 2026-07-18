@@ -2,7 +2,6 @@ import { Business } from '@/types/business';
 import { findNeighborhoodBoundaryByName, filterBusinessesByNeighborhood } from '@/utils/nyc_neighborhoods';
 import type { NeighborhoodBounds } from '@/utils/nyc_neighborhoods';
 import {
-  parseBasicSearchTerms,
   parseAdvancedSalaryPatterns,
   parseSalaryToHourly,
   COMMON_ROLES,

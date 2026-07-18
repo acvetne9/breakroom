@@ -1,88 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Business, BusinessRole } from '@/types/business';
 import { sanitizeVoteTotal } from '@/utils/voteCalculations';
-import { applyBusinessFilters, SearchFilters } from './businessFiltering';
-import { calculateBusinessFuzzyScore } from '@/utils/fuzzySearch';
 import { retryWithBackoff, isRetryableError } from '@/utils/retryWithBackoff';
 
 type MapBounds = { north: number; south: number; east: number; west: number };
-
-// Enhanced function using PostGIS spatial queries with user votes preloaded
-export async function getBusinessesNearPoint(
-  centerLat: number, 
-  centerLng: number, 
-  radiusMeters: number = 5000,
-  limit: number = 2000
-): Promise<Business[]> {
-  console.log(`🌍 Fetching businesses with user votes near ${centerLat}, ${centerLng}`);
-
-  // Get current user ID for vote loading
-  const { getUserProfile } = await import('./posts');
-  const { profileId: userProfileId } = await getUserProfile();
-
-  const { data: businessesData, error } = await supabase.rpc(
-    'get_businesses_with_roles_and_votes_near_point',
-    {
-      center_lat: centerLat,
-      center_lng: centerLng,
-      radius_meters: radiusMeters,
-      limit_count: limit,
-      user_profile_id: userProfileId
-    }
-  );
-
-  if (error) {
-    console.error('❌ Spatial query error:', error);
-    throw error;
-  }
-
-  console.log(`📊 Spatial query returned: ${businessesData?.length || 0} records`);
-
-  if (!businessesData) return [];
-
-  // Parse and return businesses with user votes already included
-  const businesses: Business[] = businessesData.map((business: any) => {
-    const roles: BusinessRole[] = business.roles 
-      ? (typeof business.roles === 'string' 
-          ? JSON.parse(business.roles) 
-          : business.roles
-        ).map((role: any) => ({
-          id: role.id,
-          role: role.role,
-          salary: role.salary,
-          payPeriod: role.pay_period,
-          votesTotal: role.votes_total || 0,
-          userVote: role.user_vote || null  // Already included from RPC!
-        }))
-      : [];
-
-    return {
-      id: business.id,
-      name: business.name,
-      address: business.address,
-      position: { lat: business.lat, lng: business.lng },
-      atmosphere: business.atmosphere || [],
-      businessType: business.business_type,
-      website: business.website,
-      roles: roles,
-    };
-  });
-
-  const totalRoles = businesses.reduce((sum, b) => sum + (b.roles?.length || 0), 0);
-  console.log(`✅ Processed ${businesses.length} businesses with ${totalRoles} roles and user votes preloaded`);
-  return businesses;
-}
-
-export async function getBusinessesBasic(limit: number = 5000): Promise<Business[]> {
-  console.log(`🔄 Fetching ${limit} businesses from center outward...`);
-  
-  // NYC center coordinates - use spatial query for better performance
-  const centerLat = 40.7589; // Times Square area
-  const centerLng = -73.9851;
-  
-  // Expanded radius to 20km to cover all of NYC
-  return getBusinessesNearPoint(centerLat, centerLng, 20000, limit);
-}
 
 /**
  * Fetches businesses within viewport bounds using grid-sampled distribution
@@ -164,74 +85,10 @@ export const getBusinessesInViewport = async (
         roles: Array.isArray(b.roles) ? b.roles : []
       }));
 
-    // Apply search filters if provided using proper filter function
-    if (searchFilters) {
-      const filters = searchFilters as SearchFilters;
-      
-      // Use the comprehensive filter function that handles all filter types
-      let filteredBusinesses = applyBusinessFilters(businesses, filters);
-      
-      // Apply fuzzy scoring threshold for text searches to ensure good matches
-      if (filters.textTerms && filters.textTerms.length > 0) {
-        const searchQuery = filters.textTerms.join(' ');
-        const MINIMUM_SCORE = 0.25; // Threshold for "good enough" match
-        
-        const scoredBusinesses = filteredBusinesses
-          .map(b => ({
-            business: b,
-            score: calculateBusinessFuzzyScore(
-              b.name || '',
-              b.businessType || '',
-              b.roles?.map(r => r.role) || [],
-              searchQuery
-            )
-          }))
-          .filter(({ score }) => score >= MINIMUM_SCORE)
-          .sort((a, b) => b.score - a.score)
-          .map(({ business }) => business);
-        
-        console.log(`🎯 Fuzzy score filter: ${filteredBusinesses.length} → ${scoredBusinesses.length} businesses (threshold: ${MINIMUM_SCORE})`);
-        return scoredBusinesses;
-      }
-      
-      console.log(`🎯 Search filter applied: ${businesses.length} → ${filteredBusinesses.length} businesses`);
-      return filteredBusinesses;
-    }
-
     return businesses;
 
   } catch (error) {
     console.error('❌ Error in getBusinessesInViewport:', error);
-    return [];
-  }
-};
-
-export const searchBusinessesByName = async (
-  query: string,
-  limit: number = 5
-): Promise<Business[]> => {
-  if (query.length < 3) return [];
-
-  try {
-    const { data, error } = await supabase
-      .from('businesses')
-      .select('id, name, business_type, address, lat, lng')
-      .ilike('name', `%${query}%`)
-      .limit(limit);
-
-    if (error) throw error;
-
-    return (data || []).map(b => ({
-      id: b.id,
-      name: b.name,
-      businessType: b.business_type,
-      address: b.address,
-      position: b.lat && b.lng ? { lat: b.lat, lng: b.lng } : undefined,
-      atmosphere: [],
-      roles: []
-    }));
-  } catch (error) {
-    console.error('Search error:', error);
     return [];
   }
 };

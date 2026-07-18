@@ -74,19 +74,21 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     showDropdownRef.current = showDropdown;
   }, [showDropdown]);
 
-  // Handle clicks outside to close dropdown
+  // Handle clicks/taps outside to close dropdown
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       // Early exit if dropdown not open - prevents unnecessary logging
       if (!showDropdownRef.current) return;
 
       // Don't close dropdown if we're scrolling within it
       if (isScrolling.current) return;
 
+      const target = event.target as Node;
+
       // Don't close if clicking on the input or dropdown
       if (
-        (inputRef.current && inputRef.current.contains(event.target as Node)) ||
-        (dropdownRef.current && dropdownRef.current.contains(event.target as Node))
+        (inputRef.current && inputRef.current.contains(target)) ||
+        (dropdownRef.current && dropdownRef.current.contains(target))
       ) {
         return;
       }
@@ -97,8 +99,10 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     };
 
     document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
     };
   }, []);
 
@@ -205,7 +209,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
 
         // Perform immediate search for dropdown (independent of map's debounced search)
         console.log(`🔍 [Dropdown] Performing immediate search for: "${q}"`);
-        const searchResults = await searchBusinessesByQuery(q, undefined, 30);
+        const searchResults = await searchBusinessesByQuery(q, undefined, 30, { loadRoles: false });
 
         // Check if this search is still current
         if (seq !== searchSeqRef.current) return;
