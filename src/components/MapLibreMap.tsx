@@ -129,45 +129,11 @@ const createOptimizedGridSampling = (
   prioritizeVisible: boolean = false,
 ): Business[] => {
   const validBusinesses = businesses.filter(b => b != null);
-  if (!validBusinesses || validBusinesses.length <= maxBusinesses) return validBusinesses;
+  if (validBusinesses.length <= maxBusinesses) return validBusinesses;
 
-  if (prioritizeVisible) {
-    const gridSize = Math.ceil(Math.sqrt(maxBusinesses / 1.5));
-    const latStep = (bounds.north - bounds.south) / gridSize;
-    const lngStep = (bounds.east - bounds.west) / gridSize;
-
-    const grid = Array.from({ length: gridSize }, () =>
-      Array.from({ length: gridSize }, () => [] as Business[])
-    );
-
-    validBusinesses.forEach((business) => {
-      if (!business?.position?.lat || !business?.position?.lng) return;
-
-      const latIndex = Math.min(
-        gridSize - 1,
-        Math.max(0, Math.floor((business.position.lat - bounds.south) / latStep)),
-      );
-      const lngIndex = Math.min(
-        gridSize - 1,
-        Math.max(0, Math.floor((business.position.lng - bounds.west) / lngStep))
-      );
-
-      grid[latIndex][lngIndex].push(business);
-    });
-
-    const businessesPerCell = Math.ceil(maxBusinesses / (gridSize * gridSize * 0.7));
-    const result: Business[] = [];
-
-    grid.forEach((row) =>
-      row.forEach((cell) => {
-        if (cell.length) result.push(...cell.slice(0, businessesPerCell));
-      }),
-    );
-
-    return result.slice(0, maxBusinesses);
-  }
-
-  const gridSize = Math.ceil(Math.sqrt(maxBusinesses / 2));
+  // Grid the viewport (finer when prioritizing the visible area) and bucket
+  // businesses into cells.
+  const gridSize = Math.ceil(Math.sqrt(maxBusinesses / (prioritizeVisible ? 1.5 : 2)));
   const latStep = (bounds.north - bounds.south) / gridSize;
   const lngStep = (bounds.east - bounds.west) / gridSize;
 
@@ -177,25 +143,32 @@ const createOptimizedGridSampling = (
 
   validBusinesses.forEach((business) => {
     if (!business?.position?.lat || !business?.position?.lng) return;
-
     const latIndex = Math.min(gridSize - 1, Math.max(0, Math.floor((business.position.lat - bounds.south) / latStep)));
     const lngIndex = Math.min(gridSize - 1, Math.max(0, Math.floor((business.position.lng - bounds.west) / lngStep)));
-
     grid[latIndex][lngIndex].push(business);
   });
 
-  const businessesPerCell = Math.ceil(maxBusinesses / (gridSize * gridSize));
+  // Round-robin across non-empty cells: take one business from each cell per
+  // pass until the cap is reached. This spreads the limit evenly across the
+  // whole viewport instead of filling row-by-row and truncating the last rows
+  // (which made businesses appear only in horizontal bands / sections).
+  const cells = grid.flat().filter((cell) => cell.length > 0);
+  cells.forEach((cell) => cell.sort(() => Math.random() - 0.5));
+
   const result: Business[] = [];
+  for (let depth = 0; result.length < maxBusinesses; depth++) {
+    let addedThisPass = false;
+    for (const cell of cells) {
+      if (depth < cell.length) {
+        result.push(cell[depth]);
+        addedThisPass = true;
+        if (result.length >= maxBusinesses) break;
+      }
+    }
+    if (!addedThisPass) break;
+  }
 
-  grid.forEach((row) =>
-    row.forEach((cell) => {
-      if (!cell.length) return;
-      const shuffled = cell.sort(() => Math.random() - 0.5);
-      result.push(...shuffled.slice(0, businessesPerCell));
-    }),
-  );
-
-  return result.slice(0, maxBusinesses);
+  return result;
 };
 
 const MapLibreMap: React.FC<MapLibreMapProps> = ({
