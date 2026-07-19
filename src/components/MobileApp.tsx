@@ -42,7 +42,7 @@ interface Post {
 const MobileApp: React.FC = () => {
   const isMobile = useIsMobile();
   const { user } = useAuth();
-  const { deviceId, loading: deviceLoading } = useDevice();
+  const { deviceId, loading: deviceLoading, isFirstSession } = useDevice();
   const [currentView, setCurrentView] = useState<"initiation" | "main" | "loading">("loading");
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -129,14 +129,16 @@ const MobileApp: React.FC = () => {
           });
           setCurrentView("main");
         } else {
-          // No current job - show initiation (create profile if needed)
+          // No current job yet — create the profile row if needed.
           if (!profileExists) {
             const { error } = await supabase.from("profiles").insert({ id: deviceId });
             if (error) {
               console.error("❌ Error creating profile row:", error);
             }
           }
-          setCurrentView("initiation");
+          // Don't prompt on the very first visit (per device). Only nudge to add
+          // a job on return visits.
+          setCurrentView(isFirstSession ? "main" : "initiation");
         }
       } catch (error) {
         console.error("Error during app initialization:", error);
@@ -145,7 +147,7 @@ const MobileApp: React.FC = () => {
     };
 
     initializeApp();
-  }, [deviceLoading, deviceId, hasProfile, hasCurrentJob]);
+  }, [deviceLoading, deviceId, hasProfile, hasCurrentJob, isFirstSession]);
 
   useEffect(() => {
     if (currentSlide === 1 && currentView === "initiation" && deviceId) {

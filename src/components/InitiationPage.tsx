@@ -18,11 +18,11 @@ interface InitiationPageProps {
 
 const isValidAddress = (address: string): boolean => {
   const trimmedAddress = address.trim();
-  if (trimmedAddress.length < 10) return false;
+  if (trimmedAddress.length < 6) return false;
   const hasNumber = /\d/.test(trimmedAddress);
   const hasStreetType = /\b(st|street|ave|avenue|rd|road|blvd|boulevard|dr|drive|ln|lane|ct|court|pl|place|way|pkwy|parkway)\b/i.test(trimmedAddress);
-  const hasComma = trimmedAddress.includes(',');
-  return hasNumber && hasStreetType && hasComma;
+  // City/State are no longer required — a street address alone is valid.
+  return hasNumber && hasStreetType;
 };
 
 const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
@@ -178,7 +178,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
       return;
     }
     if (!isValidAddress(address)) {
-      setAddressError('Please enter a valid street address (e.g., "123 Main St, City, State")');
+      setAddressError('Please enter a valid street address (e.g., "123 Main St")');
       return;
     }
 
@@ -232,7 +232,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
                     <p className="text-gray-600 text-sm">Business not found. Please enter the full business address to continue:</p>
                     <input
                       type="text"
-                      placeholder="Full address (e.g., 123 Main St, City, State)"
+                      placeholder="Street address (e.g., 123 Main St)"
                       className={`w-full px-4 py-4 bg-white text-gray-800 border-2 text-base transition-all duration-200 focus:outline-none ${addressError ? "border-red-400 focus:border-red-400 focus:ring-4 focus:ring-red-100" : "border-gray-300 focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100"}`}
                       value={manualAddress}
                       onChange={(e) => handleAddressChange(e.target.value)}
