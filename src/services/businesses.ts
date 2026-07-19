@@ -34,7 +34,7 @@ export const getBusinessesInViewport = async (
     // Wrap with retry logic for connection resilience
     const { data, error } = await retryWithBackoff(
       () => supabase.rpc(
-        'get_businesses_in_viewport_no_ordering',
+        'get_businesses_in_viewport_grid_sampled',
         {
           min_lat: bounds.south,
           max_lat: bounds.north,
