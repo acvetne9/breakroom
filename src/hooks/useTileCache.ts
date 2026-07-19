@@ -1,13 +1,8 @@
 import { useState, useCallback, useRef } from 'react';
 import type { Business } from '@/types/business';
+import { TILE_ZOOM_LEVEL, getTilesForBounds, getTileBounds, getTileKey } from '@/utils/tiles';
 
 // Tile-based caching system for optimal cache hit rates
-interface TileKey {
-  z: number;
-  x: number;
-  y: number;
-}
-
 interface CachedTileData {
   businesses: Business[];
   timestamp: number;
@@ -24,7 +19,6 @@ interface CachedTileData {
 
 // Cache configuration - INFINITE CACHE
 const MAX_CACHE_SIZE = 5000; // increased tiles limit
-const TILE_ZOOM_LEVEL = 14; // Fixed zoom for tiling (higher = smaller tiles)
 
 // In-memory tile cache - much faster than localStorage (Phase 4)
 class InMemoryTileCache {
@@ -69,60 +63,6 @@ class InMemoryTileCache {
   static forEach(callback: (data: CachedTileData, key: string) => void): void {
     this.cache.forEach((data, key) => callback(data, key));
   }
-}
-
-// Utility functions for tile calculations
-function deg2rad(deg: number): number {
-  return deg * (Math.PI / 180);
-}
-
-function latLng2Tile(lat: number, lng: number, zoom: number): TileKey {
-  const x = Math.floor((lng + 180) / 360 * Math.pow(2, zoom));
-  const y = Math.floor((1 - Math.log(Math.tan(deg2rad(lat)) + 1 / Math.cos(deg2rad(lat))) / Math.PI) / 2 * Math.pow(2, zoom));
-  return { z: zoom, x, y };
-}
-
-function tile2LatLng(x: number, y: number, zoom: number): { lat: number; lng: number } {
-  const lng = x / Math.pow(2, zoom) * 360 - 180;
-  const n = Math.PI - 2 * Math.PI * y / Math.pow(2, zoom);
-  const lat = 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
-  return { lat, lng };
-}
-
-function getTileBounds(tileKey: TileKey): { north: number; south: number; east: number; west: number } {
-  const nw = tile2LatLng(tileKey.x, tileKey.y, tileKey.z);
-  const se = tile2LatLng(tileKey.x + 1, tileKey.y + 1, tileKey.z);
-  
-  return {
-    north: nw.lat,
-    south: se.lat,
-    east: se.lng,
-    west: nw.lng
-  };
-}
-
-function getTileKey(tileKey: TileKey): string {
-  return `${tileKey.z}/${tileKey.x}/${tileKey.y}`;
-}
-
-function getTilesForBounds(bounds: {
-  north: number;
-  south: number;
-  east: number;
-  west: number;
-}, zoom: number = TILE_ZOOM_LEVEL): TileKey[] {
-  const nw = latLng2Tile(bounds.north, bounds.west, zoom);
-  const se = latLng2Tile(bounds.south, bounds.east, zoom);
-  
-  const tiles: TileKey[] = [];
-  
-  for (let x = nw.x; x <= se.x; x++) {
-    for (let y = nw.y; y <= se.y; y++) {
-      tiles.push({ z: zoom, x, y });
-    }
-  }
-  
-  return tiles;
 }
 
 // Cache cleanup - only remove excess entries if over limit (Phase 4 - optimized for in-memory)

@@ -7,9 +7,12 @@ import { fetchAndMergeBusinessDetails } from '@/utils/businessDetailsFetch';
 import { isPointInPolygon } from '@/utils/nyc_neighborhoods';
 import { useTileCache } from './useTileCache';
 import { useMapWorker } from './useMapWorker';
+import { getTilesForBounds, getTileBounds, getTileKey, sortTilesCenterOut } from '@/utils/tiles';
 
 // Preloading and caching
 const inflightRequests = new Map<string, Promise<Business[]>>();
+// Dedupe concurrent fetches of the same tile (keyed by tile + rounded zoom).
+const inflightTiles = new Map<string, Promise<Business[]>>();
 
 // Cap the accumulated browse-mode set so long panning sessions stay light to render.
 // The NYC dataset is far smaller than this, so it only guards pathological cases and
@@ -194,87 +197,125 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
     const delay = businesses.length ? (isMoving ? 400 : 150) : 0;
 
     loadTimeoutRef.current = setTimeout(async () => {
-      // Browse mode: if this whole viewport is already cached at sufficient detail,
-      // serve it instantly and skip the network round-trip entirely.
-      if (!searchFilters) {
-        const cached = getCachedBusinesses(viewportBounds, effZoom);
-        if (cached) {
-          const existingIds = new Set(businesses.map(b => b.id));
-          const merged = [...businesses, ...cached.filter(b => !existingIds.has(b.id))];
-          const capped = merged.length > MAX_ACCUMULATED_BUSINESSES
-            ? merged.slice(merged.length - MAX_ACCUMULATED_BUSINESSES)
-            : merged;
-          console.log(`⚡ Tile cache served ${cached.length} businesses (no fetch); ${capped.length} total`);
-          setBusinesses(capped);
+      requestQueue.setMaxConcurrent(effZoom);
+
+      // ---------- SEARCH MODE: one database-wide search, replace results ----------
+      if (searchFilters) {
+        setLoading(true);
+        const requestPromise = requestQueue.run(() =>
+          searchBusinessesUnified(searchFilters, viewportBounds, limit)
+        );
+        inflightRequests.set(requestKey, requestPromise);
+        try {
+          let results = await requestPromise;
+          if (searchPolygon) {
+            results = results.filter(b =>
+              isPointInPolygon({ lat: b.position.lat, lon: b.position.lng }, searchPolygon)
+            );
+          }
+          console.log(`✅ Search loaded ${results.length} businesses`);
+          setBusinesses(results);
           setCurrentBounds(viewportBounds);
-          schedulePreload(viewportBounds);
-          return;
+          return results;
+        } catch (err) {
+          console.error('❌ Error loading search results:', err);
+          return [];
+        } finally {
+          inflightRequests.delete(requestKey);
+          setLoading(false);
         }
       }
 
-      setLoading(true);
+      // ---------- BROWSE MODE: tile-chunked, progressive, center-out ----------
+      // Progressive accumulation (dedup + cap). Functional updater so it always
+      // merges into the latest set, never a stale closure.
+      const mergeTile = (incoming: Business[]) => {
+        if (!incoming.length) return;
+        setBusinesses(prev => {
+          const seen = new Set(prev.map(b => b.id));
+          const fresh = incoming.filter(b => !seen.has(b.id));
+          if (!fresh.length) return prev;
+          const merged = [...prev, ...fresh];
+          return merged.length > MAX_ACCUMULATED_BUSINESSES
+            ? merged.slice(merged.length - MAX_ACCUMULATED_BUSINESSES)
+            : merged;
+        });
+      };
 
-      requestQueue.setMaxConcurrent(effZoom);
+      const allTiles = getTilesForBounds(viewportBounds);
 
-      // FIXED: Use database-wide search when searchFilters are present
-      // Use viewport-only search when browsing (no filters)
-      const requestPromise = searchFilters
-        ? requestQueue.run(() =>
-            searchBusinessesUnified(searchFilters, viewportBounds, limit)
-          )
-        : requestQueue.run(() =>
+      // Wide views cover too many z14 tiles to chunk efficiently — fall back to a
+      // single viewport fetch (still cached per-tile for later zoom-ins).
+      const MAX_CHUNK_TILES = 24;
+      if (allTiles.length > MAX_CHUNK_TILES) {
+        const cached = getCachedBusinesses(viewportBounds, effZoom);
+        if (cached) {
+          mergeTile(cached);
+          setCurrentBounds(viewportBounds);
+          setLoading(false);
+          schedulePreload(viewportBounds);
+          return;
+        }
+        setLoading(true);
+        try {
+          const res = await requestQueue.run(() =>
             getBusinessesInViewport(viewportBounds, limit, undefined, undefined, effZoom)
           );
-
-      inflightRequests.set(requestKey, requestPromise);
-
-      try {
-        let viewportBusinesses = await requestPromise;
-
-        console.log('📍 Raw businesses from query:', {
-          count: viewportBusinesses.length,
-          searchMode: !!searchFilters,
-          allNames: viewportBusinesses.map(b => b.name)
-        });
-
-        // Apply neighborhood polygon filter if needed
-        if (searchPolygon) {
-          viewportBusinesses = viewportBusinesses.filter(b =>
-            isPointInPolygon({ lat: b.position.lat, lon: b.position.lng }, searchPolygon)
-          );
+          setCachedBusinesses(viewportBounds, res, effZoom);
+          mergeTile(res);
+          setCurrentBounds(viewportBounds);
+        } catch (err) {
+          console.error('❌ Error loading businesses:', err);
+        } finally {
+          setLoading(false);
+          schedulePreload(viewportBounds);
         }
+        return;
+      }
 
-        // REMOVED: Center-out sorting (no longer needed with grid sampling)
-        // The SQL function now handles even distribution across viewport
+      // Zoomed in enough to chunk: cover the viewport with z14 tiles, center-out.
+      const tiles = sortTilesCenterOut(allTiles, viewportBounds);
 
-        // Search mode: REPLACE (tier filtering happens in MapLibreMap)
-        // Browse mode: ACCUMULATE (collect businesses as you scroll)
-        const updatedBusinesses = searchFilters
-          ? viewportBusinesses  // SEARCH: Replace with filtered results
-          : (() => {
-              // BROWSE: Accumulate as you scroll (capped to stay light to render)
-              const existingIds = new Set(businesses.map(b => b.id));
-              const newBusinesses = viewportBusinesses.filter(b => !existingIds.has(b.id));
-              const merged = [...businesses, ...newBusinesses];
-              return merged.length > MAX_ACCUMULATED_BUSINESSES
-                ? merged.slice(merged.length - MAX_ACCUMULATED_BUSINESSES)
-                : merged;
-            })();
+      // Serve cached tiles instantly; collect the misses to fetch.
+      const missing = tiles.filter((tile) => {
+        const cached = getCachedBusinesses(getTileBounds(tile), effZoom);
+        if (cached) {
+          mergeTile(cached);
+          return false;
+        }
+        return true;
+      });
+      setCurrentBounds(viewportBounds);
 
-        console.log(`✅ Loaded ${updatedBusinesses.length} businesses (${viewportBusinesses.length} from query, search mode: ${!!searchFilters})`);
-        setBusinesses(updatedBusinesses);
-
-        if (!searchFilters) setCachedBusinesses(viewportBounds, viewportBusinesses, effZoom);
-        setCurrentBounds(viewportBounds);
-        if (!searchFilters) schedulePreload(viewportBounds);
-
-        return viewportBusinesses;
-      } catch (err) {
-        console.error('❌ Error loading businesses:', err);
-        return [];
-      } finally {
-        inflightRequests.delete(requestKey);
+      if (missing.length === 0) {
         setLoading(false);
+        schedulePreload(viewportBounds);
+        return;
+      }
+
+      // Fetch missing tiles in parallel (center-out order); render each as it lands.
+      setLoading(true);
+      try {
+        await Promise.all(missing.map((tile) => {
+          const tileBounds = getTileBounds(tile);
+          const inflightKey = `${getTileKey(tile)}-${Math.round(effZoom)}`;
+          let p = inflightTiles.get(inflightKey);
+          if (!p) {
+            p = requestQueue
+              .run(() => getBusinessesInViewport(tileBounds, limit, undefined, undefined, effZoom))
+              .then((res) => {
+                setCachedBusinesses(tileBounds, res, effZoom);
+                return res;
+              })
+              .finally(() => inflightTiles.delete(inflightKey));
+            inflightTiles.set(inflightKey, p);
+          }
+          return p.then(mergeTile).catch((e) => console.warn('Tile fetch failed', e));
+        }));
+        console.log(`✅ Tile-loaded ${missing.length} missing tiles for viewport`);
+      } finally {
+        setLoading(false);
+        schedulePreload(viewportBounds);
       }
     }, delay);
   }, [loading, businesses, searchFilters, lastSearchFilters, getCachedBusinesses, setCachedBusinesses, schedulePreload, zoom]);
