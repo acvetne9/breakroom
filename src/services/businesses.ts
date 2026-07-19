@@ -31,11 +31,14 @@ export const getBusinessesInViewport = async (
       zoom
     });
 
-    // FIXED: Use grid-sampled function for even distribution
+    // Use the no-ordering function. PostgREST caps results at 1000 rows, and this
+    // returns them in natural (physical) order which is spread evenly across the
+    // viewport. (get_businesses_in_viewport_grid_sampled orders by grid cell, so the
+    // 1000-row cap truncates it into a single southern band — do not use it here.)
     // Wrap with retry logic for connection resilience
     const { data, error } = await retryWithBackoff(
       () => supabase.rpc(
-        'get_businesses_in_viewport_grid_sampled',
+        'get_businesses_in_viewport_no_ordering',
         {
           min_lat: bounds.south,
           max_lat: bounds.north,
