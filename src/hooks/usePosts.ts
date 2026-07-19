@@ -156,35 +156,34 @@ export const usePosts = () => {
     const post = posts.find(p => p.id === postId);
     if (!post) return false;
 
-    const { calculateVoteChange } = await import('@/utils/voteCalculations');
+    const { applyOptimisticVote } = await import('./useOptimisticVote');
     const { persistVote } = await import('@/services/voting');
 
-    const { newUserVote, newTotal } = calculateVoteChange(
-      post.userVote,
+    // Fire-and-forget: apply the optimistic update, persist in the background,
+    // and roll back on failure. We do not await so votePost stays responsive.
+    void applyOptimisticVote({
+      currentUserVote: post.userVote,
+      currentVotesTotal: post.votesTotal,
       voteType,
-      post.votesTotal
-    );
-
-    const previousVotesTotal = post.votesTotal;
-    const previousUserVote = post.userVote;
-
-    setPosts(prevPosts =>
-      prevPosts.map(p =>
-        p.id === postId
-          ? { ...p, votesTotal: newTotal, userVote: newUserVote }
-          : p
-      )
-    );
-
-    const dbVoteType = newUserVote === 'up' ? 'upvote' : newUserVote === 'down' ? 'downvote' : null;
-    persistVote('votes', 'post_id', postId, dbVoteType).catch(() => {
-      setPosts(prevPosts =>
-        prevPosts.map(p =>
-          p.id === postId
-            ? { ...p, votesTotal: previousVotesTotal, userVote: previousUserVote }
-            : p
-        )
-      );
+      apply: ({ newUserVote, newTotal }) => {
+        setPosts(prevPosts =>
+          prevPosts.map(p =>
+            p.id === postId
+              ? { ...p, votesTotal: newTotal, userVote: newUserVote }
+              : p
+          )
+        );
+      },
+      persist: async (newUserVote) => {
+        const dbVoteType = newUserVote === 'up' ? 'upvote' : newUserVote === 'down' ? 'downvote' : null;
+        // Preserve original semantics: the previous implementation used a
+        // `.catch()`, so it only rolled back on a rejected promise (persistVote
+        // resolves with { success } rather than rejecting). Await here so a
+        // genuine rejection propagates and triggers rollback, but treat a
+        // resolved value as success regardless of the `success` flag.
+        await persistVote('votes', 'post_id', postId, dbVoteType);
+        return true;
+      },
     });
 
     return true;

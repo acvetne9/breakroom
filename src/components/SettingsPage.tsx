@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Plus, Minus, Loader2, AlertCircle } from "lucide-react";
-import JobSearchDropdown from "./JobSearchDropdown";
-import UnifiedBusinessSearch from "./UnifiedBusinessSearch";
+import { BusinessAddressField, RoleField, SalaryTimePeriodRow } from "./JobEntryForm";
 import { isProfane } from "../utils/profanityFilter";
 import { useDevice } from "@/contexts/DeviceContext";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -883,41 +882,32 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 
               <div className="space-y-4">
                 {/* Business Location */}
-                <div>
-                  <UnifiedBusinessSearch
-                    value={currentJob.businessInput}
-                    onChange={(value) => handleCurrentJobBusinessInputChange(value)}
-                    onBusinessSelect={handleCurrentJobBusinessSelect}
-                    className={`app-input w-full ${
-                      currentJob.showAddressInput && !currentJob.businessSelected ? "border-red-500" : ""
-                    }`}
-                    placeholder="Where do you work?..."
-                    variant="dropdown"
-                  />
-
-                  {currentJob.showAddressInput && !currentJob.businessSelected && (
-                    <div className="mt-2 space-y-2">
-                      <p className="text-app-gray-medium text-xs">Can't find your business? Enter the address below:</p>
-                      <input
-                        type="text"
-                        placeholder="Enter business address (e.g., 123 Main St, City, State)..."
-                        className={`app-input w-full ${currentJob.addressError ? "border-red-500 border-2" : ""}`}
-                        value={currentJob.addressInput}
-                        onChange={(e) => handleCurrentJobAddressChange(e.target.value)}
-                        onBlur={handleCurrentJobAddressBlur}
-                      />
-                      {currentJob.addressError && (
-                        <p className="text-red-500 text-sm px-1">{currentJob.addressError}</p>
-                      )}
-                      <p className="text-gray-500 text-xs px-1">
-                        Please include street number, street name, and street type (e.g., St, Ave, Rd)
-                      </p>
-                    </div>
-                  )}
-                </div>
+                <BusinessAddressField
+                  businessValue={currentJob.businessInput}
+                  onBusinessChange={(value) => handleCurrentJobBusinessInputChange(value)}
+                  onBusinessSelect={handleCurrentJobBusinessSelect}
+                  businessPlaceholder="Where do you work?..."
+                  businessClassName={`app-input w-full ${
+                    currentJob.showAddressInput && !currentJob.businessSelected ? "border-red-500" : ""
+                  }`}
+                  showAddressInput={currentJob.showAddressInput && !currentJob.businessSelected}
+                  addressValue={currentJob.addressInput}
+                  onAddressChange={handleCurrentJobAddressChange}
+                  onAddressBlur={handleCurrentJobAddressBlur}
+                  addressError={currentJob.addressError}
+                  addressPlaceholder="Enter business address (e.g., 123 Main St, City, State)..."
+                  addressInputClassName="app-input w-full"
+                  addressErrorClassName="app-input w-full border-red-500 border-2"
+                  addressIntroText="Can't find your business? Enter the address below:"
+                  addressHelperText="Please include street number, street name, and street type (e.g., St, Ave, Rd)"
+                  fallbackWrapperClassName="mt-2 space-y-2"
+                  introTextClassName="text-app-gray-medium text-xs"
+                  helperTextClassName="text-gray-500 text-xs px-1"
+                  errorTextClassName="text-red-500 text-sm px-1"
+                />
 
                 {/* Role */}
-                <JobSearchDropdown
+                <RoleField
                   value={currentJob.role}
                   onChange={handleCurrentJobRoleChange}
                   placeholder="Search or select a job role..."
@@ -925,33 +915,24 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 />
 
                 {/* Salary + Time Period */}
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={currentJob.salaryDisplay}
-                    onChange={handleCurrentJobSalaryChange}
-                    onBlur={handleCurrentJobSalaryBlur}
-                    className="app-input flex-1"
-                    placeholder="$14.00"
-                  />
-                  <select
-                    value={currentJob.time_period}
-                    onChange={(e) => handleCurrentJobTimePeriodChange(e.target.value)}
-                    className="px-4 py-3 bg-white text-sm"
-                    style={{
-                      border: "2px solid hsl(var(--app-gray-light))",
-                      borderRadius: "0.5rem",
-                      height: "48px",
-                      fontSize: "16px",
-                    }}
-                  >
-                    <option value="HR">HR</option>
-                    <option value="MO">MO</option>
-                    <option value="YR">YR</option>
-                  </select>
-                  <div className="w-6"></div>
-                </div>
+                <SalaryTimePeriodRow
+                  salaryValue={currentJob.salaryDisplay}
+                  onSalaryChange={handleCurrentJobSalaryChange}
+                  onSalaryBlur={handleCurrentJobSalaryBlur}
+                  salaryPlaceholder="$14.00"
+                  salaryClassName="app-input flex-1"
+                  timePeriodValue={currentJob.time_period}
+                  onTimePeriodChange={handleCurrentJobTimePeriodChange}
+                  timePeriodClassName="px-4 py-3 bg-white text-sm"
+                  timePeriodStyle={{
+                    border: "2px solid hsl(var(--app-gray-light))",
+                    borderRadius: "0.5rem",
+                    height: "48px",
+                    fontSize: "16px",
+                  }}
+                  rowClassName="flex items-center space-x-3"
+                  trailing={<div className="w-6"></div>}
+                />
               </div>
             </div>
           )}
@@ -982,41 +963,32 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   </div>
 
                   {/* Business Location */}
-                  <div>
-                    <UnifiedBusinessSearch
-                      value={job.businessInput}
-                      onChange={(value) => handlePastJobBusinessInputChange(job.id, value)}
-                      onBusinessSelect={(business) => handlePastJobBusinessSelect(job.id, business)}
-                      className={`app-input w-full ${
-                        job.showAddressInput && !job.businessSelected ? "border-red-500" : ""
-                      }`}
-                      placeholder="Where did you work?..."
-                      variant="dropdown"
-                    />
-
-                    {job.showAddressInput && !job.businessSelected && (
-                      <div className="mt-2 space-y-2">
-                        <p className="text-app-gray-medium text-xs">
-                          Can't find your business? Enter the address below:
-                        </p>
-                        <input
-                          type="text"
-                          placeholder="Enter business address (e.g., 123 Main St, City, State)..."
-                          className={`app-input w-full ${job.addressError ? "border-red-500 border-2" : ""}`}
-                          value={job.addressInput}
-                          onChange={(e) => handlePastJobAddressChange(job.id, e.target.value)}
-                          onBlur={() => handlePastJobAddressBlur(job.id)}
-                        />
-                        {job.addressError && <p className="text-red-500 text-sm px-1">{job.addressError}</p>}
-                        <p className="text-gray-500 text-xs px-1">
-                          Please include street number, street name, and street type (e.g., St, Ave, Rd)
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                  <BusinessAddressField
+                    businessValue={job.businessInput}
+                    onBusinessChange={(value) => handlePastJobBusinessInputChange(job.id, value)}
+                    onBusinessSelect={(business) => handlePastJobBusinessSelect(job.id, business)}
+                    businessPlaceholder="Where did you work?..."
+                    businessClassName={`app-input w-full ${
+                      job.showAddressInput && !job.businessSelected ? "border-red-500" : ""
+                    }`}
+                    showAddressInput={job.showAddressInput && !job.businessSelected}
+                    addressValue={job.addressInput}
+                    onAddressChange={(value) => handlePastJobAddressChange(job.id, value)}
+                    onAddressBlur={() => handlePastJobAddressBlur(job.id)}
+                    addressError={job.addressError}
+                    addressPlaceholder="Enter business address (e.g., 123 Main St, City, State)..."
+                    addressInputClassName="app-input w-full"
+                    addressErrorClassName="app-input w-full border-red-500 border-2"
+                    addressIntroText="Can't find your business? Enter the address below:"
+                    addressHelperText="Please include street number, street name, and street type (e.g., St, Ave, Rd)"
+                    fallbackWrapperClassName="mt-2 space-y-2"
+                    introTextClassName="text-app-gray-medium text-xs"
+                    helperTextClassName="text-gray-500 text-xs px-1"
+                    errorTextClassName="text-red-500 text-sm px-1"
+                  />
 
                   {/* Role */}
-                  <JobSearchDropdown
+                  <RoleField
                     value={job.role}
                     onChange={(value) => handlePastJobRoleChange(job.id, value)}
                     placeholder="Search or select a job role..."
@@ -1024,38 +996,31 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   />
 
                   {/* Salary + Time Period + Remove Button */}
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={job.salaryDisplay}
-                      onChange={(e) => handlePastJobSalaryChange(job.id, e)}
-                      onBlur={() => handlePastJobSalaryBlur(job.id)}
-                      className="app-input flex-1"
-                      placeholder="$17.00"
-                    />
-                    <select
-                      value={job.time_period}
-                      onChange={(e) => handlePastJobTimePeriodChange(job.id, e.target.value)}
-                      className="px-4 py-3 bg-white text-sm"
-                      style={{
-                        border: "2px solid hsl(var(--app-gray-light))",
-                        borderRadius: "0.5rem",
-                        height: "48px",
-                        fontSize: "16px",
-                      }}
-                    >
-                      <option value="HR">HR</option>
-                      <option value="MO">MO</option>
-                      <option value="YR">YR</option>
-                    </select>
-                    <button
-                      onClick={() => handleRemovePastJob(job.id)}
-                      className="w-6 h-6 bg-app-yellow rounded-full flex items-center justify-center"
-                    >
-                      <Minus className="w-4 h-4 text-app-black" />
-                    </button>
-                  </div>
+                  <SalaryTimePeriodRow
+                    salaryValue={job.salaryDisplay}
+                    onSalaryChange={(e) => handlePastJobSalaryChange(job.id, e)}
+                    onSalaryBlur={() => handlePastJobSalaryBlur(job.id)}
+                    salaryPlaceholder="$17.00"
+                    salaryClassName="app-input flex-1"
+                    timePeriodValue={job.time_period}
+                    onTimePeriodChange={(value) => handlePastJobTimePeriodChange(job.id, value)}
+                    timePeriodClassName="px-4 py-3 bg-white text-sm"
+                    timePeriodStyle={{
+                      border: "2px solid hsl(var(--app-gray-light))",
+                      borderRadius: "0.5rem",
+                      height: "48px",
+                      fontSize: "16px",
+                    }}
+                    rowClassName="flex items-center space-x-3"
+                    trailing={
+                      <button
+                        onClick={() => handleRemovePastJob(job.id)}
+                        className="w-6 h-6 bg-app-yellow rounded-full flex items-center justify-center"
+                      >
+                        <Minus className="w-4 h-4 text-app-black" />
+                      </button>
+                    }
+                  />
                 </div>
               ))}
             </div>

@@ -1,8 +1,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Business } from '@/types/business';
-import { getFullBusinessDetails as getFullBusinessDetailsService } from '@/services/businesses';
 import { mapBusinessRow } from '@/utils/businessMapper';
+import { fetchAndMergeBusinessDetails } from '@/utils/businessDetailsFetch';
 import { NYC_BOUNDS } from '@/utils/geo';
 import { supabase } from '@/integrations/supabase/client';
 import { useSessionCache } from './useSessionCache';
@@ -76,37 +76,27 @@ export const useBusinessesData = () => {
   }, [fetchBasicBusinesses]);
 
   const fetchFullBusinessDetails = async (businessId: string) => {
-    try {
-      console.log(`⏳ Fetching full business details for ${businessId}...`);
-      const fullBusiness = await getFullBusinessDetailsService(businessId);
-      if (!fullBusiness) {
-        return null;
+    console.log(`⏳ Fetching full business details for ${businessId}...`);
+    return fetchAndMergeBusinessDetails(businessId, setBusinesses, {
+      onFull: (fullBusiness) => {
+        // Update cache with new coordinates
+        if (fullBusiness.position?.lat && fullBusiness.position?.lng) {
+          const updatedCache = {
+            ...coordinatesCache,
+            [businessId]: {
+              lat: fullBusiness.position.lat,
+              lng: fullBusiness.position.lng,
+              name: fullBusiness.name
+            }
+          };
+          setCoordinatesCache(updatedCache);
+          saveToCache(updatedCache);
+        }
+      },
+      onError: (error) => {
+        console.error('Error fetching full business details:', error);
       }
-
-      // Update cache with new coordinates
-      if (fullBusiness.position?.lat && fullBusiness.position?.lng) {
-        const updatedCache = {
-          ...coordinatesCache,
-          [businessId]: {
-            lat: fullBusiness.position.lat,
-            lng: fullBusiness.position.lng,
-            name: fullBusiness.name
-          }
-        };
-        setCoordinatesCache(updatedCache);
-        saveToCache(updatedCache);
-      }
-
-      // Update the businesses array with full details
-      setBusinesses(prev => prev.map(business =>
-        business.id === businessId ? fullBusiness : business
-      ));
-
-      return fullBusiness;
-    } catch (error) {
-      console.error('Error fetching full business details:', error);
-      return null;
-    }
+    });
   };
 
   // Automatically refetch businesses when connection is restored

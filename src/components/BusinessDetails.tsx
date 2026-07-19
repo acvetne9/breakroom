@@ -4,7 +4,7 @@ import VotingComponent from "./VotingComponent";
 import { formatTimeAgo } from "../utils/timeAgo";
 import { TranslatedText } from "./TranslatedText";
 import { calculateVoteChange, sanitizeVoteTotal } from "@/utils/voteCalculations";
-import { persistVote } from "@/services/voting";
+import { applyOptimisticVote } from "@/hooks/useOptimisticVote";
 
 interface Post {
   id: string;
@@ -128,40 +128,53 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(
         setInternalVotingRoles((prev) => new Set(prev).add(voteKey));
       }
 
-      // Optimistically update UI
-      setLocalRoles((prevRoles) => {
-        const newRoles = [...prevRoles];
-        const role = newRoles[roleIndex];
+      // Read the current role to seed the optimistic calculation.
+      const currentRole = localRoles[roleIndex];
 
-        if (role) {
-          const currentTotal = sanitizeVoteTotal(role.votesTotal);
-          const currentVote = role.userVote;
-
-          // Use centralized vote calculation logic
-          const { newUserVote, newTotal } = calculateVoteChange(
-            currentVote,
-            voteType,
-            currentTotal
-          );
-
-          newRoles[roleIndex] = {
-            ...role,
-            votesTotal: newTotal,
-            userVote: newUserVote,
-          };
-        }
-
-        return newRoles;
-      });
+      // Optimistically update UI. Reads the freshest role inside the updater so
+      // concurrent state stays consistent. Shared between the optimistic write
+      // and (unused here) rollback path of the primitive.
+      const applyRole = ({
+        newUserVote,
+        newTotal,
+      }: {
+        newUserVote: "up" | "down" | null;
+        newTotal: number;
+      }) => {
+        setLocalRoles((prevRoles) => {
+          const newRoles = [...prevRoles];
+          const role = newRoles[roleIndex];
+          if (role) {
+            newRoles[roleIndex] = {
+              ...role,
+              votesTotal: newTotal,
+              userVote: newUserVote,
+            };
+          }
+          return newRoles;
+        });
+      };
 
       // Call parent handler if provided
       if (onRoleVote) {
         try {
-          await onRoleVote(business.id, roleIndex, voteType);
-        } catch (error) {
-          console.error("Vote failed:", error);
-          // Revert optimistic update on error
-          setLocalRoles(business.roles || []);
+          await applyOptimisticVote({
+            currentUserVote: currentRole?.userVote ?? null,
+            currentVotesTotal: sanitizeVoteTotal(currentRole?.votesTotal),
+            voteType,
+            apply: applyRole,
+            // Persistence is delegated to the parent handler, not persistVote.
+            persist: async () => {
+              await onRoleVote(business.id, roleIndex, voteType);
+              return true;
+            },
+            // Specialized rollback: revert the whole roles array to props
+            // (matches the previous behavior exactly).
+            onError: (error) => {
+              console.error("Vote failed:", error);
+              setLocalRoles(business.roles || []);
+            },
+          });
         } finally {
           // Stop loading state
           if (!externalVotingRoles) {
@@ -173,7 +186,10 @@ const BusinessDetails: React.FC<BusinessDetailsProps> = memo(
           }
         }
       } else {
-        // If no handler, just stop loading after a short delay
+        // No parent handler: apply the optimistic update locally (no persistence,
+        // no rollback), then stop loading after a short delay.
+        applyRole(calculateVoteChange(currentRole?.userVote ?? null, voteType, sanitizeVoteTotal(currentRole?.votesTotal)));
+
         if (!externalVotingRoles) {
           setTimeout(() => {
             setInternalVotingRoles((prev) => {

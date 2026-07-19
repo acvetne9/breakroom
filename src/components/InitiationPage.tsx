@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import JobSearchDropdown from './JobSearchDropdown';
-import UnifiedBusinessSearch from './UnifiedBusinessSearch';
+import { BusinessAddressField, RoleField, SalaryTimePeriodRow } from './JobEntryForm';
 import { isProfane } from '@/utils/profanityFilter';
 import { useDevice } from "@/contexts/DeviceContext";
 import { saveCurrentJob, type CurrentJobData } from "@/services/currentJobs";
@@ -205,37 +204,33 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
 
               {/* Business Location */}
               <div className="w-full">
-                <UnifiedBusinessSearch
-                  value={businessInput}
-                  onChange={handleBusinessInputChange}
+                <BusinessAddressField
+                  businessValue={businessInput}
+                  onBusinessChange={handleBusinessInputChange}
                   onBusinessSelect={handleBusinessSelect}
-                  onBlur={handleBusinessBlur}
-                  placeholder="Where do you work?..."
-                  className="w-full px-4 py-4 bg-white text-gray-800 border-2 border-gray-300 text-base transition-all duration-200 focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100 focus:outline-none"
-                  variant="dropdown"
+                  onBusinessBlur={handleBusinessBlur}
+                  businessPlaceholder="Where do you work?..."
+                  businessClassName="w-full px-4 py-4 bg-white text-gray-800 border-2 border-gray-300 text-base transition-all duration-200 focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100 focus:outline-none"
+                  showAddressInput={showAddressInput && !businessSelected}
+                  addressValue={manualAddress}
+                  onAddressChange={handleAddressChange}
+                  onAddressBlur={handleAddressBlur}
+                  addressError={addressError}
+                  addressPlaceholder="Street address (e.g., 123 Main St)"
+                  addressInputClassName="w-full px-4 py-4 bg-white text-gray-800 border-2 text-base transition-all duration-200 focus:outline-none border-gray-300 focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100"
+                  addressErrorClassName="w-full px-4 py-4 bg-white text-gray-800 border-2 text-base transition-all duration-200 focus:outline-none border-red-400 focus:border-red-400 focus:ring-4 focus:ring-red-100"
+                  addressIntroText="Business not found. Please enter the full business address to continue:"
+                  addressHelperText="Must include street number, street name and borough"
+                  fallbackWrapperClassName="mt-3 space-y-2"
+                  introTextClassName="text-gray-600 text-sm"
+                  helperTextClassName="text-gray-500 text-sm px-1"
+                  errorTextClassName="text-red-500 text-sm px-1"
                 />
-                {showAddressInput && !businessSelected && (
-                  <div className="mt-3 space-y-2">
-                    <p className="text-gray-600 text-sm">Business not found. Please enter the full business address to continue:</p>
-                    <input
-                      type="text"
-                      placeholder="Street address (e.g., 123 Main St)"
-                      className={`w-full px-4 py-4 bg-white text-gray-800 border-2 text-base transition-all duration-200 focus:outline-none ${addressError ? "border-red-400 focus:border-red-400 focus:ring-4 focus:ring-red-100" : "border-gray-300 focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100"}`}
-                      value={manualAddress}
-                      onChange={(e) => handleAddressChange(e.target.value)}
-                      onBlur={handleAddressBlur}
-                    />
-                    {addressError && <p className="text-red-500 text-sm px-1">{addressError}</p>}
-                    <p className="text-gray-500 text-sm px-1">
-                      Must include street number, street name and borough
-                    </p>
-                  </div>
-                )}
               </div>
 
               {/* Job Role */}
               <div className="w-full">
-                <JobSearchDropdown
+                <RoleField
                   value={role}
                   onChange={handleRoleChange}
                   placeholder="Share your job!..."
@@ -245,26 +240,17 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
 
               {/* Salary + Time Period */}
               <div className="w-full">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={salaryDisplay}
-                    onChange={handleSalaryChange}
-                    onBlur={handleSalaryBlur}
-                    placeholder="$14.00"
-                    className="flex-1 px-4 py-4 bg-white text-gray-800 border-2 border-gray-300 text-base transition-all duration-200 focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100 focus:outline-none"
-                  />
-                  <select
-                    value={timePeriod}
-                    onChange={e => handleTimePeriodChange(e.target.value)}
-                    className="px-5 h-[58px] bg-white text-gray-800 border-2 border-gray-300 text-base font-medium transition-all duration-200 focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100 focus:outline-none cursor-pointer"
-                  >
-                    <option value="HR">HR</option>
-                    <option value="MO">MO</option>
-                    <option value="YR">YR</option>
-                  </select>
-                </div>
+                <SalaryTimePeriodRow
+                  salaryValue={salaryDisplay}
+                  onSalaryChange={handleSalaryChange}
+                  onSalaryBlur={handleSalaryBlur}
+                  salaryPlaceholder="$14.00"
+                  salaryClassName="flex-1 px-4 py-4 bg-white text-gray-800 border-2 border-gray-300 text-base transition-all duration-200 focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100 focus:outline-none"
+                  timePeriodValue={timePeriod}
+                  onTimePeriodChange={handleTimePeriodChange}
+                  timePeriodClassName="px-5 h-[58px] bg-white text-gray-800 border-2 border-gray-300 text-base font-medium transition-all duration-200 focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100 focus:outline-none cursor-pointer"
+                  rowClassName="flex items-center gap-3"
+                />
               </div>
 
               {/* Boss reassurance message - BELOW inputs */}

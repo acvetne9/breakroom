@@ -471,73 +471,65 @@ const MobileApp: React.FC = () => {
     setVotingRoles((prev) => new Set(prev).add(roleId));
 
     try {
-      const { calculateVoteChange } = await import("@/utils/voteCalculations");
+      const { applyOptimisticVote } = await import("@/hooks/useOptimisticVote");
       const { persistVote } = await import("@/services/voting");
 
-      const { newUserVote, newTotal } = calculateVoteChange(role.userVote, voteType, role.votesTotal);
-
-      const previousVotesTotal = role.votesTotal;
-      const previousUserVote = role.userVote;
-
-      let updatedBusinessForSelection: Business | null = null;
-
-      setBusinesses((prev) =>
-        prev.map((b) => {
-          if (b.id === businessId && b.roles) {
-            const updatedBusiness = {
-              ...b,
-              roles: b.roles.map((r, idx) =>
-                idx === roleIndex ? { ...r, votesTotal: newTotal, userVote: newUserVote } : r,
-              ),
-            };
-
-            if (selectedBusiness?.id === businessId) {
-              updatedBusinessForSelection = updatedBusiness;
-            }
-
-            return updatedBusiness;
-          }
-          return b;
-        }),
-      );
-
-      if (updatedBusinessForSelection) {
-        setSelectedBusiness(updatedBusinessForSelection);
-      }
-
-      const dbVoteType = newUserVote === "up" ? "upvote" : newUserVote === "down" ? "downvote" : null;
-      const result = await persistVote("role_votes", "business_role_id", roleId, dbVoteType);
-
-      if (!result.success) {
-        console.error("❌ Failed to persist vote:", result.error);
-        alert("Vote failed to save. Please try again.");
-
-        let rolledBackBusinessForSelection: Business | null = null;
+      // Shared apply: write the given vote values into the businesses array for
+      // this role, and keep selectedBusiness in sync. Used for both the
+      // optimistic update and the rollback.
+      const applyRoleVote = ({
+        newUserVote,
+        newTotal,
+      }: {
+        newUserVote: "up" | "down" | null;
+        newTotal: number;
+      }) => {
+        let updatedBusinessForSelection: Business | null = null;
 
         setBusinesses((prev) =>
           prev.map((b) => {
             if (b.id === businessId && b.roles) {
-              const rolledBackBusiness = {
+              const updatedBusiness = {
                 ...b,
                 roles: b.roles.map((r, idx) =>
-                  idx === roleIndex ? { ...r, votesTotal: previousVotesTotal, userVote: previousUserVote } : r,
+                  idx === roleIndex ? { ...r, votesTotal: newTotal, userVote: newUserVote } : r,
                 ),
               };
 
               if (selectedBusiness?.id === businessId) {
-                rolledBackBusinessForSelection = rolledBackBusiness;
+                updatedBusinessForSelection = updatedBusiness;
               }
 
-              return rolledBackBusiness;
+              return updatedBusiness;
             }
             return b;
           }),
         );
 
-        if (rolledBackBusinessForSelection) {
-          setSelectedBusiness(rolledBackBusinessForSelection);
+        if (updatedBusinessForSelection) {
+          setSelectedBusiness(updatedBusinessForSelection);
         }
-      }
+      };
+
+      await applyOptimisticVote({
+        currentUserVote: role.userVote,
+        currentVotesTotal: role.votesTotal,
+        voteType,
+        apply: applyRoleVote,
+        persist: async (newUserVote) => {
+          const dbVoteType = newUserVote === "up" ? "upvote" : newUserVote === "down" ? "downvote" : null;
+          const result = await persistVote("role_votes", "business_role_id", roleId, dbVoteType);
+          if (!result.success) {
+            console.error("❌ Failed to persist vote:", result.error);
+          }
+          return result.success;
+        },
+        // Rollback (via apply with previous values) is handled by the primitive;
+        // we only need to surface the failure to the user here.
+        onError: () => {
+          alert("Vote failed to save. Please try again.");
+        },
+      });
       // Success: the optimistic update above is authoritative for the user's own
       // vote, so we skip the post-vote full refetch (saves 3 queries per vote).
     } finally {

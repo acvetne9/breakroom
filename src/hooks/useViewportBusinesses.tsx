@@ -1,8 +1,9 @@
 // src/hooks/useViewportBusinesses.ts
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Business } from '@/types/business';
-import { getBusinessesInViewport, getFullBusinessDetails as getFullBusinessDetailsService } from '@/services/businesses';
+import { getBusinessesInViewport } from '@/services/businesses';
 import { searchBusinessesUnified } from '@/services/unifiedSearch';
+import { fetchAndMergeBusinessDetails } from '@/utils/businessDetailsFetch';
 import { isPointInPolygon } from '@/utils/nyc_neighborhoods';
 import { useTileCache } from './useTileCache';
 import { useMapWorker } from './useMapWorker';
@@ -280,23 +281,11 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
 
   // FIXED: Properly memoize fetchFullBusinessDetails with stable dependencies
   const fetchFullBusinessDetails = useCallback(async (businessId: string) => {
-    if (PersistentDetailsCache.has(businessId)) {
-      const cached = PersistentDetailsCache.get(businessId)!;
-      setBusinesses(prev => prev.map(b => b.id === businessId ? cached : b));
-      return cached;
-    }
-
-    try {
-      const fullBusiness = await getFullBusinessDetailsService(businessId);
-      if (!fullBusiness) return null;
-
-      PersistentDetailsCache.set(businessId, fullBusiness);
-      setBusinesses(prev => prev.map(b => b.id === businessId ? fullBusiness : b));
-      return fullBusiness;
-    } catch (err) {
-      console.error('❌ Error fetching business details:', err);
-      return null;
-    }
+    return fetchAndMergeBusinessDetails(businessId, setBusinesses, {
+      getCached: (id) => PersistentDetailsCache.get(id),
+      setCached: (fullBusiness) => PersistentDetailsCache.set(businessId, fullBusiness),
+      onError: (err) => console.error('❌ Error fetching business details:', err)
+    });
   }, []); // No dependencies needed - uses service function and updates state
 
   const clearBusinesses = useCallback(() => {

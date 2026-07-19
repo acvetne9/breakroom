@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useDropdown } from "@/hooks/useDropdown";
 import { EnhancedBusiness } from "@/types/search";
 import { parseSearchFilters } from "@/services/businessFiltering";
 import { findNeighborhoodBoundaryByName } from "@/utils/nyc_neighborhoods";
@@ -50,12 +51,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   disabled = false,
 }) => {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [showDropdown, setShowDropdown] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const isScrolling = useRef(false);
-
-  const inputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const searchSeqRef = useRef(0);
   const lastFiltersRef = useRef<string | null>(null);
@@ -63,46 +60,32 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   const resultsCache = useRef<Map<string, SearchResult[]>>(new Map());
   const lastExecutedQuery = useRef<string>("");
   const wasClosedIntentionally = useRef(false);
-  const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasUserInteracted = useRef(false);
-  const showDropdownRef = useRef(showDropdown);
 
-  // Keep ref in sync with state
-  useEffect(() => {
-    showDropdownRef.current = showDropdown;
-  }, [showDropdown]);
-
-  // Handle clicks/taps outside to close dropdown
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      // Early exit if dropdown not open - prevents unnecessary logging
-      if (!showDropdownRef.current) return;
-
-      // Don't close dropdown if we're scrolling within it
-      if (isScrolling.current) return;
-
-      const target = event.target as Node;
-
-      // Don't close if clicking on the input or dropdown
-      if (
-        (inputRef.current && inputRef.current.contains(target)) ||
-        (dropdownRef.current && dropdownRef.current.contains(target))
-      ) {
-        return;
-      }
-
+  // Shared dropdown mechanics: open state, refs, outside-click
+  // (mousedown+touchstart), Escape-to-close, and the blur-timeout close.
+  // The scroll-guard and `wasClosedIntentionally` tracking stay local (they are
+  // specific to this component's async search) and are wired in via callbacks.
+  const {
+    isOpen: showDropdown,
+    setIsOpen: setShowDropdown,
+    triggerRef: inputRef,
+    dropdownRef,
+    scheduleBlurClose,
+    cancelBlurClose,
+  } = useDropdown({
+    // Don't close on outside click while the user is scrolling inside the list.
+    shouldIgnoreOutsideClick: () => isScrolling.current,
+    onOutsideClose: () => {
       console.log("✅ Closing dropdown");
       wasClosedIntentionally.current = true;
-      setShowDropdown(false);
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-    };
-  }, []);
+    },
+    onBlurClose: () => {
+      console.log("✅ Closing dropdown on blur (delayed)");
+      wasClosedIntentionally.current = true;
+      onBlur?.();
+    },
+  });
 
   // Handle scroll within dropdown
   useEffect(() => {
@@ -131,15 +114,6 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   useEffect(() => {
     return () => {
       hasUserInteracted.current = false;
-    };
-  }, []);
-
-  // Cleanup blur timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (blurTimeoutRef.current) {
-        clearTimeout(blurTimeoutRef.current);
-      }
     };
   }, []);
 
@@ -298,10 +272,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     if (disabled) return; // Prevent selection when disabled
 
     // Cancel any pending blur timeout to prevent stale state issues
-    if (blurTimeoutRef.current) {
-      clearTimeout(blurTimeoutRef.current);
-      blurTimeoutRef.current = null;
-    }
+    cancelBlurClose();
 
     if ("isNeighborhood" in result && result.isNeighborhood) {
       // Handle neighborhood click - search for all businesses in that neighborhood
@@ -428,17 +399,10 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
       return;
     }
 
-    // Delay closing to prevent premature closure during rapid typing
-    if (blurTimeoutRef.current) {
-      clearTimeout(blurTimeoutRef.current);
-    }
-
-    blurTimeoutRef.current = setTimeout(() => {
-      console.log("✅ Closing dropdown on blur (delayed)");
-      wasClosedIntentionally.current = true;
-      setShowDropdown(false);
-      onBlur?.();
-    }, 150);
+    // Delay closing to prevent premature closure during rapid typing.
+    // The close + wasClosedIntentionally + onBlur side-effects run inside the
+    // hook's onBlurClose callback.
+    scheduleBlurClose();
   };
 
   // Helper function to get display address for a business
@@ -470,10 +434,7 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           onFocus={() => {
             if (disabled) return; // Prevent focus interaction when disabled
             // Cancel any pending blur closure
-            if (blurTimeoutRef.current) {
-              clearTimeout(blurTimeoutRef.current);
-              blurTimeoutRef.current = null;
-            }
+            cancelBlurClose();
             hasUserInteracted.current = true;
             wasClosedIntentionally.current = false;
             const trimmedValue = value.trim();

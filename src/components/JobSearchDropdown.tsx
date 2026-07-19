@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { useDropdown } from '@/hooks/useDropdown';
 
 interface JobSearchDropdownProps {
   value: string;
@@ -144,11 +145,26 @@ const JobSearchDropdown: React.FC<JobSearchDropdownProps> = ({
   placeholder = "Search or select a job role...",
   className = ""
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredOptions, setFilteredOptions] = useState(JOB_OPTIONS);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Shared dropdown mechanics: open state, outside-click (mousedown+touchstart),
+  // and Escape-to-close. Result filtering below stays local to this component.
+  const {
+    isOpen,
+    setIsOpen,
+    triggerRef: inputRef,
+    dropdownRef,
+    handleKeyDown: handleDropdownKeyDown,
+  } = useDropdown({
+    onOutsideClose: () => {
+      setSearchTerm('');
+      onBlur?.();
+    },
+    onEscapeClose: () => {
+      setSearchTerm('');
+    },
+  });
 
   useEffect(() => {
     const filtered = JOB_OPTIONS.filter(job =>
@@ -156,19 +172,6 @@ const JobSearchDropdown: React.FC<JobSearchDropdownProps> = ({
     );
     setFilteredOptions(filtered);
   }, [searchTerm]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-        setSearchTerm('');
-        onBlur?.();
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [onBlur]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
@@ -190,9 +193,9 @@ const JobSearchDropdown: React.FC<JobSearchDropdownProps> = ({
       setIsOpen(false);
       setSearchTerm('');
       onBlur?.();
-    } else if (e.key === 'Escape') {
-      setIsOpen(false);
-      setSearchTerm('');
+    } else {
+      // Escape (and any other shared keys) handled by the dropdown hook.
+      handleDropdownKeyDown(e);
     }
   };
 
