@@ -12,6 +12,7 @@ export interface DeckGLBusinessLayerProps {
   neighborhoodBoundary?: { lat: number; lon: number }[];
   searchActive?: boolean;
   zoom?: number;
+  clickedBusinessIds?: Set<string>;
 }
 
 export interface LandmarkEmojiLayerProps {
@@ -87,7 +88,8 @@ export const createBusinessScatterplotLayer = ({
   getTooltip,
   neighborhoodBoundary,
   searchActive = false,
-  zoom = 12
+  zoom = 12,
+  clickedBusinessIds
 }: DeckGLBusinessLayerProps) => {
   // Filter out null/undefined businesses first
   const validBusinesses = businesses.filter(b => b != null);
@@ -131,7 +133,10 @@ export const createBusinessScatterplotLayer = ({
     
     getRadius: (_d: Business) => 15,
     
-    getFillColor: (_d: Business) => [250, 204, 21, 255], // Gold color (unchanged)
+    getFillColor: (d: Business) =>
+      clickedBusinessIds?.has(d.id)
+        ? [249, 115, 22, 255] // Orange if clicked this session
+        : [250, 204, 21, 255], // Gold otherwise
     
     getLineColor: (_d: Business) => [255, 255, 255, 255], // White border
     
@@ -149,7 +154,8 @@ export const createBusinessScatterplotLayer = ({
       getPosition: [filteredBusinesses.length],
       getRadius: [zoom],
       radiusMinPixels: [zoom],
-      radiusMaxPixels: [zoom]
+      radiusMaxPixels: [zoom],
+      getFillColor: [clickedBusinessIds?.size ?? 0]
     },
   });
 };

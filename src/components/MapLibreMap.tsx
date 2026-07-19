@@ -187,6 +187,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
   const [deckOverlay, setDeckOverlay] = useState<MapboxOverlay | null>(null);
   const [overlayReady, setOverlayReady] = useState(false);
   const [currentZoom, setCurrentZoom] = useState<number>(MAP_DEFAULTS.ZOOM);
+  // Businesses the user has clicked this session (rendered orange). Resets on reload.
+  const [clickedBusinessIds, setClickedBusinessIds] = useState<Set<string>>(new Set());
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -420,6 +422,16 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
       try {
         let businessToReturn = business;
 
+        // Mark as clicked this session so it renders orange.
+        if (business.id) {
+          setClickedBusinessIds((prev) => {
+            if (prev.has(business.id)) return prev;
+            const next = new Set(prev);
+            next.add(business.id);
+            return next;
+          });
+        }
+
         if (mapRef.current && business?.position?.lat && business?.position?.lng) {
           mapRef.current.flyTo({
             center: [business.position.lng, business.position.lat],
@@ -528,7 +540,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
               selectedBusinessId: selectedBusiness?.id,
               onBusinessClick: handleBusinessClick,
               neighborhoodBoundary: currentSearchFilters?.neighborhoodFilter?.boundary || null,
-              searchActive: !!currentSearchFilters
+              searchActive: !!currentSearchFilters,
+              clickedBusinessIds
             })
           );
         } catch (err) {
@@ -538,7 +551,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
     }
 
     return layers;
-  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, currentZoom, businesses]);
+  }, [selectedBusiness?.id, handleBusinessClick, mapLoaded, currentZoom, businesses, clickedBusinessIds]);
 
   // OPTIMIZED: Skip viewport updates during interaction
   const handleViewportChange = useCallback(async (forceUpdate = false) => {
