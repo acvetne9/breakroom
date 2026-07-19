@@ -13,6 +13,7 @@ import type { NeighborhoodBounds } from "@/utils/nyc_neighborhoods";
 import type { GeoJSONFeature } from "maplibre-gl";
 import type { Business } from "@/types/business";
 import { polygon as turfPolygon, point, booleanPointInPolygon } from "@turf/turf";
+import { NYC_BOUNDS, NYC_CENTER } from "@/utils/geo";
 import type { Feature, Point } from "geojson";
 import type { MapGeoJSONFeature } from "maplibre-gl";
 import { Capacitor } from "@capacitor/core";
@@ -73,13 +74,13 @@ const DISPLAY_LIMITS_BY_ZOOM = {
 } as const;
 
 const MAP_DEFAULTS = {
-  CENTER: [-73.986104, 40.715245] as [number, number],
+  CENTER: NYC_CENTER,
   ZOOM: 12.77,
   MAX_ZOOM: 16,
   MIN_ZOOM: 8,
   BOUNDS: [
-    [-74.25909, 40.494399] as [number, number],
-    [-73.700272, 40.917] as [number, number],
+    [NYC_BOUNDS.west, NYC_BOUNDS.south] as [number, number],
+    [NYC_BOUNDS.east, NYC_BOUNDS.north] as [number, number],
   ] as [readonly [number, number], readonly [number, number]],
 } as const;
 

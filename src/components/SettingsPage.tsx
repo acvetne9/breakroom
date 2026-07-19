@@ -8,6 +8,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { usePostsContext } from "./PostsProvider";
 import { getPastJobs, savePastJob, deletePastJob, type PastJobData } from "@/services/pastJobs";
 import { getCurrentJob, saveCurrentJob, deleteCurrentJob, type CurrentJobData } from "@/services/currentJobs";
+import { isValidAddress } from "@/utils/addressValidation";
+import { formatSalaryDisplay, sanitizeSalaryInput } from "@/utils/salaryFormat";
 
 // Improved state interfaces
 interface CurrentJobState {
@@ -134,70 +136,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   }, [isStoriesExpanded]); // Only depend on isStoriesExpanded
 
   // ==================== VALIDATION ====================
-
-  const isValidAddress = (address: string): boolean => {
-    if (!address || address.trim().length < 10) return false;
-    const trimmed = address.trim();
-
-    const hasNumbers = /\d/.test(trimmed);
-    const hasLetters = /[a-zA-Z]/.test(trimmed);
-    const hasSpaces = /\s/.test(trimmed);
-
-    if (!hasNumbers || !hasLetters || !hasSpaces) return false;
-
-    const streetTypes = [
-      "street",
-      "st",
-      "avenue",
-      "ave",
-      "road",
-      "rd",
-      "drive",
-      "dr",
-      "lane",
-      "ln",
-      "boulevard",
-      "blvd",
-      "court",
-      "ct",
-      "place",
-      "pl",
-      "way",
-      "circle",
-      "cir",
-      "plaza",
-      "square",
-      "sq",
-      "parkway",
-      "pkwy",
-      "trail",
-      "tr",
-      "terrace",
-      "ter",
-      "highway",
-      "hwy",
-      "loop",
-      "row",
-      "walk",
-      "alley",
-      "crescent",
-      "cres",
-      "grove",
-      "heights",
-      "hill",
-      "park",
-      "ridge",
-      "view",
-      "crossing",
-      "xing",
-    ];
-
-    const addressLower = trimmed.toLowerCase();
-    return streetTypes.some(
-      (type) =>
-        addressLower.includes(` ${type} `) || addressLower.endsWith(` ${type}`) || addressLower.includes(` ${type},`),
-    );
-  };
 
   const validateProfanity = (text: string): boolean => {
     return !isProfane(text);
@@ -535,20 +473,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     [saveCurrentJobToDatabase, savePastJobToDatabase],
   );
 
-  // ==================== SALARY FORMATTING ====================
-
-  const formatSalaryDisplay = (salary: number): string => {
-    if (salary === 0) return "";
-    return `$${salary.toFixed(2)}`;
-  };
-
-  const parseSalaryInput = (value: string): number => {
-    // Remove everything except numbers and decimal point
-    const cleaned = value.replace(/[^0-9.]/g, "");
-    const parsed = parseFloat(cleaned);
-    return isNaN(parsed) ? 0 : parsed;
-  };
-
   // ==================== CURRENT JOB HANDLERS ====================
 
   const updateCurrentJob = useCallback(
@@ -564,12 +488,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   );
 
   const handleCurrentJobSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/[^0-9.]/g, '');
-    if (value.includes('.')) {
-      const parts = value.split('.');
-      if (parts.length > 2) value = parts[0] + '.' + parts.slice(1).join('');
-      if (parts[1]?.length > 2) value = parts[0] + '.' + parts[1].substring(0, 2);
-    }
+    const value = sanitizeSalaryInput(e.target.value);
     const displayValue = value ? `$${value}` : '';
     const numericValue = parseFloat(value) || 0;
     
@@ -601,12 +520,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   const handleCurrentJobSalaryBlur = () => {
     // Format to 2 decimal places on blur
     if (currentJob && currentJob.salary > 0) {
-      const formattedValue = currentJob.salary.toFixed(2);
+      const formattedValue = formatSalaryDisplay(currentJob.salary);
       setCurrentJob((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
-          salaryDisplay: `$${formattedValue}`,
+          salaryDisplay: formattedValue,
           isDirty: true
         };
       });
@@ -747,12 +666,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   const handlePastJobSalaryChange = (jobId: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/[^0-9.]/g, '');
-    if (value.includes('.')) {
-      const parts = value.split('.');
-      if (parts.length > 2) value = parts[0] + '.' + parts.slice(1).join('');
-      if (parts[1]?.length > 2) value = parts[0] + '.' + parts[1].substring(0, 2);
-    }
+    const value = sanitizeSalaryInput(e.target.value);
     const displayValue = value ? `$${value}` : '';
     const numericValue = parseFloat(value) || 0;
     
@@ -781,11 +695,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
     // Format to 2 decimal places on blur
     const job = pastJobs.find((j) => j.id === jobId);
     if (job && job.salary > 0) {
-      const formattedValue = job.salary.toFixed(2);
+      const formattedValue = formatSalaryDisplay(job.salary);
       setPastJobs((prev) =>
         prev.map((j) =>
           j.id === jobId
-            ? { ...j, salaryDisplay: `$${formattedValue}`, isDirty: true }
+            ? { ...j, salaryDisplay: formattedValue, isDirty: true }
             : j
         )
       );

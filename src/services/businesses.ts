@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Business, BusinessRole } from '@/types/business';
 import { sanitizeVoteTotal } from '@/utils/voteCalculations';
 import { retryWithBackoff, isRetryableError } from '@/utils/retryWithBackoff';
+import { mapBusinessRow, mapRoleRow } from '@/utils/businessMapper';
 
 type MapBounds = { north: number; south: number; east: number; west: number };
 
@@ -74,16 +75,7 @@ export const getBusinessesInViewport = async (
     // Transform to Business type
     const businesses: Business[] = rawData
       .filter((b) => b.lat && b.lng) // Filter out invalid coordinates
-      .map((b) => ({
-        id: b.id,
-        name: b.name,
-        businessType: b.business_type,
-        address: b.address,
-        position: { lat: b.lat, lng: b.lng },
-        atmosphere: b.atmosphere || [],
-        website: b.website || undefined,
-        roles: Array.isArray(b.roles) ? b.roles : []
-      }));
+      .map((b) => mapBusinessRow(b, Array.isArray(b.roles) ? b.roles : []));
 
     return businesses;
 
@@ -156,26 +148,12 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
   }
 
   const businessRoles: BusinessRole[] = (rolesData || []).map((role: any) => {
-    const userVote = userVotesData.find(vote => vote.business_role_id === role.id)?.vote_type;
-    return {
-      id: role.id,
-      role: role.role,
-      salary: role.salary,
-      votesTotal: sanitizeVoteTotal(role.votes_total),
-      userVote: userVote === 'upvote' ? 'up' : userVote === 'downvote' ? 'down' : null,
-    };
+    const vote = userVotesData.find(v => v.business_role_id === role.id)?.vote_type;
+    const userVote = vote === 'upvote' ? 'up' : vote === 'downvote' ? 'down' : null;
+    return mapRoleRow(role, userVote);
   });
 
-  const fullBusiness: Business = {
-    id: businessData.id,
-    name: businessData.name,
-    address: (businessData as any).address,
-    businessType: businessData.business_type,
-    position: { lat: businessData.lat, lng: businessData.lng },
-    atmosphere: businessData.atmosphere || [],
-    roles: businessRoles,
-    website: businessData.website,
-  };
+  const fullBusiness: Business = mapBusinessRow(businessData, businessRoles);
 
   console.log(`✅ getFullBusinessDetails completed in ${performance.now() - startTime}ms`);
   console.log(`✅ Returning ${businessRoles.length} roles for business:`, businessData.name);

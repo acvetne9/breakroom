@@ -4,6 +4,8 @@ import UnifiedBusinessSearch from './UnifiedBusinessSearch';
 import { isProfane } from '@/utils/profanityFilter';
 import { useDevice } from "@/contexts/DeviceContext";
 import { saveCurrentJob, type CurrentJobData } from "@/services/currentJobs";
+import { isValidAddress } from "@/utils/addressValidation";
+import { formatSalaryDisplay, sanitizeSalaryInput } from "@/utils/salaryFormat";
 
 interface InitiationPageProps {
   onComplete: (data: {
@@ -15,15 +17,6 @@ interface InitiationPageProps {
     timePeriod: string;
   }) => void;
 }
-
-const isValidAddress = (address: string): boolean => {
-  const trimmedAddress = address.trim();
-  if (trimmedAddress.length < 6) return false;
-  const hasNumber = /\d/.test(trimmedAddress);
-  const hasStreetType = /\b(st|street|ave|avenue|rd|road|blvd|boulevard|dr|drive|ln|lane|ct|court|pl|place|way|pkwy|parkway)\b/i.test(trimmedAddress);
-  // City/State are no longer required — a street address alone is valid.
-  return hasNumber && hasStreetType;
-};
 
 const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   const { deviceId } = useDevice();
@@ -52,12 +45,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   const manualAddressRef = useRef('');
 
   const handleSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/[^0-9.]/g, '');
-    if (value.includes('.')) {
-      const parts = value.split('.');
-      if (parts.length > 2) value = parts[0] + '.' + parts.slice(1).join('');
-      if (parts[1]?.length > 2) value = parts[0] + '.' + parts[1].substring(0, 2);
-    }
+    const value = sanitizeSalaryInput(e.target.value);
     const displayValue = value ? `$${value}` : '';
     const numericValue = parseFloat(value) || 0;
 
@@ -79,7 +67,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
     hasSavedRef.current = true;
 
     // Format salary for display
-    const formattedSalary = salaryRef.current > 0 ? `$${salaryRef.current.toFixed(2)}` : salaryDisplay;
+    const formattedSalary = salaryRef.current > 0 ? formatSalaryDisplay(salaryRef.current) : salaryDisplay;
 
     // Optimistically close the card immediately
     onComplete({
@@ -108,8 +96,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
 
   const handleSalaryBlur = () => {
     if (salary > 0) {
-      const formattedValue = salary.toFixed(2);
-      setSalaryDisplay(`$${formattedValue}`);
+      setSalaryDisplay(formatSalaryDisplay(salary));
     }
     // Check completion after salary blur
     checkAndSave();

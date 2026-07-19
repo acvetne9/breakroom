@@ -12,6 +12,10 @@ export interface ParsedSearchTerms {
   textTerms?: string[];
 }
 
+// Approximate working hours used to convert salary between units
+export const HOURS_PER_MONTH = 173;
+export const HOURS_PER_YEAR = 2080;
+
 /**
  * Parse salary to hourly rate from various formats
  * Handles: /hr, /hour, /mo, /month, /monthly, /yr, /year, /yearly, annual
@@ -31,7 +35,7 @@ export const parseSalaryToHourly = (salary: string): number | null => {
     salaryLower.includes("month") ||
     salaryLower.includes(" mo")
   ) {
-    return Math.round((numericValue / 173) * 100) / 100; // ~173 hours per month
+    return Math.round((numericValue / HOURS_PER_MONTH) * 100) / 100; // ~173 hours per month
   } else if (
     salaryLower.includes("/yr") ||
     salaryLower.includes("/year") ||
@@ -39,7 +43,7 @@ export const parseSalaryToHourly = (salary: string): number | null => {
     salaryLower.includes("annual") ||
     salaryLower.includes(" yr")
   ) {
-    return Math.round((numericValue / 2080) * 100) / 100; // ~2080 hours per year
+    return Math.round((numericValue / HOURS_PER_YEAR) * 100) / 100; // ~2080 hours per year
   }
 
   return numericValue; // Default to hourly
@@ -123,11 +127,11 @@ export const parseAdvancedSalaryPatterns = (searchQuery: string): {
 
         // Convert to hourly rate based on unit
         if (unit.includes("mo") || unit.includes("month")) {
-          minHourly = min / 173; // ~173 hours per month
-          maxHourly = max ? max / 173 : undefined;
+          minHourly = min / HOURS_PER_MONTH; // ~173 hours per month
+          maxHourly = max ? max / HOURS_PER_MONTH : undefined;
         } else if (unit.includes("yr") || unit.includes("year") || unit.includes("annual")) {
-          minHourly = min / 2080; // ~2080 hours per year
-          maxHourly = max ? max / 2080 : undefined;
+          minHourly = min / HOURS_PER_YEAR; // ~2080 hours per year
+          maxHourly = max ? max / HOURS_PER_YEAR : undefined;
         }
 
         salaryQuery = {
@@ -165,5 +169,10 @@ export const COMMON_BUSINESS_TYPES = [
   'restaurant', 'restaurants', 'cafe', 'cafes', 'coffee', 'shop', 'shops', 'bar',
   'bars', 'store', 'stores', 'hotel', 'hotels', 'gym', 'gyms', 'salon', 'salons',
   'bakery', 'bakeries', 'deli', 'delis', 'market', 'office', 'clinic', 'hospital',
-  'bank', 'retail', 'fast', 'food', 'chain', 'franchise', 'boutique'
+  'bank', 'retail', 'fast', 'food', 'chain', 'franchise', 'boutique',
+  'pizzeria', 'pizzerias', 'boutiques', 'markets', 'studio', 'studios', 'spa',
+  'spas', 'hostel', 'hostels', 'club', 'clubs', 'lounge', 'lounges', 'pub',
+  'pubs', 'brewery', 'breweries', 'bodega', 'bodegas', 'grocery', 'groceries',
+  'bookstore', 'bookstores', 'gallery', 'galleries', 'theater', 'theaters',
+  'cinema', 'cinemas'
 ];

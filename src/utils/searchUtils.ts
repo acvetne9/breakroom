@@ -1,17 +1,5 @@
 import { Business } from "@/types/business";
-
-// Common business type keywords for detection (includes common plurals)
-const COMMON_BUSINESS_TYPES = [
-  'restaurant', 'restaurants', 'cafe', 'cafes', 'coffee', 'bar', 'bars',
-  'bakery', 'bakeries', 'deli', 'delis', 'pizzeria', 'pizzerias',
-  'shop', 'shops', 'store', 'stores', 'boutique', 'boutiques',
-  'market', 'markets', 'gym', 'gyms', 'studio', 'studios',
-  'salon', 'salons', 'spa', 'spas', 'hotel', 'hotels',
-  'hostel', 'hostels', 'club', 'clubs', 'lounge', 'lounges',
-  'pub', 'pubs', 'brewery', 'breweries', 'bodega', 'bodegas',
-  'grocery', 'groceries', 'bookstore', 'bookstores',
-  'gallery', 'galleries', 'theater', 'theaters', 'cinema', 'cinemas'
-];
+import { COMMON_BUSINESS_TYPES } from './searchParsing';
 
 /**
  * Strips punctuation and extra whitespace from text for comparison

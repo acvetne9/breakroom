@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import type { FeatureCollection, Feature } from 'geojson';
 import { ungzip } from 'pako';
+import { NYC_BOUNDS } from '@/utils/geo';
 
 interface ViewportBounds {
   north: number;
@@ -27,14 +28,6 @@ export const useViewportMapData = () => {
   const landDataRef = useRef<FeatureCollection | null>(null);
   const chunkIndexRef = useRef<Map<string, Feature[]>>(new Map());
   const startedRef = useRef(false);
-
-  // NYC bounds for chunking
-  const NYC_BOUNDS = {
-    north: 40.917,
-    south: 40.4774,
-    east: -73.7003,
-    west: -74.2591
-  };
 
   // Create chunk grid (divide NYC into 4x4 grid = 16 chunks)
   const GRID_SIZE = 4;

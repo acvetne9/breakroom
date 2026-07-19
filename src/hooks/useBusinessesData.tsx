@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Business } from '@/types/business';
 import { getFullBusinessDetails as getFullBusinessDetailsService } from '@/services/businesses';
+import { mapBusinessRow } from '@/utils/businessMapper';
+import { NYC_BOUNDS } from '@/utils/geo';
 import { supabase } from '@/integrations/supabase/client';
 import { useSessionCache } from './useSessionCache';
 import { useReconnectionHandler } from './useReconnectionHandler';
@@ -29,10 +31,10 @@ export const useBusinessesData = () => {
       const { data: businessesData, error } = await supabase
         .from('businesses')
         .select('id, name, lat, lng, business_type, atmosphere')
-        .gte('lat', 40.49)
-        .lte('lat', 40.92)
-        .gte('lng', -74.26)
-        .lte('lng', -73.70)
+        .gte('lat', NYC_BOUNDS.south)
+        .lte('lat', NYC_BOUNDS.north)
+        .gte('lng', NYC_BOUNDS.west)
+        .lte('lng', NYC_BOUNDS.east)
         .limit(5000);
 
       if (error) {
@@ -41,14 +43,7 @@ export const useBusinessesData = () => {
         return;
       }
 
-      const basicBusinesses: Business[] = (businessesData || []).map(b => ({
-        id: b.id,
-        name: b.name,
-        position: { lat: b.lat, lng: b.lng },
-        businessType: b.business_type,
-        atmosphere: b.atmosphere || [],
-        roles: []
-      }));
+      const basicBusinesses: Business[] = (businessesData || []).map(b => mapBusinessRow(b));
 
       console.log(`🏢 Successfully loaded ${basicBusinesses.length} businesses`);
 

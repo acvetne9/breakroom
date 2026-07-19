@@ -3,6 +3,7 @@ import { Business } from "@/types/business";
 import { applyBusinessFilters, SearchFilters } from "./businessFiltering";
 import { expandTerm } from "@/utils/smartSearch";
 import { sanitizeVoteTotal } from "@/utils/voteCalculations";
+import { mapBusinessRow, mapRoleRow } from "@/utils/businessMapper";
 import { findNeighborhoodBoundaryByName } from "@/utils/nyc_neighborhoods";
 import { parseAdvancedSalaryPatterns } from "@/utils/searchParsing";
 import { retryWithBackoff, isRetryableError } from "@/utils/retryWithBackoff";
@@ -299,24 +300,14 @@ export const searchBusinessesUnified = async (
       console.warn("⚠️ No roles loaded for businesses - roles table may be empty");
     }
 
-    const businessesWithRoles: Business[] = businesses.map((business) => ({
-      id: business.id,
-      name: business.name,
-      position: { lat: business.lat, lng: business.lng },
-      atmosphere: business.atmosphere || [],
-      businessType: business.business_type,
-      website: business.website,
-      address: business.address,
-      roles: allRoles
-        .filter((role) => role.business_id === business.id)
-        .map((role) => ({
-          id: role.id,
-          role: role.role,
-          salary: role.salary,
-          votesTotal: sanitizeVoteTotal(role.votes_total),
-          userVote: null,
-        })),
-    }));
+    const businessesWithRoles: Business[] = businesses.map((business) =>
+      mapBusinessRow(
+        business,
+        allRoles
+          .filter((role) => role.business_id === business.id)
+          .map((role) => mapRoleRow(role)),
+      ),
+    );
 
     // Calculate relevance score for each business
     console.log(`🎯 Scoring ${businessesWithRoles.length} businesses for relevance...`);

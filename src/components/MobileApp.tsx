@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDevice } from "@/contexts/DeviceContext";
 import { useBusinessesData } from "@/hooks/useBusinessesData";
+import { parseSalaryInput } from "@/utils/salaryFormat";
 
 const HomePage = React.lazy(() => import("./HomePage"));
 const SettingsPage = React.lazy(() => import("./SettingsPage"));
@@ -188,7 +189,7 @@ const MobileApp: React.FC = () => {
 
     try {
       const { saveCurrentJob } = await import("../services/currentJobs");
-      const salary = parseFloat(data.salary.replace(/[^0-9.]/g, "")) || 0;
+      const salary = parseSalaryInput(data.salary);
 
       await saveCurrentJob(deviceId, {
         role: data.role,
@@ -244,7 +245,7 @@ const MobileApp: React.FC = () => {
 
     try {
       const { saveCurrentJob } = await import("../services/currentJobs");
-      const salary = parseFloat(jobData.salary.replace(/[^0-9.]/g, "")) || 0;
+      const salary = parseSalaryInput(jobData.salary);
 
       await saveCurrentJob(deviceId, {
         role: jobData.role,
