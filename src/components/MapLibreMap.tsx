@@ -631,7 +631,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
            zoom < 18 ? BUSINESS_LIMITS.NORMAL.ZOOM_18 :
            BUSINESS_LIMITS.NORMAL.DEFAULT);
 
-      await loadBusinessesInViewport?.(viewportBounds, limit, true);
+      await loadBusinessesInViewport?.(viewportBounds, limit, true, zoom);
     } catch (err) {
       console.error("❌ Error loading businesses:", err);
     }
@@ -900,7 +900,7 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
            zoom < 18 ? BUSINESS_LIMITS.NORMAL.ZOOM_18 :
            BUSINESS_LIMITS.NORMAL.DEFAULT);
 
-      loadBusinessesInViewport?.(viewportBounds, limit, true);
+      loadBusinessesInViewport?.(viewportBounds, limit, true, zoom);
       callbackRefs.current.onBusinessesLoaded?.();
     }
   }, [mapLoaded, loadBusinessesInViewport, searchFilters]);

@@ -11,6 +11,9 @@ interface TileKey {
 interface CachedTileData {
   businesses: Business[];
   timestamp: number;
+  // Map zoom this tile was fetched at. Higher zoom = denser/more complete data,
+  // so a tile is only served for a request whose zoom is <= the cached zoom.
+  zoom: number;
   bounds: {
     north: number;
     south: number;
@@ -150,20 +153,20 @@ export const useTileCache = () => {
     south: number;
     east: number;
     west: number;
-  }): Business[] | null => {
+  }, minZoom: number = 0): Business[] | null => {
     const tiles = getTilesForBounds(bounds);
     const cachedBusinesses: Business[] = [];
-    
-    // Check if all required tiles are cached
+
+    // Check if all required tiles are cached at sufficient detail
     for (const tile of tiles) {
       const key = getTileKey(tile);
       const cached = InMemoryTileCache.get(key);
-      
-      if (!cached) {
-        // Missing tile, cache miss
+
+      if (!cached || cached.zoom < minZoom) {
+        // Missing tile, or cached at a lower (sparser) zoom than needed → cache miss
         return null;
       }
-      
+
       // Add businesses from this tile
       cachedBusinesses.push(...cached.businesses);
     }
@@ -195,16 +198,23 @@ export const useTileCache = () => {
       east: number;
       west: number;
     },
-    businesses: Business[]
+    businesses: Business[],
+    zoom: number = TILE_ZOOM_LEVEL
   ): void => {
     const tiles = getTilesForBounds(bounds);
     const now = Date.now();
-    
+
     // Distribute businesses across tiles
     for (const tile of tiles) {
       const key = getTileKey(tile);
+
+      // Don't overwrite a tile already cached at a higher (denser) zoom with
+      // sparser data from a lower zoom.
+      const existing = InMemoryTileCache.get(key);
+      if (existing && existing.zoom > zoom) continue;
+
       const tileBounds = getTileBounds(tile);
-      
+
       // Find businesses that fall within this tile
       const tileBusinesses = businesses.filter(business =>
         business.position.lat >= tileBounds.south &&
@@ -212,11 +222,12 @@ export const useTileCache = () => {
         business.position.lng >= tileBounds.west &&
         business.position.lng <= tileBounds.east
       );
-      
+
       // Cache tile data
       InMemoryTileCache.set(key, {
         businesses: tileBusinesses,
         timestamp: now,
+        zoom,
         bounds: tileBounds
       });
     }

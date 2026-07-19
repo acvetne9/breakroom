@@ -10,6 +10,11 @@ import { useMapWorker } from './useMapWorker';
 // Preloading and caching
 const inflightRequests = new Map<string, Promise<Business[]>>();
 
+// Cap the accumulated browse-mode set so long panning sessions stay light to render.
+// The NYC dataset is far smaller than this, so it only guards pathological cases and
+// never drops the current viewport (newest results are kept).
+const MAX_ACCUMULATED_BUSINESSES = 40000;
+
 // Concurrent request limiting based on zoom
 class RequestQueue {
   private activeRequests = 0;
@@ -80,6 +85,9 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
 
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const preloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Tracks the real map zoom (plumbed in via loadBusinessesInViewport) so caching,
+  // preloading and concurrency use the actual zoom instead of a fixed default.
+  const currentZoomRef = useRef<number>(zoom);
 
   const { getCachedBusinesses, setCachedBusinesses } = useTileCache();
   const { clusterBusinesses } = useMapWorker();
@@ -99,18 +107,19 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
         { north: bounds.north, south: bounds.south, east: bounds.west, west: bounds.west - lonSize }
       ];
 
+      const effZoom = currentZoomRef.current;
       for (const area of adjacentAreas) {
-        if (!getCachedBusinesses(area)) {
-          if (zoom <= 12 && requestQueue.active > 0) {
+        if (!getCachedBusinesses(area, effZoom)) {
+          if (effZoom <= 12 && requestQueue.active > 0) {
             console.log('⏭️ Skipping preload at far zoom');
             continue;
           }
-          
+
           try {
-            const b = await requestQueue.run(() => 
-              getBusinessesInViewport(area, 2000, undefined, undefined, zoom)
+            const b = await requestQueue.run(() =>
+              getBusinessesInViewport(area, 2000, undefined, undefined, effZoom)
             );
-            setCachedBusinesses(area, b);
+            setCachedBusinesses(area, b, effZoom);
             console.log(`🔮 Preloaded ${b.length} businesses`);
           } catch (err) {
             console.warn('Preload failed:', err);
@@ -121,10 +130,14 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
   }, [getCachedBusinesses, setCachedBusinesses, searchFilters, zoom]);
 
   const loadBusinessesInViewport = useCallback(async (
-    viewportBounds: MapBounds, 
-    limit = 8000, 
-    isMoving = false
+    viewportBounds: MapBounds,
+    limit = 8000,
+    isMoving = false,
+    viewZoom?: number
   ) => {
+    if (viewZoom != null) currentZoomRef.current = viewZoom;
+    const effZoom = currentZoomRef.current;
+
     let searchPolygon: MapPoint[] | null = null;
 
     if (searchFilters?.neighborhoodFilter?.boundary?.length) {
@@ -180,9 +193,27 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
     const delay = businesses.length ? (isMoving ? 400 : 150) : 0;
 
     loadTimeoutRef.current = setTimeout(async () => {
+      // Browse mode: if this whole viewport is already cached at sufficient detail,
+      // serve it instantly and skip the network round-trip entirely.
+      if (!searchFilters) {
+        const cached = getCachedBusinesses(viewportBounds, effZoom);
+        if (cached) {
+          const existingIds = new Set(businesses.map(b => b.id));
+          const merged = [...businesses, ...cached.filter(b => !existingIds.has(b.id))];
+          const capped = merged.length > MAX_ACCUMULATED_BUSINESSES
+            ? merged.slice(merged.length - MAX_ACCUMULATED_BUSINESSES)
+            : merged;
+          console.log(`⚡ Tile cache served ${cached.length} businesses (no fetch); ${capped.length} total`);
+          setBusinesses(capped);
+          setCurrentBounds(viewportBounds);
+          schedulePreload(viewportBounds);
+          return;
+        }
+      }
+
       setLoading(true);
 
-      requestQueue.setMaxConcurrent(zoom);
+      requestQueue.setMaxConcurrent(effZoom);
 
       // FIXED: Use database-wide search when searchFilters are present
       // Use viewport-only search when browsing (no filters)
@@ -191,7 +222,7 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
             searchBusinessesUnified(searchFilters, viewportBounds, limit)
           )
         : requestQueue.run(() =>
-            getBusinessesInViewport(viewportBounds, limit, undefined, undefined, zoom)
+            getBusinessesInViewport(viewportBounds, limit, undefined, undefined, effZoom)
           );
 
       inflightRequests.set(requestKey, requestPromise);
@@ -220,16 +251,19 @@ export const useViewportBusinesses = (searchFilters?: any, zoom: number = 12) =>
         const updatedBusinesses = searchFilters
           ? viewportBusinesses  // SEARCH: Replace with filtered results
           : (() => {
-              // BROWSE: Accumulate as you scroll
+              // BROWSE: Accumulate as you scroll (capped to stay light to render)
               const existingIds = new Set(businesses.map(b => b.id));
               const newBusinesses = viewportBusinesses.filter(b => !existingIds.has(b.id));
-              return [...businesses, ...newBusinesses];
+              const merged = [...businesses, ...newBusinesses];
+              return merged.length > MAX_ACCUMULATED_BUSINESSES
+                ? merged.slice(merged.length - MAX_ACCUMULATED_BUSINESSES)
+                : merged;
             })();
 
         console.log(`✅ Loaded ${updatedBusinesses.length} businesses (${viewportBusinesses.length} from query, search mode: ${!!searchFilters})`);
         setBusinesses(updatedBusinesses);
 
-        if (!searchFilters) setCachedBusinesses(viewportBounds, viewportBusinesses);
+        if (!searchFilters) setCachedBusinesses(viewportBounds, viewportBusinesses, effZoom);
         setCurrentBounds(viewportBounds);
         if (!searchFilters) schedulePreload(viewportBounds);
 
