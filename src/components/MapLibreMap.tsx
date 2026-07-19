@@ -76,7 +76,7 @@ const DISPLAY_LIMITS_BY_ZOOM = {
 const MAP_DEFAULTS = {
   CENTER: NYC_CENTER,
   ZOOM: 12.77,
-  MAX_ZOOM: 16,
+  MAX_ZOOM: 18,
   MIN_ZOOM: 8,
   BOUNDS: [
     [NYC_BOUNDS.west, NYC_BOUNDS.south] as [number, number],
