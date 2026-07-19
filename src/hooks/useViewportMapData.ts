@@ -1,6 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
 import type { FeatureCollection, Feature } from 'geojson';
-import * as turf from '@turf/turf';
 import { ungzip } from 'pako';
 
 interface ViewportBounds {

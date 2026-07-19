@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 
 interface TranslationCache {
@@ -48,12 +48,28 @@ const loadCache = (): TranslationCache => {
   return {}
 }
 
-const saveCache = (cache: TranslationCache) => {
+// Single module-level cache, parsed from localStorage ONCE at module load.
+// Shared across every hook instance / TranslatedText component so no component
+// re-parses or holds its own copy.
+const translationCache: TranslationCache = loadCache()
+
+// Debounced/batched flush to localStorage so we don't stringify the whole
+// (growing) cache synchronously on every completed translation.
+const FLUSH_DELAY = 1000 // ms
+let flushTimer: ReturnType<typeof setTimeout> | null = null
+
+const flushCache = () => {
+  flushTimer = null
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(cache))
+    localStorage.setItem(CACHE_KEY, JSON.stringify(translationCache))
   } catch (error) {
     console.warn('Failed to save translation cache:', error)
   }
+}
+
+const scheduleFlush = () => {
+  if (flushTimer !== null) return
+  flushTimer = setTimeout(flushCache, FLUSH_DELAY)
 }
 
 // Rate limiting: max 5 requests per second
@@ -128,7 +144,6 @@ const detectUserLanguage = (): string => {
 
 export function useTranslation() {
   const [userLanguage, setUserLanguage] = useState<string>(() => detectUserLanguage())
-  const [translationCache, setTranslationCache] = useState<TranslationCache>(() => loadCache())
 
   useEffect(() => {
     // Re-detect language on mount (in case browser settings changed)
@@ -162,13 +177,14 @@ export function useTranslation() {
     // Create cache key
     const cacheKey = `${text.substring(0, 100)}-${userLanguage}` // Limit key length
 
-    // Check cache first (both memory and localStorage)
-    if (translationCache[cacheKey]) {
+    // Check shared module cache first
+    const cached = translationCache[cacheKey]
+    if (cached) {
       return {
-        translatedText: translationCache[cacheKey].translatedText,
-        sourceLanguage: translationCache[cacheKey].sourceLanguage,
-        targetLanguage: translationCache[cacheKey].targetLanguage,
-        isTranslated: translationCache[cacheKey].sourceLanguage !== userLanguage
+        translatedText: cached.translatedText,
+        sourceLanguage: cached.sourceLanguage,
+        targetLanguage: cached.targetLanguage,
+        isTranslated: cached.sourceLanguage !== userLanguage
       }
     }
 
@@ -196,20 +212,15 @@ export function useTranslation() {
         isTranslated: result.sourceLanguage !== userLanguage
       }
 
-      // Update cache (both memory and localStorage)
-      setTranslationCache(prev => {
-        const updated = {
-          ...prev,
-          [cacheKey]: {
-            translatedText: translationResult.translatedText,
-            sourceLanguage: translationResult.sourceLanguage,
-            targetLanguage: translationResult.targetLanguage,
-            timestamp: Date.now()
-          }
-        }
-        saveCache(updated)
-        return updated
-      })
+      // Write into the shared module cache and schedule a debounced flush
+      // instead of stringifying the whole cache synchronously here.
+      translationCache[cacheKey] = {
+        translatedText: translationResult.translatedText,
+        sourceLanguage: translationResult.sourceLanguage,
+        targetLanguage: translationResult.targetLanguage,
+        timestamp: Date.now()
+      }
+      scheduleFlush()
 
       return translationResult
     } catch (error) {
@@ -221,7 +232,7 @@ export function useTranslation() {
         isTranslated: false
       }
     }
-  }, [userLanguage, translationCache])
+  }, [userLanguage])
 
   const getLanguageName = (code: string): string => {
     const languages: { [key: string]: string } = {

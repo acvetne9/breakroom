@@ -1,5 +1,5 @@
 // High-performance Web Worker for map processing
-import * as turf from '@turf/turf';
+import { simplify } from '@turf/turf';
 import Supercluster from 'supercluster';
 import type { Business } from '@/types/business';
 
@@ -69,7 +69,7 @@ function simplifyGeometry(feature: any, zoom: number): any {
          feature.geometry.type === 'LineString' ||
          feature.geometry.type === 'MultiLineString')) {
       
-      simplified = turf.simplify(feature, { 
+      simplified = simplify(feature, {
         tolerance, 
         highQuality: false, // Use fast simplification
         mutate: false 

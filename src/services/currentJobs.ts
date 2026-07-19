@@ -82,38 +82,21 @@ export const saveCurrentJob = async (profileId: string, jobData: CurrentJobData)
     hasLocation: !!dataToSave.location,
   });
 
-  // First check if a record exists
-  const { data: existing } = (await supabase
-    .from("current_jobs")
-    .select("id")
-    .eq("profile_id", profileId)
-    .maybeSingle()) as any;
-
-  if (existing) {
-    // Update existing record
-    const { error } = await supabase
-      .from("current_jobs")
-      .update({
-        ...dataToSave,
-        updated_at: new Date().toISOString(),
-      } as any)
-      .eq("profile_id", profileId);
-
-    if (error) {
-      console.error("❌ Error updating current job:", error);
-      throw error;
-    }
-  } else {
-    // Insert new record
-    const { error } = await supabase.from("current_jobs").insert({
+  // Insert or update in a single query using UPSERT on the profile_id unique key
+  const { error } = await supabase.from("current_jobs").upsert(
+    {
       profile_id: profileId,
       ...dataToSave,
-    } as any);
+      updated_at: new Date().toISOString(),
+    } as any,
+    {
+      onConflict: "profile_id",
+    },
+  );
 
-    if (error) {
-      console.error("❌ Error inserting current job:", error);
-      throw error;
-    }
+  if (error) {
+    console.error("❌ Error saving current job:", error);
+    throw error;
   }
 
   console.log("✅ Current job saved successfully", businessId ? `(linked to business: ${businessId})` : "(no business link)");

@@ -77,10 +77,9 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
   const [postText, setPostText] = useState("");
   const [commentText, setCommentText] = useState("");
   const [commentPlaceholder, setCommentPlaceholder] = useState("Leave a comment!");
-  const [visibleCount, setVisibleCount] = useState(1000);
+  const [visibleCount, setVisibleCount] = useState(25);
 
   // Use ref to track if scroll handler is attached
-  const scrollHandlerAttached = useRef(false);
   const infiniteScrollHandlerAttached = useRef(false);
 
   useEffect(() => {
@@ -126,16 +125,48 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
     setPostPlaceholder(filteredBusinessId ? "Thoughts about this business?" : "How's work?");
   }, [filteredBusinessId]);
 
-  const realPosts = useMemo(() => {
-    return filteredBusinessId
-      ? posts.filter((post) => post.businessId === filteredBusinessId && !post.isJobUpdate && post.author !== "System")
-      : filteredUserStories
-        ? posts.filter((post) => post.author === "You" && !post.isJobUpdate)
-        : posts.filter((post) => post.author !== "System");
+  const { displayPosts, realPostCount } = useMemo(() => {
+    console.log('🔍 ExplorePage displayPosts recalculating:', {
+      filteredBusinessId,
+      filteredUserStories,
+      totalPosts: posts.length,
+      userPosts: posts.filter(p => p.author === "You").length
+    });
+
+    let filtered: Post[] = [];
+
+    if (filteredBusinessId) {
+      filtered = posts.filter((post) => post.businessId === filteredBusinessId && !post.isJobUpdate && !post.isComment);
+      console.log('📍 Filtering by business:', filteredBusinessId, 'Found:', filtered.length);
+    } else if (filteredUserStories) {
+      filtered = posts.filter((post) => post.author === "You" && !post.isJobUpdate && !post.isComment);
+      console.log('👤 Filtering by user stories - Found:', filtered.length, 'posts');
+    } else {
+      filtered = posts.filter((post) => !post.isComment);
+      console.log('📋 Showing all posts:', filtered.length);
+    }
+
+    const realBusinessPosts = filtered.filter((post) => post.author !== "System");
+
+    if (filteredBusinessId && realBusinessPosts.length === 0) {
+      const defaultPost: Post = {
+        id: `default-${filteredBusinessId}`,
+        author: "System",
+        text: "Share a thought about this business 💭",
+        businessId: filteredBusinessId,
+        isStory: true,
+        votesTotal: 0,
+        userVote: null,
+        createdAt: new Date(),
+      };
+      filtered = [defaultPost, ...filtered];
+    }
+
+    return { displayPosts: filtered, realPostCount: realBusinessPosts.length };
   }, [posts, filteredBusinessId, filteredUserStories]);
 
   useEffect(() => {
-    if (filteredBusinessId && realPosts.length > 0 && !fadeOutSystemPost && !hideSystemPost) {
+    if (filteredBusinessId && realPostCount > 0 && !fadeOutSystemPost && !hideSystemPost) {
       setFadeOutSystemPost(true);
       setTimeout(() => {
         setHideSystemPost(true);
@@ -143,11 +174,11 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
       }, 500);
     }
 
-    if (!filteredBusinessId || realPosts.length === 0) {
+    if (!filteredBusinessId || realPostCount === 0) {
       setFadeOutSystemPost(false);
       setHideSystemPost(false);
     }
-  }, [realPosts.length, filteredBusinessId, fadeOutSystemPost, hideSystemPost]);
+  }, [realPostCount, filteredBusinessId, fadeOutSystemPost, hideSystemPost]);
 
   const handlePostSubmit = useCallback(async () => {
     if (!postText.trim()) return;
@@ -233,74 +264,51 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(({
     }
   }, [expandedPost, filteredBusinessId]);
 
-  const displayPosts = useMemo(() => {
-    console.log('🔍 ExplorePage displayPosts recalculating:', {
-      filteredBusinessId,
-      filteredUserStories,
-      totalPosts: posts.length,
-      userPosts: posts.filter(p => p.author === "You").length
-    });
-
-    let filtered: Post[] = [];
-
-    if (filteredBusinessId) {
-      filtered = posts.filter((post) => post.businessId === filteredBusinessId && !post.isJobUpdate && !post.isComment);
-      console.log('📍 Filtering by business:', filteredBusinessId, 'Found:', filtered.length);
-    } else if (filteredUserStories) {
-      filtered = posts.filter((post) => post.author === "You" && !post.isJobUpdate && !post.isComment);
-      console.log('👤 Filtering by user stories - Found:', filtered.length, 'posts');
-    } else {
-      filtered = posts.filter((post) => !post.isComment);
-      console.log('📋 Showing all posts:', filtered.length);
+  // Build a lookup of comments keyed by parent post id once per posts change,
+  // instead of filtering all posts on every render / per expanded post.
+  const commentsByPostId = useMemo(() => {
+    const map = new Map<string, Post[]>();
+    for (const post of posts) {
+      if (post.isComment) {
+        const existing = map.get(post.isComment);
+        if (existing) {
+          existing.push(post);
+        } else {
+          map.set(post.isComment, [post]);
+        }
+      }
     }
-
-    const realBusinessPosts = filtered.filter((post) => post.author !== "System");
-
-    if (filteredBusinessId && realBusinessPosts.length === 0) {
-      const defaultPost: Post = {
-        id: `default-${filteredBusinessId}`,
-        author: "System",
-        text: "Share a thought about this business 💭",
-        businessId: filteredBusinessId,
-        isStory: true,
-        votesTotal: 0,
-        userVote: null,
-        createdAt: new Date(),
-      };
-      filtered = [defaultPost, ...filtered];
-    }
-
-    return filtered;
-  }, [posts, filteredBusinessId, filteredUserStories]);
-
-  const getPostComments = useCallback((postId: string) => {
-    return posts.filter((post) => post.isComment === postId);
+    return map;
   }, [posts]);
 
-  // Memoized pagination handler
+  const getPostComments = useCallback(
+    (postId: string) => commentsByPostId.get(postId) ?? [],
+    [commentsByPostId],
+  );
+
+  // Incremental rendering: grow the number of locally-rendered posts as the
+  // user scrolls near the bottom. When the end of the locally-rendered posts
+  // is reached and the hook still has more server posts, trigger loadMore.
   const handlePaginationScroll = useCallback(() => {
     const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
     if (scrollTop + clientHeight >= scrollHeight - 50) {
-      setVisibleCount((prev) => Math.min(prev + 1000, displayPosts.length));
+      if (visibleCount < displayPosts.length) {
+        setVisibleCount((prev) => Math.min(prev + 25, displayPosts.length));
+      } else if (hasMore && !loading) {
+        loadMore();
+      }
     }
-  }, [displayPosts.length]);
+  }, [displayPosts.length, visibleCount, hasMore, loading, loadMore]);
 
   useEffect(() => {
-    if (!scrollHandlerAttached.current) {
-      window.addEventListener("scroll", handlePaginationScroll);
-      scrollHandlerAttached.current = true;
-    }
-
+    window.addEventListener("scroll", handlePaginationScroll);
     return () => {
-      if (scrollHandlerAttached.current) {
-        window.removeEventListener("scroll", handlePaginationScroll);
-        scrollHandlerAttached.current = false;
-      }
+      window.removeEventListener("scroll", handlePaginationScroll);
     };
   }, [handlePaginationScroll]);
 
   useEffect(() => {
-    setVisibleCount(1000);
+    setVisibleCount(25);
   }, [displayPosts]);
 
   const paginatedPosts = useMemo(() => {

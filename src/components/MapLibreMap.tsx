@@ -12,7 +12,7 @@ import { addTileDebugLogs, logCapacitorEnvironment } from "@/utils/debugCapacito
 import type { NeighborhoodBounds } from "@/utils/nyc_neighborhoods";
 import type { GeoJSONFeature } from "maplibre-gl";
 import type { Business } from "@/types/business";
-import * as turf from "@turf/turf";
+import { polygon as turfPolygon, point, booleanPointInPolygon } from "@turf/turf";
 import type { Feature, Point } from "geojson";
 import type { MapGeoJSONFeature } from "maplibre-gl";
 import { Capacitor } from "@capacitor/core";
@@ -505,9 +505,9 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
           featureToLatLon(p)
         );
         if (coords.length) {
-          const polygon = turf.polygon([coords.map((p) => [p.lon, p.lat])]);
+          const polygon = turfPolygon([coords.map((p) => [p.lon, p.lat])]);
           validBusinesses = validBusinesses.filter((b) =>
-            turf.booleanPointInPolygon(turf.point([b.position.lng, b.position.lat]), polygon)
+            booleanPointInPolygon(point([b.position.lng, b.position.lat]), polygon)
           );
         }
       }

@@ -110,22 +110,23 @@ const MobileApp: React.FC = () => {
 
     const initializeApp = async () => {
       try {
-        const profileExists = await hasProfile();
-        const hasJob = await hasCurrentJob();
-    
-        if (hasJob) {
-          const { getCurrentJob } = await import("../services/currentJobs");
-          const currentJob = await getCurrentJob(deviceId);
-          if (currentJob) {
-            setUserData({
-              salary: `$${currentJob.salary.toFixed(2)}`,
-              role: currentJob.role,
-              location: currentJob.location,
-              fullLocation: currentJob.location,
-              businessName: currentJob.business_name || "",
-              timePeriod: currentJob.time_period || "HR",
-            });
-          }
+        const { getCurrentJob } = await import("../services/currentJobs");
+        // Independent reads in parallel; getCurrentJob replaces the redundant
+        // hasCurrentJob() + getCurrentJob() double fetch.
+        const [profileExists, currentJob] = await Promise.all([
+          hasProfile(),
+          getCurrentJob(deviceId),
+        ]);
+
+        if (currentJob) {
+          setUserData({
+            salary: `$${currentJob.salary.toFixed(2)}`,
+            role: currentJob.role,
+            location: currentJob.location,
+            fullLocation: currentJob.location,
+            businessName: currentJob.business_name || "",
+            timePeriod: currentJob.time_period || "HR",
+          });
           setCurrentView("main");
         } else {
           // No current job - show initiation (create profile if needed)
@@ -533,21 +534,9 @@ const MobileApp: React.FC = () => {
         if (rolledBackBusinessForSelection) {
           setSelectedBusiness(rolledBackBusinessForSelection);
         }
-      } else {
-        try {
-          const refreshedBusiness = await fetchFullBusinessDetails(businessId);
-
-          if (refreshedBusiness) {
-            setBusinesses((prev) => prev.map((b) => (b.id === businessId ? refreshedBusiness : b)));
-
-            if (selectedBusiness?.id === businessId) {
-              setSelectedBusiness(refreshedBusiness);
-            }
-          }
-        } catch (syncError) {
-          console.warn("⚠️ Failed to sync with database after vote:", syncError);
-        }
       }
+      // Success: the optimistic update above is authoritative for the user's own
+      // vote, so we skip the post-vote full refetch (saves 3 queries per vote).
     } finally {
       setVotingRoles((prev) => {
         const next = new Set(prev);

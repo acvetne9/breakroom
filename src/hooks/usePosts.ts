@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getPosts, createPost, voteOnPost, deletePost, getUserVotes, transformPost, getUserProfile, Post, PostData } from '@/services/posts';
+import { getPosts, createPost, deletePost, getUserVotes, transformPost, getUserProfile, Post, PostData } from '@/services/posts';
 import { supabase } from '@/integrations/supabase/client';
 import { useSessionCache } from './useSessionCache';
 import { useReconnectionHandler } from './useReconnectionHandler';
 
-const POSTS_PER_PAGE = 1000;
+const POSTS_PER_PAGE = 30;
 
 export const usePosts = () => {
   // Use reusable cache hook
@@ -27,6 +27,10 @@ export const usePosts = () => {
   const hasFetchedRef = useRef(false);
   const isSubscribedRef = useRef(false);
 
+  // Keep a ref of the current offset so fetchPosts can stay stable
+  // (avoids re-registering the reconnect callback on every loadMore)
+  const offsetRef = useRef(0);
+
   // Memoized fetch function
   const fetchPosts = useCallback(async (isLoadMore: boolean = false) => {
     // Prevent duplicate initial loads
@@ -39,8 +43,8 @@ export const usePosts = () => {
     setError(null);
     
     try {
-      const currentOffset = isLoadMore ? offset : 0;
-      
+      const currentOffset = isLoadMore ? offsetRef.current : 0;
+
       const { data: postsData, error: postsError } = await getPosts(POSTS_PER_PAGE, currentOffset);
       
       if (postsError) {
@@ -73,10 +77,12 @@ export const usePosts = () => {
             console.log(`✅ Loaded ${postsWithVotes.length} more posts. Total: ${updatedPosts.length}`);
             return updatedPosts;
           });
-          setOffset(currentOffset + POSTS_PER_PAGE);
+          offsetRef.current = currentOffset + POSTS_PER_PAGE;
+          setOffset(offsetRef.current);
         } else {
           setPosts(postsWithVotes);
           saveToCache(postsWithVotes);
+          offsetRef.current = POSTS_PER_PAGE;
           setOffset(POSTS_PER_PAGE);
           console.log(`✅ Loaded ${postsWithVotes.length} posts (initial)`);
           hasFetchedRef.current = true;
@@ -88,7 +94,7 @@ export const usePosts = () => {
     } finally {
       setLoading(false);
     }
-  }, [offset]);
+  }, []);
 
   const loadMorePosts = useCallback(() => {
     if (!loading && hasMore) {
@@ -243,6 +249,7 @@ export const usePosts = () => {
             console.log('📨 New post received via realtime');
             // Only refetch if we're not already loading
             if (!loading) {
+              offsetRef.current = 0;
               setOffset(0);
               hasFetchedRef.current = false; // Allow refetch
               fetchPosts(false);
@@ -320,6 +327,7 @@ export const usePosts = () => {
 
   const refetch = useCallback(() => {
     hasFetchedRef.current = false;
+    offsetRef.current = 0;
     setOffset(0);
     fetchPosts(false);
   }, [fetchPosts]);

@@ -2,25 +2,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { executeQuery, createCacheKey, queryCache } from "@/utils/databaseOptimizations";
 import { retryWithBackoff, isRetryableError } from "@/utils/retryWithBackoff";
 
-// Debug function to check profile status
-export const debugProfileStatus = async () => {
-  const deviceId = localStorage.getItem("device_id");
-  console.log("🔍 Debug: device_id in localStorage:", deviceId);
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  console.log("🔍 Debug: authenticated user:", user?.id);
-
-  if (user) {
-    const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
-    console.log("🔍 Debug: profile for auth user:", profile);
-  } else if (deviceId) {
-    const { data: profile } = await supabase.from("profiles").select("*").eq("id", deviceId).maybeSingle();
-    console.log("🔍 Debug: profile for device_id:", profile);
-  }
-};
-
 // Cache for user profile to avoid race conditions
 let cachedProfileId: string | null = null;
 let profilePromise: Promise<{ profileId: string; wasCreated: boolean }> | null = null;
@@ -144,7 +125,15 @@ export const getPosts = async (
           .from("posts")
           .select(
             `
-            *,
+            id,
+            content,
+            post_type,
+            business_id,
+            user_id,
+            votes_total,
+            created_at,
+            is_comment,
+            is_deleted,
             businesses(id, name, lat, lng)
           `,
           )
@@ -243,46 +232,6 @@ export const createPost = async (
   queryCache.invalidatePattern('posts:');
 
   return { data: transformedData as PostData, error: null };
-};
-
-// Vote on a post
-export const voteOnPost = async (
-  postId: string,
-  voteType: "upvote" | "downvote",
-): Promise<{ success: boolean; error?: any }> => {
-  // Get authenticated or temp user ID
-  const userId = await getUserId();
-
-  // Check if user already voted
-  const { data: existingVote } = await supabase
-    .from("votes")
-    .select("*")
-    .eq("post_id", postId)
-    .eq("user_id", userId)
-    .single();
-
-  if (existingVote) {
-    if (existingVote.vote_type === voteType) {
-      // Remove vote if same type
-      const { error } = await supabase.from("votes").delete().eq("id", existingVote.id);
-
-      return { success: !error, error };
-    } else {
-      // Update vote type
-      const { error } = await supabase.from("votes").update({ vote_type: voteType }).eq("id", existingVote.id);
-
-      return { success: !error, error };
-    }
-  } else {
-    // Create new vote
-    const { error } = await supabase.from("votes").insert({
-      post_id: postId,
-      user_id: userId,
-      vote_type: voteType,
-    });
-
-    return { success: !error, error };
-  }
 };
 
 // Get user's votes for posts

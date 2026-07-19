@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 interface ConnectionContextType {
   isOnline: boolean;
@@ -86,8 +86,13 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
     throw lastError!;
   }, []);
 
+  const value = useMemo(
+    () => ({ isOnline, registerReconnectCallback, retryWithBackoff }),
+    [isOnline, registerReconnectCallback, retryWithBackoff]
+  );
+
   return (
-    <ConnectionContext.Provider value={{ isOnline, registerReconnectCallback, retryWithBackoff }}>
+    <ConnectionContext.Provider value={value}>
       {children}
     </ConnectionContext.Provider>
   );

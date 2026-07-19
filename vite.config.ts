@@ -36,4 +36,15 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/maplibre-gl')) return 'maplibre';
+          if (id.includes('node_modules/@deck.gl') || id.includes('node_modules/@luma.gl')) return 'deck';
+          if (id.includes('node_modules/@turf')) return 'turf';
+        },
+      },
+    },
+  },
 }));

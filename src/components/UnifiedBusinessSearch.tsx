@@ -23,7 +23,6 @@ interface UnifiedBusinessSearchProps {
   variant?: "dropdown" | "search-bar";
   showIcon?: boolean;
   onLocationSave?: (location: string, fullLocation: string) => void;
-  mapBusinesses?: any[];
   disabled?: boolean;
 }
 
@@ -48,7 +47,6 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   variant = "dropdown",
   showIcon = false,
   onLocationSave,
-  mapBusinesses = [],
   disabled = false,
 }) => {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);

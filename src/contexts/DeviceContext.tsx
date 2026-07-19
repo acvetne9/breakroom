@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useMemo, ReactNode } from "react";
 import { updateDeviceIdHeader } from "@/integrations/supabase/client";
 
 interface DeviceContextType {
@@ -68,11 +68,14 @@ export function DeviceProvider({ children }: DeviceProviderProps) {
     initializeDevice();
   }, []);
 
-  const value = {
-    deviceId,
-    loading,
-    isFirstSession,
-  };
+  const value = useMemo(
+    () => ({
+      deviceId,
+      loading,
+      isFirstSession,
+    }),
+    [deviceId, loading, isFirstSession]
+  );
   
   return <DeviceContext.Provider value={value}>{children}</DeviceContext.Provider>;
 }

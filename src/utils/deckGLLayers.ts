@@ -1,6 +1,6 @@
 import { ScatterplotLayer, TextLayer } from '@deck.gl/layers';
 import { COORDINATE_SYSTEM } from '@deck.gl/core';
-import * as turf from '@turf/turf';
+import { polygon, point, booleanPointInPolygon } from '@turf/turf';
 import type { Business } from '@/types/business';
 
 export interface DeckGLBusinessLayerProps {
@@ -40,12 +40,12 @@ const filterBusinessesInPolygon = (
       polygonCoords.push(polygonCoords[0]);
     }
 
-    const turfPoly = turf.polygon([polygonCoords]);
+    const turfPoly = polygon([polygonCoords]);
 
     return businesses.filter((b) => {
       if (!b || !b?.position) return false;
-      return turf.booleanPointInPolygon(
-        turf.point([b.position.lng, b.position.lat]),
+      return booleanPointInPolygon(
+        point([b.position.lng, b.position.lat]),
         turfPoly
       );
     });

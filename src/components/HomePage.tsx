@@ -82,7 +82,6 @@ const HomePage: React.FC<HomePageProps> = ({
   const [mapDataReady, setMapDataReady] = useState(false);
   const [businessDataReady, setBusinessDataReady] = useState(false);
   const [searchCompleted, setSearchCompleted] = useState(false);
-  const [mapBusinesses, setMapBusinesses] = useState<any[]>([]);
   const [showWelcome, setShowWelcome] = useState(false);
 
   // Computed loading state - show overlay until all three complete
@@ -303,7 +302,6 @@ const HomePage: React.FC<HomePageProps> = ({
           landmarks={LANDMARKS}
           searchFilters={searchFilters}
           neighborhoodCenter={neighborhoodCenter}
-          onBusinessesUpdate={setMapBusinesses}
           onMapLoaded={handleMapLoaded}
           onBusinessesLoaded={handleBusinessesLoaded}
         />
@@ -357,7 +355,6 @@ const HomePage: React.FC<HomePageProps> = ({
                   variant="search-bar"
                   showIcon={!showClearButton}
                   onLocationSave={onLocationSave}
-                  mapBusinesses={mapBusinesses}
                 />
 
                 {showClearButton && (
