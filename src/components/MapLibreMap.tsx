@@ -423,7 +423,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         if (mapRef.current && business?.position?.lat && business?.position?.lng) {
           mapRef.current.flyTo({
             center: [business.position.lng, business.position.lat],
-            zoom: 16,
+            // Zoom in to at least 16, but never zoom back out if already closer.
+            zoom: Math.max(mapRef.current.getZoom(), 16),
             speed: 1.2,
             curve: 1.2,
             essential: true,
@@ -701,7 +702,8 @@ const MapLibreMap: React.FC<MapLibreMapProps> = ({
         if (mapRef.current && lat != null && lng != null) {
           mapRef.current.flyTo({
             center: [lng, lat],
-            zoom: 16,
+            // Zoom in to at least 16, but never zoom back out if already closer.
+            zoom: Math.max(mapRef.current.getZoom(), 16),
             speed: 3,
             curve: 1,
             essential: true,
