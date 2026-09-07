@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Business } from "@/types/business";
 import { getBusinessesInViewport, getFullBusinessDetailsCached } from "@/services/businesses";
-import { searchBusinessesUnified } from "@/services/unifiedSearch";
-import type { SearchFilters } from "@/services/businessFiltering";
-import { isPointInPolygon } from "@/utils/nyc_neighborhoods";
+import { searchBusinesses, searchFiltersKey, type SearchFilters } from "@/services/search";
 import { useTileCache, getCachedTile, setCachedTile } from "./useTileCache";
 import { getTilesForBounds, getTileBounds, getTileKey, sortTilesCenterOut, type TileKey } from "@/utils/tiles";
 
@@ -57,12 +55,6 @@ class RequestQueue {
 const requestQueue = new RequestQueue();
 
 export type MapBounds = { north: number; south: number; east: number; west: number };
-type MapPoint = { lat: number; lon: number };
-
-const filtersKey = (f: SearchFilters | null | undefined) =>
-  f
-    ? [(f.textTerms ?? []).join(","), f.roleFilter ?? "", f.businessTypeFilter ?? "", f.neighborhoodFilter?.name ?? ""].join("|")
-    : "";
 
 /** Fetch one complete tile, de-duplicated across callers, and cache it. */
 function fetchTile(tile: TileKey, zoom: number): Promise<Business[]> {
@@ -146,11 +138,7 @@ export const useViewportBusinesses = (searchFilters?: SearchFilters | null) => {
       if (viewZoom != null) currentZoomRef.current = viewZoom;
       const effZoom = currentZoomRef.current;
 
-      const searchPolygon: MapPoint[] | null = searchFilters?.neighborhoodFilter?.boundary?.length
-        ? (searchFilters.neighborhoodFilter.boundary as MapPoint[])
-        : null;
-
-      const key = filtersKey(searchFilters);
+      const key = searchFiltersKey(searchFilters);
       const isNewSearch = key !== lastFiltersKeyRef.current;
 
       if (isNewSearch) {
@@ -190,13 +178,10 @@ export const useViewportBusinesses = (searchFilters?: SearchFilters | null) => {
         // and forth is cheap; new ground triggers a new query.
         if (searchFilters) {
           setLoadingState(true);
-          const requestPromise = requestQueue.run(() => searchBusinessesUnified(searchFilters, viewportBounds, limit));
+          const requestPromise = requestQueue.run(() => searchBusinesses(searchFilters, { bounds: viewportBounds, limit }));
           inflightRequests.set(requestKey, requestPromise);
           try {
-            let results = await requestPromise;
-            if (searchPolygon) {
-              results = results.filter((b) => isPointInPolygon({ lat: b.position.lat, lon: b.position.lng }, searchPolygon));
-            }
+            const results = await requestPromise;
             setBusinesses(results);
             return results;
           } catch (err) {

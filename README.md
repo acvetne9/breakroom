@@ -24,10 +24,9 @@ A location-based community platform for sharing real workplace info — salaries
 │    ├── Turf.js for neighborhood geometry                   │
 │    └── Tile-chunked, viewport-based business loading       │
 │                                                           │
-│  Search     Unified search pipeline                        │
-│    ├── DataMuse API — query term expansion                 │
-│    ├── Salary / neighborhood / synonym parsing             │
-│    └── Supabase RPC — trigram + PostGIS spatial            │
+│  Search     One parser + one Postgres function            │
+│    ├── Pay range, neighborhood, stop-word parsing (client) │
+│    └── search_businesses — trigram + PostGIS, ranked       │
 │                                                           │
 │  i18n       Browser on-device Translator API (no server)  │
 │  UI         shadcn/ui (Radix) + Tailwind + Framer Motion   │
@@ -54,7 +53,7 @@ A location-based community platform for sharing real workplace info — salaries
 | **Animation** | Framer Motion | Page transitions and the swipeable carousel shell. |
 | **Maps** | MapLibre GL + Deck.GL | Open-source (no Mapbox token); **self-hosted vector tiles** in `public/data/tiles` keep the map free and offline-capable. Fonts shipped as `.pbf` glyphs. |
 | **Geo** | Turf.js | Client-side neighborhood boundary tests. |
-| **Search** | DataMuse API | Term expansion layered over Postgres trigram/spatial RPC; custom hospitality/job synonym indexes (`src/data`, `src/utils/jobSynonyms.json`). |
+| **Search** | Postgres function `search_businesses` | Client parses pay, neighborhood and terms; the database matches name (punctuation-insensitive, fuzzy), type, address and roles with trigram indexes, filters by neighborhood polygon and hourly pay, and returns ranked results with match reasons. |
 | **Backend** | Supabase (Postgres + PostGIS) | Single managed backend: database, auth, RLS, and Deno edge functions in one place. |
 | **Identity** | Anonymous **device id** | A UUID is generated client-side (`src/utils/deviceId.ts`), stored as `profiles.id`, and sent on every request as the `x-device-id` header. RLS policies compare against it; there is no account. |
 | **Server state** | Custom hooks | `usePosts` (feed + realtime), `useViewportBusinesses` (tile cache), `useOptimisticVote`, reconnection handling. |
@@ -66,7 +65,7 @@ A location-based community platform for sharing real workplace info — salaries
 
 - **No map vendor lock-in.** MapLibre + locally-hosted `.pbf` tiles avoid Mapbox/Google billing. The tiles are gzip on disk; `vercel.json` serves them with `Content-Encoding: gzip` and the `gzpbf://` MapLibre protocol (`src/utils/tileProtocol.ts`) inflates them anywhere a host doesn't, including the Capacitor shell.
 - **Account-less contributions.** Device-based identity lowers the barrier to posting salary/role data while RLS policies scope writes to the posting device.
-- **Layered search.** Cheap client-side parsing (salary patterns, neighborhood names, synonyms) narrows intent before hitting Postgres trigram + PostGIS RPCs, with a short-lived in-memory result cache.
+- **Search lives in the database.** The client only parses intent (pay, neighborhood, words); one SQL function does matching, geography and ranking, so the dropdown and the map always agree and there is no third-party API in the path.
 - **Content safety.** A block-list `profanityFilter` guards user-generated posts.
 - **Performance-tuned DB.** Index strategy is documented in `INDEX_OPTIMIZATION_GUIDE.md` / `DATABASE_OPTIMIZATION_GUIDE.md`, with paired apply/rollback migrations.
 

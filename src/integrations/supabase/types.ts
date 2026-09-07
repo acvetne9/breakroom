@@ -887,6 +887,36 @@ export type Database = {
       }
       postgis_version: { Args: never; Returns: string }
       postgis_wagyu_version: { Args: never; Returns: string }
+      role_hourly_rate: {
+        Args: { pay_period: string; salary: string }
+        Returns: number
+      }
+      search_businesses: {
+        Args: {
+          max_hourly?: number
+          max_lat?: number
+          max_lng?: number
+          min_hourly?: number
+          min_lat?: number
+          min_lng?: number
+          phrase?: string
+          polygon_geojson?: string
+          result_limit?: number
+          terms?: string[]
+        }
+        Returns: {
+          address: string
+          atmosphere: string[]
+          business_type: string
+          id: string
+          lat: number
+          lng: number
+          match_reasons: string[]
+          name: string
+          score: number
+          website: string
+        }[]
+      }
       search_businesses_global: {
         Args: {
           max_hourly?: number

@@ -84,7 +84,41 @@ await step("search dropdown returns businesses", async () => {
   return `${n} results, first: ${firstBusinessName}`;
 });
 
+await step("role search surfaces businesses that only match by role", async () => {
+  const search = page.locator('input[placeholder="Find that next gig!"]');
+  await search.fill("");
+  await search.fill("barista");
+  const items = page.locator("div.max-h-60 div.cursor-pointer");
+  await items.first().waitFor({ state: "visible", timeout: 30_000 });
+  await page.waitForTimeout(500);
+  const labels = await items.locator("span.font-medium").allInnerTexts();
+  const roleOnly = labels.filter((n) => !/barista/i.test(n));
+  await shot("02b-role-search");
+  if (roleOnly.length === 0) throw new Error("every result has 'barista' in its name; role matching not surfacing");
+  return `${labels.length} results, ${roleOnly.length} matched by role only (e.g. ${roleOnly[0]})`;
+});
+
+await step("neighborhood + pay query parses and returns businesses", async () => {
+  const search = page.locator('input[placeholder="Find that next gig!"]');
+  await search.fill("");
+  await search.fill("upper east side over $18/hr");
+  const items = page.locator("div.max-h-60 div.cursor-pointer");
+  await items.first().waitFor({ state: "visible", timeout: 30_000 });
+  await page.waitForTimeout(500);
+  const first = (await items.first().innerText()).trim();
+  const n = await items.count();
+  await shot("02c-neighborhood-pay");
+  if (!/Upper East Side/i.test(first)) throw new Error(`first item should be the neighborhood, got: ${first}`);
+  if (n < 2) throw new Error("no businesses returned for neighborhood + pay");
+  return `${n - 1} businesses in the Upper East Side paying $18+/hr`;
+});
+
 await step("selecting a result opens the preview card", async () => {
+  const search = page.locator('input[placeholder="Find that next gig!"]');
+  await search.fill("");
+  await search.fill("coffee");
+  await page.locator("div.max-h-60 div.cursor-pointer").first().waitFor({ state: "visible", timeout: 30_000 });
+  await page.waitForTimeout(300);
   await page.locator("div.max-h-60 div.cursor-pointer").first().click();
   const preview = page.locator(".app-popup");
   await preview.waitFor({ state: "visible", timeout: 20_000 });

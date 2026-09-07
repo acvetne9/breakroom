@@ -117,7 +117,7 @@ const MobileApp: React.FC = () => {
         const { data: existing } = await supabase.from("businesses").select("id").ilike("name", data.location).maybeSingle();
         if (existing) {
           businessId = existing.id;
-          await createOrUpdateBusinessRole(data.location, data.role, data.salary);
+          await createOrUpdateBusinessRole(data.location, data.role, data.salary, timePeriod);
         }
       } catch (roleError) {
         console.error("Error with business role:", roleError);

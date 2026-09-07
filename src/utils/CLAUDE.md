@@ -7,7 +7,6 @@ Pure helpers, no React.
 - `platform.ts` — `isCapacitor`, `isAndroid`.
 - `deckGLLayers.ts` — scatterplot + emoji layers.
 - `tiles.ts`, `geo.ts`, `nyc_neighborhoods.ts` — web-mercator tile math, NYC bounds, neighborhood polygons.
-- `searchParsing.ts`, `searchUtils.ts`, `smartSearch.ts`, `jobSynonyms.json` — query parsing and synonym expansion.
 - `jobForm.ts` — `JobFormState` and pure transitions for the job editors (validation, address fallback, salary formatting).
 - `businessMapper.ts`, `voteCalculations.ts`, `salaryFormat.ts`, `timeAgo.ts`, `addressValidation.ts`, `commenterIdentity.ts`, `profanityFilter.ts`, `retryWithBackoff.ts`.
 

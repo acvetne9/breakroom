@@ -9,7 +9,7 @@ import { useViewportBusinesses, type MapBounds } from "../hooks/useViewportBusin
 import { registerGzipTileProtocol, getTileUrlTemplate } from "@/utils/tileProtocol";
 import { isAndroid } from "@/utils/platform";
 import type { Business } from "@/types/business";
-import type { SearchFilters } from "@/services/businessFiltering";
+import { searchFiltersKey, type SearchFilters } from "@/services/search";
 import { NYC_BOUNDS, NYC_CENTER } from "@/utils/geo";
 
 export interface MapHandle {
@@ -339,7 +339,7 @@ const MapLibreMap = forwardRef<MapHandle, MapLibreMapProps>(function MapLibreMap
       const scatter = createBusinessScatterplotLayer({
         businesses: visible,
         onBusinessClick: handleBusinessClick,
-        neighborhoodBoundary: searchFilters?.neighborhoodFilter?.boundary ?? null,
+        neighborhoodBoundary: searchFilters?.neighborhood?.boundary ?? null,
         zoom: currentZoom,
         clickedBusinessIds,
       });
@@ -511,19 +511,7 @@ const MapLibreMap = forwardRef<MapHandle, MapLibreMapProps>(function MapLibreMap
   }, [mapLoaded, handleViewportChange]);
 
   // Reload when the search changes.
-  const searchFiltersHash = useMemo(
-    () =>
-      searchFilters
-        ? JSON.stringify({
-            terms: searchFilters.textTerms,
-            role: searchFilters.roleFilter,
-            type: searchFilters.businessTypeFilter,
-            salary: searchFilters.salaryQuery,
-            neighborhood: searchFilters.neighborhoodFilter?.name,
-          })
-        : "none",
-    [searchFilters],
-  );
+  const searchFiltersHash = useMemo(() => searchFiltersKey(searchFilters) || "none", [searchFilters]);
   const prevHashRef = useRef(searchFiltersHash);
 
   useEffect(() => {
@@ -537,7 +525,7 @@ const MapLibreMap = forwardRef<MapHandle, MapLibreMapProps>(function MapLibreMap
 
   // Fly to a searched neighborhood once the user stops interacting.
   useEffect(() => {
-    if (!mapRef.current || !mapLoaded || !searchFilters?.neighborhoodFilter || !neighborhoodCenter) return;
+    if (!mapRef.current || !mapLoaded || !searchFilters?.neighborhood || !neighborhoodCenter) return;
     if (isUserInteractingRef.current) return;
 
     const timeout = setTimeout(() => {
@@ -546,7 +534,7 @@ const MapLibreMap = forwardRef<MapHandle, MapLibreMapProps>(function MapLibreMap
       }
     }, 800);
     return () => clearTimeout(timeout);
-  }, [searchFilters?.neighborhoodFilter, neighborhoodCenter, mapLoaded]);
+  }, [searchFilters?.neighborhood, neighborhoodCenter, mapLoaded]);
 
   return <div ref={mapContainerRef} style={{ position: "absolute", top: 0, bottom: 0, width: "100%" }} />;
 });

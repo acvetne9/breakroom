@@ -1,20 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
+import { Search } from "lucide-react";
 import { useDropdown } from "@/hooks/useDropdown";
 import { EnhancedBusiness } from "@/types/search";
-import { parseSearchFilters } from "@/services/businessFiltering";
-import { findNeighborhoodBoundaryByName } from "@/utils/nyc_neighborhoods";
 import { isProfane } from "@/utils/profanityFilter";
-import { Search } from "lucide-react";
-import { searchBusinessesByQuery } from "@/services/unifiedSearch";
+import { parseSearchQuery, searchBusinesses, type SearchResult } from "@/services/search";
 
 interface UnifiedBusinessSearchProps {
   value: string;
-  onChange: (
-    value: string,
-    business?: EnhancedBusiness,
-    filters?: any,
-    neighborhoodCoords?: { lat: number; lon: number },
-  ) => void;
+  onChange: (value: string) => void;
+  /** Enter key, or picking a neighborhood: the parent should apply the query now. */
+  onSubmit?: (value: string) => void;
   onBusinessSelect?: (business: EnhancedBusiness) => void;
   onNoResults?: (query: string) => void;
   onBlur?: () => void;
@@ -34,11 +29,32 @@ interface NeighborhoodResult {
   borough: string;
 }
 
-type SearchResult = EnhancedBusiness | NeighborhoodResult;
+type DropdownItem = (EnhancedBusiness & { matchReasons?: string[] }) | NeighborhoodResult;
+
+const MIN_QUERY_LENGTH = 3;
+const DROPDOWN_LIMIT = 30;
+
+const reasonLabel = (reasons: string[] | undefined) => {
+  if (!reasons?.length) return null;
+  const r = reasons.filter((x) => x !== "neighborhood" && x !== "pay");
+  if (r.includes("role")) return "has this role";
+  if (r.includes("similar name")) return "similar name";
+  if (r.includes("address")) return "address";
+  return null;
+};
+
+const toEnhanced = (b: SearchResult): EnhancedBusiness & { matchReasons: string[] } => ({
+  ...b,
+  lat: b.position.lat,
+  lng: b.position.lng,
+  roles: (b.roles ?? []).map((r) => ({ id: r.id ?? "", role: r.role, salary: r.salary, votesTotal: r.votesTotal, userVote: r.userVote })),
+  matchReasons: b.matchReasons,
+});
 
 const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   value,
   onChange,
+  onSubmit,
   onBusinessSelect,
   onNoResults,
   onBlur,
@@ -50,22 +66,14 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   onLocationSave,
   disabled = false,
 }) => {
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [items, setItems] = useState<DropdownItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const isScrolling = useRef(false);
-
   const searchSeqRef = useRef(0);
-  const lastFiltersRef = useRef<string | null>(null);
-  const committedQueryRef = useRef<string>("");
-  const resultsCache = useRef<Map<string, SearchResult[]>>(new Map());
-  const lastExecutedQuery = useRef<string>("");
+  const resultsCache = useRef<Map<string, DropdownItem[]>>(new Map());
   const wasClosedIntentionally = useRef(false);
   const hasUserInteracted = useRef(false);
 
-  // Shared dropdown mechanics: open state, refs, outside-click
-  // (mousedown+touchstart), Escape-to-close, and the blur-timeout close.
-  // The scroll-guard and `wasClosedIntentionally` tracking stay local (they are
-  // specific to this component's async search) and are wired in via callbacks.
   const {
     isOpen: showDropdown,
     setIsOpen: setShowDropdown,
@@ -74,352 +82,135 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
     scheduleBlurClose,
     cancelBlurClose,
   } = useDropdown({
-    // Don't close on outside click while the user is scrolling inside the list.
     shouldIgnoreOutsideClick: () => isScrolling.current,
     onOutsideClose: () => {
-      console.log("✅ Closing dropdown");
       wasClosedIntentionally.current = true;
     },
     onBlurClose: () => {
-      console.log("✅ Closing dropdown on blur (delayed)");
       wasClosedIntentionally.current = true;
       onBlur?.();
     },
   });
 
-  // Handle scroll within dropdown
+  // Typeahead: parse, then ask the database. Neighborhood matches go first.
   useEffect(() => {
-    let scrollTimeout: NodeJS.Timeout;
-    const dropdown = dropdownRef.current;
-
-    if (showDropdown && dropdown) {
-      const handleScroll = () => {
-        isScrolling.current = true;
-        clearTimeout(scrollTimeout);
-        scrollTimeout = setTimeout(() => {
-          isScrolling.current = false;
-          console.log("🔄 Scroll state reset");
-        }, 150);
-      };
-
-      dropdown.addEventListener("scroll", handleScroll);
-      return () => {
-        dropdown.removeEventListener("scroll", handleScroll);
-        clearTimeout(scrollTimeout);
-      };
-    }
-  }, [showDropdown]);
-
-  // Reset interaction flag on unmount
-  useEffect(() => {
-    return () => {
-      hasUserInteracted.current = false;
-    };
-  }, []);
-
-  // Show businesses from map in dropdown
-  useEffect(() => {
-    // Don't run search logic when component is disabled
-    if (disabled) {
-      return;
-    }
-
+    if (disabled) return;
     const q = value.trim();
 
-    if (!q) {
-      setSearchResults([]);
+    if (q.length < MIN_QUERY_LENGTH) {
+      setItems([]);
       setShowDropdown(false);
       setIsSearching(false);
-      if (lastFiltersRef.current !== null) {
-        lastFiltersRef.current = null;
-        committedQueryRef.current = "";
-        onChange(value, undefined, null);
-      }
       return;
     }
+    if (!hasUserInteracted.current && variant === "dropdown") return;
 
-    // Don't auto-search on mount with initial value for dropdown variant
-    // Only search if user has interacted OR if it's the search-bar variant
-    if (!hasUserInteracted.current && variant === "dropdown") {
-      console.log("⏸️ Skipping auto-search on mount - waiting for user interaction");
-      return;
-    }
-
-    // Check cache first
-    const cachedResults = resultsCache.current.get(q);
-    if (cachedResults) {
-      setSearchResults(cachedResults);
-      // Only show dropdown if not intentionally closed
-      if (!wasClosedIntentionally.current) {
-        setShowDropdown(true);
-      }
+    const cached = resultsCache.current.get(q);
+    if (cached) {
+      setItems(cached);
+      if (!wasClosedIntentionally.current) setShowDropdown(true);
       setIsSearching(false);
       return;
     }
 
     setIsSearching(true);
-    // Only show dropdown if not intentionally closed
-    if (!wasClosedIntentionally.current) {
-      setShowDropdown(true);
-    }
+    if (!wasClosedIntentionally.current) setShowDropdown(true);
     const seq = ++searchSeqRef.current;
 
     const timer = setTimeout(async () => {
       try {
-        const results: SearchResult[] = [];
+        const filters = parseSearchQuery(q);
+        const next: DropdownItem[] = [];
 
-        // Check for neighborhood match
-        const neighborhood = findNeighborhoodBoundaryByName(q);
-        if (neighborhood) {
-          results.push({
-            id: `neighborhood-${neighborhood.name}`,
-            name: `${neighborhood.name} - Search Neighborhood`,
-            isNeighborhood: true as const,
-            borough: neighborhood.borough,
+        if (filters?.neighborhood) {
+          next.push({
+            id: `neighborhood-${filters.neighborhood.name}`,
+            name: filters.neighborhood.name,
+            isNeighborhood: true,
+            borough: filters.neighborhood.borough,
           });
         }
 
-        // Perform immediate search for dropdown (independent of map's debounced search)
-        console.log(`🔍 [Dropdown] Performing immediate search for: "${q}"`);
-        const searchResults = await searchBusinessesByQuery(q, undefined, 30, { loadRoles: false });
+        if (filters && (filters.terms.length > 0 || filters.salary)) {
+          const results = await searchBusinesses(filters, { limit: DROPDOWN_LIMIT });
+          if (seq !== searchSeqRef.current) return;
+          next.push(...results.map(toEnhanced));
+        }
 
-        // Check if this search is still current
-        if (seq !== searchSeqRef.current) return;
-
-        console.log(`✅ [Dropdown] Found ${searchResults.length} immediate results`);
-
-        // Convert to EnhancedBusiness format and add to results
-        const enhancedResults = searchResults.map((b) => ({
-          ...b,
-          lat: b.position.lat,
-          lng: b.position.lng,
-        })) as EnhancedBusiness[];
-
-        results.push(...enhancedResults);
-
-        // Cache results (limit cache size to prevent memory issues)
-        resultsCache.current.set(q, results);
+        resultsCache.current.set(q, next);
         if (resultsCache.current.size > 50) {
           const firstKey = resultsCache.current.keys().next().value;
           if (firstKey) resultsCache.current.delete(firstKey);
         }
+        setItems(next);
 
-        setSearchResults(results);
-
-        // Notify parent if no business results found (only after user stops typing)
-        const hasBusinessResults = results.some((r) => !("isNeighborhood" in r));
-        if (!hasBusinessResults && onNoResults) {
-          // Delay callback to avoid interrupting ongoing typing
+        if (onNoResults && !next.some((r) => !("isNeighborhood" in r))) {
           setTimeout(() => {
-            // Check if search is still current
-            if (seq === searchSeqRef.current && value.trim() === q) {
-              onNoResults(q);
-            }
+            if (seq === searchSeqRef.current && value.trim() === q) onNoResults(q);
           }, 800);
-        }
-
-        // Update parent with filters
-        try {
-          const parsed = parseSearchFilters(q);
-          const filtersKey = parsed ? JSON.stringify(parsed) : null;
-          if (lastFiltersRef.current !== filtersKey) {
-            lastFiltersRef.current = filtersKey;
-            if (parsed?.neighborhoodFilter) {
-              const neighborhoodCoords = {
-                lat: parsed.neighborhoodFilter.center.lat,
-                lon: parsed.neighborhoodFilter.center.lon,
-              };
-              onChange(q, undefined, parsed, neighborhoodCoords);
-            } else {
-              onChange(q, undefined, parsed || null);
-            }
-          }
-        } catch (e) {
-          console.warn("Filter parse failed:", e);
         }
       } catch (error) {
         console.error("Search error:", error);
-        if (seq === searchSeqRef.current) {
-          setSearchResults([]);
-        }
+        if (seq === searchSeqRef.current) setItems([]);
       } finally {
-        if (seq === searchSeqRef.current) {
-          setIsSearching(false);
-        }
+        if (seq === searchSeqRef.current) setIsSearching(false);
       }
-    }, 300);
+    }, 250);
 
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, disabled]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (disabled) {
-      e.preventDefault(); // Prevent the change entirely
-      return;
-    }
-    const newValue = e.target.value;
+    if (disabled) return;
     hasUserInteracted.current = true;
     wasClosedIntentionally.current = false;
-    onChange(newValue);
-    if (!newValue.trim()) {
-      setSearchResults([]);
-      setShowDropdown(false);
-      setIsSearching(false);
-    }
+    onChange(e.target.value);
   };
 
-  const handleResultClick = (result: SearchResult) => {
-    if (disabled) return; // Prevent selection when disabled
-
-    // Cancel any pending blur timeout to prevent stale state issues
+  const handleResultClick = (item: DropdownItem) => {
+    if (disabled) return;
     cancelBlurClose();
 
-    if ("isNeighborhood" in result && result.isNeighborhood) {
-      // Handle neighborhood click - search for all businesses in that neighborhood
-      const neighborhoodName = result.name.replace(" - Search Neighborhood", "");
-
-      // Update the search input with just the neighborhood name
-      onChange(neighborhoodName);
-
-      // Trigger neighborhood search with coordinates
-      const filters = parseSearchFilters(neighborhoodName);
-      if (filters?.neighborhoodFilter) {
-        const neighborhoodCoords = {
-          lat: filters.neighborhoodFilter.center.lat,
-          lon: filters.neighborhoodFilter.center.lon,
-        };
-
-        committedQueryRef.current = neighborhoodName;
-        lastExecutedQuery.current = neighborhoodName;
-        lastFiltersRef.current = JSON.stringify(filters);
-        onChange(neighborhoodName, undefined, filters, neighborhoodCoords);
-      }
+    if ("isNeighborhood" in item) {
+      onChange(item.name);
+      onSubmit?.(item.name);
     } else {
-      // Handle business click
-      const business = result as EnhancedBusiness;
-
-      // Call the business select callback so parent can handle the selection
-      // Parent is responsible for updating the input value via state
-      if (onBusinessSelect) {
-        onBusinessSelect(business);
-      } else {
-        // Fallback: update input value if no onBusinessSelect handler
-        onChange(business.name);
-      }
-
-      // Save the clicked business location
+      const business = item as EnhancedBusiness;
+      if (onBusinessSelect) onBusinessSelect(business);
+      else onChange(business.name);
       if (onLocationSave && business.name) {
         const fullLocation = business.formatted_address || business.vicinity || business.name;
         onLocationSave(fullLocation, fullLocation);
       }
     }
 
-    wasClosedIntentionally.current = true; // Mark as intentionally closed
+    wasClosedIntentionally.current = true;
     setShowDropdown(false);
-    setSearchResults([]);
+    setItems([]);
   };
 
-  const performSearch = () => {
-    const trimmedValue = value.trim();
-
-    // Check if this is the same query we just executed
-    if (trimmedValue === lastExecutedQuery.current && trimmedValue.length >= 3) {
-      setShowDropdown(false);
-      return;
-    }
-
-    if (!trimmedValue) {
-      // Clear search - commit empty query to clear filters
-      if (committedQueryRef.current !== "") {
-        committedQueryRef.current = "";
-        lastFiltersRef.current = null;
-        lastExecutedQuery.current = "";
-        onChange(value, undefined, null);
-      }
-      return;
-    }
-
-    // Check for profanity in search terms
-    if (isProfane(trimmedValue)) {
-      console.log("❌ Profanity detected, blocking search");
-      return; // Just prevent search, don't clear input
-    }
-
-    // Commit the query and apply filters immediately (require 3+ characters for meaningful search)
-    if (trimmedValue.length >= 3 && committedQueryRef.current !== trimmedValue) {
-      committedQueryRef.current = trimmedValue;
-      lastExecutedQuery.current = trimmedValue;
-      const filters = parseSearchFilters(trimmedValue);
-
-      // Only proceed if filters have meaningful content
-      if (
-        filters &&
-        ((filters.textTerms && Array.isArray(filters.textTerms) && filters.textTerms.length > 0) ||
-          filters.salaryQuery ||
-          filters.roleFilter ||
-          filters.businessTypeFilter ||
-          filters.neighborhoodFilter)
-      ) {
-        const filtersKey = JSON.stringify(filters);
-        lastFiltersRef.current = filtersKey;
-        onChange(value, undefined, filters);
-      } else {
-        if (lastFiltersRef.current !== null) {
-          lastFiltersRef.current = null;
-          committedQueryRef.current = "";
-          lastExecutedQuery.current = "";
-          onChange(value, undefined, null);
-        }
-      }
-    } else if (trimmedValue.length < 3 && lastFiltersRef.current !== null) {
-      // Clear filters if search is too short
-      lastFiltersRef.current = null;
-      committedQueryRef.current = "";
-      lastExecutedQuery.current = "";
-      onChange(value, undefined, null);
-    }
+  const handleSubmit = () => {
+    const q = value.trim();
+    if (q && isProfane(q)) return;
+    onSubmit?.(q);
     setShowDropdown(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      performSearch();
-    }
   };
 
   const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    console.log("👋 Blur event", {
-      relatedTarget: e.relatedTarget,
-      isDropdownFocus: dropdownRef.current?.contains(e.relatedTarget as Node),
-    });
-
-    // Don't close if focusing within the dropdown
-    if (dropdownRef.current && e.relatedTarget && dropdownRef.current.contains(e.relatedTarget as Node)) {
-      console.log("⏸️ Blur ignored - focusing dropdown");
-      return;
-    }
-
-    // Delay closing to prevent premature closure during rapid typing.
-    // The close + wasClosedIntentionally + onBlur side-effects run inside the
-    // hook's onBlurClose callback.
+    if (dropdownRef.current && e.relatedTarget && dropdownRef.current.contains(e.relatedTarget as Node)) return;
     scheduleBlurClose();
   };
 
-  // Helper function to get display address for a business
-  const getBusinessAddress = (business: EnhancedBusiness): string | null => {
-    // Only check for address property (the one that exists in Business type)
-    return business.address || null;
-  };
-
-  // Check if parent is passing app-input class (used in InitiationPage)
   const isAppInputStyle = className.includes("app-input");
-
   const baseInputClasses =
     variant === "search-bar"
       ? "search-bar pr-12"
       : isAppInputStyle
-        ? "" // Don't add base classes if app-input is specified
+        ? ""
         : "w-full px-3 py-2 border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring";
+
+  const hasQuery = value.trim().length >= MIN_QUERY_LENGTH;
 
   return (
     <div className="relative">
@@ -428,37 +219,27 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
           ref={inputRef}
           type="text"
           value={value}
-          onChange={(e) => handleInputChange(e)}
+          onChange={handleInputChange}
           onBlur={handleInputBlur}
-          onKeyDown={handleKeyDown}
+          onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
           onFocus={() => {
-            if (disabled) return; // Prevent focus interaction when disabled
-            // Cancel any pending blur closure
+            if (disabled) return;
             cancelBlurClose();
             hasUserInteracted.current = true;
             wasClosedIntentionally.current = false;
-            const trimmedValue = value.trim();
-            // Show dropdown if we have a value and either:
-            // 1. We have current search results to display
-            // 2. We have cached results for this value
-            // 3. We're currently searching
-            if (
-              trimmedValue.length > 2 &&
-              (searchResults.length > 0 || resultsCache.current.has(trimmedValue) || isSearching)
-            ) {
-              setShowDropdown(true);
-            }
-            // Call parent onFocus handler
+            if (hasQuery && (items.length > 0 || resultsCache.current.has(value.trim()) || isSearching)) setShowDropdown(true);
             onFocus?.();
           }}
           placeholder={placeholder}
           className={`${baseInputClasses} ${className}`}
           disabled={disabled}
           readOnly={disabled}
+          aria-label={placeholder}
         />
         {showIcon && variant === "search-bar" && (
           <button
-            onClick={performSearch}
+            onClick={handleSubmit}
+            aria-label="Search"
             className="absolute right-3 top-1/2 transform -translate-y-1/2 text-app-gray-medium hover:text-app-gray-dark transition-colors"
           >
             <Search size={18} />
@@ -466,11 +247,8 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
         )}
       </div>
 
-      {/* Search Results Dropdown */}
-      {!disabled && showDropdown && (searchResults.length > 0 || isSearching || value.trim()) && (
-        <div
-          className={`absolute ${variant === "search-bar" ? "bottom-full mb-2" : "top-full mt-1"} left-0 right-0 z-[9999]`}
-        >
+      {!disabled && showDropdown && hasQuery && (
+        <div className={`absolute ${variant === "search-bar" ? "bottom-full mb-2" : "top-full mt-1"} left-0 right-0 z-[9999]`}>
           <div
             ref={dropdownRef}
             className="bg-card shadow-xl border border-border max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
@@ -482,49 +260,35 @@ const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
               }, 200);
             }}
           >
-            {isSearching ? (
+            {isSearching && items.length === 0 ? (
               <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">Searching...</div>
-            ) : searchResults.length === 0 ? (
-              <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
-                No relevant businesses found
-              </div>
+            ) : items.length === 0 ? (
+              <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">No relevant businesses found</div>
             ) : (
               <div className="p-3">
-                {searchResults.map((result, index) => (
-                  <div key={result.id}>
-                    <div
-                      className="cursor-pointer py-1.5 px-0 rounded transition-colors hover:bg-accent/20"
-                      onClick={() => handleResultClick(result)}
-                    >
-                      {"isNeighborhood" in result && result.isNeighborhood ? (
-                        // Neighborhood result
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium">{result.name}</span>
-                          <span className="text-xs opacity-70">{result.borough}</span>
+                {items.map((item) => (
+                  <div key={item.id} className="cursor-pointer py-1.5 px-0 rounded transition-colors hover:bg-accent/20" onClick={() => handleResultClick(item)}>
+                    {"isNeighborhood" in item ? (
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">{item.name}</span>
+                        <span className="text-xs opacity-70">{item.borough} · all businesses</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col">
+                        <div className="flex justify-between items-center gap-2">
+                          <span className="font-medium truncate">{item.name}</span>
+                          <span className="text-sm opacity-70 whitespace-nowrap">
+                            {item.businessType === "Other" ? "" : item.businessType || "Business"}
+                          </span>
                         </div>
-                      ) : (
-                        // Business result
-                        <div className="flex flex-col">
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">{(result as EnhancedBusiness).name}</span>
-                            <span className="text-sm opacity-70">
-                              {(result as EnhancedBusiness).businessType === "Other"
-                                ? ""
-                                : (result as EnhancedBusiness).businessType || "Business"}
-                            </span>
-                          </div>
-                          {/* Show address if available */}
-                          {getBusinessAddress(result as EnhancedBusiness) && (
-                            <span className="text-xs text-muted-foreground truncate mt-0.5">
-                              {getBusinessAddress(result as EnhancedBusiness)}
-                            </span>
+                        <div className="flex justify-between items-center gap-2">
+                          {item.address && <span className="text-xs text-muted-foreground truncate mt-0.5">{item.address}</span>}
+                          {reasonLabel(item.matchReasons) && (
+                            <span className="text-xs text-muted-foreground whitespace-nowrap mt-0.5">{reasonLabel(item.matchReasons)}</span>
                           )}
                         </div>
-                      )}
-                    </div>
-
-                    {/* Divider between results */}
-                    {index < searchResults.length - 1 && <div className="h-px bg-border/30 my-1.5"></div>}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

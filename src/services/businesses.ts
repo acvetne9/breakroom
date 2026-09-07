@@ -124,7 +124,12 @@ export async function getFullBusinessDetailsCached(businessId: string): Promise<
 }
 
 /** Add a role/salary pair to an existing business if it isn't already listed. */
-export async function createOrUpdateBusinessRole(businessLocation: string, role: string, salary: string): Promise<void> {
+export async function createOrUpdateBusinessRole(
+  businessLocation: string,
+  role: string,
+  salary: string,
+  payPeriod: string = "HR",
+): Promise<void> {
   const { data: existingBusiness, error: findError } = await supabase
     .from("businesses")
     .select("id")
@@ -147,7 +152,7 @@ export async function createOrUpdateBusinessRole(businessLocation: string, role:
 
   const { error: createRoleError } = await supabase
     .from("business_roles")
-    .insert({ business_id: existingBusiness.id, role, salary, votes_total: 0 });
+    .insert({ business_id: existingBusiness.id, role, salary, pay_period: payPeriod, votes_total: 0 });
   if (createRoleError) throw createRoleError;
 
   // The cached copy is now stale.

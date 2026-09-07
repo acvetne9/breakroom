@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useConnection } from '@/contexts/ConnectionContext';
-import { clearSearchCache } from '@/services/unifiedSearch';
+import { clearSearchCache } from '@/services/search';
 
 /**
  * Hook to automatically handle cache invalidation and data refresh on reconnection.

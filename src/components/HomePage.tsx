@@ -5,8 +5,7 @@ import BusinessDetails from "./BusinessDetails";
 import WorkaroundLoading from "./WorkaroundLoading";
 import UnifiedBusinessSearch from "./UnifiedBusinessSearch";
 import { EnhancedBusiness } from "@/types/search";
-import { parseSearchFilters, type SearchFilters } from "@/services/businessFiltering";
-import { clearSearchCache, expandFilterTerms } from "@/services/unifiedSearch";
+import { parseSearchQuery, clearSearchCache, type SearchFilters } from "@/services/search";
 import type { Business } from "@/types/business";
 import type { Post } from "@/services/posts";
 
@@ -86,30 +85,11 @@ const HomePage: React.FC<HomePageProps> = ({
     return () => clearTimeout(timer);
   }, [searchValue]);
 
-  // Parse the query into map filters, then widen role terms with the same synonym
-  // expansion the dropdown uses so the map and dropdown agree.
+  // Parse the committed query into map filters; the same parser feeds the dropdown.
   useEffect(() => {
-    if (!debouncedSearchValue.trim()) {
-      setSearchFilters(null);
-      return;
-    }
-
-    const base = parseSearchFilters(debouncedSearchValue);
-    if (!base) {
-      setSearchFilters(null);
-      return;
-    }
-
-    if (base.neighborhoodFilter?.center) setNeighborhoodCenter(base.neighborhoodFilter.center);
-
-    let cancelled = false;
-    expandFilterTerms(base)
-      .then((expanded) => !cancelled && setSearchFilters(expanded))
-      .catch(() => !cancelled && setSearchFilters(base));
-
-    return () => {
-      cancelled = true;
-    };
+    const parsed = parseSearchQuery(debouncedSearchValue);
+    setSearchFilters(parsed);
+    if (parsed?.neighborhood) setNeighborhoodCenter(parsed.neighborhood.center);
   }, [debouncedSearchValue]);
 
   useEffect(() => {
@@ -126,10 +106,17 @@ const HomePage: React.FC<HomePageProps> = ({
   }, [showLoadingOverlay, currentView]);
 
   const handleSearchChange = useCallback((value: string) => {
-    if (value.trim()) clearSearchCache();
     setSearchValue(value);
     setSearchCompleted(!!value.trim());
     if (!value.trim()) setNeighborhoodCenter(null);
+  }, []);
+
+  /** Enter or a neighborhood pick: apply immediately instead of waiting for the debounce. */
+  const handleSearchSubmit = useCallback((value: string) => {
+    clearSearchCache();
+    setSearchValue(value);
+    setDebouncedSearchValue(value);
+    setSearchCompleted(!!value.trim());
   }, []);
 
   const handleBusinessClick = useCallback(
@@ -229,6 +216,7 @@ const HomePage: React.FC<HomePageProps> = ({
                 <UnifiedBusinessSearch
                   value={searchValue}
                   onChange={handleSearchChange}
+                  onSubmit={handleSearchSubmit}
                   onBusinessSelect={handleSearchBusinessSelect}
                   placeholder="Find that next gig!"
                   variant="search-bar"

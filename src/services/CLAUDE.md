@@ -6,6 +6,6 @@ Every Supabase call lives here. Functions return plain data or `{ data, error }`
 - `businesses.ts` — viewport RPC, `getFullBusinessDetails`, and the app-wide details cache (`getFullBusinessDetailsCached`, `setCachedBusiness`). `createOrUpdateBusinessRole` adds a role/salary row when a user records a job.
 - `voting.ts` — `persistVote` for `votes` and `role_votes` (upsert or delete).
 - `currentJobs.ts`, `pastJobs.ts`, `businessLookup.ts` — job history keyed by `profile_id` = device id.
-- `unifiedSearch.ts`, `businessFiltering.ts` — search parsing and the trigram/PostGIS search RPC. Still carries `any` types; the largest remaining cleanup target.
+- `search.ts` — the whole search feature: `parseSearchQuery` (pay range, neighborhood by phrase or alias, stop words, punctuation) and `searchBusinesses`, which calls the `search_businesses` Postgres function. Results carry a `score` and `matchReasons` (name, role, type, address, similar name, neighborhood, pay). Cached 30 s per (filters, bounds, limit).
 
 The `x-device-id` header is added automatically by the client wrapper; never pass the device id as a query filter for security, only for convenience.
