@@ -1,61 +1,37 @@
 import { supabase } from "@/integrations/supabase/client";
-import { executeQuery, createCacheKey, queryCache } from "@/utils/databaseOptimizations";
 import { retryWithBackoff, isRetryableError } from "@/utils/retryWithBackoff";
+import { getDeviceId } from "@/utils/deviceId";
 
-// Cache for user profile to avoid race conditions
-let cachedProfileId: string | null = null;
-let profilePromise: Promise<{ profileId: string; wasCreated: boolean }> | null = null;
+/** The profile row for the system-authored seed posts. Never deletable. */
+export const SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000000";
 
-// Global flag to ensure single initialization across the app
-let isInitializing = false;
+/** The current user's profile id is the device id. */
+export const getUserProfile = async (): Promise<{ profileId: string }> => ({ profileId: getDeviceId() });
 
-// Clear cached profile data (useful when device context changes)
-export const clearProfileCache = () => {
-  console.log("🧹 Clearing profile cache");
-  cachedProfileId = null;
-  profilePromise = null;
-};
-
-export const getUserProfile = async (): Promise<{ profileId: string }> => {
-  if (cachedProfileId) {
-    return { profileId: cachedProfileId };
-  }
-
-  // Just get deviceId - that's the profile ID
-  const deviceId = localStorage.getItem("device_id");
-
-  if (!deviceId) {
-    throw new Error("Device ID not found");
-  }
-
-  cachedProfileId = deviceId;
-  return { profileId: deviceId };
-};
-
-// Retrieve authenticated user ID or temporary ID for backwards compatibility
-const getUserId = async (): Promise<string> => {
-  const { profileId } = await getUserProfile();
-  return profileId;
-};
-
+/** Raw `posts` row plus the flattened business join. */
 export interface PostData {
   id: string;
   content: string;
   post_type: string;
-  job_role?: string;
-  time_period?: string;
-  salary?: number;
-  business_id?: string;
+  job_role?: string | null;
+  time_period?: string | null;
+  salary?: number | null;
+  business_id?: string | null;
   user_id: string;
   votes_total: number;
   created_at: string;
-  is_comment?: string;
+  /** When set, this row is a comment on the post with that id. */
+  is_comment?: string | null;
   is_deleted?: boolean;
+  business_name?: string | null;
+  business_lat?: number | null;
+  business_lng?: number | null;
 }
 
+/** Post shape used by the UI. Single source of truth for every component. */
 export interface Post {
   id: string;
-  author: string;
+  author: "You" | "Other" | "System";
   text: string;
   businessId?: string;
   businessName?: string;
@@ -69,120 +45,111 @@ export interface Post {
   userVote?: "up" | "down" | null;
   createdAt: Date;
   timestamp?: string;
+  /** Parent post id when this post is a comment. */
   isComment?: string;
   userId?: string;
 }
 
-// Transform database post to frontend post format (no businesses array needed - data is flattened)
-export const transformPost = async (
-  dbPost: PostData,
-  _businesses: any[] = [],
-  currentUserId?: string,
-): Promise<Post> => {
-  // Use provided currentUserId or get it once
-  const userId = currentUserId || (await getUserId());
-  const isOwnPost = dbPost.user_id === userId;
+const POST_SELECT = `
+  id,
+  content,
+  post_type,
+  business_id,
+  user_id,
+  votes_total,
+  created_at,
+  is_comment,
+  is_deleted,
+  businesses(id, name, lat, lng)
+`;
 
-  // Extract coordinates from flattened data (already joined in getPosts query)
-  const businessLat = (dbPost as any).business_lat;
-  const businessLng = (dbPost as any).business_lng;
+type RawPostRow = Omit<PostData, "business_name" | "business_lat" | "business_lng"> & {
+  businesses?: { id: string; name: string; lat: number; lng: number } | null;
+};
 
+const flattenBusiness = (row: RawPostRow): PostData => {
+  const { businesses, ...rest } = row;
   return {
-    id: dbPost.id,
-    author: isOwnPost ? "You" : "Other",
-    text: dbPost.content,
-    businessId: dbPost.business_id,
-    businessName: (dbPost as any).business_name,
-    businessLat,
-    businessLng,
-    isStory: dbPost.post_type === "story",
-    isJobUpdate: dbPost.post_type === "job_update",
-    linkedLocation: (dbPost as any).business_name,
-    votesTotal: dbPost.votes_total || 0,
-    userVote: null, // Will be determined by votes table
-    createdAt: new Date(dbPost.created_at),
-    timestamp: dbPost.created_at,
-    isComment: dbPost.is_comment,
-    userId: dbPost.user_id,
+    ...rest,
+    business_lat: businesses?.lat ?? null,
+    business_lng: businesses?.lng ?? null,
+    business_name: businesses?.name ?? null,
   };
 };
 
-// Get posts with pagination (excludes soft-deleted posts)
+export const transformPost = (dbPost: PostData, currentUserId: string = getDeviceId()): Post => ({
+  id: dbPost.id,
+  author: dbPost.user_id === SYSTEM_USER_ID ? "System" : dbPost.user_id === currentUserId ? "You" : "Other",
+  text: dbPost.content,
+  businessId: dbPost.business_id ?? undefined,
+  businessName: dbPost.business_name ?? undefined,
+  businessLat: dbPost.business_lat ?? undefined,
+  businessLng: dbPost.business_lng ?? undefined,
+  isStory: dbPost.post_type === "story",
+  isJobUpdate: dbPost.post_type === "job_update",
+  linkedLocation: dbPost.business_name ?? undefined,
+  votesTotal: dbPost.votes_total || 0,
+  userVote: null,
+  createdAt: new Date(dbPost.created_at),
+  timestamp: dbPost.created_at,
+  isComment: dbPost.is_comment ?? undefined,
+  userId: dbPost.user_id,
+});
+
+/**
+ * One page of top-level posts (comments excluded), newest first.
+ * Comments are loaded separately with `getCommentsForPosts` so a post's thread
+ * is complete regardless of how old the comments are.
+ */
 export const getPosts = async (
-  limit: number = 1000,
+  limit: number,
   offset: number = 0,
-): Promise<{ data: PostData[] | null; error: any }> => {
-  console.log(`🔍 getPosts - fetching ${limit} posts with coordinates...`);
-
-  // Use optimized query with caching
-  const cacheKey = createCacheKey('posts', { limit, offset });
-
-  return executeQuery(
-    'getPosts',
-    async () => {
-      const { data, error } = await retryWithBackoff(
-        () => supabase
-          .from("posts")
-          .select(
-            `
-            id,
-            content,
-            post_type,
-            business_id,
-            user_id,
-            votes_total,
-            created_at,
-            is_comment,
-            is_deleted,
-            businesses(id, name, lat, lng)
-          `,
-          )
-          .eq('is_deleted', false)
-          .order("created_at", { ascending: false })
-          .range(offset, offset + limit - 1),
-        { shouldRetry: isRetryableError }
-      );
-
-      console.log("📊 RAW SUPABASE RESPONSE:", {
-        dataLength: data?.length || 0,
-        error,
-        firstPost: data?.[0],
-      });
-
-      if (error) {
-        console.error("❌ Error fetching posts:", error);
-        return { data: null, error };
-      }
-
-      // Transform data to flatten business coordinates (handle null businesses from left join)
-      const transformedData = data?.map((post: any) => ({
-        ...post,
-        business_lat: post.businesses?.lat || null,
-        business_lng: post.businesses?.lng || null,
-        business_name: post.businesses?.name || null,
-      }));
-
-      console.log(`✅ Fetched ${transformedData?.length || 0} posts with coordinates`);
-      console.log("🔍 TRANSFORMED DATA SAMPLE:", {
-        totalPosts: transformedData?.length,
-        firstThreePosts: transformedData?.slice(0, 3).map((p) => ({
-          id: p.id,
-          text: p.content?.substring(0, 30),
-          business_id: p.business_id,
-          business_name: p.business_name,
-          hasCoordinates: !!(p.business_lat && p.business_lng),
-        })),
-      });
-      return { data: transformedData as PostData[], error: null };
-    },
-    {
-      cacheKey,
-      cacheTTL: 30000, // Cache for 30 seconds
-    }
+): Promise<{ data: PostData[] | null; error: unknown }> => {
+  const { data, error } = await retryWithBackoff(
+    () =>
+      supabase
+        .from("posts")
+        .select(POST_SELECT)
+        .eq("is_deleted", false)
+        .is("is_comment", null)
+        .order("created_at", { ascending: false })
+        .range(offset, offset + limit - 1),
+    { shouldRetry: isRetryableError },
   );
+
+  if (error) return { data: null, error };
+  return { data: (data as unknown as RawPostRow[]).map(flattenBusiness), error: null };
 };
 
-// Create a new post
+/** All non-deleted comments whose parent is one of `postIds`. */
+export const getCommentsForPosts = async (postIds: string[]): Promise<PostData[]> => {
+  if (postIds.length === 0) return [];
+
+  const BATCH = 100;
+  const out: PostData[] = [];
+  for (let i = 0; i < postIds.length; i += BATCH) {
+    const { data, error } = await supabase
+      .from("posts")
+      .select(POST_SELECT)
+      .eq("is_deleted", false)
+      .in("is_comment", postIds.slice(i, i + BATCH))
+      .order("created_at", { ascending: true });
+    if (error) {
+      console.error("Error fetching comments:", error);
+      continue;
+    }
+    out.push(...(data as unknown as RawPostRow[]).map(flattenBusiness));
+  }
+  return out;
+};
+
+/** A single post by id (used when a realtime insert arrives). */
+export const getPostById = async (postId: string): Promise<PostData | null> => {
+  const { data, error } = await supabase.from("posts").select(POST_SELECT).eq("id", postId).maybeSingle();
+  if (error || !data) return null;
+  return flattenBusiness(data as unknown as RawPostRow);
+};
+
 export const createPost = async (
   content: string,
   postType: string,
@@ -191,182 +158,67 @@ export const createPost = async (
   timePeriod?: string,
   salary?: number,
   isComment?: string,
-): Promise<{ data: PostData | null; error: any }> => {
-  // Get authenticated or temp user ID
-  const userId = await getUserId();
-
+): Promise<{ data: PostData | null; error: unknown }> => {
   const { data, error } = await supabase
     .from("posts")
     .insert({
       content,
       post_type: postType,
-      user_id: userId,
+      user_id: getDeviceId(),
       business_id: businessId,
       job_role: jobRole,
       time_period: timePeriod,
       salary,
       is_comment: isComment,
-      created_at: new Date().toISOString(), // Explicitly set timestamp
     })
-    .select(
-      `
-      *,
-      businesses(id, name, lat, lng)
-    `,
-    )
+    .select(POST_SELECT)
     .single();
 
-  if (error) {
-    return { data: null, error };
-  }
-
-  // Flatten business data like in getPosts
-  const transformedData = {
-    ...data,
-    business_lat: data.businesses?.lat || null,
-    business_lng: data.businesses?.lng || null,
-    business_name: data.businesses?.name || null,
-  };
-
-  // Invalidate posts cache after creating a new post
-  queryCache.invalidatePattern('posts:');
-
-  return { data: transformedData as PostData, error: null };
+  if (error) return { data: null, error };
+  return { data: flattenBusiness(data as unknown as RawPostRow), error: null };
 };
 
-// Get user's votes for posts
+/** The current device's votes for the given posts. */
 export const getUserVotes = async (postIds: string[]): Promise<{ [postId: string]: "up" | "down" }> => {
-  if (postIds.length === 0) {
-    return {};
-  }
+  if (postIds.length === 0) return {};
 
-  // Use caching for user votes
-  const cacheKey = createCacheKey('user_votes', { postIds: postIds.sort() });
+  const BATCH = 100;
+  const allVotes: { [postId: string]: "up" | "down" } = {};
 
-  return executeQuery(
-    'getUserVotes',
-    async () => {
-      // Get device ID directly
-      const deviceId = localStorage.getItem("device_id");
-  
-  if (!deviceId) {
-    console.warn("No device ID found, cannot fetch user votes");
-    return {};
-  }
+  for (let i = 0; i < postIds.length; i += BATCH) {
+    const { data, error } = await supabase
+      .from("votes")
+      .select("post_id, vote_type")
+      .eq("user_id", getDeviceId())
+      .in("post_id", postIds.slice(i, i + BATCH));
 
-  console.log("🔍 Fetching votes for user:", deviceId, "for", postIds.length, "posts");
-
-  try {
-    // Batch requests in chunks of 100 to avoid URL length limits
-    const BATCH_SIZE = 100;
-    const allVotes: { [postId: string]: "up" | "down" } = {};
-
-    for (let i = 0; i < postIds.length; i += BATCH_SIZE) {
-      const batch = postIds.slice(i, i + BATCH_SIZE);
-      
-      const { data: votes, error } = await supabase
-        .from("votes")
-        .select("post_id, vote_type")
-        .eq("user_id", deviceId)
-        .in("post_id", batch);
-
-      if (error) {
-        console.error("❌ Error fetching user votes batch:", error);
-        continue; // Skip this batch but continue with others
-      }
-
-      if (votes) {
-        votes.forEach((vote) => {
-          allVotes[vote.post_id] = vote.vote_type === "upvote" ? "up" : "down";
-        });
-      }
+    if (error) {
+      console.error("Error fetching user votes:", error);
+      continue;
     }
-
-    console.log("✅ Fetched user votes:", Object.keys(allVotes).length, "votes");
-    return allVotes;
-  } catch (error) {
-    console.error("❌ Exception fetching user votes:", error);
-    return {};
-  }
-    },
-    {
-      cacheKey,
-      cacheTTL: 60000, // Cache for 1 minute
+    for (const vote of data ?? []) {
+      allVotes[vote.post_id] = vote.vote_type === "upvote" ? "up" : "down";
     }
-  );
+  }
+  return allVotes;
 };
 
-// Soft delete a post (marks as deleted)
-export const deletePost = async (postId: string): Promise<{ success: boolean; error?: any }> => {
-  // Get current user's profile ID
-  const { profileId: currentProfileId } = await getUserProfile();
-
-  // Get the post to check ownership
-  const { data: post, error: fetchError } = await supabase
-    .from("posts")
-    .select("user_id, is_deleted")
-    .eq("id", postId)
-    .maybeSingle();
-
-  if (fetchError) {
-    return { success: false, error: fetchError };
-  }
-
-  if (!post) {
-    return { success: false, error: "Post not found" };
-  }
-
-  // Prevent deletion of default posts (system posts)
-  if (post.user_id === "00000000-0000-0000-0000-000000000000") {
-    return { success: false, error: "Default posts cannot be deleted" };
-  }
-
-  // Check if user owns the post by comparing profile IDs
-  if (post.user_id !== currentProfileId) {
-    return { success: false, error: "Not authorized to delete this post" };
-  }
-
-  // Soft delete: mark as deleted
-  const { error } = await supabase
-    .from("posts")
-    .update({ is_deleted: true })
-    .eq("id", postId);
-
-  return { success: !error, error };
-};
-
-// Hard delete a post (permanently removes from database)
-export const hardDeletePost = async (postId: string): Promise<{ success: boolean; error?: any }> => {
-  // Get current user's profile ID
-  const { profileId: currentProfileId } = await getUserProfile();
-
-  // Get the post to check ownership
+/**
+ * Soft delete. Row-level security only lets the author's device update the
+ * row; the local check just gives a clearer message than a silent no-op.
+ */
+export const deletePost = async (postId: string): Promise<{ success: boolean; error?: unknown }> => {
   const { data: post, error: fetchError } = await supabase
     .from("posts")
     .select("user_id")
     .eq("id", postId)
     .maybeSingle();
 
-  if (fetchError) {
-    return { success: false, error: fetchError };
-  }
+  if (fetchError) return { success: false, error: fetchError };
+  if (!post) return { success: false, error: "Post not found" };
+  if (post.user_id === SYSTEM_USER_ID) return { success: false, error: "Default posts cannot be deleted" };
+  if (post.user_id !== getDeviceId()) return { success: false, error: "Not authorized to delete this post" };
 
-  if (!post) {
-    return { success: false, error: "Post not found" };
-  }
-
-  // Prevent deletion of default posts (system posts)
-  if (post.user_id === "00000000-0000-0000-0000-000000000000") {
-    return { success: false, error: "Default posts cannot be deleted" };
-  }
-
-  // Check if user owns the post by comparing profile IDs
-  if (post.user_id !== currentProfileId) {
-    return { success: false, error: "Not authorized to delete this post" };
-  }
-
-  // Hard delete: permanently remove from database
-  const { error } = await supabase.from("posts").delete().eq("id", postId);
-
+  const { error } = await supabase.from("posts").update({ is_deleted: true }).eq("id", postId);
   return { success: !error, error };
 };

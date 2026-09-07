@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
+import type { EnhancedBusiness } from '@/types/search';
 import { BusinessAddressField, RoleField, SalaryTimePeriodRow } from './JobEntryForm';
 import { isProfane } from '@/utils/profanityFilter';
 import { useDevice } from "@/contexts/DeviceContext";
@@ -30,7 +31,7 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
   const [showAddressInput, setShowAddressInput] = useState(false);
   const [manualAddress, setManualAddress] = useState('');
   const [addressError, setAddressError] = useState('');
-  const [isManualAddress, setIsManualAddress] = useState(false);
+  const [, setIsManualAddress] = useState(false);
   const [businessInput, setBusinessInput] = useState('');
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null);
 
@@ -135,8 +136,8 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
     }
   };
 
-  const handleBusinessSelect = (business: any) => {
-    const locationValue = business.name || business.location || '';
+  const handleBusinessSelect = (business: EnhancedBusiness) => {
+    const locationValue = business.name || '';
     setBusinessSelected(true);
     businessSelectedRef.current = true;
     selectedBusinessNameRef.current = locationValue; // Track selected name to prevent reset

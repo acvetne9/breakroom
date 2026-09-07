@@ -1,291 +1,191 @@
-import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '@/integrations/supabase/client'
+import { useState, useCallback } from "react";
+
+/**
+ * On-device translation via the browser's built-in Translator / LanguageDetector
+ * APIs (Chromium 138+). Free, unlimited, and nothing leaves the device. Where the
+ * APIs are missing (Safari, Firefox, older WebViews) text is shown untranslated.
+ *
+ * Results are cached in localStorage so a post is translated once per device.
+ */
+
+// Minimal typings for the built-in AI translation APIs.
+interface BuiltInTranslator {
+  translate(text: string): Promise<string>;
+}
+interface BuiltInLanguageDetector {
+  detect(text: string): Promise<Array<{ detectedLanguage: string; confidence: number }>>;
+}
+type Availability = "unavailable" | "downloadable" | "downloading" | "available";
+interface TranslatorStatic {
+  availability(opts: { sourceLanguage: string; targetLanguage: string }): Promise<Availability>;
+  create(opts: { sourceLanguage: string; targetLanguage: string }): Promise<BuiltInTranslator>;
+}
+interface LanguageDetectorStatic {
+  availability(): Promise<Availability>;
+  create(): Promise<BuiltInLanguageDetector>;
+}
+declare global {
+  // eslint-disable-next-line no-var
+  var Translator: TranslatorStatic | undefined;
+  // eslint-disable-next-line no-var
+  var LanguageDetector: LanguageDetectorStatic | undefined;
+}
 
 interface TranslationCache {
-  [key: string]: {
-    translatedText: string
-    sourceLanguage: string
-    targetLanguage: string
-    timestamp: number
-  }
+  [key: string]: { translatedText: string; sourceLanguage: string; targetLanguage: string; timestamp: number };
 }
 
-interface TranslationResult {
-  translatedText: string
-  sourceLanguage: string
-  targetLanguage: string
-  isTranslated: boolean
+export interface TranslationResult {
+  translatedText: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+  isTranslated: boolean;
 }
 
-// Global persistent cache in localStorage
-const CACHE_KEY = 'translation_cache_v1'
-const CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000 // 7 days
+const CACHE_KEY = "translation_cache_v2";
+const CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+const MIN_DETECT_CONFIDENCE = 0.5;
 
 const loadCache = (): TranslationCache => {
   try {
-    const cached = localStorage.getItem(CACHE_KEY)
-    if (cached) {
-      const parsed = JSON.parse(cached) as TranslationCache
-      // Clean old entries
-      const now = Date.now()
-      const cleaned: TranslationCache = {}
-      let cleanedCount = 0
-      for (const [key, value] of Object.entries(parsed)) {
-        if (now - value.timestamp < CACHE_MAX_AGE) {
-          cleaned[key] = value
-        } else {
-          cleanedCount++
-        }
-      }
-      if (cleanedCount > 0) {
-        localStorage.setItem(CACHE_KEY, JSON.stringify(cleaned))
-      }
-      return cleaned
+    const parsed = JSON.parse(localStorage.getItem(CACHE_KEY) ?? "{}") as TranslationCache;
+    const now = Date.now();
+    const fresh: TranslationCache = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (now - value.timestamp < CACHE_MAX_AGE) fresh[key] = value;
     }
-  } catch (error) {
-    console.warn('Failed to load translation cache:', error)
+    return fresh;
+  } catch {
+    return {};
   }
-  return {}
-}
+};
 
-// Single module-level cache, parsed from localStorage ONCE at module load.
-// Shared across every hook instance / TranslatedText component so no component
-// re-parses or holds its own copy.
-const translationCache: TranslationCache = loadCache()
-
-// Debounced/batched flush to localStorage so we don't stringify the whole
-// (growing) cache synchronously on every completed translation.
-const FLUSH_DELAY = 1000 // ms
-let flushTimer: ReturnType<typeof setTimeout> | null = null
-
-const flushCache = () => {
-  flushTimer = null
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(translationCache))
-  } catch (error) {
-    console.warn('Failed to save translation cache:', error)
-  }
-}
-
+const translationCache: TranslationCache = loadCache();
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
 const scheduleFlush = () => {
-  if (flushTimer !== null) return
-  flushTimer = setTimeout(flushCache, FLUSH_DELAY)
-}
-
-// Rate limiting: max 5 requests per second
-class RateLimiter {
-  private queue: Array<() => void> = []
-  private activeRequests = 0
-  private readonly maxConcurrent = 3
-  private readonly delayBetweenBatches = 200 // ms
-
-  async execute<T>(fn: () => Promise<T>): Promise<T> {
-    return new Promise((resolve, reject) => {
-      this.queue.push(async () => {
-        try {
-          const result = await fn()
-          resolve(result)
-        } catch (error) {
-          reject(error)
-        }
-      })
-      this.processQueue()
-    })
-  }
-
-  private async processQueue() {
-    if (this.activeRequests >= this.maxConcurrent || this.queue.length === 0) {
-      return
+  if (flushTimer !== null) return;
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(translationCache));
+    } catch {
+      /* storage full or disabled */
     }
+  }, 1000);
+};
 
-    const task = this.queue.shift()
-    if (!task) return
+export const isBuiltInTranslationSupported = () => typeof globalThis.Translator !== "undefined";
 
-    this.activeRequests++
-    await task()
-    this.activeRequests--
+// One translator instance per language pair, created lazily.
+const translators = new Map<string, Promise<BuiltInTranslator | null>>();
+let detectorPromise: Promise<BuiltInLanguageDetector | null> | null = null;
 
-    setTimeout(() => this.processQueue(), this.delayBetweenBatches / this.maxConcurrent)
+const getDetector = () => {
+  if (!detectorPromise) {
+    detectorPromise = (async () => {
+      try {
+        if (!globalThis.LanguageDetector) return null;
+        if ((await globalThis.LanguageDetector.availability()) === "unavailable") return null;
+        return await globalThis.LanguageDetector.create();
+      } catch {
+        return null;
+      }
+    })();
   }
-}
+  return detectorPromise;
+};
 
-const rateLimiter = new RateLimiter()
+const getTranslator = (sourceLanguage: string, targetLanguage: string) => {
+  const key = `${sourceLanguage}>${targetLanguage}`;
+  let p = translators.get(key);
+  if (!p) {
+    p = (async () => {
+      try {
+        if (!globalThis.Translator) return null;
+        if ((await globalThis.Translator.availability({ sourceLanguage, targetLanguage })) === "unavailable") return null;
+        // May trigger a one-time model download; the browser handles it.
+        return await globalThis.Translator.create({ sourceLanguage, targetLanguage });
+      } catch {
+        return null;
+      }
+    })();
+    translators.set(key, p);
+  }
+  return p;
+};
 
-/**
- * Detects user's preferred language from browser/device settings
- * Checks multiple sources in order of preference
- */
 const detectUserLanguage = (): string => {
   try {
-    // 1. Check localStorage for user preference (highest priority)
-    const savedLanguage = localStorage.getItem('user_language_preference')
-    if (savedLanguage) {
-      return savedLanguage
-    }
-
-    // 2. Check navigator.languages (array of preferred languages)
-    if (navigator.languages && navigator.languages.length > 0) {
-      // Get first language and extract code (e.g., "en-US" -> "en")
-      return navigator.languages[0].split('-')[0].toLowerCase()
-    }
-
-    // 3. Check navigator.language (single language)
-    if (navigator.language) {
-      return navigator.language.split('-')[0].toLowerCase()
-    }
-
-    // 4. Fallback to English
-    return 'en'
-  } catch (error) {
-    console.warn('Error detecting user language:', error)
-    return 'en'
+    const saved = localStorage.getItem("user_language_preference");
+    if (saved) return saved;
+    return (navigator.languages?.[0] ?? navigator.language ?? "en").split("-")[0].toLowerCase();
+  } catch {
+    return "en";
   }
-}
+};
+
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: "English", es: "Spanish", fr: "French", de: "German", it: "Italian", pt: "Portuguese", ru: "Russian",
+  ja: "Japanese", ko: "Korean", zh: "Chinese", ar: "Arabic", hi: "Hindi", nl: "Dutch", sv: "Swedish", da: "Danish",
+  no: "Norwegian", fi: "Finnish", pl: "Polish", tr: "Turkish", he: "Hebrew", th: "Thai", vi: "Vietnamese",
+  id: "Indonesian", ms: "Malay", uk: "Ukrainian", cs: "Czech", sk: "Slovak", hu: "Hungarian", ro: "Romanian",
+  bg: "Bulgarian", hr: "Croatian", sr: "Serbian", sl: "Slovenian", et: "Estonian", lv: "Latvian", lt: "Lithuanian",
+};
 
 export function useTranslation() {
-  const [userLanguage, setUserLanguage] = useState<string>(() => detectUserLanguage())
+  const [userLanguage, setUserLanguage] = useState<string>(detectUserLanguage);
 
-  useEffect(() => {
-    // Re-detect language on mount (in case browser settings changed)
-    const detectedLanguage = detectUserLanguage()
-    if (detectedLanguage !== userLanguage) {
-      setUserLanguage(detectedLanguage)
-    }
-  }, [])
-
-  const translateText = useCallback(async (text: string, originalLanguage?: string): Promise<TranslationResult> => {
-    // Validate input
-    if (!text || text.trim().length === 0) {
-      return {
+  const translateText = useCallback(
+    async (text: string, originalLanguage?: string): Promise<TranslationResult> => {
+      const untranslated = (sourceLanguage: string): TranslationResult => ({
         translatedText: text,
-        sourceLanguage: originalLanguage || 'en',
+        sourceLanguage,
         targetLanguage: userLanguage,
-        isTranslated: false
+        isTranslated: false,
+      });
+
+      if (!text?.trim() || !isBuiltInTranslationSupported()) return untranslated(originalLanguage ?? "unknown");
+
+      const cacheKey = `${userLanguage}:${text.substring(0, 200)}`;
+      const cached = translationCache[cacheKey];
+      if (cached) {
+        return { ...cached, isTranslated: cached.sourceLanguage !== userLanguage };
       }
-    }
 
-    // If target language is English, skip translation (most content is in English)
-    if (userLanguage === 'en') {
-      return {
-        translatedText: text,
-        sourceLanguage: 'en',
-        targetLanguage: 'en',
-        isTranslated: false
-      }
-    }
-
-    // Create cache key
-    const cacheKey = `${text.substring(0, 100)}-${userLanguage}` // Limit key length
-
-    // Check shared module cache first
-    const cached = translationCache[cacheKey]
-    if (cached) {
-      return {
-        translatedText: cached.translatedText,
-        sourceLanguage: cached.sourceLanguage,
-        targetLanguage: cached.targetLanguage,
-        isTranslated: cached.sourceLanguage !== userLanguage
-      }
-    }
-
-    try {
-      // Use rate limiter to prevent overwhelming the server
-      const result = await rateLimiter.execute(async () => {
-        const { data, error } = await supabase.functions.invoke('translate', {
-          body: {
-            text,
-            targetLanguage: userLanguage
-          }
-        })
-
-        if (error) {
-          throw error
+      try {
+        let sourceLanguage = originalLanguage;
+        if (!sourceLanguage) {
+          const detector = await getDetector();
+          const best = detector ? (await detector.detect(text))[0] : undefined;
+          sourceLanguage = best && best.confidence >= MIN_DETECT_CONFIDENCE ? best.detectedLanguage : "en";
         }
+        if (sourceLanguage === userLanguage) return untranslated(sourceLanguage);
 
-        return data
-      })
+        const translator = await getTranslator(sourceLanguage, userLanguage);
+        if (!translator) return untranslated(sourceLanguage);
 
-      const translationResult = {
-        translatedText: result.translatedText,
-        sourceLanguage: result.sourceLanguage,
-        targetLanguage: result.targetLanguage,
-        isTranslated: result.sourceLanguage !== userLanguage
+        const translatedText = await translator.translate(text);
+        translationCache[cacheKey] = { translatedText, sourceLanguage, targetLanguage: userLanguage, timestamp: Date.now() };
+        scheduleFlush();
+        return { translatedText, sourceLanguage, targetLanguage: userLanguage, isTranslated: true };
+      } catch (error) {
+        console.warn("On-device translation failed:", error);
+        return untranslated(originalLanguage ?? "unknown");
       }
+    },
+    [userLanguage],
+  );
 
-      // Write into the shared module cache and schedule a debounced flush
-      // instead of stringifying the whole cache synchronously here.
-      translationCache[cacheKey] = {
-        translatedText: translationResult.translatedText,
-        sourceLanguage: translationResult.sourceLanguage,
-        targetLanguage: translationResult.targetLanguage,
-        timestamp: Date.now()
-      }
-      scheduleFlush()
+  const getLanguageName = (code: string): string => LANGUAGE_NAMES[code] || code.toUpperCase();
 
-      return translationResult
-    } catch (error) {
-      console.error('Translation service error:', error)
-      return {
-        translatedText: text,
-        sourceLanguage: originalLanguage || 'unknown',
-        targetLanguage: userLanguage,
-        isTranslated: false
-      }
-    }
-  }, [userLanguage])
-
-  const getLanguageName = (code: string): string => {
-    const languages: { [key: string]: string } = {
-      'en': 'English',
-      'es': 'Spanish',
-      'fr': 'French',
-      'de': 'German',
-      'it': 'Italian',
-      'pt': 'Portuguese',
-      'ru': 'Russian',
-      'ja': 'Japanese',
-      'ko': 'Korean',
-      'zh': 'Chinese',
-      'ar': 'Arabic',
-      'hi': 'Hindi',
-      'nl': 'Dutch',
-      'sv': 'Swedish',
-      'da': 'Danish',
-      'no': 'Norwegian',
-      'fi': 'Finnish',
-      'pl': 'Polish',
-      'tr': 'Turkish',
-      'he': 'Hebrew',
-      'th': 'Thai',
-      'vi': 'Vietnamese',
-      'id': 'Indonesian',
-      'ms': 'Malay',
-      'uk': 'Ukrainian',
-      'cs': 'Czech',
-      'sk': 'Slovak',
-      'hu': 'Hungarian',
-      'ro': 'Romanian',
-      'bg': 'Bulgarian',
-      'hr': 'Croatian',
-      'sr': 'Serbian',
-      'sl': 'Slovenian',
-      'et': 'Estonian',
-      'lv': 'Latvian',
-      'lt': 'Lithuanian'
-    }
-    return languages[code] || code.toUpperCase()
-  }
-
-  // Enhanced setUserLanguage that persists to localStorage
   const setUserLanguagePreference = useCallback((languageCode: string) => {
-    setUserLanguage(languageCode)
-    localStorage.setItem('user_language_preference', languageCode)
-  }, [])
+    setUserLanguage(languageCode);
+    try {
+      localStorage.setItem("user_language_preference", languageCode);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
-  return {
-    userLanguage,
-    setUserLanguage: setUserLanguagePreference,
-    translateText,
-    getLanguageName
-  }
+  return { userLanguage, setUserLanguage: setUserLanguagePreference, translateText, getLanguageName };
 }

@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
 import { sanitizeVoteTotal } from '@/utils/voteCalculations';
 
 interface VotingComponentProps {

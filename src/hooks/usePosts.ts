@@ -1,340 +1,243 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { getPosts, createPost, deletePost, getUserVotes, transformPost, getUserProfile, Post, PostData } from '@/services/posts';
-import { supabase } from '@/integrations/supabase/client';
-import { useSessionCache } from './useSessionCache';
-import { useReconnectionHandler } from './useReconnectionHandler';
+import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  getPosts,
+  getCommentsForPosts,
+  getPostById,
+  createPost,
+  deletePost,
+  getUserVotes,
+  transformPost,
+  Post,
+  PostData,
+} from "@/services/posts";
+import { supabase } from "@/integrations/supabase/client";
+import { useSessionCache } from "./useSessionCache";
+import { useReconnectionHandler } from "./useReconnectionHandler";
+import { applyOptimisticVote } from "./useOptimisticVote";
+import { persistVote } from "@/services/voting";
 
 const POSTS_PER_PAGE = 30;
 
+/**
+ * Feed state: top-level posts and their comments live in one array so filters
+ * can slice it either way. Comments are fetched for every loaded page, so a
+ * thread is always complete once its parent post is on screen.
+ */
 export const usePosts = () => {
-  // Use reusable cache hook
   const { cachedData: initialCachedPosts, saveToCache } = useSessionCache<Post[]>({
-    key: 'posts_cache',
-    version: '1.0',
-    deserialize: (data: any[]) => data.map((p: any) => ({
-      ...p,
-      createdAt: new Date(p.createdAt)
-    })),
+    key: "posts_cache",
+    version: "2.0",
+    deserialize: (data: Array<Post & { createdAt: string }>) =>
+      data.map((p) => ({ ...p, createdAt: new Date(p.createdAt) })),
   });
 
   const [posts, setPosts] = useState<Post[]>(initialCachedPosts || []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
-  const [offset, setOffset] = useState(0);
 
-  // Track if initial fetch has happened
-  const hasFetchedRef = useRef(false);
-  const isSubscribedRef = useRef(false);
-
-  // Keep a ref of the current offset so fetchPosts can stay stable
-  // (avoids re-registering the reconnect callback on every loadMore)
+  // Refs so the fetcher and the realtime handler never read stale state.
   const offsetRef = useRef(0);
+  const loadingRef = useRef(false);
+  const postsRef = useRef<Post[]>(posts);
+  postsRef.current = posts;
 
-  // Memoized fetch function
-  const fetchPosts = useCallback(async (isLoadMore: boolean = false) => {
-    // Prevent duplicate initial loads
-    if (!isLoadMore && hasFetchedRef.current) {
-      console.log('⏭️ Skipping duplicate initial fetch');
-      return;
+  const commitPosts = useCallback(
+    (updater: (prev: Post[]) => Post[]) => {
+      setPosts((prev) => {
+        const next = updater(prev);
+        saveToCache(next);
+        return next;
+      });
+    },
+    [saveToCache],
+  );
+
+  /** Fetch a page of posts plus their comments and the device's votes on all of them. */
+  const fetchPage = useCallback(async (offset: number): Promise<Post[] | null> => {
+    const { data: postsData, error: postsError } = await getPosts(POSTS_PER_PAGE, offset);
+    if (postsError || !postsData) {
+      console.error("Posts fetch error:", postsError);
+      return null;
     }
 
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const currentOffset = isLoadMore ? offsetRef.current : 0;
+    setHasMore(postsData.length === POSTS_PER_PAGE);
 
-      const { data: postsData, error: postsError } = await getPosts(POSTS_PER_PAGE, currentOffset);
-      
-      if (postsError) {
-        setError('Failed to fetch posts');
-        console.error('❌ Posts fetch error:', postsError);
-        return;
-      }
+    const comments = await getCommentsForPosts(postsData.map((p) => p.id));
+    const rows: PostData[] = [...postsData, ...comments];
+    const transformed = rows.map((row) => transformPost(row));
+    const userVotes = await getUserVotes(transformed.map((p) => p.id));
 
-      if (postsData) {
-        setHasMore(postsData.length === POSTS_PER_PAGE);
-
-        const { profileId: currentUserId } = await getUserProfile();
-
-        const transformedPosts = await Promise.all(
-          postsData.map(post => transformPost(post, [], currentUserId))
-        );
-        
-        const postIds = transformedPosts.map(p => p.id);
-        const userVotes = await getUserVotes(postIds);
-        
-        const postsWithVotes = transformedPosts.map(post => ({
-          ...post,
-          userVote: userVotes[post.id] || null
-        }));
-        
-        if (isLoadMore) {
-          setPosts(prevPosts => {
-            const updatedPosts = [...prevPosts, ...postsWithVotes];
-            saveToCache(updatedPosts);
-            console.log(`✅ Loaded ${postsWithVotes.length} more posts. Total: ${updatedPosts.length}`);
-            return updatedPosts;
-          });
-          offsetRef.current = currentOffset + POSTS_PER_PAGE;
-          setOffset(offsetRef.current);
-        } else {
-          setPosts(postsWithVotes);
-          saveToCache(postsWithVotes);
-          offsetRef.current = POSTS_PER_PAGE;
-          setOffset(POSTS_PER_PAGE);
-          console.log(`✅ Loaded ${postsWithVotes.length} posts (initial)`);
-          hasFetchedRef.current = true;
-        }
-      }
-    } catch (err) {
-      setError('Failed to load posts');
-      console.error('❌ Posts loading error:', err);
-    } finally {
-      setLoading(false);
-    }
+    return transformed.map((post) => ({ ...post, userVote: userVotes[post.id] || null }));
   }, []);
+
+  const fetchPosts = useCallback(
+    async (isLoadMore = false) => {
+      if (loadingRef.current) return;
+      loadingRef.current = true;
+      setLoading(true);
+      setError(null);
+
+      try {
+        const offset = isLoadMore ? offsetRef.current : 0;
+        const page = await fetchPage(offset);
+        if (!page) {
+          setError("Failed to fetch posts");
+          return;
+        }
+
+        if (isLoadMore) {
+          commitPosts((prev) => {
+            const seen = new Set(prev.map((p) => p.id));
+            return [...prev, ...page.filter((p) => !seen.has(p.id))];
+          });
+        } else {
+          commitPosts(() => page);
+        }
+        offsetRef.current = offset + POSTS_PER_PAGE;
+      } catch (err) {
+        setError("Failed to load posts");
+        console.error("Posts loading error:", err);
+      } finally {
+        loadingRef.current = false;
+        setLoading(false);
+      }
+    },
+    [fetchPage, commitPosts],
+  );
 
   const loadMorePosts = useCallback(() => {
-    if (!loading && hasMore) {
-      fetchPosts(true);
-    }
-  }, [loading, hasMore, fetchPosts]);
+    if (!loadingRef.current && hasMore) fetchPosts(true);
+  }, [hasMore, fetchPosts]);
 
-  const submitPost = useCallback(async (
-    text: string,
-    businessId?: string,
-    isJobUpdate: boolean = false,
-    jobRole?: string,
-    timePeriod?: string,
-    salary?: number,
-    isComment?: string
-  ): Promise<boolean> => {
-    try {
-      const postType = 'story';
-      
-      const { data, error } = await createPost(
-        text,
-        postType,
-        businessId,
-        jobRole,
-        timePeriod,
-        salary,
-        isComment
-      );
-
-      if (error) {
-        console.error('Error creating post:', error);
-        return false;
-      }
-
-      if (data) {
-        const { profileId: currentUserId } = await getUserProfile();
-        const newPost = await transformPost(data, [], currentUserId);
-        
-        if (!(newPost.createdAt instanceof Date) || isNaN(newPost.createdAt.getTime())) {
-          console.error('⚠️ Post created without valid date:', newPost);
-          newPost.createdAt = new Date();
-        }
-        
-        setPosts(prevPosts => {
-          const updatedPosts = [newPost, ...prevPosts];
-          saveToCache(updatedPosts);
-          return updatedPosts;
-        });
-        
-        return true;
-      }
-    } catch (err) {
-      console.error('Post submission error:', err);
-    }
-    return false;
-  }, []);
-
-  const votePost = useCallback(async (postId: string, voteType: 'up' | 'down'): Promise<boolean> => {
-    const post = posts.find(p => p.id === postId);
-    if (!post) return false;
-
-    const { applyOptimisticVote } = await import('./useOptimisticVote');
-    const { persistVote } = await import('@/services/voting');
-
-    // Fire-and-forget: apply the optimistic update, persist in the background,
-    // and roll back on failure. We do not await so votePost stays responsive.
-    void applyOptimisticVote({
-      currentUserVote: post.userVote,
-      currentVotesTotal: post.votesTotal,
-      voteType,
-      apply: ({ newUserVote, newTotal }) => {
-        setPosts(prevPosts =>
-          prevPosts.map(p =>
-            p.id === postId
-              ? { ...p, votesTotal: newTotal, userVote: newUserVote }
-              : p
-          )
-        );
-      },
-      persist: async (newUserVote) => {
-        const dbVoteType = newUserVote === 'up' ? 'upvote' : newUserVote === 'down' ? 'downvote' : null;
-        // Preserve original semantics: the previous implementation used a
-        // `.catch()`, so it only rolled back on a rejected promise (persistVote
-        // resolves with { success } rather than rejecting). Await here so a
-        // genuine rejection propagates and triggers rollback, but treat a
-        // resolved value as success regardless of the `success` flag.
-        await persistVote('votes', 'post_id', postId, dbVoteType);
-        return true;
-      },
-    });
-
-    return true;
-  }, [posts]);
-
-  const removePost = useCallback(async (postId: string): Promise<boolean> => {
-    try {
-      const { success, error } = await deletePost(postId);
-
-      if (!success) {
-        console.error('Error deleting post:', error);
-        return false;
-      }
-
-      setPosts(prevPosts => {
-        const filtered = prevPosts.filter(post => post.id !== postId);
-        saveToCache(filtered);
-        return filtered;
-      });
-      
+  const submitPost = useCallback(
+    async (
+      text: string,
+      businessId?: string,
+      _isJobUpdate = false,
+      jobRole?: string,
+      timePeriod?: string,
+      salary?: number,
+      isComment?: string,
+    ): Promise<boolean> => {
       try {
-        const commentedPostIds = JSON.parse(localStorage.getItem('userCommentedPosts') || '[]');
-        const updatedIds = commentedPostIds.filter((id: string) => id !== postId);
-        localStorage.setItem('userCommentedPosts', JSON.stringify(updatedIds));
+        const { data, error } = await createPost(text, "story", businessId, jobRole, timePeriod, salary, isComment);
+        if (error || !data) {
+          console.error("Error creating post:", error);
+          return false;
+        }
+        const newPost = transformPost(data);
+        commitPosts((prev) => (prev.some((p) => p.id === newPost.id) ? prev : [newPost, ...prev]));
+        return true;
       } catch (err) {
-        console.warn('Failed to clean up commented posts tracking:', err);
+        console.error("Post submission error:", err);
+        return false;
       }
-      
+    },
+    [commitPosts],
+  );
+
+  const votePost = useCallback(
+    async (postId: string, voteType: "up" | "down"): Promise<boolean> => {
+      const post = postsRef.current.find((p) => p.id === postId);
+      if (!post) return false;
+
+      // Optimistic: apply now, persist in the background, roll back on failure.
+      void applyOptimisticVote({
+        currentUserVote: post.userVote ?? null,
+        currentVotesTotal: post.votesTotal,
+        voteType,
+        apply: ({ newUserVote, newTotal }) => {
+          setPosts((prev) =>
+            prev.map((p) => (p.id === postId ? { ...p, votesTotal: newTotal, userVote: newUserVote } : p)),
+          );
+        },
+        persist: async (newUserVote) => {
+          const dbVoteType = newUserVote === "up" ? "upvote" : newUserVote === "down" ? "downvote" : null;
+          const result = await persistVote("votes", "post_id", postId, dbVoteType);
+          return result.success;
+        },
+      });
+
       return true;
-    } catch (err) {
-      console.error('Delete error:', err);
-      return false;
-    }
-  }, []);
+    },
+    [],
+  );
 
-  // Single effect for initialization and subscription
-  useEffect(() => {
-    // Only run once
-    if (hasFetchedRef.current) {
-      console.log('⏭️ Skipping duplicate useEffect run');
-      return;
-    }
-
-    // Load from cache immediately if available
-    if (initialCachedPosts && initialCachedPosts.length > 0) {
-      console.log(`📦 Loaded ${initialCachedPosts.length} posts from cache`);
-      setLoading(false);
-    }
-    
-    // Fetch fresh data
-    fetchPosts(false);
-
-    // Subscribe to real-time changes only once
-    if (!isSubscribedRef.current) {
-      isSubscribedRef.current = true;
-      
-      const channel = supabase
-        .channel('posts-changes')
-        .on('postgres_changes', 
-          { event: 'INSERT', schema: 'public', table: 'posts' },
-          (payload) => {
-            console.log('📨 New post received via realtime');
-            // Only refetch if we're not already loading
-            if (!loading) {
-              offsetRef.current = 0;
-              setOffset(0);
-              hasFetchedRef.current = false; // Allow refetch
-              fetchPosts(false);
-            }
-          }
-        )
-        .on('postgres_changes', 
-          { event: 'UPDATE', schema: 'public', table: 'posts' },
-          (payload) => {
-            console.log('📝 Post updated via realtime');
-            const updatedPost = payload.new as PostData;
-            // If post was soft deleted, remove it from local state
-            if (updatedPost.is_deleted) {
-              setPosts(prev => {
-                const filtered = prev.filter(p => p.id !== updatedPost.id);
-                saveToCache(filtered);
-                console.log(`🗑️ Removed soft-deleted post ${updatedPost.id} from state`);
-                return filtered;
-              });
-            }
-          }
-        )
-        .on('postgres_changes', 
-          { event: 'DELETE', schema: 'public', table: 'posts' },
-          (payload) => {
-            console.log('🗑️ Post hard deleted via realtime');
-            const deletedPost = payload.old as PostData;
-            // Remove hard deleted post from local state
-            setPosts(prev => {
-              const filtered = prev.filter(p => p.id !== deletedPost.id);
-              saveToCache(filtered);
-              console.log(`🗑️ Removed hard-deleted post ${deletedPost.id} from state`);
-              return filtered;
-            });
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-        isSubscribedRef.current = false;
-      };
-    }
-  }, []); // Empty deps - run only once
-
-  const getBusinessPosts = useCallback((businessId: string) => {
-    return posts.filter(post => post.businessId === businessId);
-  }, [posts]);
-
-  const getUserPostsAndCommented = useCallback(() => {
-    const userPosts = posts.filter(post => post.author === 'You');
-    
-    const commentedPostIds = JSON.parse(localStorage.getItem('userCommentedPosts') || '[]');
-    const commentedPosts = posts.filter(post => 
-      post.author !== 'You' && commentedPostIds.includes(post.id)
-    );
-    
-    const allUserRelatedPosts = [...userPosts, ...commentedPosts];
-    return allUserRelatedPosts.sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-  }, [posts]);
-
-  const getUserPosts = useCallback(() => {
-    return posts.filter(post => post.author === 'You');
-  }, [posts]);
-
-  const trackCommentedPost = useCallback((postId: string) => {
-    const commentedPostIds = JSON.parse(localStorage.getItem('userCommentedPosts') || '[]');
-    if (!commentedPostIds.includes(postId)) {
-      commentedPostIds.push(postId);
-      localStorage.setItem('userCommentedPosts', JSON.stringify(commentedPostIds));
-    }
-  }, []);
+  const removePost = useCallback(
+    async (postId: string): Promise<boolean> => {
+      const { success, error } = await deletePost(postId);
+      if (!success) {
+        console.error("Error deleting post:", error);
+        return false;
+      }
+      // Drop the post and any comments under it.
+      commitPosts((prev) => prev.filter((p) => p.id !== postId && p.isComment !== postId));
+      return true;
+    },
+    [commitPosts],
+  );
 
   const refetch = useCallback(() => {
-    hasFetchedRef.current = false;
     offsetRef.current = 0;
-    setOffset(0);
     fetchPosts(false);
   }, [fetchPosts]);
 
-  // Automatically refetch posts when connection is restored
-  useReconnectionHandler({
-    onReconnect: refetch
-  });
+  // Initial load + realtime subscription.
+  useEffect(() => {
+    if (initialCachedPosts && initialCachedPosts.length > 0) setLoading(false);
+    fetchPosts(false);
+
+    const channel = supabase
+      .channel("posts-changes")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "posts" }, async (payload) => {
+        const inserted = payload.new as PostData;
+        if (postsRef.current.some((p) => p.id === inserted.id)) return;
+        // Our own inserts are already in state; for anyone else's we need the business join.
+        const full = await getPostById(inserted.id);
+        if (!full || full.is_deleted) return;
+        const post = transformPost(full);
+        commitPosts((prev) => (prev.some((p) => p.id === post.id) ? prev : [post, ...prev]));
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "posts" }, (payload) => {
+        const updated = payload.new as PostData;
+        if (updated.is_deleted) {
+          commitPosts((prev) => prev.filter((p) => p.id !== updated.id && p.isComment !== updated.id));
+        } else {
+          commitPosts((prev) =>
+            prev.map((p) => (p.id === updated.id ? { ...p, votesTotal: updated.votes_total ?? p.votesTotal } : p)),
+          );
+        }
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "posts" }, (payload) => {
+        const deleted = payload.old as PostData;
+        commitPosts((prev) => prev.filter((p) => p.id !== deleted.id && p.isComment !== deleted.id));
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // Mount-only by design; the callbacks read refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const getBusinessPosts = useCallback(
+    (businessId: string) => posts.filter((post) => post.businessId === businessId),
+    [posts],
+  );
+
+  const getUserPosts = useCallback(() => posts.filter((post) => post.author === "You"), [posts]);
+
+  /** The device's own posts plus any post it has commented on, newest first. */
+  const getUserPostsAndCommented = useCallback(() => {
+    const commentedIds = new Set(posts.filter((p) => p.author === "You" && p.isComment).map((p) => p.isComment!));
+    return posts
+      .filter((post) => !post.isComment && (post.author === "You" || commentedIds.has(post.id)))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }, [posts]);
+
+  useReconnectionHandler({ onReconnect: refetch });
 
   return {
     posts,
@@ -349,6 +252,5 @@ export const usePosts = () => {
     getBusinessPosts,
     getUserPosts,
     getUserPostsAndCommented,
-    trackCommentedPost
   };
 };

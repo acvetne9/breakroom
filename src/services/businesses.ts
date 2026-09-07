@@ -1,248 +1,155 @@
-import { supabase } from '@/integrations/supabase/client';
-import type { Business, BusinessRole } from '@/types/business';
-import { sanitizeVoteTotal } from '@/utils/voteCalculations';
-import { retryWithBackoff, isRetryableError } from '@/utils/retryWithBackoff';
-import { mapBusinessRow, mapRoleRow } from '@/utils/businessMapper';
+import { supabase } from "@/integrations/supabase/client";
+import type { Business, BusinessRole } from "@/types/business";
+import { retryWithBackoff, isRetryableError } from "@/utils/retryWithBackoff";
+import { mapBusinessRow, mapRoleRow } from "@/utils/businessMapper";
+import { getDeviceId } from "@/utils/deviceId";
 
 type MapBounds = { north: number; south: number; east: number; west: number };
 
 /**
- * Fetches businesses within viewport bounds using grid-sampled distribution
- * FIXED: No longer creates circular pattern - evenly distributes across viewport
+ * Businesses inside a bounding box, as map dots: id, name, coordinates, type.
+ * Roles and the rest are loaded on click via getFullBusinessDetails. The RPC
+ * caps a response at 5,000 rows; a single zoom-14 tile never reaches that, so
+ * per-tile fetches are complete while whole-viewport fetches are a sample.
  */
-export const getBusinessesInViewport = async (
-  bounds: MapBounds,
-  limit: number = 1000,
-  searchFilters?: any,
-  userId?: string,
-  zoom: number = 12
-): Promise<Business[]> => {
+export const getBusinessesInViewport = async (bounds: MapBounds, limit: number = 2000): Promise<Business[]> => {
   try {
-    // Get current user if not provided
-    if (!userId) {
-      const { data: { user } } = await supabase.auth.getUser();
-      userId = user?.id;
-    }
-
-    console.log('🔍 Fetching businesses from Supabase:', {
-      bounds,
-      limit,
-      hasFilters: !!searchFilters,
-      zoom
-    });
-
-    // Use the no-ordering function. PostgREST caps results at 1000 rows, and this
-    // returns them in natural (physical) order which is spread evenly across the
-    // viewport. (get_businesses_in_viewport_grid_sampled orders by grid cell, so the
-    // 1000-row cap truncates it into a single southern band — do not use it here.)
-    // Wrap with retry logic for connection resilience
     const { data, error } = await retryWithBackoff(
-      () => supabase.rpc(
-        'get_businesses_in_viewport_no_ordering',
-        {
+      () =>
+        supabase.rpc("get_businesses_in_viewport_slim", {
           min_lat: bounds.south,
           max_lat: bounds.north,
           min_lng: bounds.west,
           max_lng: bounds.east,
           result_limit: limit,
-          user_profile_id: userId || null
-        }
-      ),
-      { shouldRetry: isRetryableError }
+        }),
+      { shouldRetry: isRetryableError },
     );
 
-    if (error) {
-      console.error('❌ Supabase RPC error:', error);
-      throw error;
-    }
+    if (error) throw error;
+    if (!data || data.length === 0) return [];
 
-    const rawData = data as Array<{
-      id: string;
-      name: string;
-      business_type: string;
-      address: string;
-      lat: number;
-      lng: number;
-      atmosphere: string[];
-      website: string;
-      roles: any[];
-    }> | null;
-
-    if (!rawData || rawData.length === 0) {
-      console.log('⚠️ No businesses returned from query');
-      return [];
-    }
-
-    console.log(`✅ Raw data from Supabase: ${rawData.length} businesses`);
-
-    // Transform to Business type
-    const businesses: Business[] = rawData
-      .filter((b) => b.lat && b.lng) // Filter out invalid coordinates
-      .map((b) => mapBusinessRow(b, Array.isArray(b.roles) ? b.roles : []));
-
-    return businesses;
-
+    return data.filter((b) => b.lat && b.lng).map((b) => mapBusinessRow(b));
   } catch (error) {
-    console.error('❌ Error in getBusinessesInViewport:', error);
+    console.error("Error in getBusinessesInViewport:", error);
     return [];
   }
 };
 
+/** Business row, its roles, and the current device's votes on those roles. */
 export async function getFullBusinessDetails(businessId: string): Promise<Business | null> {
-  console.log('🔍 FETCHING FULL BUSINESS DETAILS FOR:', businessId);
-  const startTime = performance.now();
-
-  // Fetch business data, user profile, and roles in PARALLEL with retry logic
-  const [businessResult, userProfileResult, rolesResult] = await retryWithBackoff(
-    () => Promise.all([
-      // Business data
-      supabase
-        .from('businesses')
-        .select('*')
-        .eq('id', businessId)
-        .maybeSingle(),
-
-      // User profile (for votes)
-      (async () => {
-        const { getUserProfile } = await import('./posts');
-        return getUserProfile();
-      })(),
-
-      // Roles data
-      supabase
-        .from('business_roles')
-        .select('*')
-        .eq('business_id', businessId)
-        .order('votes_total', { ascending: false })
-        .order('created_at', { ascending: true })
-    ]),
-    { shouldRetry: isRetryableError }
+  const [businessResult, rolesResult] = await retryWithBackoff(
+    () =>
+      Promise.all([
+        supabase.from("businesses").select("*").eq("id", businessId).maybeSingle(),
+        supabase
+          .from("business_roles")
+          .select("*")
+          .eq("business_id", businessId)
+          .order("votes_total", { ascending: false })
+          .order("created_at", { ascending: true }),
+      ]),
+    { shouldRetry: isRetryableError },
   );
 
-  const { data: businessData, error: businessError } = businessResult;
-  if (businessError) throw businessError;
-  if (!businessData) return null;
+  if (businessResult.error) throw businessResult.error;
+  if (!businessResult.data) return null;
+  if (rolesResult.error) throw rolesResult.error;
 
-  const { profileId: currentUserId } = userProfileResult;
-  const { data: rolesData, error: rolesError } = rolesResult;
-  if (rolesError) throw rolesError;
-
-  console.log(`✅ Fetched business + roles in ${performance.now() - startTime}ms (parallel)`);
-
-  // Fetch user role votes ONLY for this business's roles
-  let userVotesData: any[] = [];
-  if (currentUserId && rolesData && rolesData.length > 0) {
-    const votesStartTime = performance.now();
-    const roleIds = rolesData.map(r => r.id);
-    
+  const rolesData = rolesResult.data ?? [];
+  const userVotes = new Map<string, string>();
+  if (rolesData.length > 0) {
     const { data: votesData, error: votesError } = await supabase
-      .from('role_votes')
-      .select('business_role_id, vote_type')
-      .eq('user_id', currentUserId)
-      .in('business_role_id', roleIds);
-
-    console.log(`✅ Fetched votes for ${roleIds.length} roles in ${performance.now() - votesStartTime}ms`);
-
-    if (votesError) {
-      console.warn('Error fetching user votes:', votesError);
-    } else {
-      userVotesData = votesData || [];
-    }
+      .from("role_votes")
+      .select("business_role_id, vote_type")
+      .eq("user_id", getDeviceId())
+      .in(
+        "business_role_id",
+        rolesData.map((r) => r.id),
+      );
+    if (votesError) console.warn("Error fetching user role votes:", votesError);
+    for (const v of votesData ?? []) userVotes.set(v.business_role_id, v.vote_type);
   }
 
-  const businessRoles: BusinessRole[] = (rolesData || []).map((role: any) => {
-    const vote = userVotesData.find(v => v.business_role_id === role.id)?.vote_type;
-    const userVote = vote === 'upvote' ? 'up' : vote === 'downvote' ? 'down' : null;
-    return mapRoleRow(role, userVote);
+  const roles: BusinessRole[] = rolesData.map((role) => {
+    const vote = userVotes.get(role.id);
+    return mapRoleRow(role, vote === "upvote" ? "up" : vote === "downvote" ? "down" : null);
   });
 
-  const fullBusiness: Business = mapBusinessRow(businessData, businessRoles);
-
-  console.log(`✅ getFullBusinessDetails completed in ${performance.now() - startTime}ms`);
-  console.log(`✅ Returning ${businessRoles.length} roles for business:`, businessData.name);
-  return fullBusiness;
+  return mapBusinessRow(businessResult.data, roles);
 }
 
-export async function geocodeAndCreateBusiness(name: string, address?: string): Promise<{ id: string; lat: number; lng: number }> {
-  if (!address) {
-    throw new Error('Address is required for creating a new business');
+// ---------------------------------------------------------------------------
+// Details cache. One app-wide store so the map, the shell, and the details
+// card all agree on a business's roles and votes.
+// ---------------------------------------------------------------------------
+
+const MAX_CACHED_DETAILS = 500;
+const detailsCache = new Map<string, Business>();
+const inflightDetails = new Map<string, Promise<Business | null>>();
+
+export function getCachedBusiness(businessId: string): Business | undefined {
+  return detailsCache.get(businessId);
+}
+
+export function setCachedBusiness(business: Business): void {
+  if (detailsCache.size >= MAX_CACHED_DETAILS) {
+    const oldest = detailsCache.keys().next().value;
+    if (oldest) detailsCache.delete(oldest);
   }
+  detailsCache.set(business.id, business);
+}
 
-  console.log(`🌍 Geocoding business: ${name} at ${address}`);
+/** Cached, de-duplicated fetch of full business details. Returns null on error or miss. */
+export async function getFullBusinessDetailsCached(businessId: string): Promise<Business | null> {
+  const cached = detailsCache.get(businessId);
+  if (cached) return cached;
 
-  const { data: geocodeResult, error: geocodeError } = await supabase.functions.invoke('geocode-address', {
-    body: { address }
-  });
+  const inflight = inflightDetails.get(businessId);
+  if (inflight) return inflight;
 
-  if (geocodeError || !geocodeResult) {
-    console.error('❌ Geocoding failed:', geocodeError);
-    throw new Error(`Failed to geocode address: ${address}`);
-  }
-
-  console.log(`✅ Geocoded coordinates: ${geocodeResult.latitude}, ${geocodeResult.longitude}`);
-
-  const { data: newBusiness, error: createError } = await supabase
-    .from('businesses')
-    .insert({
-      name,
-      address: geocodeResult.display_name || address,
-      lat: geocodeResult.latitude,
-      lng: geocodeResult.longitude,
-      atmosphere: [],
+  const request = getFullBusinessDetails(businessId)
+    .then((business) => {
+      if (business) setCachedBusiness(business);
+      return business;
     })
-    .select('id, lat, lng')
-    .single();
+    .catch((error) => {
+      console.error("Error fetching business details:", error);
+      return null;
+    })
+    .finally(() => inflightDetails.delete(businessId));
 
-  if (createError) {
-    console.error('❌ Failed to create business:', createError);
-    throw createError;
-  }
-
-  console.log(`✅ Created business with ID: ${newBusiness.id}`);
-  return newBusiness;
+  inflightDetails.set(businessId, request);
+  return request;
 }
 
+/** Add a role/salary pair to an existing business if it isn't already listed. */
 export async function createOrUpdateBusinessRole(businessLocation: string, role: string, salary: string): Promise<void> {
-  let businessId: string;
-  
   const { data: existingBusiness, error: findError } = await supabase
-    .from('businesses')
-    .select('id')
-    .ilike('name', businessLocation)
+    .from("businesses")
+    .select("id")
+    .ilike("name", businessLocation)
     .maybeSingle();
 
-  if (findError) {
-    throw findError;
-  }
-
-  if (existingBusiness) {
-    businessId = existingBusiness.id;
-  } else {
-    throw new Error(`Business "${businessLocation}" not found. Use geocodeAndCreateBusiness() to create it with coordinates first.`);
-  }
+  if (findError) throw findError;
+  if (!existingBusiness) throw new Error(`Business "${businessLocation}" not found`);
 
   const { data: existingRole, error: roleCheckError } = await supabase
-    .from('business_roles')
-    .select('id')
-    .eq('business_id', businessId)
-    .eq('role', role)
-    .eq('salary', salary)
+    .from("business_roles")
+    .select("id")
+    .eq("business_id", existingBusiness.id)
+    .eq("role", role)
+    .eq("salary", salary)
     .maybeSingle();
 
-  if (roleCheckError) {
-    throw roleCheckError;
-  }
+  if (roleCheckError) throw roleCheckError;
+  if (existingRole) return;
 
-  if (!existingRole) {
-    const { error: createRoleError } = await supabase
-      .from('business_roles')
-      .insert({
-        business_id: businessId,
-        role: role,
-        salary: salary,
-        votes_total: 0
-      });
+  const { error: createRoleError } = await supabase
+    .from("business_roles")
+    .insert({ business_id: existingBusiness.id, role, salary, votes_total: 0 });
+  if (createRoleError) throw createRoleError;
 
-    if (createRoleError) throw createRoleError;
-  }
+  // The cached copy is now stale.
+  detailsCache.delete(existingBusiness.id);
 }

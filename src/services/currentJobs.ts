@@ -59,7 +59,7 @@ export const saveCurrentJob = async (profileId: string, jobData: CurrentJobData)
       profile_id: profileId,
       ...dataToSave,
       updated_at: new Date().toISOString(),
-    } as any,
+    },
     {
       onConflict: "profile_id",
     },

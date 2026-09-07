@@ -61,7 +61,7 @@ export interface UseDropdown {
 }
 
 export function useDropdown(options: UseDropdownOptions = {}): UseDropdown {
-  const { shouldIgnoreOutsideClick, onOutsideClose, onEscapeClose, onBlurClose, blurCloseDelay = 150 } = options;
+  const { onEscapeClose, onBlurClose, blurCloseDelay = 150 } = options;
 
   const [isOpen, setIsOpen] = useState(false);
 

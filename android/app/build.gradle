@@ -22,12 +22,23 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
+    // Release signing comes from android/keystore.properties (gitignored) or
+    // environment variables. See android/keystore.properties.example.
+    def keystoreProps = new Properties()
+    def keystorePropsFile = rootProject.file("keystore.properties")
+    if (keystorePropsFile.exists()) {
+        keystorePropsFile.withInputStream { keystoreProps.load(it) }
+    }
+    def signingValue = { String key -> keystoreProps.getProperty(key) ?: System.getenv(key) }
+
     signingConfigs {
         release {
-            storeFile file("${rootDir}/../my-upload-key.jks")
-            storePassword "wofwallen"
-            keyAlias "my-key-alias"
-            keyPassword "wofwallen"
+            if (signingValue("KEYSTORE_FILE")) {
+                storeFile file(signingValue("KEYSTORE_FILE"))
+                storePassword signingValue("KEYSTORE_PASSWORD")
+                keyAlias signingValue("KEY_ALIAS")
+                keyPassword signingValue("KEY_PASSWORD")
+            }
         }
     }
 

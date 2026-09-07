@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useTranslation } from '@/hooks/useTranslation'
+import { useTranslation, isBuiltInTranslationSupported } from '@/hooks/useTranslation'
 
 interface TranslatedTextProps {
   text: string
@@ -14,7 +14,7 @@ export function TranslatedText({
   className = '',
   showIndicator = true,
   sourceLanguage,
-  enableTranslation = true, // Default to enabled now that we have rate limiting
+  enableTranslation = true,
 }: TranslatedTextProps) {
   const { translateText, userLanguage, getLanguageName } = useTranslation()
   const [translatedText, setTranslatedText] = useState(text)
@@ -33,11 +33,8 @@ export function TranslatedText({
   }, [text])
 
   useEffect(() => {
-    // Only translate if:
-    // 1. Translation is enabled
-    // 2. User language is not English (most content is English)
-    // 3. We haven't already attempted translation for this text
-    if (!enableTranslation || userLanguage === 'en' || translationAttempted.current) {
+    // Skip when disabled, when the browser has no on-device translator, or once attempted.
+    if (!enableTranslation || !isBuiltInTranslationSupported() || translationAttempted.current) {
       return
     }
 

@@ -1,207 +1,119 @@
-import { useState, useCallback, useRef } from 'react';
-import type { Business } from '@/types/business';
-import { TILE_ZOOM_LEVEL, getTilesForBounds, getTileBounds, getTileKey } from '@/utils/tiles';
+import { useCallback } from "react";
+import type { Business } from "@/types/business";
+import { TILE_ZOOM_LEVEL, getTilesForBounds, getTileBounds, getTileKey, type TileBounds, type TileKey } from "@/utils/tiles";
 
-// Tile-based caching system for optimal cache hit rates
+/**
+ * In-memory cache of businesses keyed by zoom-14 tile.
+ *
+ * Each entry remembers the map zoom it was fetched at and whether it is
+ * `partial`. A partial tile came from a row-limited fetch that covered many
+ * tiles at once (a zoomed-out viewport), so it holds only a sample of the
+ * businesses in that tile. Partial tiles are good enough to draw a zoomed-out
+ * map but must never be served to the per-tile loader, which expects every
+ * business in the tile.
+ */
 interface CachedTileData {
   businesses: Business[];
   timestamp: number;
-  // Map zoom this tile was fetched at. Higher zoom = denser/more complete data,
-  // so a tile is only served for a request whose zoom is <= the cached zoom.
   zoom: number;
-  bounds: {
-    north: number;
-    south: number;
-    east: number;
-    west: number;
-  };
+  partial: boolean;
+  bounds: TileBounds;
 }
 
-// Cache configuration - INFINITE CACHE
-const MAX_CACHE_SIZE = 5000; // increased tiles limit
+const MAX_CACHE_SIZE = 5000;
 
-// In-memory tile cache - much faster than localStorage (Phase 4)
-class InMemoryTileCache {
-  private static cache = new Map<string, CachedTileData>();
-  private static accessTimes = new Map<string, number>();
+const cache = new Map<string, CachedTileData>();
+const accessTimes = new Map<string, number>();
 
-  static get(key: string): CachedTileData | undefined {
-    const data = this.cache.get(key);
-    if (data) {
-      this.accessTimes.set(key, Date.now()); // Update access time
-    }
-    return data;
-  }
-
-  static set(key: string, data: CachedTileData): void {
-    this.cache.set(key, data);
-    this.accessTimes.set(key, Date.now());
-  }
-
-  static has(key: string): boolean {
-    return this.cache.has(key);
-  }
-
-  static delete(key: string): void {
-    this.cache.delete(key);
-    this.accessTimes.delete(key);
-  }
-
-  static clear(): void {
-    this.cache.clear();
-    this.accessTimes.clear();
-  }
-
-  static size(): number {
-    return this.cache.size;
-  }
-
-  static getAccessTimes(): Map<string, number> {
-    return this.accessTimes;
-  }
-
-  static forEach(callback: (data: CachedTileData, key: string) => void): void {
-    this.cache.forEach((data, key) => callback(data, key));
-  }
+function readTile(key: string): CachedTileData | undefined {
+  const data = cache.get(key);
+  if (data) accessTimes.set(key, Date.now());
+  return data;
 }
 
-// Cache cleanup - only remove excess entries if over limit (Phase 4 - optimized for in-memory)
-function cleanupCache(): void {
-  // Only clean up if we're over the size limit
-  if (InMemoryTileCache.size() > MAX_CACHE_SIZE) {
-    const accessTimes = InMemoryTileCache.getAccessTimes();
-    const sortedByAccess = Array.from(accessTimes.entries())
-      .sort((a, b) => a[1] - b[1])
-      .slice(0, InMemoryTileCache.size() - MAX_CACHE_SIZE + 100); // Remove extra for buffer
-    
-    sortedByAccess.forEach(([key]) => {
-      InMemoryTileCache.delete(key);
+function writeTile(key: string, data: CachedTileData): void {
+  cache.set(key, data);
+  accessTimes.set(key, Date.now());
+  if (cache.size > MAX_CACHE_SIZE) evictOldest(cache.size - MAX_CACHE_SIZE + 100);
+}
+
+function evictOldest(count: number): void {
+  Array.from(accessTimes.entries())
+    .sort((a, b) => a[1] - b[1])
+    .slice(0, count)
+    .forEach(([key]) => {
+      cache.delete(key);
+      accessTimes.delete(key);
     });
-  }
+}
+
+const inTile = (b: Business, t: TileBounds) =>
+  b.position.lat >= t.south && b.position.lat <= t.north && b.position.lng >= t.west && b.position.lng <= t.east;
+
+/** Businesses for one tile, or null if it is missing, too sparse, or partial. */
+export function getCachedTile(tile: TileKey, minZoom: number): Business[] | null {
+  const cached = readTile(getTileKey(tile));
+  if (!cached || cached.partial || cached.zoom < minZoom) return null;
+  return cached.businesses;
+}
+
+export function isTileCached(tile: TileKey, minZoom: number): boolean {
+  return getCachedTile(tile, minZoom) !== null;
+}
+
+/** Store one complete tile's businesses. */
+export function setCachedTile(tile: TileKey, businesses: Business[], zoom: number): void {
+  const key = getTileKey(tile);
+  const existing = readTile(key);
+  if (existing && !existing.partial && existing.zoom > zoom) return;
+  writeTile(key, { businesses, timestamp: Date.now(), zoom, partial: false, bounds: getTileBounds(tile) });
 }
 
 export const useTileCache = () => {
-  const cleanupTimerRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Periodic cache cleanup only for size management
-  if (!cleanupTimerRef.current) {
-    cleanupTimerRef.current = setInterval(cleanupCache, 300000); // Clean every 5 minutes
-  }
-  
-  const getCachedBusinesses = useCallback((bounds: {
-    north: number;
-    south: number;
-    east: number;
-    west: number;
-  }, minZoom: number = 0): Business[] | null => {
-    const tiles = getTilesForBounds(bounds);
-    const cachedBusinesses: Business[] = [];
+  /**
+   * Every tile under `bounds` from the cache, or null on any miss.
+   * With `allowPartial`, tiles sampled by a wide fetch count as hits.
+   */
+  const getCachedBusinesses = useCallback(
+    (bounds: TileBounds, minZoom: number = 0, allowPartial = false): Business[] | null => {
+      const tiles = getTilesForBounds(bounds);
+      const collected: Business[] = [];
 
-    // Check if all required tiles are cached at sufficient detail
-    for (const tile of tiles) {
-      const key = getTileKey(tile);
-      const cached = InMemoryTileCache.get(key);
-
-      if (!cached || cached.zoom < minZoom) {
-        // Missing tile, or cached at a lower (sparser) zoom than needed → cache miss
-        return null;
+      for (const tile of tiles) {
+        const cached = readTile(getTileKey(tile));
+        if (!cached || cached.zoom < minZoom || (cached.partial && !allowPartial)) return null;
+        collected.push(...cached.businesses);
       }
 
-      // Add businesses from this tile
-      cachedBusinesses.push(...cached.businesses);
-    }
-    
-    // Filter businesses to exact bounds (tiles might overlap)
-    const filteredBusinesses = cachedBusinesses.filter(business => 
-      business.position.lat >= bounds.south &&
-      business.position.lat <= bounds.north &&
-      business.position.lng >= bounds.west &&
-      business.position.lng <= bounds.east
-    );
-    
-    // Remove duplicates using Set for O(n) performance
-    const seenIds = new Set<string>();
-    const uniqueBusinesses = filteredBusinesses.filter(business => {
-      if (seenIds.has(business.id)) return false;
-      seenIds.add(business.id);
-      return true;
-    });
-    
-    console.log(`🎯 Tile cache HIT! ${tiles.length} tiles, ${uniqueBusinesses.length} unique businesses`);
-    return uniqueBusinesses; // Return empty array if no businesses - this is still a valid cache hit
-  }, []);
-  
-  const setCachedBusinesses = useCallback((
-    bounds: {
-      north: number;
-      south: number;
-      east: number;
-      west: number;
+      const seen = new Set<string>();
+      return collected.filter((b) => inTile(b, bounds) && !seen.has(b.id) && seen.add(b.id));
     },
-    businesses: Business[],
-    zoom: number = TILE_ZOOM_LEVEL
-  ): void => {
-    const tiles = getTilesForBounds(bounds);
-    const now = Date.now();
+    [],
+  );
 
-    // Distribute businesses across tiles
-    for (const tile of tiles) {
-      const key = getTileKey(tile);
-
-      // Don't overwrite a tile already cached at a higher (denser) zoom with
-      // sparser data from a lower zoom.
-      const existing = InMemoryTileCache.get(key);
-      if (existing && existing.zoom > zoom) continue;
-
-      const tileBounds = getTileBounds(tile);
-
-      // Find businesses that fall within this tile
-      const tileBusinesses = businesses.filter(business =>
-        business.position.lat >= tileBounds.south &&
-        business.position.lat <= tileBounds.north &&
-        business.position.lng >= tileBounds.west &&
-        business.position.lng <= tileBounds.east
-      );
-
-      // Cache tile data
-      InMemoryTileCache.set(key, {
-        businesses: tileBusinesses,
-        timestamp: now,
-        zoom,
-        bounds: tileBounds
-      });
-    }
-    
-    console.log(`💾 Cached ${businesses.length} businesses across ${tiles.length} tiles`);
-    
-    // Trigger cleanup if cache is getting full (use requestIdleCallback - Phase 5)
-    if (InMemoryTileCache.size() > MAX_CACHE_SIZE * 0.8) {
-      if ('requestIdleCallback' in window) {
-        requestIdleCallback(cleanupCache, { timeout: 5000 });
-      } else {
-        setTimeout(cleanupCache, 100);
+  /**
+   * Scatter a viewport-wide result into its tiles. Mark `partial` when the
+   * fetch was row-limited across many tiles, so the per-tile loader refetches.
+   */
+  const setCachedBusinesses = useCallback(
+    (bounds: TileBounds, businesses: Business[], zoom: number = TILE_ZOOM_LEVEL, partial = false): void => {
+      const now = Date.now();
+      for (const tile of getTilesForBounds(bounds)) {
+        const key = getTileKey(tile);
+        const existing = readTile(key);
+        // Never downgrade a complete tile to a partial one, or a denser one to a sparser one.
+        if (existing && !existing.partial && (partial || existing.zoom > zoom)) continue;
+        const tileBounds = getTileBounds(tile);
+        writeTile(key, { businesses: businesses.filter((b) => inTile(b, tileBounds)), timestamp: now, zoom, partial, bounds: tileBounds });
       }
-    }
-  }, []);
-  
+    },
+    [],
+  );
+
   const clearCache = useCallback(() => {
-    InMemoryTileCache.clear();
-    console.log('🧹 Cleared tile cache');
+    cache.clear();
+    accessTimes.clear();
   }, []);
-  
-  const getCacheStats = useCallback(() => {
-    return {
-      size: InMemoryTileCache.size(),
-      maxSize: MAX_CACHE_SIZE,
-      ttl: 'infinite',
-      tileZoom: TILE_ZOOM_LEVEL
-    };
-  }, []);
-  
-  return {
-    getCachedBusinesses,
-    setCachedBusinesses,
-    clearCache,
-    getCacheStats
-  };
+
+  return { getCachedBusinesses, setCachedBusinesses, getCachedTile, setCachedTile, isTileCached, clearCache };
 };

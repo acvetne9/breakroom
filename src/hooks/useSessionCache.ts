@@ -1,10 +1,10 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 
 interface CacheOptions<T> {
   key: string;
   version: string;
-  deserialize?: (data: any) => T;
-  serialize?: (data: T) => any;
+  deserialize?: (data: unknown) => T;
+  serialize?: (data: T) => unknown;
 }
 
 /**

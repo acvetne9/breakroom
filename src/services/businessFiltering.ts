@@ -28,7 +28,7 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
 
   if (!searchQuery.trim()) return null;
 
-  let filters: SearchFilters = {
+  const filters: SearchFilters = {
     textTerms: []
   };
 
@@ -68,11 +68,11 @@ export function parseSearchFilters(searchQuery: string): SearchFilters | null {
     );
   }
 
-  let roleFilter = filteredTextTerms?.find(term =>
+  const roleFilter = filteredTextTerms?.find(term =>
     COMMON_ROLES.includes(term.toLowerCase())
   );
 
-  let businessTypeFilter = filteredTextTerms?.find(term =>
+  const businessTypeFilter = filteredTextTerms?.find(term =>
     COMMON_BUSINESS_TYPES.includes(term.toLowerCase())
   );
 

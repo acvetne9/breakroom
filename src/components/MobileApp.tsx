@@ -1,20 +1,24 @@
 import React, { useState, useRef, useEffect, Suspense, useCallback, useMemo } from "react";
-import { motion, PanInfo } from "framer-motion";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import InitiationPage from "./InitiationPage";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 import { useDevice } from "@/contexts/DeviceContext";
-import { useBusinessesData } from "@/hooks/useBusinessesData";
 import { parseSalaryInput } from "@/utils/salaryFormat";
+import { getCurrentJob, saveCurrentJob } from "@/services/currentJobs";
+import { createOrUpdateBusinessRole, getFullBusinessDetailsCached, setCachedBusiness } from "@/services/businesses";
+import { createPost, type Post } from "@/services/posts";
+import { applyOptimisticVote } from "@/hooks/useOptimisticVote";
+import { persistVote } from "@/services/voting";
+import type { Business } from "@/types/business";
+import type { MapHandle } from "./MapLibreMap";
+import { usePostsContext } from "./PostsProvider";
 
 const HomePage = React.lazy(() => import("./HomePage"));
 const SettingsPage = React.lazy(() => import("./SettingsPage"));
 const ExplorePage = React.lazy(() => import("./ExplorePage"));
-
-import { Business } from "@/types/business";
-import { usePostsContext } from "./PostsProvider";
 
 interface UserData {
   salary: string;
@@ -25,531 +29,236 @@ interface UserData {
   timePeriod: string;
 }
 
-interface Post {
-  id: string;
-  author: string;
-  text: string;
-  businessId?: string;
-  businessName?: string;
-  images?: string[];
-  isStory?: boolean;
-  isJobUpdate?: boolean;
-  linkedLocation?: string;
-  votesTotal: number;
-  userVote?: "up" | "down" | null;
-  createdAt: Date;
-}
+/** A business whose roles came from the full-details query (roles carry ids). */
+const hasFullDetails = (business: Business | null | undefined) =>
+  !!business?.atmosphere?.length && !!business?.roles?.length && !!business.roles[0]?.id;
 
 const MobileApp: React.FC = () => {
   const isMobile = useIsMobile();
-  const { user } = useAuth();
-  const { deviceId, loading: deviceLoading, isFirstSession } = useDevice();
+  const { deviceId, isFirstSession } = useDevice();
+  const { posts } = usePostsContext();
+
   const [currentView, setCurrentView] = useState<"initiation" | "main" | "loading">("loading");
   const [currentSlide, setCurrentSlide] = useState(1); // 0: Settings, 1: Home, 2: Explore
-  const [userData, setUserData] = useState<UserData | null>(null);
-  const [expandedPost, setExpandedPost] = useState<string | null>(null);
-  const [comments, setComments] = useState<{ [postId: string]: string[] }>({});
-  const [selectedBusiness, setSelectedBusiness] = useState<any>(null);
+  const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [showBusinessDetails, setShowBusinessDetails] = useState(false);
-  const [previouslySelectedBusiness, setPreviouslySelectedBusiness] = useState<any>(null);
+  const [previouslySelectedBusiness, setPreviouslySelectedBusiness] = useState<Business | null>(null);
   const [filteredBusinessId, setFilteredBusinessId] = useState<string | null>(null);
   const [filteredUserStories, setFilteredUserStories] = useState(false);
   const [votingRoles, setVotingRoles] = useState<Set<string>>(new Set());
 
-  const constraintsRef = useRef(null);
-  const { posts } = usePostsContext();
-  const { businesses, setBusinesses, fetchFullBusinessDetails } = useBusinessesData();
-
-  // Ref to prevent double initialization in React 18 StrictMode
+  const mapRef = useRef<MapHandle>(null);
   const hasInitialized = useRef(false);
 
-  // Touch/Drag tracking refs
+  // Touch tracking for the swipeable cards.
   const touchStartXRef = useRef(0);
   const touchStartYRef = useRef(0);
-  const touchStartScrollTopRef = useRef(0);
   const isDraggingHorizontallyRef = useRef(false);
   const hasScrolledRef = useRef(false);
   const dragStartTimeRef = useRef(0);
 
-  const hasProfile = useCallback(async (): Promise<boolean> => {
-    if (!deviceId) return false;
-    try {
-      const { data, error } = await supabase.from("profiles").select("id").eq("id", deviceId).maybeSingle();
-      if (error) {
-        console.error("Error checking profile:", error);
-        return false;
-      }
-      return !!data;
-    } catch (error) {
-      console.error("Error checking profile:", error);
-      return false;
-    }
-  }, [deviceId]);
-
-  const hasCurrentJob = useCallback(async (): Promise<boolean> => {
-    if (!deviceId) return false;
-    try {
-      const { getCurrentJob } = await import("../services/currentJobs");
-      const job = await getCurrentJob(deviceId);
-      return job !== null;
-    } catch (error) {
-      console.error("Error checking current job:", error);
-      return false;
-    }
-  }, [deviceId]);
-
+  // ---------------------------------------------------------------- startup
   useEffect(() => {
-    if (hasInitialized.current) {
-      return;
-    }
-
-    if (deviceLoading || !deviceId) {
-      return;
-    }
-
+    if (hasInitialized.current || !deviceId) return;
     hasInitialized.current = true;
 
-    const initializeApp = async () => {
+    (async () => {
       try {
-        const { getCurrentJob } = await import("../services/currentJobs");
-        // Independent reads in parallel; getCurrentJob replaces the redundant
-        // hasCurrentJob() + getCurrentJob() double fetch.
-        const [profileExists, currentJob] = await Promise.all([
-          hasProfile(),
+        const [{ data: profile }, currentJob] = await Promise.all([
+          supabase.from("profiles").select("id").eq("id", deviceId).maybeSingle(),
           getCurrentJob(deviceId),
         ]);
 
+        if (!profile) {
+          const { error } = await supabase.from("profiles").insert({ id: deviceId });
+          if (error) console.error("Error creating profile row:", error);
+        }
+
         if (currentJob) {
-          setUserData({
-            salary: `$${currentJob.salary.toFixed(2)}`,
-            role: currentJob.role,
-            location: currentJob.location,
-            fullLocation: currentJob.location,
-            businessName: currentJob.business_name || "",
-            timePeriod: currentJob.time_period || "HR",
-          });
           setCurrentView("main");
         } else {
-          // No current job yet — create the profile row if needed.
-          if (!profileExists) {
-            const { error } = await supabase.from("profiles").insert({ id: deviceId });
-            if (error) {
-              console.error("❌ Error creating profile row:", error);
-            }
-          }
-          // Don't prompt on the very first visit (per device). Only nudge to add
-          // a job on return visits.
+          // Don't prompt on the very first visit; nudge on return visits instead.
           setCurrentView(isFirstSession ? "main" : "initiation");
         }
       } catch (error) {
         console.error("Error during app initialization:", error);
         setCurrentView("main");
       }
-    };
+    })();
+  }, [deviceId, isFirstSession]);
 
-    initializeApp();
-  }, [deviceLoading, deviceId, hasProfile, hasCurrentJob, isFirstSession]);
-
+  // If the user returns to the home slide while the prompt is up and a job now exists, dismiss it.
   useEffect(() => {
-    if (currentSlide === 1 && currentView === "initiation" && deviceId) {
-      const recheckCurrentJob = async () => {
-        try {
-          const hasJob = await hasCurrentJob();
-          if (hasJob) {
-            const { getCurrentJob } = await import("../services/currentJobs");
-            const currentJob = await getCurrentJob(deviceId);
-            if (currentJob) {
-              setUserData({
-                salary: `$${currentJob.salary.toFixed(2)}`,
-                role: currentJob.role,
-                location: currentJob.location,
-                fullLocation: currentJob.location,
-                businessName: currentJob.business_name || "",
-                timePeriod: currentJob.time_period || "HR",
-              });
-              setCurrentView("main");
-            }
-          }
-        } catch (error) {
-          console.error("Error re-checking current job:", error);
-        }
-      };
-      recheckCurrentJob();
-    }
-  }, [currentSlide, currentView, deviceId, hasCurrentJob]);
+    if (currentSlide !== 1 || currentView !== "initiation" || !deviceId) return;
+    getCurrentJob(deviceId)
+      .then((currentJob) => {
+        if (currentJob) setCurrentView("main");
+      })
+      .catch((error) => console.error("Error re-checking current job:", error));
+  }, [currentSlide, currentView, deviceId]);
 
-  const handleInitiationComplete = useCallback(async (data: UserData) => {
-    if (!deviceId) {
-      console.error("❌ No deviceId available");
-      return;
-    }
-
-    setUserData(data);
-    setCurrentView("main");
-
-    try {
-      const { saveCurrentJob } = await import("../services/currentJobs");
+  // ------------------------------------------------------------ job saving
+  /** Save the job, attach the role/salary to the business if it exists, and post the update. */
+  const persistJob = useCallback(
+    async (data: UserData) => {
       const salary = parseSalaryInput(data.salary);
+      const timePeriod = data.timePeriod || "HR";
 
       await saveCurrentJob(deviceId, {
         role: data.role,
-        salary: salary,
+        salary,
         location: data.location,
-        business_name: data.businessName || "",
-        time_period: data.timePeriod || "HR",
+        business_name: data.businessName || data.location,
+        time_period: timePeriod,
       });
 
       let businessId: string | undefined;
-
       try {
-        const { data: existingBusiness } = await supabase
-          .from("businesses")
-          .select("id")
-          .ilike("name", data.location)
-          .maybeSingle();
-
-        if (existingBusiness) {
-          businessId = existingBusiness.id;
-          const { createOrUpdateBusinessRole } = await import("../services/businesses");
+        const { data: existing } = await supabase.from("businesses").select("id").ilike("name", data.location).maybeSingle();
+        if (existing) {
+          businessId = existing.id;
           await createOrUpdateBusinessRole(data.location, data.role, data.salary);
         }
       } catch (roleError) {
         console.error("Error with business role:", roleError);
       }
 
-      const { createPost } = await import("../services/posts");
       await createPost(
-        `New Job Update! ${data.salary}/${data.timePeriod || "HR"} for ${data.role} 😳`,
+        `New Job Update! ${data.salary}/${timePeriod} for ${data.role} 😳`,
         "job_update",
         businessId,
         data.role,
-        data.timePeriod,
+        timePeriod,
         salary,
       );
-    } catch (error) {
-      console.error("❌ Error saving job data:", error);
-    }
-  }, [deviceId]);
+    },
+    [deviceId],
+  );
 
-  const handleJobUpdate = useCallback(async (jobData: {
-    salary: string;
-    role: string;
-    location: string;
-    businessName?: string;
-    timePeriod: string;
-  }) => {
-    if (!deviceId) {
-      console.error("❌ No deviceId available");
-      return;
-    }
-
-    try {
-      const { saveCurrentJob } = await import("../services/currentJobs");
-      const salary = parseSalaryInput(jobData.salary);
-
-      await saveCurrentJob(deviceId, {
-        role: jobData.role,
-        salary: salary,
-        location: jobData.location,
-        business_name: jobData.businessName || jobData.location,
-        time_period: jobData.timePeriod,
-      });
-
-      setUserData((prev) =>
-        prev
-          ? {
-              ...prev,
-              salary: jobData.salary,
-              role: jobData.role,
-              location: jobData.location,
-              businessName: jobData.businessName || jobData.location,
-              timePeriod: jobData.timePeriod,
-            }
-          : null,
-      );
-
-      let businessId: string | undefined;
-
+  const handleInitiationComplete = useCallback(
+    async (data: UserData) => {
+      setCurrentView("main");
       try {
-        const { data: existingBusiness } = await supabase
-          .from("businesses")
-          .select("id")
-          .ilike("name", jobData.location)
-          .maybeSingle();
+        await persistJob(data);
+      } catch (error) {
+        console.error("Error saving job data:", error);
+      }
+    },
+    [persistJob],
+  );
 
-        if (existingBusiness) {
-          businessId = existingBusiness.id;
-          const { createOrUpdateBusinessRole } = await import("../services/businesses");
-          await createOrUpdateBusinessRole(jobData.location, jobData.role, jobData.salary);
-        }
-      } catch (roleError) {
-        console.error("Error with business role:", roleError);
+  // ------------------------------------------------------- business selection
+  const handleBusinessClick = useCallback(
+    async (business: Business | null) => {
+      if (!business) {
+        setSelectedBusiness(null);
+        setFilteredBusinessId(null);
+        setShowBusinessDetails(false);
+        return;
       }
 
-      const { createPost } = await import("../services/posts");
-      await createPost(
-        `New Job Update! ${jobData.salary}/${jobData.timePeriod} for ${jobData.role} 😳`,
-        "job_update",
-        businessId,
-        jobData.role,
-        jobData.timePeriod,
-        salary,
-      );
-    } catch (error) {
-      console.error("Error updating job:", error);
-    }
-  }, [deviceId]);
-
-  const handleLocationSave = useCallback((location: string, fullLocation: string) => {
-    setUserData((prev) => {
-      if (prev) {
-        return {
-          ...prev,
-          location: location,
-          fullLocation: fullLocation,
-        };
-      }
-      return prev;
-    });
-  }, []);
-
-  const handleBusinessClick = useCallback(async (business: any) => {
-    if (!business) {
-      setSelectedBusiness(null);
+      setSelectedBusiness(business);
       setFilteredBusinessId(null);
-      setShowBusinessDetails(false);
-      return;
-    }
 
-    setSelectedBusiness(business);
-    setFilteredBusinessId(null);
-
-    if (business.name) {
-      handleLocationSave(business.name, business.name);
-    }
-
-    const needsFullDetails =
-      !business.atmosphere?.length ||
-      !business.roles?.length ||
-      (business.roles && business.roles.length > 0 && !business.roles[0]?.id);
-
-    if (needsFullDetails) {
-      fetchFullBusinessDetails(business.id).then((fullBusiness) => {
-        if (fullBusiness) {
-          setSelectedBusiness(fullBusiness);
-        }
-      });
-    }
-  }, [fetchFullBusinessDetails, handleLocationSave]);
+      if (!hasFullDetails(business)) {
+        const full = await getFullBusinessDetailsCached(business.id);
+        if (full) setSelectedBusiness((current) => (current?.id === full.id ? full : current));
+      }
+    },
+    [],
+  );
 
   const handleBusinessStoriesClick = useCallback((businessId: string) => {
     setFilteredBusinessId(businessId);
-    setFilteredUserStories(false); // Clear user stories filter
+    setFilteredUserStories(false);
     setCurrentSlide(2);
   }, []);
 
   const handleUserStoriesClick = useCallback(() => {
-    console.log('📖 My Stories clicked - setting filteredUserStories to true');
     setFilteredUserStories(true);
-    setFilteredBusinessId(null); // Clear any business filter
+    setFilteredBusinessId(null);
     setCurrentSlide(2);
   }, []);
 
   const handleBackToAllPosts = useCallback(() => {
-    console.log('⬅️ Back to all posts clicked');
     setFilteredBusinessId(null);
     setFilteredUserStories(false);
   }, []);
 
-  const handleFlyToBusiness = useCallback(async (businessId: string, post?: any) => {
-    const startTime = performance.now();
+  /** Jump from a post to its business on the map. */
+  const handleFlyToBusiness = useCallback(async (businessId: string, post?: Post) => {
     setCurrentSlide(1);
 
-    let business = businesses.find((b) => b.id === businessId);
-
-    const needsFullDetails =
-      !business?.roles?.length ||
-      !business?.atmosphere?.length ||
-      (business?.roles && business.roles.length > 0 && !business.roles[0]?.id);
-
-    if (needsFullDetails) {
-      fetchFullBusinessDetails(businessId).then((fullBusiness) => {
-        if (fullBusiness) {
-          setSelectedBusiness(fullBusiness);
-        }
-      });
-    }
-
+    // Show something immediately if the post carries coordinates, then upgrade to full details.
     if (post?.businessLat && post?.businessLng) {
-      if (!business && post.businessName) {
-        business = {
-          id: businessId,
-          name: post.businessName,
-          position: { lat: post.businessLat, lng: post.businessLng },
-          atmosphere: [],
-          roles: [],
-        };
-      }
-
-      if (business) {
-        setSelectedBusiness(business);
-        setShowBusinessDetails(true);
-      }
-
-      window.dispatchEvent(
-        new CustomEvent("flyToBusiness", {
-          detail: {
-            lat: post.businessLat,
-            lng: post.businessLng,
-            businessId: businessId,
-          },
-        }),
-      );
-      return;
-    }
-
-    if (business?.position?.lat && business?.position?.lng) {
-      setSelectedBusiness(business);
+      setSelectedBusiness({
+        id: businessId,
+        name: post.businessName ?? "",
+        position: { lat: post.businessLat, lng: post.businessLng },
+        atmosphere: [],
+        roles: [],
+      });
       setShowBusinessDetails(true);
-      window.dispatchEvent(
-        new CustomEvent("flyToBusiness", {
-          detail: {
-            lat: business.position.lat,
-            lng: business.position.lng,
-            businessId: businessId,
-          },
-        }),
-      );
-      return;
+      mapRef.current?.flyTo(post.businessLat, post.businessLng);
     }
 
-    if (business) {
-      setSelectedBusiness(business);
-    }
+    const full = await getFullBusinessDetailsCached(businessId);
+    if (!full) return;
+    setSelectedBusiness(full);
+    setShowBusinessDetails(true);
+    if (full.position?.lat && full.position?.lng) mapRef.current?.flyTo(full.position.lat, full.position.lng);
+  }, []);
 
-    try {
-      const fullBusiness = await fetchFullBusinessDetails(businessId);
-
-      if (!fullBusiness) {
-        console.error("❌ Failed to fetch business details (returned null)", performance.now() - startTime, "ms");
+  // ------------------------------------------------------------- role votes
+  const handleRoleVote = useCallback(
+    async (businessId: string, roleIndex: number, voteType: "up" | "down") => {
+      const business = selectedBusiness?.id === businessId ? selectedBusiness : null;
+      const role = business?.roles?.[roleIndex];
+      if (!business || !role?.id) {
+        toast.error("Unable to vote right now. Close and reopen the business to refresh its roles.");
         return;
       }
+      const roleId = role.id;
 
-      if (!fullBusiness.position?.lat || !fullBusiness.position?.lng) {
-        console.error("❌ Business details missing coordinates", performance.now() - startTime, "ms");
-        return;
-      }
+      setVotingRoles((prev) => new Set(prev).add(roleId));
 
-      setSelectedBusiness(fullBusiness);
-      setShowBusinessDetails(true);
-      window.dispatchEvent(
-        new CustomEvent("flyToBusiness", {
-          detail: {
-            lat: fullBusiness.position.lat,
-            lng: fullBusiness.position.lng,
-            businessId: businessId,
-          },
-        }),
-      );
-    } catch (error) {
-      console.error("❌ Error in handleFlyToBusiness:", error, performance.now() - startTime, "ms");
-    }
-  }, [businesses, fetchFullBusinessDetails]);
-
-  const handleRoleVote = useCallback(async (businessId: string, roleIndex: number, voteType: "up" | "down") => {
-    let business = selectedBusiness?.id === businessId ? selectedBusiness : businesses.find((b) => b.id === businessId);
-
-    if (!business?.roles?.[roleIndex]?.id) {
-      console.error("❌ Role missing ID - this should not happen!");
-      alert("Unable to vote: Role data is incomplete. Please try closing and reopening the business details.");
-      return;
-    }
-
-    const roleId = business.roles[roleIndex].id;
-    const role = business.roles[roleIndex];
-
-    setVotingRoles((prev) => new Set(prev).add(roleId));
-
-    try {
-      const { applyOptimisticVote } = await import("@/hooks/useOptimisticVote");
-      const { persistVote } = await import("@/services/voting");
-
-      // Shared apply: write the given vote values into the businesses array for
-      // this role, and keep selectedBusiness in sync. Used for both the
-      // optimistic update and the rollback.
-      const applyRoleVote = ({
-        newUserVote,
-        newTotal,
-      }: {
-        newUserVote: "up" | "down" | null;
-        newTotal: number;
-      }) => {
-        let updatedBusinessForSelection: Business | null = null;
-
-        setBusinesses((prev) =>
-          prev.map((b) => {
-            if (b.id === businessId && b.roles) {
-              const updatedBusiness = {
-                ...b,
-                roles: b.roles.map((r, idx) =>
-                  idx === roleIndex ? { ...r, votesTotal: newTotal, userVote: newUserVote } : r,
-                ),
-              };
-
-              if (selectedBusiness?.id === businessId) {
-                updatedBusinessForSelection = updatedBusiness;
-              }
-
-              return updatedBusiness;
-            }
-            return b;
-          }),
-        );
-
-        if (updatedBusinessForSelection) {
-          setSelectedBusiness(updatedBusinessForSelection);
-        }
+      const applyRoleVote = ({ newUserVote, newTotal }: { newUserVote: "up" | "down" | null; newTotal: number }) => {
+        setSelectedBusiness((current) => {
+          if (!current || current.id !== businessId || !current.roles) return current;
+          const updated = {
+            ...current,
+            roles: current.roles.map((r, idx) => (idx === roleIndex ? { ...r, votesTotal: newTotal, userVote: newUserVote } : r)),
+          };
+          setCachedBusiness(updated);
+          return updated;
+        });
       };
 
-      await applyOptimisticVote({
-        currentUserVote: role.userVote,
-        currentVotesTotal: role.votesTotal,
-        voteType,
-        apply: applyRoleVote,
-        persist: async (newUserVote) => {
-          const dbVoteType = newUserVote === "up" ? "upvote" : newUserVote === "down" ? "downvote" : null;
-          const result = await persistVote("role_votes", "business_role_id", roleId, dbVoteType);
-          if (!result.success) {
-            console.error("❌ Failed to persist vote:", result.error);
-          }
-          return result.success;
-        },
-        // Rollback (via apply with previous values) is handled by the primitive;
-        // we only need to surface the failure to the user here.
-        onError: () => {
-          alert("Vote failed to save. Please try again.");
-        },
-      });
-      // Success: the optimistic update above is authoritative for the user's own
-      // vote, so we skip the post-vote full refetch (saves 3 queries per vote).
-    } finally {
-      setVotingRoles((prev) => {
-        const next = new Set(prev);
-        next.delete(roleId);
-        return next;
-      });
-    }
-  }, [businesses, selectedBusiness, setBusinesses, fetchFullBusinessDetails]);
-
-  useEffect(() => {
-    if (selectedBusiness) {
-      const updatedBusiness = businesses.find((b) => b.id === selectedBusiness.id);
-      if (updatedBusiness && updatedBusiness !== selectedBusiness) {
-        setSelectedBusiness(updatedBusiness);
+      try {
+        await applyOptimisticVote({
+          currentUserVote: role.userVote ?? null,
+          currentVotesTotal: role.votesTotal,
+          voteType,
+          apply: applyRoleVote,
+          persist: async (newUserVote) => {
+            const dbVoteType = newUserVote === "up" ? "upvote" : newUserVote === "down" ? "downvote" : null;
+            const result = await persistVote("role_votes", "business_role_id", roleId, dbVoteType);
+            return result.success;
+          },
+          onError: () => toast.error("Vote failed to save. Please try again."),
+        });
+      } finally {
+        setVotingRoles((prev) => {
+          const next = new Set(prev);
+          next.delete(roleId);
+          return next;
+        });
       }
-    }
-  }, [businesses, selectedBusiness]);
+    },
+    [selectedBusiness],
+  );
 
+  // ------------------------------------------------------------ slide state
   useEffect(() => {
     if (currentSlide === 2 || currentSlide === 0) {
       if (selectedBusiness) {
@@ -560,166 +269,81 @@ const MobileApp: React.FC = () => {
       setSelectedBusiness(previouslySelectedBusiness);
       setPreviouslySelectedBusiness(null);
     }
-
-    // Only clear filteredUserStories if moving away from slide 2 AND it wasn't just set
-    // This prevents race conditions where the state is cleared right after being set
   }, [currentSlide, selectedBusiness, previouslySelectedBusiness]);
 
-  const getSettingsCardPosition = useCallback(() => {
+  const settingsCardPosition = useMemo(() => {
     if (!isMobile) return currentSlide === 0 ? "0%" : "-100%";
-    if (currentSlide === 0) return "0%";
-    if (currentSlide === 1) return "-92.75%";
-    return "-200%";
+    return currentSlide === 0 ? "0%" : currentSlide === 1 ? "-92.75%" : "-200%";
   }, [isMobile, currentSlide]);
 
-  const getExploreCardPosition = useCallback(() => {
+  const exploreCardPosition = useMemo(() => {
     if (!isMobile) return currentSlide === 2 ? "0%" : "100%";
-    if (currentSlide === 2) return "0%";
-    if (currentSlide === 1) return "92.75%";
-    return "200%";
+    return currentSlide === 2 ? "0%" : currentSlide === 1 ? "92.75%" : "200%";
   }, [isMobile, currentSlide]);
 
-  const shouldRenderSettingsCard = useMemo(() => {
-    return isMobile || currentSlide === 0;
-  }, [isMobile, currentSlide]);
+  const shouldRenderSettingsCard = isMobile || currentSlide === 0;
+  const shouldRenderExploreCard = isMobile || currentSlide === 2;
 
-  const shouldRenderExploreCard = useMemo(() => {
-    return isMobile || currentSlide === 2;
-  }, [isMobile, currentSlide]);
+  const handleSettingsPostClick = useCallback(() => setCurrentSlide(2), []);
 
-  const handlePostClick = useCallback((post: Post) => {
-    setExpandedPost(post.id);
-  }, []);
-
-  const handleShowBusinessDetails = useCallback(() => {
-    setShowBusinessDetails(true);
-  }, []);
-
-  const handleBackToPreview = useCallback(() => {
-    setShowBusinessDetails(false);
-  }, []);
-
-  const handleSettingsPostClick = useCallback((post: Post) => {
-    setExpandedPost(post.id);
-    setCurrentSlide(2);
-  }, []);
-
-  const handleSearchTrigger = useCallback((searchTerm: string) => {
-    setCurrentSlide(1);
-    setTimeout(() => {
-      const searchEvent = new CustomEvent("triggerSearch", { detail: searchTerm });
-      window.dispatchEvent(searchEvent);
-    }, 100);
-  }, []);
-
-  const handleExploreBusinessView = useCallback((businessId: string) => {
-    const business = businesses.find((b) => b.id === businessId);
-    if (business) {
-      setSelectedBusiness(business);
-      setCurrentSlide(1);
-    } else {
-      (async () => {
-        const full = await fetchFullBusinessDetails(businessId);
-        if (full) {
-          setSelectedBusiness(full);
-          setCurrentSlide(1);
-        }
-      })();
-    }
-  }, [businesses, fetchFullBusinessDetails]);
-
-  const handleExpandedPostChange = useCallback((postId: string | null) => {
-    setExpandedPost(postId);
-  }, []);
-
-  const handleCommentSubmit = useCallback((postId: string, comment: string) => {
-    setComments((prev) => ({
-      ...prev,
-      [postId]: [...(prev[postId] || []), comment],
-    }));
-  }, []);
-
-  // ==================== SMART TOUCH HANDLERS ====================
-  
-  const handleTouchStart = useCallback((e: React.TouchEvent, cardType: 'settings' | 'explore') => {
+  // ---------------------------------------------------------- swipe gestures
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
     const touch = e.touches[0];
     touchStartXRef.current = touch.clientX;
     touchStartYRef.current = touch.clientY;
     dragStartTimeRef.current = Date.now();
-    
-    // Track initial scroll position
-    const scrollableElement = e.currentTarget.querySelector('[data-scrollable]');
-    if (scrollableElement) {
-      touchStartScrollTopRef.current = scrollableElement.scrollTop;
-    }
-    
     isDraggingHorizontallyRef.current = false;
     hasScrolledRef.current = false;
   }, []);
 
-  const handleTouchMove = useCallback((e: React.TouchEvent, cardType: 'settings' | 'explore') => {
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
     const touch = e.touches[0];
     const deltaX = Math.abs(touch.clientX - touchStartXRef.current);
     const deltaY = Math.abs(touch.clientY - touchStartYRef.current);
-    
-    // Determine intent VERY early (after just 5px)
+
+    // Decide intent early: mostly-horizontal means swipe, otherwise let it scroll.
     if (!isDraggingHorizontallyRef.current && !hasScrolledRef.current && (deltaX > 5 || deltaY > 5)) {
-      // If more horizontal than vertical, treat as swipe
       if (deltaX > deltaY * 1.5) {
         isDraggingHorizontallyRef.current = true;
-        // Prevent scrolling during horizontal swipe
         e.preventDefault();
       } else {
-        // More vertical - allow scroll
         hasScrolledRef.current = true;
       }
     }
-    
-    // Continue preventing scroll if we're swiping horizontally
-    if (isDraggingHorizontallyRef.current) {
-      e.preventDefault();
-    }
+    if (isDraggingHorizontallyRef.current) e.preventDefault();
   }, []);
 
-  const handleTouchEnd = useCallback((e: React.TouchEvent, cardType: 'settings' | 'explore') => {
-    if (!isDraggingHorizontallyRef.current) {
-      return;
-    }
-    
-    const touch = e.changedTouches[0];
-    const deltaX = touch.clientX - touchStartXRef.current;
-    const deltaTime = Date.now() - dragStartTimeRef.current;
-    const velocity = Math.abs(deltaX) / deltaTime; // px/ms
-    
-    // Very forgiving thresholds for mobile
-    const DISTANCE_THRESHOLD = 30; // Just 30px
-    const VELOCITY_THRESHOLD = 0.3; // 0.3 px/ms (300 px/s)
-    
-    const isQuickSwipe = velocity > VELOCITY_THRESHOLD;
-    const isLongSwipe = Math.abs(deltaX) > DISTANCE_THRESHOLD;
-    
-    if (isQuickSwipe || isLongSwipe) {
-      if (cardType === 'settings') {
-        // Settings card: swipe left to go to home, swipe right from home to go to settings
-        if (currentSlide === 0 && deltaX < -15) {
-          setCurrentSlide(1);
-        } else if (currentSlide === 1 && deltaX > 15) {
-          setCurrentSlide(0);
-        }
-      } else {
-        // Explore card: swipe right to go to home, swipe left from home to go to explore
-        if (currentSlide === 2 && deltaX > 15) {
-          setCurrentSlide(1);
-        } else if (currentSlide === 1 && deltaX < -15) {
-          setCurrentSlide(2);
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent, cardType: "settings" | "explore") => {
+      if (!isDraggingHorizontallyRef.current) return;
+
+      const touch = e.changedTouches[0];
+      const deltaX = touch.clientX - touchStartXRef.current;
+      const deltaTime = Date.now() - dragStartTimeRef.current;
+      const velocity = Math.abs(deltaX) / deltaTime; // px/ms
+
+      const DISTANCE_THRESHOLD = 30;
+      const VELOCITY_THRESHOLD = 0.3;
+      const isQuickSwipe = velocity > VELOCITY_THRESHOLD;
+      const isLongSwipe = Math.abs(deltaX) > DISTANCE_THRESHOLD;
+
+      if (isQuickSwipe || isLongSwipe) {
+        if (cardType === "settings") {
+          if (currentSlide === 0 && deltaX < -15) setCurrentSlide(1);
+          else if (currentSlide === 1 && deltaX > 15) setCurrentSlide(0);
+        } else {
+          if (currentSlide === 2 && deltaX > 15) setCurrentSlide(1);
+          else if (currentSlide === 1 && deltaX < -15) setCurrentSlide(2);
         }
       }
-    }
-    
-    // Reset
-    isDraggingHorizontallyRef.current = false;
-    hasScrolledRef.current = false;
-  }, [currentSlide]);
+
+      isDraggingHorizontallyRef.current = false;
+      hasScrolledRef.current = false;
+    },
+    [currentSlide],
+  );
+
+  const cardTransition = { type: "spring", stiffness: 300, damping: 30, mass: 0.8 } as const;
 
   return (
     <div className={`fixed inset-0 ${!isMobile ? "overflow-hidden" : ""}`}>
@@ -728,114 +352,92 @@ const MobileApp: React.FC = () => {
           <Skeleton className="w-full h-full" />
         </div>
       )}
-  
+
       <Suspense fallback={<Skeleton className="w-full h-full" />}>
         <HomePage
+          mapRef={mapRef}
           currentSlide={currentSlide}
           currentView={currentView === "loading" ? "main" : currentView}
           selectedBusiness={selectedBusiness}
           onBusinessSelect={handleBusinessClick}
           posts={posts}
           onBusinessStoriesClick={handleBusinessStoriesClick}
-          onPostClick={handlePostClick}
           onRoleVote={handleRoleVote}
-          onLocationSave={handleLocationSave}
           votingRoles={votingRoles}
           showBusinessDetails={showBusinessDetails}
-          onShowBusinessDetails={handleShowBusinessDetails}
-          onBackToPreview={handleBackToPreview}
+          onShowBusinessDetails={() => setShowBusinessDetails(true)}
+          onBackToPreview={() => setShowBusinessDetails(false)}
         />
       </Suspense>
-  
+
       {shouldRenderSettingsCard && currentView !== "initiation" && (
         <motion.div
-          animate={{ x: getSettingsCardPosition() }}
-          transition={{
-            type: "spring",
-            stiffness: 300,
-            damping: 30,
-            mass: 0.8,
-          }}
+          animate={{ x: settingsCardPosition }}
+          transition={cardTransition}
           className="absolute inset-0 z-20"
           style={{
             pointerEvents: currentSlide === 0 || (isMobile && currentSlide === 1) ? "auto" : "none",
-            filter: currentSlide === 0 ? 'none' : 'brightness(0.95)',
+            filter: currentSlide === 0 ? "none" : "brightness(0.95)",
           }}
-          onTouchStart={(e) => handleTouchStart(e, 'settings')}
-          onTouchMove={(e) => handleTouchMove(e, 'settings')}
-          onTouchEnd={(e) => handleTouchEnd(e, 'settings')}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={(e) => handleTouchEnd(e, "settings")}
         >
           <div data-scrollable className="h-full overflow-y-auto">
             <Suspense fallback={<Skeleton className="w-full h-full" />}>
-              <SettingsPage
-                initialData={userData || { salary: "", role: "", location: "", businessName: "", timePeriod: "HR" }}
-                onStoriesClick={handleUserStoriesClick}
-                onPostClick={handleSettingsPostClick}
-                onJobUpdate={handleJobUpdate}
-                onSearchTrigger={handleSearchTrigger}
-              />
+              <SettingsPage onStoriesClick={handleUserStoriesClick} onPostClick={handleSettingsPostClick} />
             </Suspense>
           </div>
         </motion.div>
       )}
-  
+
       {shouldRenderExploreCard && currentView !== "initiation" && (
         <motion.div
-          animate={{ x: getExploreCardPosition() }}
-          transition={{
-            type: "spring",
-            stiffness: 300,
-            damping: 30,
-            mass: 0.8,
-          }}
+          animate={{ x: exploreCardPosition }}
+          transition={cardTransition}
           className="absolute inset-0 z-20"
           style={{
             pointerEvents: currentSlide === 2 || (isMobile && currentSlide === 1) ? "auto" : "none",
-            filter: currentSlide === 2 ? 'none' : 'brightness(0.95)',
+            filter: currentSlide === 2 ? "none" : "brightness(0.95)",
           }}
-          onTouchStart={(e) => handleTouchStart(e, 'explore')}
-          onTouchMove={(e) => handleTouchMove(e, 'explore')}
-          onTouchEnd={(e) => handleTouchEnd(e, 'explore')}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={(e) => handleTouchEnd(e, "explore")}
         >
-          <div data-scrollable className="h-full overflow-y-auto">
+          <div data-scrollable className="h-full">
             <Suspense fallback={<Skeleton className="w-full h-full" />}>
               <ExplorePage
                 currentSlide={currentSlide}
                 filteredBusinessId={filteredBusinessId || undefined}
                 filteredUserStories={filteredUserStories}
-                onBusinessView={handleExploreBusinessView}
-                onExpandedPostChange={handleExpandedPostChange}
-                onCommentSubmit={handleCommentSubmit}
                 onBackToAllPosts={handleBackToAllPosts}
-                onNavigateToHomeBusiness={handleFlyToBusiness}
                 onFlyToBusiness={handleFlyToBusiness}
               />
             </Suspense>
           </div>
         </motion.div>
       )}
-  
+
       {currentView === "initiation" && (
         <div className="fixed inset-0 z-[60]">
           <InitiationPage onComplete={handleInitiationComplete} />
         </div>
       )}
-  
+
       {!isMobile && (
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-50">
           {[0, 1, 2].map((index) => (
             <button
               key={index}
               onClick={() => setCurrentSlide(index)}
-              className={`w-3 h-3 rounded-full transition-colors ${
-                index === currentSlide ? "bg-app-yellow" : "bg-app-gray-light"
-              }`}
+              aria-label={["Settings", "Map", "Explore"][index]}
+              className={`w-3 h-3 rounded-full transition-colors ${index === currentSlide ? "bg-app-yellow" : "bg-app-gray-light"}`}
             />
           ))}
         </div>
       )}
     </div>
   );
-}
+};
 
 export default MobileApp;

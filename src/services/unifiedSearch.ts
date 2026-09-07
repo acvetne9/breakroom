@@ -2,8 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Business } from "@/types/business";
 import { applyBusinessFilters, SearchFilters } from "./businessFiltering";
 import { expandTerm } from "@/utils/smartSearch";
-import { sanitizeVoteTotal } from "@/utils/voteCalculations";
-import { mapBusinessRow, mapRoleRow } from "@/utils/businessMapper";
+import { mapBusinessRow, mapRoleRow, type RawBusinessRow, type RawRoleRow } from "@/utils/businessMapper";
 import { findNeighborhoodBoundaryByName } from "@/utils/nyc_neighborhoods";
 import { parseAdvancedSalaryPatterns } from "@/utils/searchParsing";
 import { retryWithBackoff, isRetryableError } from "@/utils/retryWithBackoff";
@@ -14,8 +13,7 @@ const searchCache = new Map<string, { results: Business[]; timestamp: number }>(
 const CACHE_DURATION = 30000; // 30 seconds
 const MAX_CACHE_SIZE = 100;
 
-export interface UnifiedSearchFilters extends SearchFilters {}
-
+export type UnifiedSearchFilters = SearchFilters;
 /**
  * Widen a parsed filter's role terms with synonyms (via DataMuse) for broader role
  * matching. Keeps `originalTerms` (used for name/type/address matching) and every other
@@ -97,7 +95,7 @@ export const searchBusinessesUnified = async (
 
   try {
     // Use database-level text search for comprehensive matching
-    let businesses: any[] = [];
+    let businesses: RawBusinessRow[] = [];
 
     // Universal search across ALL fields (name, type, address, roles)
     if (
@@ -183,7 +181,7 @@ export const searchBusinessesUnified = async (
 
         // Fetch businesses from role matches in batches
         const FETCH_BATCH_SIZE = 200;
-        const roleBusinesses: any[] = [];
+        const roleBusinesses: RawBusinessRow[] = [];
 
         for (let i = 0; i < roleBusinessIds.length; i += FETCH_BATCH_SIZE) {
           const batchIds = roleBusinessIds.slice(i, i + FETCH_BATCH_SIZE);
@@ -252,7 +250,7 @@ export const searchBusinessesUnified = async (
 
     // Load roles in safe batches with optimized parallelism
     const businessIds = businesses.map((b) => b.id);
-    let allRoles: any[] = [];
+    let allRoles: RawRoleRow[] = [];
 
     if (businessIds.length > 0 && shouldLoadRoles) {
       const BATCH_SIZE = 200; // Optimized batch size for better URL utilization
@@ -265,7 +263,7 @@ export const searchBusinessesUnified = async (
       // Use Promise.all for cleaner parallel execution
       const batchPromises = chunks.map((chunk, index) =>
         // Stagger batches to avoid overwhelming the server
-        new Promise<any[]>((resolve) => {
+        new Promise<RawRoleRow[]>((resolve) => {
           setTimeout(async () => {
             try {
               const { data, error } = await supabase

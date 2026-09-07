@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useCallback } from "react";
-import MapLibreMap from "./MapLibreMap";
+import React, { useState, useEffect, useCallback, RefObject } from "react";
+import MapLibreMap, { type MapHandle } from "./MapLibreMap";
 import BusinessPreview from "./BusinessPreview";
 import BusinessDetails from "./BusinessDetails";
 import WorkaroundLoading from "./WorkaroundLoading";
 import UnifiedBusinessSearch from "./UnifiedBusinessSearch";
 import { EnhancedBusiness } from "@/types/search";
-import { parseSearchFilters } from "@/services/businessFiltering";
+import { parseSearchFilters, type SearchFilters } from "@/services/businessFiltering";
 import { clearSearchCache, expandFilterTerms } from "@/services/unifiedSearch";
+import type { Business } from "@/types/business";
+import type { Post } from "@/services/posts";
 
 const LANDMARKS = [
   { lat: 40.690331, lng: -74.045414, emoji: "🗽" },
@@ -33,22 +35,12 @@ const LANDMARKS = [
   { lat: 40.625569, lng: -74.115425, emoji: "🐾" },
 ];
 
-interface Post {
-  id: string;
-  author: string;
-  text: string;
-  businessId?: string;
-  businessName?: string;
-  images?: string[];
-  isStory?: boolean;
-  createdAt: Date;
-}
-
 interface HomePageProps {
+  mapRef: RefObject<MapHandle>;
   currentSlide?: number;
   currentView?: "initiation" | "main";
-  selectedBusiness?: any;
-  onBusinessSelect?: (business: any) => void;
+  selectedBusiness?: Business | null;
+  onBusinessSelect?: (business: Business | null) => void;
   posts?: Post[];
   onBusinessStoriesClick?: (businessId: string) => void;
   onPostClick?: (post: Post) => void;
@@ -61,10 +53,11 @@ interface HomePageProps {
 }
 
 const HomePage: React.FC<HomePageProps> = ({
+  mapRef,
   currentSlide = 1,
   currentView = "main",
   onBackToPreview,
-  selectedBusiness: propSelectedBusiness,
+  selectedBusiness,
   onBusinessSelect,
   posts = [],
   onBusinessStoriesClick,
@@ -72,7 +65,7 @@ const HomePage: React.FC<HomePageProps> = ({
   onRoleVote,
   onLocationSave,
   votingRoles,
-  showBusinessDetails: propShowBusinessDetails = false,
+  showBusinessDetails = false,
   onShowBusinessDetails,
 }) => {
   const [searchValue, setSearchValue] = useState("");
@@ -83,32 +76,18 @@ const HomePage: React.FC<HomePageProps> = ({
   const [businessDataReady, setBusinessDataReady] = useState(false);
   const [searchCompleted, setSearchCompleted] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [searchFilters, setSearchFilters] = useState<SearchFilters | null>(null);
 
-  // Computed loading state - show overlay until all three complete
   const showLoadingOverlay = !animationComplete || !mapDataReady || !businessDataReady;
 
-  // Debounce search value updates (2 seconds as requested)
+  // Debounce typing before the map reloads (Enter triggers immediately).
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchValue(searchValue);
-    }, 2000);
+    const timer = setTimeout(() => setDebouncedSearchValue(searchValue), 2000);
     return () => clearTimeout(timer);
   }, [searchValue]);
 
-  // Handle Enter key to trigger immediate search
-  const handleSearchKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter") {
-        setDebouncedSearchValue(searchValue);
-      }
-    },
-    [searchValue],
-  );
-
-  // Parse the debounced query into map search filters, then widen role terms with the
-  // same synonym expansion the dropdown uses (async) so the map and dropdown stay
-  // consistent. Neighborhood/role/type detection still comes from parseSearchFilters.
-  const [searchFilters, setSearchFilters] = useState<any>(null);
+  // Parse the query into map filters, then widen role terms with the same synonym
+  // expansion the dropdown uses so the map and dropdown agree.
   useEffect(() => {
     if (!debouncedSearchValue.trim()) {
       setSearchFilters(null);
@@ -121,144 +100,65 @@ const HomePage: React.FC<HomePageProps> = ({
       return;
     }
 
-    if (base.neighborhoodFilter?.center) {
-      setNeighborhoodCenter(base.neighborhoodFilter.center);
-    }
+    if (base.neighborhoodFilter?.center) setNeighborhoodCenter(base.neighborhoodFilter.center);
 
     let cancelled = false;
     expandFilterTerms(base)
-      .then((expanded) => {
-        if (!cancelled) setSearchFilters(expanded);
-      })
-      .catch(() => {
-        // On expansion failure fall back to the unexpanded filters
-        if (!cancelled) setSearchFilters(base);
-      });
+      .then((expanded) => !cancelled && setSearchFilters(expanded))
+      .catch(() => !cancelled && setSearchFilters(base));
 
     return () => {
       cancelled = true;
     };
   }, [debouncedSearchValue]);
 
-  // Listen for search triggers from other pages
   useEffect(() => {
-    const handleSearchTrigger = (event: CustomEvent) => {
-      const searchTerm = event.detail;
-      console.log("🔍 [triggerSearch] Received search trigger:", searchTerm);
-      clearSearchCache();
-      setSearchValue(searchTerm);
-      setSearchCompleted(true);
+    if (showLoadingOverlay || currentView !== "main") return;
+    let hide: ReturnType<typeof setTimeout> | undefined;
+    const show = setTimeout(() => {
+      setShowWelcome(true);
+      hide = setTimeout(() => setShowWelcome(false), 6000);
+    }, 500);
+    return () => {
+      clearTimeout(show);
+      if (hide) clearTimeout(hide);
     };
-
-    window.addEventListener("triggerSearch", handleSearchTrigger as EventListener);
-    return () => window.removeEventListener("triggerSearch", handleSearchTrigger as EventListener);
-  }, []);
-
-  const handleLoadingComplete = () => {
-    setAnimationComplete(true);
-  };
-
-  const handleMapLoaded = () => {
-    setMapDataReady(true);
-  };
-
-  const handleBusinessesLoaded = () => {
-    setBusinessDataReady(true);
-  };
-
-  useEffect(() => {
-    if (!showLoadingOverlay && currentView === "main") {
-      const timer1 = setTimeout(() => {
-        setShowWelcome(true);
-        const timer2 = setTimeout(() => setShowWelcome(false), 6000);
-        return () => clearTimeout(timer2);
-      }, 500);
-      return () => clearTimeout(timer1);
-    }
   }, [showLoadingOverlay, currentView]);
 
-  const selectedBusiness = propSelectedBusiness;
+  const handleSearchChange = useCallback((value: string) => {
+    if (value.trim()) clearSearchCache();
+    setSearchValue(value);
+    setSearchCompleted(!!value.trim());
+    if (!value.trim()) setNeighborhoodCenter(null);
+  }, []);
 
-  const handleSearchChange = useCallback(
-    (value: string, business?: EnhancedBusiness, filters?: any, neighborhoodCoords?: { lat: number; lon: number }) => {
-      console.log("🔍 Search change in HomePage:", { value });
-
-      if (value.trim()) {
-        clearSearchCache();
-      }
-
-      setSearchValue(value);
-      setSearchCompleted(!!value.trim());
-
-      if (!value.trim()) {
-        console.log("🧹 Search cleared");
-        setNeighborhoodCenter(null);
-        setSearchCompleted(false);
+  const handleBusinessClick = useCallback(
+    (business: Business & { formatted_address?: string; vicinity?: string }) => {
+      onBusinessSelect?.(business);
+      if (onLocationSave && business.name) {
+        const fullLocation = business.formatted_address || business.vicinity || business.name;
+        onLocationSave(fullLocation, fullLocation);
       }
     },
-    [],
+    [onBusinessSelect, onLocationSave],
   );
 
-  const handleSearchBusinessSelect = (business: EnhancedBusiness) => {
-    console.log("🔍 DEBUG: handleSearchBusinessSelect deps check", {
-      hasSearchFilters: !!searchFilters,
-    });
-    const mapBusiness = {
-      ...business,
-      businessType: business.businessType || business.business_type,
-      formatted_address: business.formatted_address || business.vicinity || business.name,
-    };
-
-    if (business?.position?.lat && business?.position?.lng) {
-      window.dispatchEvent(
-        new CustomEvent("flyToBusiness", {
-          detail: {
-            lat: business.position.lat,
-            lng: business.position.lng,
-            business: mapBusiness,
-          },
-        }),
-      );
-    }
-
-    handleBusinessClick(mapBusiness);
-    console.log("🔍 Business selected from search - keeping filters active:", searchFilters);
-  };
-
-  const handleBusinessClick = (business: any) => {
-    console.log("🏠 HomePage handleBusinessClick called:", business?.name);
-    console.log("🔍 DEBUG: handleBusinessClick deps check", {
-      onBusinessSelect: typeof onBusinessSelect,
-      onLocationSave: typeof onLocationSave,
-    });
-    onBusinessSelect?.(business);
-
-    if (onLocationSave && business.name) {
-      const fullLocation = business.formatted_address || business.vicinity || business.name;
-      onLocationSave(fullLocation, fullLocation);
-    }
-  };
-
-  const handleShowBusinessDetails = () => {
-    onShowBusinessDetails?.();
-  };
-
-  const handleBusinessStoriesClick = () => {
-    onBusinessStoriesClick?.(selectedBusiness.id);
-  };
-
-  const handleClosePreview = () => {
-    onBusinessSelect?.(null);
-  };
-
-  const handleBackToPreview = () => {
-    onBackToPreview?.();
-  };
-
-  const showBusinessDetails = propShowBusinessDetails;
+  const handleSearchBusinessSelect = useCallback(
+    (business: EnhancedBusiness) => {
+      const mapBusiness = {
+        ...business,
+        businessType: business.businessType || business.business_type,
+        formatted_address: business.formatted_address || business.vicinity || business.name,
+      };
+      if (business.position?.lat && business.position?.lng) {
+        mapRef.current?.flyTo(business.position.lat, business.position.lng);
+      }
+      handleBusinessClick(mapBusiness);
+    },
+    [handleBusinessClick, mapRef],
+  );
 
   const handleClearSearch = useCallback(() => {
-    console.log("🧹 Clearing search from X button");
     setSearchValue("");
     setDebouncedSearchValue("");
     setNeighborhoodCenter(null);
@@ -267,48 +167,27 @@ const HomePage: React.FC<HomePageProps> = ({
 
   const hasActiveSearch = searchValue.trim() !== "" || searchFilters !== null;
   const showClearButton = searchCompleted && hasActiveSearch;
-
-  useEffect(() => {
-    const handleResize = () => {
-      const mapContainer = document.querySelector(".maplibregl-map") as HTMLElement;
-      if (mapContainer) {
-        // @ts-ignore
-        const map = mapContainer?.__map__ || mapContainer?.map;
-        if (map && typeof map.resize === "function") {
-          map.resize();
-        }
-      }
-    };
-
-    window.addEventListener("resize", handleResize);
-    handleResize();
-
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  const interactive = currentSlide === 1;
 
   return (
     <div
       className="absolute inset-0 w-full h-full min-w-[200px] min-h-[200px]"
-      style={{
-        pointerEvents: currentSlide !== 1 ? "none" : "auto",
-        touchAction: currentSlide !== 1 ? "none" : "auto",
-      }}
+      style={{ pointerEvents: interactive ? "auto" : "none", touchAction: interactive ? "auto" : "none" }}
     >
-      {/* Map renders immediately but hidden behind loading screen */}
-      <div className="absolute inset-0" style={{ pointerEvents: currentSlide !== 1 ? "none" : "auto" }}>
+      <div className="absolute inset-0" style={{ pointerEvents: interactive ? "auto" : "none" }}>
         <MapLibreMap
+          ref={mapRef}
           onBusinessClick={handleBusinessClick}
           selectedBusiness={selectedBusiness}
           landmarks={LANDMARKS}
           searchFilters={searchFilters}
           neighborhoodCenter={neighborhoodCenter}
-          onMapLoaded={handleMapLoaded}
-          onBusinessesLoaded={handleBusinessesLoaded}
+          onMapLoaded={() => setMapDataReady(true)}
+          onBusinessesLoaded={() => setBusinessDataReady(true)}
         />
       </div>
 
-      {/* Loading overlay on top */}
-      <WorkaroundLoading onComplete={handleLoadingComplete} isLoaded={mapDataReady && businessDataReady} />
+      <WorkaroundLoading onComplete={() => setAnimationComplete(true)} isLoaded={mapDataReady && businessDataReady} />
 
       {showWelcome && !showLoadingOverlay && (
         <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-30 w-[90%] max-w-lg transition-opacity duration-700">
@@ -325,9 +204,9 @@ const HomePage: React.FC<HomePageProps> = ({
             <BusinessPreview
               business={selectedBusiness}
               posts={posts}
-              onClose={handleClosePreview}
-              onShowDetails={handleShowBusinessDetails}
-              onStoriesClick={handleBusinessStoriesClick}
+              onClose={() => onBusinessSelect?.(null)}
+              onShowDetails={() => onShowBusinessDetails?.()}
+              onStoriesClick={() => onBusinessStoriesClick?.(selectedBusiness.id)}
             />
           )}
 
@@ -335,8 +214,8 @@ const HomePage: React.FC<HomePageProps> = ({
             <BusinessDetails
               business={selectedBusiness}
               posts={posts}
-              onClose={handleClosePreview}
-              onBackToPreview={handleBackToPreview}
+              onClose={() => onBusinessSelect?.(null)}
+              onBackToPreview={() => onBackToPreview?.()}
               onStoriesClick={() => onBusinessStoriesClick?.(selectedBusiness.id)}
               onPostClick={onPostClick}
               onRoleVote={onRoleVote}
@@ -344,7 +223,7 @@ const HomePage: React.FC<HomePageProps> = ({
             />
           )}
 
-          {currentSlide === 1 && (
+          {interactive && (
             <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
               <div className="relative">
                 <UnifiedBusinessSearch

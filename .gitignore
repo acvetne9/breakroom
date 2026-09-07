@@ -24,3 +24,21 @@ dist-ssr
 *.sw?
 .vercel
 .env*
+
+# Secrets: never commit signing keys or env files
+*.jks
+*.keystore
+android/keystore.properties
+
+# Local signing material
+secrets/
+
+# Playwright smoke-test screenshots
+.e2e-shots/
+
+# Supabase CLI link state (contains project urls)
+supabase/.temp/
+
+# Claude skills tooling (not part of the app)
+.agents/
+skills-lock.json

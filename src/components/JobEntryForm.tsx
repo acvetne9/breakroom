@@ -1,6 +1,7 @@
 import React from "react";
 import JobSearchDropdown from "./JobSearchDropdown";
 import UnifiedBusinessSearch from "./UnifiedBusinessSearch";
+import type { EnhancedBusiness } from "@/types/search";
 
 /**
  * Shared, fully-controlled presentational pieces for the "job entry" UI that is
@@ -23,7 +24,7 @@ interface BusinessAddressFieldProps {
   // Business search input
   businessValue: string;
   onBusinessChange: (value: string) => void;
-  onBusinessSelect: (business: any) => void;
+  onBusinessSelect: (business: EnhancedBusiness) => void;
   onBusinessBlur?: () => void;
   businessPlaceholder: string;
   businessClassName: string;

@@ -4,7 +4,7 @@ import { Business } from '@/types/business';
 export interface NeighborhoodBounds {
   borough: string;
   name: string;
-  boundary: any;
+  boundary: { lat: number; lon: number }[];
   center?: { lat: number; lon: number }; // optional
 }
 
@@ -442,7 +442,7 @@ export function generateNeighborhoodBoundary(
   neighbors: { name: string; lat: number; lon: number }[]
 ) {
   // Find the actual boundary from our data
-  for (const [borough, neighborhoods] of Object.entries(nycNeighborhoodBoundaries)) {
+  for (const neighborhoods of Object.values(nycNeighborhoodBoundaries)) {
     if (neighborhoods[neighborhood.name]) {
       return neighborhoods[neighborhood.name];
     }
@@ -580,15 +580,6 @@ export const isPointInPolygon = (point: { lat: number; lon: number }, polygon: {
     if (intersect) inside = !inside;
   }
   return inside;
-};
-
-// Merge new businesses with existing, deduplicate by ID
-const mergeWithExisting = (existing: Business[], incoming: Business[]) => {
-  const map = new Map(existing.map(b => [b.id, b]));
-  for (const b of incoming) {
-    if (!map.has(b.id)) map.set(b.id, b);
-  }
-  return Array.from(map.values());
 };
 
 // Filter businesses within neighborhood rectangular bounds with generous padding
