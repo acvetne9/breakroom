@@ -570,25 +570,6 @@ export type Database = {
             }
             Returns: string
           }
-      businesses_in_bbox: {
-        Args: {
-          east: number
-          north: number
-          query_limit?: number
-          south: number
-          west: number
-        }
-        Returns: {
-          atmosphere: string[]
-          business_type: string
-          id: string
-          lat: number
-          lng: number
-          name: string
-          salary: string
-          website: string
-        }[]
-      }
       current_device_id: { Args: never; Returns: string }
       disablelongtransactions: { Args: never; Returns: string }
       dropgeometrycolumn:
@@ -721,71 +702,6 @@ export type Database = {
         Returns: boolean
       }
       geomfromewkt: { Args: { "": string }; Returns: unknown }
-      get_businesses_in_viewport_grid_sampled: {
-        Args: {
-          max_lat: number
-          max_lng: number
-          min_lat: number
-          min_lng: number
-          result_limit?: number
-          user_profile_id?: string
-        }
-        Returns: {
-          address: string
-          atmosphere: string[]
-          business_type: string
-          id: string
-          lat: number
-          lng: number
-          name: string
-          roles: Json
-          website: string
-        }[]
-      }
-      get_businesses_in_viewport_no_ordering: {
-        Args: {
-          max_lat: number
-          max_lng: number
-          min_lat: number
-          min_lng: number
-          result_limit?: number
-          user_profile_id?: string
-        }
-        Returns: {
-          address: string
-          atmosphere: string[]
-          business_type: string
-          id: string
-          lat: number
-          lng: number
-          name: string
-          roles: Json
-          website: string
-        }[]
-      }
-      get_businesses_in_viewport_ordered: {
-        Args: {
-          center_lat: number
-          center_lng: number
-          max_lat: number
-          max_lng: number
-          min_lat: number
-          min_lng: number
-          result_limit?: number
-          user_profile_id?: string
-        }
-        Returns: {
-          address: string
-          atmosphere: string[]
-          business_type: string
-          id: string
-          lat: number
-          lng: number
-          name: string
-          roles: Json
-          website: string
-        }[]
-      }
       get_businesses_in_viewport_slim: {
         Args: {
           max_lat: number
@@ -800,61 +716,6 @@ export type Database = {
           lat: number
           lng: number
           name: string
-        }[]
-      }
-      get_businesses_near_point: {
-        Args: {
-          center_lat: number
-          center_lng: number
-          limit_count?: number
-          radius_meters?: number
-        }
-        Returns: {
-          address: string
-          distance_meters: number
-          id: string
-          lat: number
-          lng: number
-          name: string
-        }[]
-      }
-      get_businesses_with_roles_and_votes_near_point: {
-        Args: {
-          center_lat: number
-          center_lng: number
-          limit_count: number
-          radius_meters: number
-          user_profile_id?: string
-        }
-        Returns: {
-          address: string
-          atmosphere: string[]
-          business_type: string
-          id: string
-          lat: number
-          lng: number
-          name: string
-          roles: Json
-          website: string
-        }[]
-      }
-      get_businesses_with_roles_near_point: {
-        Args: {
-          center_lat: number
-          center_lng: number
-          limit_count?: number
-          radius_meters?: number
-        }
-        Returns: {
-          address: string
-          atmosphere: string[]
-          business_type: string
-          id: string
-          lat: number
-          lng: number
-          name: string
-          roles: Json
-          website: string
         }[]
       }
       gettransactionid: { Args: never; Returns: unknown }
@@ -927,27 +788,6 @@ export type Database = {
           match_reasons: string[]
           name: string
           score: number
-          website: string
-        }[]
-      }
-      search_businesses_global: {
-        Args: {
-          max_hourly?: number
-          min_hourly?: number
-          result_limit?: number
-          result_offset?: number
-          search_business_type?: string
-          search_query?: string
-          search_role?: string
-        }
-        Returns: {
-          atmosphere: string[]
-          business_type: string
-          id: string
-          lat: number
-          lng: number
-          name: string
-          salary: string
           website: string
         }[]
       }

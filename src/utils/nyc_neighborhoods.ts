@@ -1,5 +1,4 @@
 // ---------------- NYC neighborhoods (approximate polygons) ----------------
-import { Business } from '@/types/business';
 
 export interface NeighborhoodBounds {
   borough: string;
@@ -8,7 +7,7 @@ export interface NeighborhoodBounds {
   center?: { lat: number; lon: number }; // optional
 }
 
-export const nycNeighborhoodBoundaries = {
+export const nycNeighborhoodBoundaries: Record<string, Record<string, { lat: number; lon: number }[]>> = {
   "Manhattan": {
     "Upper East Side": [
       { lat: 40.764, lon: -73.973 },
@@ -387,15 +386,6 @@ export const nycNeighborhoodBoundaries = {
   }
 };
 
-// ---------------- Public helper ----------------
-export function getNeighborhoodBoundary(borough: string, neighborhood: string) {
-  const boroughData = nycNeighborhoodBoundaries[borough];
-  if (!boroughData) throw new Error(`Borough "${borough}" not found`);
-
-  const boundary = boroughData[neighborhood];
-  if (!boundary) throw new Error(`Neighborhood "${neighborhood}" not found in ${borough}`);
-  return boundary;
-}
 
 // Convert boundaries to neighborhood data format expected by other components
 export const nycNeighborhoods = Object.fromEntries(
@@ -436,120 +426,7 @@ export const nycNeighborhoods = Object.fromEntries(
   ])
 );
 
-// Generate boundary using neighborhood and neighbors
-export function generateNeighborhoodBoundary(
-  neighborhood: { name: string; lat: number; lon: number }, 
-  neighbors: { name: string; lat: number; lon: number }[]
-) {
-  // Find the actual boundary from our data
-  for (const neighborhoods of Object.values(nycNeighborhoodBoundaries)) {
-    if (neighborhoods[neighborhood.name]) {
-      return neighborhoods[neighborhood.name];
-    }
-  }
-  
-  console.log(`🏙️ Generating improved boundary for ${neighborhood.name}`);
-  
-  // Determine accurate radius based on neighborhood characteristics
-  const getNeighborhoodRadius = (name: string): number => {
-    const nameLower = name.toLowerCase();
-    
-    // Major areas and districts - larger boundaries
-    if (['financial district', 'midtown', 'upper east side', 'upper west side', 'downtown'].some(area => nameLower.includes(area))) {
-      return 0.012; // ~1.3km radius
-    }
-    
-    // Well-known large neighborhoods
-    if (['chinatown', 'little italy', 'soho', 'tribeca', 'chelsea', 'greenwich village', 'east village', 'west village'].some(area => nameLower.includes(area))) {
-      return 0.008; // ~900m radius
-    }
-    
-    // Medium neighborhoods
-    if (['nolita', 'bowery', 'murray hill', 'gramercy', 'flatiron'].some(area => nameLower.includes(area))) {
-      return 0.006; // ~650m radius
-    }
-    
-    // Small but distinct areas
-    if (['battery park', 'stone street', 'south street seaport'].some(area => nameLower.includes(area))) {
-      return 0.004; // ~450m radius
-    }
-    
-    // Default for other neighborhoods
-    return 0.007; // ~750m radius
-  };
 
-  const baseRadius = getNeighborhoodRadius(neighborhood.name);
-  
-  // Create 16-20 points for very realistic boundaries
-  const numPoints = 16 + Math.floor(Math.random() * 5); // 16-20 points
-  const boundary: { lat: number; lon: number }[] = [];
-  
-  // Sort neighbors by distance and use them to influence boundary shape
-  const influentialNeighbors = neighbors
-    .map(n => ({
-      ...n,
-      distance: haversine(neighborhood.lat, neighborhood.lon, n.lat, n.lon),
-      angle: Math.atan2(n.lat - neighborhood.lat, n.lon - neighborhood.lon)
-    }))
-    .filter(n => n.distance < baseRadius * 3) // Only use nearby neighbors
-    .sort((a, b) => a.distance - b.distance)
-    .slice(0, 6); // Use closest 6 neighbors for influence
-  
-  for (let i = 0; i < numPoints; i++) {
-    const baseAngle = (2 * Math.PI * i) / numPoints;
-    
-    // Start with base radius
-    let currentRadius = baseRadius;
-    
-    // Apply neighbor influence for more realistic boundaries
-    if (influentialNeighbors.length > 0) {
-      for (const neighbor of influentialNeighbors) {
-        const angleDiff = Math.abs(baseAngle - neighbor.angle);
-        const normalizedAngleDiff = Math.min(angleDiff, 2 * Math.PI - angleDiff);
-        
-        // Strong influence when pointing directly toward neighbor
-        if (normalizedAngleDiff < Math.PI / 4) { // Within 45 degrees
-          const influence = 1 - (normalizedAngleDiff / (Math.PI / 4));
-          const distanceFactor = Math.max(0.3, 1 - (neighbor.distance / (baseRadius * 2)));
-          currentRadius *= (0.5 + (1 - influence * distanceFactor) * 0.5); // Reduce radius toward neighbors
-        }
-      }
-    }
-    
-    // Add natural variation and irregularity
-    const radiusVariation = 0.75 + Math.random() * 0.5; // 75%-125% variation
-    currentRadius *= radiusVariation;
-    
-    // Add small angular offset for organic shape
-    const angleOffset = (Math.random() - 0.5) * 0.3; // ±0.15 radians (~±9°)
-    const finalAngle = baseAngle + angleOffset;
-    
-    const lat = neighborhood.lat + currentRadius * Math.cos(finalAngle);
-    const lon = neighborhood.lon + currentRadius * Math.sin(finalAngle) / Math.cos(neighborhood.lat * Math.PI / 180);
-    
-    boundary.push({ lat, lon });
-  }
-  
-  // Close the polygon
-  if (boundary.length > 0) {
-    boundary.push({ ...boundary[0] });
-  }
-  
-  console.log(`✅ Generated ${boundary.length} accurate boundary points for ${neighborhood.name}`);
-  return boundary;
-}
-
-// Haversine distance calculation (in km)
-export function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371; // Earth's radius in km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
 
 // Find neighborhood by name (case insensitive)
 export function findNeighborhoodBoundaryByName(name: string) {
@@ -569,38 +446,7 @@ export function findNeighborhoodBoundaryByName(name: string) {
   return null;
 }
 
-// Ray-casting algorithm to check if a point is inside a polygon
-export const isPointInPolygon = (point: { lat: number; lon: number }, polygon: { lat: number; lon: number }[]) => {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i].lon, yi = polygon[i].lat;
-    const xj = polygon[j].lon, yj = polygon[j].lat;
-    const intersect = ((yi > point.lat) !== (yj > point.lat)) &&
-      (point.lon < (xj - xi) * (point.lat - yi) / (yj - yi + 1e-12) + xi);
-    if (intersect) inside = !inside;
-  }
-  return inside;
-};
 
-// Filter businesses within neighborhood rectangular bounds with generous padding
-export function filterBusinessesByNeighborhood(
-  businesses: Business[], 
-  neighborhoodBounds: NeighborhoodBounds
-): Business[] {
-  const polygon = neighborhoodBounds.boundary;
-  
-  console.log('🏙️ Filtering businesses using polygon for neighborhood:', neighborhoodBounds.name);
-  console.log('🏙️ Polygon points:', polygon.length);
-  console.log('🏙️ Total businesses to check:', businesses.length);
-
-  const filtered = businesses.filter(b => {
-    if (!b.position?.lat || !b.position?.lng) return false;
-    return isPointInPolygon({ lat: b.position.lat, lon: b.position.lng }, polygon);
-  });
-
-  console.log('🏙️ Businesses inside polygon:', filtered.length);
-  return filtered;
-}
 
 // Get all neighborhood names for autocomplete/matching
 export function getAllNeighborhoodNames(): string[] {

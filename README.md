@@ -46,7 +46,7 @@ A location-based community platform for sharing real workplace info — salaries
 | Layer | Technology | Rationale |
 |-------|-----------|-----------|
 | **Build** | Vite + `@vitejs/plugin-react-swc` | Fast HMR and SWC-based transforms; a custom Vite plugin serves `.pbf` tiles with correct protobuf headers in dev. |
-| **Language** | TypeScript (relaxed config) | Type safety without friction — `strictNullChecks`, `noImplicitAny`, and unused-checks are intentionally **off** to keep iteration fast. |
+| **Language** | TypeScript (`strict`) | Strict null checks and no implicit `any`; unused-variable checks are left to ESLint. |
 | **UI framework** | React 18 | Concurrent rendering; `React.StrictMode` enabled. |
 | **Components** | shadcn/ui (Radix primitives) | Accessible, unstyled primitives owned in-repo (`src/components/ui`) rather than a black-box library. |
 | **Styling** | Tailwind CSS + `tailwindcss-animate` + typography plugin | Utility-first styling; `next-themes` for theming. |
@@ -67,7 +67,7 @@ A location-based community platform for sharing real workplace info — salaries
 - **Account-less contributions.** Device-based identity lowers the barrier to posting salary/role data while RLS policies scope writes to the posting device.
 - **Search lives in the database.** The client only parses intent (pay, neighborhood, words); one SQL function does matching, geography and ranking, so the dropdown and the map always agree and there is no third-party API in the path.
 - **Content safety.** A block-list `profanityFilter` guards user-generated posts.
-- **Performance-tuned DB.** Index strategy is documented in `INDEX_OPTIMIZATION_GUIDE.md` / `DATABASE_OPTIMIZATION_GUIDE.md`, with paired apply/rollback migrations.
+- **Performance-tuned DB.** Trigram and PostGIS indexes back search and the map; the history of how they were chosen is in `supabase/migrations_archive/docs/`.
 
 ## Project Layout
 

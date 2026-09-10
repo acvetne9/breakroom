@@ -29,7 +29,7 @@ interface NeighborhoodResult {
   borough: string;
 }
 
-type DropdownItem = (EnhancedBusiness & { matchReasons?: string[] }) | NeighborhoodResult;
+type DropdownItem = EnhancedBusiness | NeighborhoodResult;
 
 const MIN_QUERY_LENGTH = 3;
 const DROPDOWN_LIMIT = 30;
@@ -43,13 +43,7 @@ const reasonLabel = (reasons: string[] | undefined) => {
   return null;
 };
 
-const toEnhanced = (b: SearchResult): EnhancedBusiness & { matchReasons: string[] } => ({
-  ...b,
-  lat: b.position.lat,
-  lng: b.position.lng,
-  roles: (b.roles ?? []).map((r) => ({ id: r.id ?? "", role: r.role, salary: r.salary, votesTotal: r.votesTotal, userVote: r.userVote })),
-  matchReasons: b.matchReasons,
-});
+const toEnhanced = (b: SearchResult): EnhancedBusiness => ({ ...b, lat: b.position.lat, lng: b.position.lng });
 
 const UnifiedBusinessSearch: React.FC<UnifiedBusinessSearchProps> = ({
   value,

@@ -22,8 +22,6 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
 
       // Only trigger callbacks if we were previously offline
       if (wasOfflineRef.current) {
-        console.log('[ConnectionContext] Connection restored, triggering callbacks');
-
         // Execute all registered reconnect callbacks
         const callbacks = Array.from(reconnectCallbacksRef.current);
         await Promise.allSettled(callbacks.map(callback => callback()));
@@ -33,7 +31,6 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
     };
 
     const handleOffline = () => {
-      console.log('[ConnectionContext] Connection lost');
       setIsOnline(false);
       wasOfflineRef.current = true;
     };
@@ -77,7 +74,6 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
         // Don't wait after the last attempt
         if (attempt < maxRetries) {
           const delay = initialDelay * Math.pow(2, attempt);
-          console.log(`[ConnectionContext] Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }

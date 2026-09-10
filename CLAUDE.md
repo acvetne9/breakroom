@@ -4,7 +4,7 @@ Location-based community app: real salaries, roles, and stories pinned to ~54k b
 
 ## Stack
 
-- React 18 + TypeScript + Vite 5 (SWC). Tailwind + shadcn/ui. Framer Motion for the 3-card swipe shell.
+- React 18 + TypeScript (`strict`) + Vite 5 (SWC). Tailwind + five shadcn/ui primitives. Framer Motion for the 3-card swipe shell.
 - Map: MapLibre GL with self-hosted vector tiles in `public/data/tiles`, business dots drawn by deck.gl.
 - Backend: Supabase (Postgres + PostGIS, RLS, one Deno edge function for geocoding). No Supabase Auth sign-in. Translation runs on-device in the browser.
 - Mobile: Capacitor 7 wraps the same web build (`android/`, `ios/`).
@@ -36,5 +36,4 @@ npm run test:e2e   # Playwright smoke test against a running dev server
 ## Known gaps
 
 - `supabase/migrations` was re-baselined on 2026-09-07 from a dump of the live database; older files are in `supabase/migrations_archive/`. Keep `src/integrations/supabase/types.ts` regenerated after schema changes.
-- TypeScript runs with `strict: false`. Enabling it produces ~90 errors, mostly in the search pipeline.
 - The Android keystore that was in git history is compromised. A fresh one lives in `secrets/upload-key.jks` (gitignored) with its credentials in `android/keystore.properties`; back both up outside the repo. If the app was ever published with the old key, request an upload-key reset in Play Console.

@@ -1,23 +1,12 @@
-// Shared search types
-export interface EnhancedBusiness {
-  id: string;
-  name: string;
+import type { Business } from "./business";
+
+/** A search result as the dropdown and job forms consume it: a Business plus flat coordinates. */
+export type EnhancedBusiness = Business & {
   lat: number;
   lng: number;
-  position: { lat: number; lng: number };
-  atmosphere: string[];
-  salary?: string;
-  businessType?: string;
+  /** Raw column alias some callers still read. */
   business_type?: string;
-  website?: string;
-  address?: string;
-  roles?: Array<{
-    id: string;
-    role: string;
-    salary: string;
-    votesTotal: number;
-    userVote?: 'up' | 'down' | null;
-  }>;
   formatted_address?: string;
   vicinity?: string;
-}
+  matchReasons?: string[];
+};

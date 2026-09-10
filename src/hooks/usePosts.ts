@@ -28,8 +28,7 @@ export const usePosts = () => {
   const { cachedData: initialCachedPosts, saveToCache } = useSessionCache<Post[]>({
     key: "posts_cache",
     version: "2.0",
-    deserialize: (data: Array<Post & { createdAt: string }>) =>
-      data.map((p) => ({ ...p, createdAt: new Date(p.createdAt) })),
+    deserialize: (data) => (data as Array<Post & { createdAt: string }>).map((p) => ({ ...p, createdAt: new Date(p.createdAt) })),
   });
 
   const [posts, setPosts] = useState<Post[]>(initialCachedPosts || []);

@@ -16,8 +16,6 @@ export function useReconnectionHandler(options?: {
 
   useEffect(() => {
     const handleReconnect = async () => {
-      console.log('[useReconnectionHandler] Handling reconnection');
-
       // Clear search cache by default
       if (clearSearchCacheOnReconnect) {
         clearSearchCache();
