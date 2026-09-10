@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   getPosts,
   getCommentsForPosts,
+  getMyPosts,
   getPostById,
   createPost,
   deletePost,
@@ -178,6 +179,38 @@ export const usePosts = () => {
     [commitPosts],
   );
 
+  /**
+   * Pull every post this device wrote (plus comments on them) into the feed so
+   * the "My Stories" filter is complete, not just whatever pages happen to be loaded.
+   */
+  const myPostsLoadedRef = useRef(false);
+  const loadMyPosts = useCallback(async () => {
+    if (myPostsLoadedRef.current) return;
+    myPostsLoadedRef.current = true;
+    try {
+      const PAGE = 50;
+      const MAX = 500;
+      const mine: PostData[] = [];
+      for (let offset = 0; offset < MAX; offset += PAGE) {
+        const page = await getMyPosts(PAGE, offset);
+        mine.push(...page);
+        if (page.length < PAGE) break;
+      }
+      const topLevelIds = mine.filter((p) => !p.is_comment).map((p) => p.id);
+      const comments = await getCommentsForPosts(topLevelIds);
+      const rows = [...mine, ...comments];
+      const votes = await getUserVotes(rows.map((r) => r.id));
+      const fresh = rows.map((row) => ({ ...transformPost(row), userVote: votes[row.id] || null }));
+      commitPosts((prev) => {
+        const seen = new Set(prev.map((p) => p.id));
+        return [...prev, ...fresh.filter((p) => !seen.has(p.id))];
+      });
+    } catch (err) {
+      myPostsLoadedRef.current = false;
+      console.error("Failed to load my posts:", err);
+    }
+  }, [commitPosts]);
+
   const refetch = useCallback(() => {
     offsetRef.current = 0;
     fetchPosts(false);
@@ -241,6 +274,7 @@ export const usePosts = () => {
     removePost,
     refetch,
     loadMore: loadMorePosts,
+    loadMyPosts,
     getBusinessPosts,
     getUserPosts,
   };

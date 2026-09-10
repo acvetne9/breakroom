@@ -14,7 +14,7 @@ const kindLabel = (post: Post) => (post.isComment ? "Your comment" : post.isJobU
 
 /** Every post this device has written, newest first, loaded in pages straight from the database. */
 const MyStories: React.FC<MyStoriesProps> = ({ onOpenPost }) => {
-  const { removePost, posts: feedPosts } = usePostsContext();
+  const { removePost, posts: feedPosts, loadMyPosts } = usePostsContext();
   const [items, setItems] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
@@ -34,7 +34,8 @@ const MyStories: React.FC<MyStoriesProps> = ({ onOpenPost }) => {
 
   useEffect(() => {
     load(0);
-  }, [load]);
+    loadMyPosts();
+  }, [load, loadMyPosts]);
 
   // Keep vote counts in step with the feed when the same post is loaded there.
   useEffect(() => {

@@ -20,7 +20,7 @@ const PAGE_STEP = 25;
 
 const ExplorePage: React.FC<ExplorePageProps> = memo(
   ({ filteredBusinessId, filteredUserStories, onBackToAllPosts, onFlyToBusiness, currentSlide = 2 }) => {
-    const { posts, loading, hasMore, submitPost, votePost, removePost, loadMore } = usePostsContext();
+    const { posts, loading, hasMore, submitPost, votePost, removePost, loadMore, loadMyPosts } = usePostsContext();
 
     const [expandedPost, setExpandedPost] = useState<string | null>(null);
     const [fadeOutSystemPost, setFadeOutSystemPost] = useState(false);
@@ -35,6 +35,11 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     const defaultPlaceholder = filteredBusinessId ? "Thoughts about this business?" : "How's work?";
+
+    // "My Stories" must show everything the device wrote, not just the loaded pages.
+    useEffect(() => {
+      if (filteredUserStories) loadMyPosts();
+    }, [filteredUserStories, loadMyPosts]);
 
     useEffect(() => {
       setPostPlaceholder(defaultPlaceholder);

@@ -186,6 +186,7 @@ export type Database = {
           profile_id: string
           role: string
           salary: number | null
+          started_at: string | null
           time_period: string | null
           updated_at: string | null
         }
@@ -199,6 +200,7 @@ export type Database = {
           profile_id: string
           role: string
           salary?: number | null
+          started_at?: string | null
           time_period?: string | null
           updated_at?: string | null
         }
@@ -212,6 +214,7 @@ export type Database = {
           profile_id?: string
           role?: string
           salary?: number | null
+          started_at?: string | null
           time_period?: string | null
           updated_at?: string | null
         }

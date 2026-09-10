@@ -92,11 +92,16 @@ await step("search dropdown returns businesses", async () => {
 await step("role search surfaces businesses that only match by role", async () => {
   const search = page.locator('input[placeholder="Find that next gig!"]');
   await search.fill("");
-  await search.fill("barista");
+  await page.waitForTimeout(300);
+  await search.click();
+  await search.type("barista", { delay: 30 });
   const items = page.locator("div.max-h-60 div.cursor-pointer");
-  await items.first().waitFor({ state: "visible", timeout: 30_000 });
-  await page.waitForTimeout(500);
-  const labels = await items.locator("span.font-medium").allInnerTexts();
+  // Results replace the "Searching…" row asynchronously; poll until the list has settled.
+  let labels = [];
+  for (let i = 0; i < 40 && labels.length < 5; i++) {
+    await page.waitForTimeout(250);
+    labels = await items.locator("span.font-medium").allInnerTexts();
+  }
   const roleOnly = labels.filter((n) => !/barista/i.test(n));
   await shot("02b-role-search");
   if (roleOnly.length === 0) throw new Error(`every result has 'barista' in its name; saw: ${labels.slice(0, 8).join(" | ")}`);
@@ -267,6 +272,39 @@ await step("settings: complete the current job, retire it, then hide it", async 
   await page.locator("button", { hasText: "My Stories" }).click();
   await page.locator("text=No stories or comments yet").waitFor({ state: "visible", timeout: 15_000 });
   return "job completed, auto-saved, retired to past jobs, then hidden; My Stories loaded from the database";
+});
+
+await step("My Stories in Settings lists a post and opens the complete feed filter", async () => {
+  // Write a story in Explore, then find it from Settings and tap through to the feed filter.
+  await page.locator('button[aria-label="Explore"]').click();
+  const input = page.locator('input[placeholder="How\'s work?"]');
+  await input.waitFor({ state: "visible", timeout: 10_000 });
+  await input.fill(`${marker} mine`);
+  await input.press("Enter");
+  await page.locator(".app-popup-transparent", { hasText: `${marker} mine` }).waitFor({ state: "visible", timeout: 20_000 });
+
+  await page.locator('button[aria-label="Settings"]').click();
+  await page.locator("h2", { hasText: "Current Job" }).waitFor({ state: "visible", timeout: 20_000 });
+  const toggle = page.locator("button", { hasText: "My Stories" });
+  if (!(await page.locator(".story-item").count())) await toggle.click();
+  const entry = page.locator(".story-item", { hasText: `${marker} mine` });
+  await entry.waitFor({ state: "visible", timeout: 20_000 });
+  await entry.click();
+
+  await page.locator("h2", { hasText: "My Stories" }).waitFor({ state: "visible", timeout: 20_000 });
+  const inFeed = page.locator(".app-popup-transparent", { hasText: `${marker} mine` });
+  await inFeed.waitFor({ state: "visible", timeout: 20_000 });
+  const others = await page.locator(".app-popup-transparent").count();
+  await shot("13-my-stories-feed");
+
+  const trash = inFeed.locator("button", { hasText: "🗑️" }).first();
+  await trash.click();
+  await page.waitForTimeout(300);
+  await trash.click();
+  await inFeed.waitFor({ state: "hidden", timeout: 15_000 });
+  await page.locator("button", { hasText: "← Back" }).click();
+  if (others !== 1) throw new Error(`My Stories feed showed ${others} posts for a device with one story`);
+  return "story visible in Settings, feed filter showed only the device's own post";
 });
 
 await step("back to the map", async () => {

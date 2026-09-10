@@ -2,7 +2,7 @@
 
 Data hooks:
 
-- `usePosts.ts` — the feed. Pages of top-level posts, then comments for those posts, then the device's votes. Realtime inserts fetch the single row (with its business join) and prepend it. Uses refs for offset/loading so the realtime handler never reads stale state.
+- `usePosts.ts` — the feed. Pages of top-level posts, then comments for those posts, then the device's votes. Realtime inserts fetch the single row (with its business join) and prepend it. `loadMyPosts` pulls every post the device wrote (plus their comments) into the feed once, so the "My Stories" filter is complete. Uses refs for offset/loading so the realtime handler never reads stale state.
 - `useViewportBusinesses.tsx` — browse mode covers the viewport with complete z14 tiles, center-out, via the slim viewport RPC; when zoomed out past 24 tiles it does one row-limited fetch instead. After the map settles it preloads the ring of tiles around the viewport, one tile at a time. Search mode calls `search_businesses` for the current viewport and re-queries as the user pans. `fetchFullBusinessDetails` merges the cached full record back into the list.
 - `useTileCache.ts` — in-memory per-tile cache keyed by tile + zoom. Tiles filled by a wide, row-limited fetch are flagged `partial` and never satisfy the per-tile loader; only whole-tile fetches count as complete.
 - `useOptimisticVote.ts` — `applyOptimisticVote` primitive shared by post votes and role votes.
