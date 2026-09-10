@@ -19,7 +19,8 @@
 
 ## Settings
 
-- `SettingsPage.tsx` — current job + past jobs with per-job debounced auto-save, plus "My Stories". Both kinds use the same `JobFormState`.
+- `SettingsPage.tsx` — current job (editable, "Move to past jobs" retires it atomically via the `move_current_job_to_past` RPC, and switching business offers to keep the old one), past jobs (add / hide; hiding sets `deleted_at`, incomplete drafts are wiped), and "My Stories". Both job kinds use the same `JobFormState`; incomplete jobs show a badge and are not saved.
+- `MyStories.tsx` — every post the device wrote, paged straight from the database (`getMyPosts`), with delete.
 - `JobEditor.tsx` — the three fields for one job; state transitions come from `utils/jobForm.ts`.
 - `JobEntryForm.tsx` — low-level presentational fields shared with `InitiationPage`.
 

@@ -24,7 +24,12 @@ const step = async (name, fn) => {
     console.log(`PASS ${name}${detail ? ` — ${detail}` : ""}`);
   } catch (err) {
     results.push({ name, ok: false, ms: Date.now() - t0, error: String(err?.message ?? err) });
-    console.log(`FAIL ${name} — ${err?.message ?? err}`);
+    console.log(`FAIL ${name} — ${String(err?.message ?? err).split("\n")[0]}`);
+    try {
+      await page.screenshot({ path: `${SHOTS}fail-${results.length}.png` });
+    } catch {
+      /* page may be gone */
+    }
   }
 };
 
@@ -94,7 +99,7 @@ await step("role search surfaces businesses that only match by role", async () =
   const labels = await items.locator("span.font-medium").allInnerTexts();
   const roleOnly = labels.filter((n) => !/barista/i.test(n));
   await shot("02b-role-search");
-  if (roleOnly.length === 0) throw new Error("every result has 'barista' in its name; role matching not surfacing");
+  if (roleOnly.length === 0) throw new Error(`every result has 'barista' in its name; saw: ${labels.slice(0, 8).join(" | ")}`);
   return `${labels.length} results, ${roleOnly.length} matched by role only (e.g. ${roleOnly[0]})`;
 });
 
@@ -221,21 +226,47 @@ await step("👀 on a post flies the map to its business", async () => {
   await page.mouse.click(20, 400);
 });
 
-await step("settings page renders editors", async () => {
+await step("settings: complete the current job, retire it, then hide it", async () => {
   await page.locator('button[aria-label="Settings"]').click();
   await page.locator("h2", { hasText: "Current Job" }).waitFor({ state: "visible", timeout: 20_000 });
-  const role = page.locator('input[placeholder="Search or select a job role..."]').first();
-  await role.fill("Barista");
+
+  // Pick a business from the dropdown so the job is "selected", then role + pay.
+  const business = page.locator('input[placeholder="Where do you work?..."]');
+  await business.click();
+  await business.type("coffee", { delay: 40 });
+  const option = page.locator("div.max-h-60 div.cursor-pointer").first();
+  await option.waitFor({ state: "visible", timeout: 30_000 });
+  await option.click();
+  await page.locator('input[placeholder="Search or select a job role..."]').first().fill("Barista");
   const salary = page.locator('input[placeholder="$14.00"]');
   await salary.fill("18.5");
   await salary.blur();
-  await page.waitForTimeout(300);
-  const shown = await salary.inputValue();
-  await shot("11-settings");
-  if (shown !== "$18.50") throw new Error(`salary formatting: ${shown}`);
+  if ((await salary.inputValue()) !== "$18.50") throw new Error(`salary formatting: ${await salary.inputValue()}`);
+
+  const move = page.locator("button", { hasText: "Move to past jobs" });
+  await page.waitForTimeout(1800); // let the debounced save land
+  await move.waitFor({ state: "visible" });
+  if (await move.isDisabled()) throw new Error("Move to past jobs stayed disabled after completing the job");
+  await move.click();
+  await page.locator("text=Moved to past jobs").waitFor({ state: "visible", timeout: 15_000 });
+  await shot("11-retired");
+
+  const pastRole = page.locator('input[placeholder="Search or select a job role..."]').nth(1);
+  await pastRole.waitFor({ state: "visible", timeout: 10_000 });
+  const pastRoleValue = await pastRole.inputValue();
+  if (!/barista/i.test(pastRoleValue)) throw new Error(`past job role is "${pastRoleValue}"`);
+  const currentRole = await page.locator('input[placeholder="Search or select a job role..."]').first().inputValue();
+  if (currentRole) throw new Error(`current job not cleared: "${currentRole}"`);
+
+  await page.locator('button[aria-label="Remove past job"]').first().click();
+  await page.waitForTimeout(1200);
+  const remaining = await page.locator('button[aria-label="Remove past job"]').count();
+  await shot("12-hidden");
+  if (remaining !== 0) throw new Error(`past job still visible after hide (${remaining})`);
+
   await page.locator("button", { hasText: "My Stories" }).click();
-  await page.waitForTimeout(300);
-  return "role + salary typed, salary formatted to $18.50 (form left incomplete on purpose, nothing saved)";
+  await page.locator("text=No stories or comments yet").waitFor({ state: "visible", timeout: 15_000 });
+  return "job completed, auto-saved, retired to past jobs, then hidden; My Stories loaded from the database";
 });
 
 await step("back to the map", async () => {

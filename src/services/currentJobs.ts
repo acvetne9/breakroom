@@ -11,73 +11,47 @@ export interface CurrentJobData {
 }
 
 export const getCurrentJob = async (profileId: string): Promise<CurrentJobData | null> => {
-  console.log("🔍 Fetching current job for device:", profileId);
-
-  const { data, error } = await supabase.from("current_jobs").select("*").eq("profile_id", profileId).maybeSingle(); // Use maybeSingle() instead of single() to avoid errors when no rows exist
-
-  if (error) {
-    console.error("❌ Error fetching current job:", error);
-    throw error;
-  }
-
-  console.log("✅ Current job data:", data);
-  return data;
+  const { data, error } = await supabase.from("current_jobs").select("*").eq("profile_id", profileId).maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return {
+    role: data.role ?? "",
+    salary: data.salary ?? 0,
+    location: data.location ?? "",
+    business_name: data.business_name ?? "",
+    time_period: data.time_period ?? "HR",
+    business_id: data.business_id,
+  };
 };
 
+/** Insert or replace the profile's single current job. */
 export const saveCurrentJob = async (profileId: string, jobData: CurrentJobData): Promise<void> => {
-  console.log("💾 Saving current job for device:", profileId);
-  console.log("   Input data:", {
-    role: jobData.role,
-    salary: jobData.salary,
-    location: jobData.location,
-    business_name: jobData.business_name,
-    time_period: jobData.time_period,
-    business_id: jobData.business_id,
-  });
+  const businessId = jobData.business_id ?? (jobData.business_name ? await findBusinessIdByName(jobData.business_name) : null);
 
-  // Use provided business_id if available, otherwise look it up by name
-  let businessId: string | null = jobData.business_id || null;
-  if (!businessId && jobData.business_name) {
-    console.log("   No business_id provided, looking up by name...");
-    businessId = await findBusinessIdByName(jobData.business_name);
-  }
-
-  const dataToSave = {
-    ...jobData,
-    business_id: businessId,
-  };
-
-  console.log("   Final data to save:", {
-    ...dataToSave,
-    hasBusinessId: !!businessId,
-    hasLocation: !!dataToSave.location,
-  });
-
-  // Insert or update in a single query using UPSERT on the profile_id unique key
   const { error } = await supabase.from("current_jobs").upsert(
     {
       profile_id: profileId,
-      ...dataToSave,
+      role: jobData.role,
+      salary: jobData.salary,
+      location: jobData.location,
+      business_name: jobData.business_name,
+      time_period: jobData.time_period,
+      business_id: businessId,
       updated_at: new Date().toISOString(),
     },
-    {
-      onConflict: "profile_id",
-    },
+    { onConflict: "profile_id" },
   );
-
-  if (error) {
-    console.error("❌ Error saving current job:", error);
-    throw error;
-  }
-
-  console.log("✅ Current job saved successfully", businessId ? `(linked to business: ${businessId})` : "(no business link)");
+  if (error) throw error;
 };
 
 export const deleteCurrentJob = async (profileId: string): Promise<void> => {
   const { error } = await supabase.from("current_jobs").delete().eq("profile_id", profileId);
+  if (error) throw error;
+};
 
-  if (error) {
-    console.error("❌ Error deleting current job:", error);
-    throw error;
-  }
+/** Retire the current job into past jobs. Returns the new past-job id, or null if there was no current job. */
+export const moveCurrentJobToPast = async (): Promise<string | null> => {
+  const { data, error } = await supabase.rpc("move_current_job_to_past");
+  if (error) throw error;
+  return data ?? null;
 };

@@ -100,6 +100,11 @@ export function toJobRecord(job: JobFormState): JobRecord {
   };
 }
 
+/** Anything typed at all (distinguishes an untouched blank editor from a half-filled one). */
+export function jobFormHasContent(job: JobFormState): boolean {
+  return !!(job.role.trim() || job.salary > 0 || job.businessInput.trim() || job.addressInput.trim());
+}
+
 /** Complete enough to persist. */
 export function isJobFormComplete(job: JobFormState | null | undefined): boolean {
   if (!job) return false;

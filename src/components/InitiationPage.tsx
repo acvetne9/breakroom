@@ -8,6 +8,8 @@ import { isValidAddress } from "@/utils/addressValidation";
 import { formatSalaryDisplay, sanitizeSalaryInput } from "@/utils/salaryFormat";
 
 interface InitiationPageProps {
+  /** "I'm not working right now": close the prompt without saving a job. */
+  onSkip?: () => void;
   onComplete: (data: {
     salary: string;
     role: string;
@@ -18,7 +20,7 @@ interface InitiationPageProps {
   }) => void;
 }
 
-const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
+const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete, onSkip }) => {
   const { deviceId } = useDevice();
 
   const [salary, setSalary] = useState(0);
@@ -191,6 +193,11 @@ const InitiationPage: React.FC<InitiationPageProps> = ({ onComplete }) => {
           <div className="text-center space-y-2 mb-6 w-full">
             <h1 className="text-3xl font-semibold text-gray-800 tracking-tight">Welcome to workaround! 👋</h1>
             <p className="text-base text-gray-600">Let's get started by sharing a few details</p>
+            {onSkip && (
+              <button type="button" onClick={onSkip} className="text-sm text-gray-500 underline underline-offset-2 hover:text-gray-700">
+                I'm not working right now
+              </button>
+            )}
           </div>
 
           {/* Content - vertically centered */}

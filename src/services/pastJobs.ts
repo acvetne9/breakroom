@@ -9,91 +9,79 @@ export interface PastJobData {
   business_name: string;
   time_period: string;
   business_id?: string | null;
+  created_at?: string | null;
 }
 
-export const getPastJobs = async (deviceId: string): Promise<PastJobData[]> => {
-  console.log("🔍 Fetching past jobs for device:", deviceId);
+/** A row the user would consider a real job; anything less is a leftover draft. */
+export const isCompletePastJob = (job: Pick<PastJobData, "role" | "salary" | "location" | "time_period">) =>
+  !!job.role?.trim() && (job.salary ?? 0) > 0 && !!job.location?.trim() && !!job.time_period;
 
+/** Visible (not hidden) past jobs, newest first. */
+export const getPastJobs = async (deviceId: string): Promise<PastJobData[]> => {
   const { data, error } = await supabase
     .from("past_jobs")
     .select("*")
     .eq("profile_id", deviceId)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
-  if (error) {
-    console.error("❌ Error fetching past jobs:", error);
-    throw error;
-  }
-
-  console.log("✅ Past jobs data:", data);
-  return data || [];
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    role: row.role,
+    salary: row.salary ?? 0,
+    location: row.location ?? "",
+    business_name: row.business_name ?? "",
+    time_period: row.time_period ?? "HR",
+    business_id: row.business_id,
+    created_at: row.created_at,
+  }));
 };
 
 export const savePastJob = async (deviceId: string, jobData: PastJobData): Promise<string> => {
-  console.log("💾 Saving past job for device:", deviceId, jobData);
+  const businessId = jobData.business_id ?? (jobData.business_name ? await findBusinessIdByName(jobData.business_name) : null);
 
-  // Look up business_id if business_name is provided
-  let businessId: string | null = null;
-  if (jobData.business_name) {
-    businessId = await findBusinessIdByName(jobData.business_name);
-  }
+  const record = {
+    role: jobData.role,
+    salary: jobData.salary,
+    location: jobData.location,
+    business_name: jobData.business_name,
+    business_id: businessId,
+    time_period: jobData.time_period,
+  };
 
   if (jobData.id) {
-    // Update existing record
     const { error } = await supabase
       .from("past_jobs")
-      .update({
-        role: jobData.role,
-        salary: jobData.salary,
-        location: jobData.location,
-        business_name: jobData.business_name,
-        business_id: businessId,
-        time_period: jobData.time_period,
-        updated_at: new Date().toISOString(),
-      })
+      .update({ ...record, updated_at: new Date().toISOString() })
       .eq("id", jobData.id)
       .eq("profile_id", deviceId);
-
-    if (error) {
-      console.error("❌ Error updating past job:", error);
-      throw error;
-    }
-
-    console.log("✅ Past job updated successfully", businessId ? `(linked to business: ${businessId})` : "(no business link)");
+    if (error) throw error;
     return jobData.id;
-  } else {
-    // Insert new record
-    const { data, error } = await supabase
-      .from("past_jobs")
-      .insert({
-        profile_id: deviceId,
-        role: jobData.role,
-        salary: jobData.salary,
-        location: jobData.location,
-        business_name: jobData.business_name,
-        business_id: businessId,
-        time_period: jobData.time_period,
-      })
-      .select("id")
-      .single();
-
-    if (error) {
-      console.error("❌ Error inserting past job:", error);
-      throw error;
-    }
-
-    console.log("✅ Past job inserted successfully", businessId ? `(linked to business: ${businessId})` : "(no business link)");
-    return data.id;
   }
+
+  const { data, error } = await supabase
+    .from("past_jobs")
+    .insert({ profile_id: deviceId, ...record })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id;
 };
 
-export const deletePastJob = async (deviceId: string, jobId: string): Promise<void> => {
-  const { error } = await supabase.from("past_jobs").delete().eq("id", jobId).eq("profile_id", deviceId);
+/** Hide a past job. The row stays in the database with `deleted_at` set. */
+export const hidePastJob = async (deviceId: string, jobId: string): Promise<void> => {
+  const { error } = await supabase
+    .from("past_jobs")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", jobId)
+    .eq("profile_id", deviceId);
+  if (error) throw error;
+};
 
-  if (error) {
-    console.error("❌ Error deleting past job:", error);
-    throw error;
-  }
-
-  console.log("✅ Past job deleted successfully");
+/** Permanently remove past jobs. Only used for incomplete drafts. */
+export const wipePastJobs = async (deviceId: string, jobIds: string[]): Promise<void> => {
+  if (jobIds.length === 0) return;
+  const { error } = await supabase.from("past_jobs").delete().eq("profile_id", deviceId).in("id", jobIds);
+  if (error) throw error;
 };

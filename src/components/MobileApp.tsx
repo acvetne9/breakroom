@@ -29,6 +29,15 @@ interface UserData {
   timePeriod: string;
 }
 
+const JOB_PROMPT_SKIPPED_KEY = "job_prompt_skipped";
+const readSkipped = () => {
+  try {
+    return localStorage.getItem(JOB_PROMPT_SKIPPED_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
 /** A business whose roles came from the full-details query (roles carry ids). */
 const hasFullDetails = (business: Business | null | undefined) =>
   !!business?.atmosphere?.length && !!business?.roles?.length && !!business.roles[0]?.id;
@@ -77,8 +86,8 @@ const MobileApp: React.FC = () => {
         if (currentJob) {
           setCurrentView("main");
         } else {
-          // Don't prompt on the very first visit; nudge on return visits instead.
-          setCurrentView(isFirstSession ? "main" : "initiation");
+          // Don't prompt on the very first visit, or once the user has said they aren't working.
+          setCurrentView(isFirstSession || readSkipped() ? "main" : "initiation");
         }
       } catch (error) {
         console.error("Error during app initialization:", error);
@@ -146,6 +155,15 @@ const MobileApp: React.FC = () => {
     },
     [persistJob],
   );
+
+  const handleInitiationSkip = useCallback(() => {
+    try {
+      localStorage.setItem(JOB_PROMPT_SKIPPED_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    setCurrentView("main");
+  }, []);
 
   // ------------------------------------------------------- business selection
   const handleBusinessClick = useCallback(
@@ -420,7 +438,7 @@ const MobileApp: React.FC = () => {
 
       {currentView === "initiation" && (
         <div className="fixed inset-0 z-[60]">
-          <InitiationPage onComplete={handleInitiationComplete} />
+          <InitiationPage onComplete={handleInitiationComplete} onSkip={handleInitiationSkip} />
         </div>
       )}
 

@@ -43,6 +43,7 @@ export type Database = {
         Row: {
           business_id: string
           created_at: string
+          hourly_rate: number | null
           id: string
           pay_period: string | null
           role: string
@@ -53,6 +54,7 @@ export type Database = {
         Insert: {
           business_id: string
           created_at?: string
+          hourly_rate?: number | null
           id?: string
           pay_period?: string | null
           role: string
@@ -63,6 +65,7 @@ export type Database = {
         Update: {
           business_id?: string
           created_at?: string
+          hourly_rate?: number | null
           id?: string
           pay_period?: string | null
           role?: string
@@ -91,6 +94,7 @@ export type Database = {
           lat: number
           lng: number
           name: string
+          name_norm: string | null
           updated_at: string
           website: string | null
         }
@@ -104,6 +108,7 @@ export type Database = {
           lat: number
           lng: number
           name: string
+          name_norm?: string | null
           updated_at?: string
           website?: string | null
         }
@@ -117,6 +122,7 @@ export type Database = {
           lat?: number
           lng?: number
           name?: string
+          name_norm?: string | null
           updated_at?: string
           website?: string | null
         }
@@ -174,6 +180,7 @@ export type Database = {
           business_id: string | null
           business_name: string | null
           created_at: string | null
+          deleted_at: string | null
           id: string
           location: string | null
           profile_id: string
@@ -186,6 +193,7 @@ export type Database = {
           business_id?: string | null
           business_name?: string | null
           created_at?: string | null
+          deleted_at?: string | null
           id?: string
           location?: string | null
           profile_id: string
@@ -198,6 +206,7 @@ export type Database = {
           business_id?: string | null
           business_name?: string | null
           created_at?: string | null
+          deleted_at?: string | null
           id?: string
           location?: string | null
           profile_id?: string
@@ -847,6 +856,7 @@ export type Database = {
       }
       gettransactionid: { Args: never; Returns: unknown }
       longtransactionsenabled: { Args: never; Returns: boolean }
+      move_current_job_to_past: { Args: never; Returns: string }
       populate_geometry_columns:
         | { Args: { tbl_oid: unknown; use_typmod?: boolean }; Returns: number }
         | { Args: { use_typmod?: boolean }; Returns: string }

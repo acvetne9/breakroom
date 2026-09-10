@@ -143,6 +143,22 @@ export const getCommentsForPosts = async (postIds: string[]): Promise<PostData[]
   return out;
 };
 
+/** The device's own posts (stories, job updates and comments), newest first. */
+export const getMyPosts = async (limit: number, offset: number = 0): Promise<PostData[]> => {
+  const { data, error } = await supabase
+    .from("posts")
+    .select(POST_SELECT)
+    .eq("user_id", getDeviceId())
+    .eq("is_deleted", false)
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) {
+    console.error("Error fetching my posts:", error);
+    return [];
+  }
+  return (data as unknown as RawPostRow[]).map(flattenBusiness);
+};
+
 /** A single post by id (used when a realtime insert arrives). */
 export const getPostById = async (postId: string): Promise<PostData | null> => {
   const { data, error } = await supabase.from("posts").select(POST_SELECT).eq("id", postId).maybeSingle();

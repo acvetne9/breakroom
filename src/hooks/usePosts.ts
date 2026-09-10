@@ -229,14 +229,6 @@ export const usePosts = () => {
 
   const getUserPosts = useCallback(() => posts.filter((post) => post.author === "You"), [posts]);
 
-  /** The device's own posts plus any post it has commented on, newest first. */
-  const getUserPostsAndCommented = useCallback(() => {
-    const commentedIds = new Set(posts.filter((p) => p.author === "You" && p.isComment).map((p) => p.isComment!));
-    return posts
-      .filter((post) => !post.isComment && (post.author === "You" || commentedIds.has(post.id)))
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  }, [posts]);
-
   useReconnectionHandler({ onReconnect: refetch });
 
   return {
@@ -251,6 +243,5 @@ export const usePosts = () => {
     loadMore: loadMorePosts,
     getBusinessPosts,
     getUserPosts,
-    getUserPostsAndCommented,
   };
 };
