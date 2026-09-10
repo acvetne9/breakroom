@@ -49,6 +49,7 @@ interface HomePageProps {
   showBusinessDetails?: boolean;
   onShowBusinessDetails?: () => void;
   onBackToPreview?: () => void;
+  onRoleAdded?: (businessId: string) => void;
 }
 
 const HomePage: React.FC<HomePageProps> = ({
@@ -66,6 +67,7 @@ const HomePage: React.FC<HomePageProps> = ({
   votingRoles,
   showBusinessDetails = false,
   onShowBusinessDetails,
+  onRoleAdded,
 }) => {
   const [searchValue, setSearchValue] = useState("");
   const [debouncedSearchValue, setDebouncedSearchValue] = useState("");
@@ -207,6 +209,7 @@ const HomePage: React.FC<HomePageProps> = ({
               onPostClick={onPostClick}
               onRoleVote={onRoleVote}
               votingRoles={votingRoles}
+              onRoleAdded={onRoleAdded}
             />
           )}
 

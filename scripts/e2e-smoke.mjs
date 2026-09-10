@@ -161,6 +161,32 @@ await step("preview opens details with roles; vote toggles and reverts", async (
   return `roles=${n}, count ${before} -> ${after} -> ${reverted}`;
 });
 
+await step("details card: add a role, then report a problem", async () => {
+  const details = page.locator(".app-card", { hasText: "Roles & Salaries" });
+  const rolesBefore = await details.locator("button", { hasText: "✅" }).count();
+  await details.locator('button[aria-label="Is this business accurate?"]').click();
+  const panel = details.locator("form");
+  await panel.waitFor({ state: "visible", timeout: 10_000 });
+
+  await panel.locator("button", { hasText: "Add a role & pay" }).click();
+  await panel.locator('input[placeholder="Job role..."]').fill(`${marker} role`);
+  await panel.locator('input[placeholder="$18.00"]').fill("19");
+  await panel.locator('button[type="submit"]').click();
+  await page.locator("text=Added").first().waitFor({ state: "visible", timeout: 15_000 });
+  await details.locator("text=" + `${marker} role`).waitFor({ state: "visible", timeout: 15_000 });
+  const rolesAfter = await details.locator("button", { hasText: "✅" }).count();
+  if (rolesAfter !== rolesBefore + 1) throw new Error(`role count ${rolesBefore} -> ${rolesAfter}`);
+
+  await details.locator('button[aria-label="Is this business accurate?"]').click();
+  await panel.waitFor({ state: "visible", timeout: 10_000 });
+  await panel.locator("select").selectOption("closed");
+  await panel.locator("textarea").fill(`${marker} report`);
+  await panel.locator('button[type="submit"]').click();
+  await page.locator("text=Thanks, we'll take a look.").waitFor({ state: "visible", timeout: 15_000 });
+  await shot("05b-feedback");
+  return `role added (${rolesBefore} -> ${rolesAfter}) and report sent`;
+});
+
 await step("close details card", async () => {
   await page.mouse.click(20, 400); // background click
   await page.locator(".app-card", { hasText: "Roles & Salaries" }).waitFor({ state: "hidden", timeout: 10_000 });

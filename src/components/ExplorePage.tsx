@@ -143,9 +143,9 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(
         setPostPlaceholder("Post blocked: Inappropriate content detected");
         return;
       }
-      const success = await submitPost(postText, filteredBusinessId);
+      const result = await submitPost(postText, filteredBusinessId);
       setPostText("");
-      setPostPlaceholder(success ? defaultPlaceholder : "Failed to create post. Please try again.");
+      setPostPlaceholder(result.ok ? defaultPlaceholder : result.reason);
     }, [postText, submitPost, filteredBusinessId, defaultPlaceholder]);
 
     const handleCommentSubmit = useCallback(async () => {
@@ -154,9 +154,9 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(
         setCommentText("");
         return;
       }
-      const success = await submitPost(commentText, undefined, false, undefined, undefined, undefined, expandedPost);
+      const result = await submitPost(commentText, undefined, false, undefined, undefined, undefined, expandedPost);
       setCommentText("");
-      setCommentPlaceholder(success ? "Leave a comment!" : "Connection error. Please try again.");
+      setCommentPlaceholder(result.ok ? "Leave a comment!" : result.reason);
     }, [commentText, expandedPost, submitPost]);
 
     const handlePostClick = useCallback(

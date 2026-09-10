@@ -39,10 +39,65 @@ export type Database = {
   }
   public: {
     Tables: {
+      business_reports: {
+        Row: {
+          business_id: string
+          created_at: string
+          details: string | null
+          id: string
+          issue_type: string
+          profile_id: string
+          resolved_at: string | null
+          status: string
+          suggested_address: string | null
+          suggested_name: string | null
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          details?: string | null
+          id?: string
+          issue_type: string
+          profile_id: string
+          resolved_at?: string | null
+          status?: string
+          suggested_address?: string | null
+          suggested_name?: string | null
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          details?: string | null
+          id?: string
+          issue_type?: string
+          profile_id?: string
+          resolved_at?: string | null
+          status?: string
+          suggested_address?: string | null
+          suggested_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_reports_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_reports_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_roles: {
         Row: {
           business_id: string
           created_at: string
+          created_by: string | null
           hourly_rate: number | null
           id: string
           pay_period: string | null
@@ -54,6 +109,7 @@ export type Database = {
         Insert: {
           business_id: string
           created_at?: string
+          created_by?: string | null
           hourly_rate?: number | null
           id?: string
           pay_period?: string | null
@@ -65,6 +121,7 @@ export type Database = {
         Update: {
           business_id?: string
           created_at?: string
+          created_by?: string | null
           hourly_rate?: number | null
           id?: string
           pay_period?: string | null
@@ -79,6 +136,13 @@ export type Database = {
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_roles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -232,7 +296,7 @@ export type Database = {
         Row: {
           business_id: string | null
           content: string
-          created_at: string | null
+          created_at: string
           id: string
           is_comment: string | null
           is_deleted: boolean
@@ -245,7 +309,7 @@ export type Database = {
         Insert: {
           business_id?: string | null
           content: string
-          created_at?: string | null
+          created_at?: string
           id?: string
           is_comment?: string | null
           is_deleted?: boolean
@@ -258,7 +322,7 @@ export type Database = {
         Update: {
           business_id?: string | null
           content?: string
-          created_at?: string | null
+          created_at?: string
           id?: string
           is_comment?: string | null
           is_deleted?: boolean
@@ -603,6 +667,17 @@ export type Database = {
         | { Args: { schema_name: string; table_name: string }; Returns: string }
         | { Args: { table_name: string }; Returns: string }
       enablelongtransactions: { Args: never; Returns: string }
+      enforce_rate_limit: {
+        Args: {
+          p_max: number
+          p_message: string
+          p_table: string
+          p_user_column: string
+          p_user_id: string
+          p_window: string
+        }
+        Returns: undefined
+      }
       equals: { Args: { geom1: unknown; geom2: unknown }; Returns: boolean }
       geometry: { Args: { "": string }; Returns: unknown }
       geometry_above: {

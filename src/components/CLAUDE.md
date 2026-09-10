@@ -8,6 +8,7 @@
 ## Home (map)
 
 - `HomePage.tsx` — search bar, welcome toast, `BusinessPreview` / `BusinessDetails` cards. Forwards `mapRef` to the map.
+- `BusinessDetails.tsx` — roles with votes, recent stories, and the "Is this business accurate?" panel: add a role + pay (writes `business_roles`, parent refetches) or report a problem (writes `business_reports`).
 - `MapLibreMap.tsx` — creates the MapLibre map + deck.gl overlay, throttles viewport loads, thins dots by zoom with a deterministic (id-hash) grid sample so the picked subset is stable across rebuilds, exposes `flyTo` via `forwardRef`. Tile URLs use the `gzpbf://` protocol from `utils/tileProtocol.ts`.
 - `UnifiedBusinessSearch.tsx` — typeahead over `services/search`: a neighborhood row first when one is mentioned, then businesses with a small "has this role" / "similar name" hint. Minimum 3 characters. Enter or picking a neighborhood calls `onSubmit` so the map applies the query immediately.
 - `WorkaroundLoading.tsx` — loading overlay until map tiles and businesses arrive.

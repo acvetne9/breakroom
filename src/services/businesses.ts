@@ -123,7 +123,26 @@ export async function getFullBusinessDetailsCached(businessId: string): Promise<
   return request;
 }
 
-/** Add a role/salary pair to an existing business if it isn't already listed. */
+/** Add a role/salary pair to a business by id if it isn't already listed. */
+export async function addBusinessRole(businessId: string, role: string, salary: string, payPeriod: string = "HR"): Promise<void> {
+  const { data: existingRole, error: roleCheckError } = await supabase
+    .from("business_roles")
+    .select("id")
+    .eq("business_id", businessId)
+    .eq("role", role)
+    .eq("salary", salary)
+    .maybeSingle();
+  if (roleCheckError) throw roleCheckError;
+  if (existingRole) return;
+
+  const { error } = await supabase
+    .from("business_roles")
+    .insert({ business_id: businessId, role, salary, pay_period: payPeriod, votes_total: 0, created_by: getDeviceId() });
+  if (error) throw error;
+  detailsCache.delete(businessId);
+}
+
+/** Add a role/salary pair to an existing business (looked up by name) if it isn't already listed. */
 export async function createOrUpdateBusinessRole(
   businessLocation: string,
   role: string,
@@ -152,7 +171,7 @@ export async function createOrUpdateBusinessRole(
 
   const { error: createRoleError } = await supabase
     .from("business_roles")
-    .insert({ business_id: existingBusiness.id, role, salary, pay_period: payPeriod, votes_total: 0 });
+    .insert({ business_id: existingBusiness.id, role, salary, pay_period: payPeriod, votes_total: 0, created_by: getDeviceId() });
   if (createRoleError) throw createRoleError;
 
   // The cached copy is now stale.

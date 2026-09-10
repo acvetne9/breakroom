@@ -16,6 +16,7 @@ import { useSessionCache } from "./useSessionCache";
 import { useReconnectionHandler } from "./useReconnectionHandler";
 import { applyOptimisticVote } from "./useOptimisticVote";
 import { persistVote } from "@/services/voting";
+import { describeDbError } from "@/services/errors";
 
 const POSTS_PER_PAGE = 30;
 
@@ -119,19 +120,19 @@ export const usePosts = () => {
       timePeriod?: string,
       salary?: number,
       isComment?: string,
-    ): Promise<boolean> => {
+    ): Promise<{ ok: true } | { ok: false; reason: string }> => {
       try {
         const { data, error } = await createPost(text, "story", businessId, jobRole, timePeriod, salary, isComment);
         if (error || !data) {
           console.error("Error creating post:", error);
-          return false;
+          return { ok: false, reason: describeDbError(error, "Failed to create post. Please try again.") };
         }
         const newPost = transformPost(data);
         commitPosts((prev) => (prev.some((p) => p.id === newPost.id) ? prev : [newPost, ...prev]));
-        return true;
+        return { ok: true };
       } catch (err) {
         console.error("Post submission error:", err);
-        return false;
+        return { ok: false, reason: "Connection error. Please try again." };
       }
     },
     [commitPosts],

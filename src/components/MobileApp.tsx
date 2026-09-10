@@ -276,6 +276,12 @@ const MobileApp: React.FC = () => {
     [selectedBusiness],
   );
 
+  /** A role was added from the details card: pull the fresh roles (cache was invalidated). */
+  const handleRoleAdded = useCallback(async (businessId: string) => {
+    const full = await getFullBusinessDetailsCached(businessId);
+    if (full) setSelectedBusiness((current) => (current?.id === businessId ? full : current));
+  }, []);
+
   // ------------------------------------------------------------ slide state
   useEffect(() => {
     if (currentSlide === 2 || currentSlide === 0) {
@@ -385,6 +391,7 @@ const MobileApp: React.FC = () => {
           showBusinessDetails={showBusinessDetails}
           onShowBusinessDetails={() => setShowBusinessDetails(true)}
           onBackToPreview={() => setShowBusinessDetails(false)}
+          onRoleAdded={handleRoleAdded}
         />
       </Suspense>
 
