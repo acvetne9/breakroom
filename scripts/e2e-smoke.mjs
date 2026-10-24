@@ -13,8 +13,11 @@ const consoleErrors = [];
 const pageErrors = [];
 const failedRequests = [];
 const tileResponses = { ok: 0, bad: 0 };
+const chicagoTileResponses = { ok: 0, bad: 0 };
 let viewportCalls = 0;
 let viewportRows = 0;
+/** Viewport RPC calls per city, read from the request body. */
+const viewportCallsByCity = { nyc: 0, chicago: 0 };
 
 const step = async (name, fn) => {
   const t0 = Date.now();
@@ -44,8 +47,15 @@ page.on("pageerror", (err) => pageErrors.push(String(err).slice(0, 300)));
 page.on("requestfailed", (req) => failedRequests.push(`${req.method()} ${req.url().slice(0, 120)} ${req.failure()?.errorText ?? ""}`));
 page.on("response", async (res) => {
   if (res.url().includes("/data/tiles/")) (res.ok() ? tileResponses.ok++ : tileResponses.bad++);
+  if (res.url().includes("/data/tiles-chicago/")) (res.ok() ? chicagoTileResponses.ok++ : chicagoTileResponses.bad++);
   if (res.url().includes("/rpc/get_businesses_in_viewport_slim") && res.ok()) {
     viewportCalls++;
+    try {
+      const body = JSON.parse(res.request().postData() ?? "{}");
+      viewportCallsByCity[body.city === "chicago" ? "chicago" : "nyc"]++;
+    } catch {
+      /* not json */
+    }
     try {
       viewportRows += (await res.json()).length;
     } catch {
@@ -338,8 +348,87 @@ await step("back to the map", async () => {
   await page.locator('input[placeholder="Find that next gig!"]').waitFor({ state: "visible", timeout: 10_000 });
 });
 
+// ---------------------------------------------------------------- Chicago
+const switchCity = async (label) => {
+  await page.locator('button[aria-label="Settings"]').click();
+  const radio = page.locator('[role="radiogroup"][aria-label="Map city"] button', { hasText: label });
+  await radio.waitFor({ state: "visible", timeout: 20_000 });
+  await radio.click();
+  if ((await radio.getAttribute("aria-checked")) !== "true") throw new Error(`${label} not selected`);
+  await page.locator('button[aria-label="Map"]').click();
+  await page.locator('input[placeholder="Find that next gig!"]').waitFor({ state: "visible", timeout: 90_000 });
+  await page.waitForTimeout(2500); // let tiles and the first dots land
+};
+
+await step("settings: switch the map to Chicago", async () => {
+  const before = { tiles: chicagoTileResponses.ok, calls: viewportCallsByCity.chicago };
+  await switchCity("Chicago");
+  const stored = await page.evaluate(() => localStorage.getItem("map_city"));
+  if (stored !== "chicago") throw new Error(`map_city is ${stored}`);
+  await shot("14-chicago-map");
+  if (chicagoTileResponses.ok <= before.tiles) throw new Error("no Chicago tiles were fetched");
+  if (chicagoTileResponses.bad > 0) throw new Error(`${chicagoTileResponses.bad} Chicago tile requests failed`);
+  if (viewportCallsByCity.chicago <= before.calls) throw new Error("viewport RPC was never called with city=chicago");
+  return `tiles ok=${chicagoTileResponses.ok} bad=${chicagoTileResponses.bad}, chicago viewport calls=${viewportCallsByCity.chicago}`;
+});
+
+let chicagoBusiness = "";
+await step("chicago: search returns Chicago businesses", async () => {
+  const search = page.locator('input[placeholder="Find that next gig!"]');
+  await search.click();
+  await search.fill("pizza");
+  const items = page.locator("div.max-h-60 div.cursor-pointer");
+  await items.first().waitFor({ state: "visible", timeout: 30_000 });
+  await page.waitForTimeout(500);
+  const n = await items.count();
+  chicagoBusiness = (await items.first().locator("span.font-medium").first().innerText()).trim();
+  await shot("15-chicago-search");
+  if (n === 0) throw new Error("no results");
+  return `${n} results, first: ${chicagoBusiness}`;
+});
+
+await step("chicago: a community area is recognised in the query", async () => {
+  const search = page.locator('input[placeholder="Find that next gig!"]');
+  await search.fill("");
+  await search.fill("coffee in the loop");
+  const items = page.locator("div.max-h-60 div.cursor-pointer");
+  await items.first().waitFor({ state: "visible", timeout: 30_000 });
+  await page.waitForTimeout(500);
+  const first = (await items.first().innerText()).trim();
+  await shot("16-chicago-neighborhood");
+  if (!/^Loop/i.test(first)) throw new Error(`first item should be the Loop, got: ${first}`);
+  return `neighborhood row: ${first.split("\n")[0]}`;
+});
+
+await step("chicago: selecting a result opens its preview", async () => {
+  const search = page.locator('input[placeholder="Find that next gig!"]');
+  await search.fill("");
+  await search.fill("pizza");
+  const items = page.locator("div.max-h-60 div.cursor-pointer");
+  await items.first().waitFor({ state: "visible", timeout: 30_000 });
+  await page.waitForTimeout(300);
+  await items.first().click();
+  const preview = page.locator(".app-popup");
+  await preview.waitFor({ state: "visible", timeout: 20_000 });
+  const title = (await preview.locator("h3").first().innerText()).trim();
+  await page.waitForTimeout(1500); // flyTo settles at z16
+  await shot("17-chicago-preview");
+  if (!title) throw new Error("preview has no title");
+  await page.mouse.click(20, 400);
+  return `preview for "${title}"`;
+});
+
+await step("settings: switch back to NYC", async () => {
+  const before = viewportCallsByCity.nyc;
+  await switchCity("NYC");
+  const stored = await page.evaluate(() => localStorage.getItem("map_city"));
+  if (stored !== "nyc") throw new Error(`map_city is ${stored}`);
+  if (viewportCallsByCity.nyc <= before) throw new Error("viewport RPC was never called with city=nyc after switching back");
+  await shot("18-back-to-nyc");
+});
+
 await browser.close();
 
 console.log("\n==== SUMMARY ====");
-console.log(JSON.stringify({ passed: results.filter((r) => r.ok).length, failed: results.filter((r) => !r.ok).length, tileResponses, consoleErrors, pageErrors, failedRequests: failedRequests.slice(0, 10) }, null, 2));
+console.log(JSON.stringify({ passed: results.filter((r) => r.ok).length, failed: results.filter((r) => !r.ok).length, tileResponses, chicagoTileResponses, viewportCallsByCity, consoleErrors, pageErrors, failedRequests: failedRequests.slice(0, 10) }, null, 2));
 process.exit(results.some((r) => !r.ok) ? 1 : 0);

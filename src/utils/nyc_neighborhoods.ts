@@ -426,37 +426,4 @@ export const nycNeighborhoods = Object.fromEntries(
   ])
 );
 
-
-
-// Find neighborhood by name (case insensitive)
-export function findNeighborhoodBoundaryByName(name: string) {
-  if (!name) return null;
-  const normalized = name.trim().toLowerCase();
-  for (const borough of Object.keys(nycNeighborhoodBoundaries)) {
-    for (const n of Object.keys(nycNeighborhoodBoundaries[borough])) {
-      if (n.toLowerCase() === normalized) {
-        return {
-          borough,
-          name: n,
-          boundary: nycNeighborhoodBoundaries[borough][n]
-        };
-      }
-    }
-  }
-  return null;
-}
-
-
-
-// Get all neighborhood names for autocomplete/matching
-export function getAllNeighborhoodNames(): string[] {
-  const names: string[] = [];
-  
-  for (const neighborhoods of Object.values(nycNeighborhoods)) {
-    for (const neighborhood of neighborhoods) {
-      names.push(neighborhood.name);
-    }
-  }
-  
-  return names.sort();
-}
+// Name lookup and the list of names live in utils/cities.ts so they work for every city.

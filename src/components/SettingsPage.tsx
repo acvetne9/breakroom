@@ -4,6 +4,8 @@ import { toast } from "sonner";
 import JobEditor, { JobSyncIndicator } from "./JobEditor";
 import MyStories from "./MyStories";
 import { useDevice } from "@/contexts/DeviceContext";
+import { useCity } from "@/contexts/CityContext";
+import { CITY_LIST } from "@/utils/cities";
 import { getPastJobs, savePastJob, hidePastJob, wipePastJobs, isCompletePastJob } from "@/services/pastJobs";
 import { getCurrentJob, saveCurrentJob, moveCurrentJobToPast } from "@/services/currentJobs";
 import {
@@ -38,6 +40,7 @@ const AUTO_SAVE_DELAY_MS = 1000;
  */
 const SettingsPage: React.FC<SettingsPageProps> = ({ onStoriesClick, onPostClick }) => {
   const { deviceId } = useDevice();
+  const { city, cityId, setCityId } = useCity();
 
   const [currentJob, setCurrentJob] = useState<JobFormState | null>(null);
   const [pastJobs, setPastJobs] = useState<JobFormState[]>([]);
@@ -280,6 +283,30 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onStoriesClick, onPostClick
             <span className="font-medium">Tip:</span>{" "}
             <span className="font-light opacity-70">Use the search bar on the map to search businesses by keyword, roles, and pay.</span>
           </p>
+
+          <div className="mb-8">
+            <h2 className="text-lg font-medium text-app-black mb-2">Map city</h2>
+            <div role="radiogroup" aria-label="Map city" className="inline-flex rounded-full bg-app-gray-light p-1">
+              {CITY_LIST.map((option) => {
+                const active = option.id === cityId;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setCityId(option.id)}
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      active ? "bg-app-yellow text-app-black shadow-sm" : "text-app-gray-dark hover:text-app-black"
+                    }`}
+                  >
+                    {option.shortName}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-app-gray-medium mt-2">The map, search and stories show {city.name}.</p>
+          </div>
 
           {currentJob && (
             <div className="mb-8">

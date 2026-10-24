@@ -10,14 +10,16 @@ import { registerGzipTileProtocol, getTileUrlTemplate } from "@/utils/tileProtoc
 import { isAndroid } from "@/utils/platform";
 import type { Business } from "@/types/business";
 import { searchFiltersKey, type SearchFilters } from "@/services/search";
-import { NYC_BOUNDS, NYC_CENTER } from "@/utils/geo";
+import type { CityConfig } from "@/utils/cities";
 
 export interface MapHandle {
-  /** Fly to a point, zooming in to street level but never zooming back out. */
+  /** Fly to a point, zooming in to street level but never zooming back out. Waits for the map to load. */
   flyTo: (lat: number, lng: number) => void;
 }
 
 interface MapLibreMapProps {
+  /** The city to draw. Mount one map per city (key the component by `city.id`). */
+  city: CityConfig;
   onBusinessClick?: (business: Business) => void;
   selectedBusiness?: Business | null;
   landmarks?: { lat: number; lng: number; emoji: string }[];
@@ -39,16 +41,13 @@ const BUSINESS_LIMITS = {
 // How many dots we are willing to draw at each zoom before thinning.
 const DISPLAY_LIMITS_BY_ZOOM = { ZOOM_10: 1000, ZOOM_11: 2000, ZOOM_12: 4000, ZOOM_13: 8000, ZOOM_14: 15000, ZOOM_15: 30000 } as const;
 
-const MAP_DEFAULTS = {
-  CENTER: NYC_CENTER,
-  ZOOM: 12.77,
-  MAX_ZOOM: 18,
-  MIN_ZOOM: 8,
-  BOUNDS: [
-    [NYC_BOUNDS.west, NYC_BOUNDS.south],
-    [NYC_BOUNDS.east, NYC_BOUNDS.north],
-  ] as [[number, number], [number, number]],
-} as const;
+const MAX_ZOOM = 18;
+const MIN_ZOOM = 8;
+
+const maxBoundsOf = (city: CityConfig): [[number, number], [number, number]] => [
+  [city.bounds.west, city.bounds.south],
+  [city.bounds.east, city.bounds.north],
+];
 
 const getBusinessLimit = (zoom: number, searching: boolean) => {
   if (searching) {
@@ -143,20 +142,23 @@ const sampleAcrossViewport = (bounds: MapBounds, businesses: Business[], maxBusi
   return result;
 };
 
-const BASE_LAYERS: LayerSpecification[] = [
+const SOURCE_ID = "city-tiles";
+
+/** The same style for every city; only the vector layer name differs between tile sets. */
+const buildBaseLayers = (sourceLayer: string): LayerSpecification[] => [
   {
-    id: "nyc-land",
+    id: "base-land",
     type: "fill",
-    source: "nyc-tiles",
-    "source-layer": "examplepoints",
+    source: SOURCE_ID,
+    "source-layer": sourceLayer,
     paint: { "fill-color": "#F5F5DC", "fill-opacity": 1.0 },
     filter: ["all", ["==", ["geometry-type"], "Polygon"]],
   },
   {
-    id: "nyc-green-spaces",
+    id: "base-green-spaces",
     type: "fill",
-    source: "nyc-tiles",
-    "source-layer": "examplepoints",
+    source: SOURCE_ID,
+    "source-layer": sourceLayer,
     paint: { "fill-color": "#87C17A", "fill-opacity": 1.0 },
     filter: [
       "all",
@@ -178,18 +180,22 @@ const BASE_LAYERS: LayerSpecification[] = [
     ],
   },
   {
-    id: "nyc-water",
+    id: "base-water",
     type: "fill",
-    source: "nyc-tiles",
-    "source-layer": "examplepoints",
+    source: SOURCE_ID,
+    "source-layer": sourceLayer,
     paint: { "fill-color": "#6CA4E1", "fill-opacity": 1.0 },
-    filter: ["all", ["==", ["geometry-type"], "Polygon"], ["has", "natural"]],
+    filter: [
+      "all",
+      ["==", ["geometry-type"], "Polygon"],
+      ["any", ["match", ["get", "natural"], ["water", "bay", "strait", "wetland"], true, false], ["has", "water"]],
+    ],
   },
   {
-    id: "nyc-roads",
+    id: "base-roads",
     type: "line",
-    source: "nyc-tiles",
-    "source-layer": "examplepoints",
+    source: SOURCE_ID,
+    "source-layer": sourceLayer,
     paint: {
       "line-color": "#666666",
       "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.3, 10, 0.5, 14, 1.5, 16, 3],
@@ -198,10 +204,10 @@ const BASE_LAYERS: LayerSpecification[] = [
     filter: ["all", ["==", ["geometry-type"], "LineString"], ["has", "highway"]],
   },
   {
-    id: "nyc-road-labels",
+    id: "base-road-labels",
     type: "symbol",
-    source: "nyc-tiles",
-    "source-layer": "examplepoints",
+    source: SOURCE_ID,
+    "source-layer": sourceLayer,
     minzoom: 13,
     filter: [
       "all",
@@ -234,30 +240,30 @@ const BASE_LAYERS: LayerSpecification[] = [
   },
 ];
 
-const buildStyle = (): StyleSpecification => {
+const buildStyle = (city: CityConfig): StyleSpecification => {
   const android = isAndroid();
   return {
     version: 8,
     glyphs: android ? "assets/fonts/{fontstack}/{range}.pbf" : `${window.location.origin}/data/{fontstack}/{range}.pbf`,
     sources: {
-      "nyc-tiles": {
+      [SOURCE_ID]: {
         type: "vector",
-        tiles: [android ? "gzpbf://assets/tiles/{z}/{x}/{y}.pbf" : getTileUrlTemplate()],
-        minzoom: 6,
+        tiles: [android ? `gzpbf://assets/${city.tilesDir}/{z}/{x}/{y}.pbf` : getTileUrlTemplate(city.tilesDir)],
+        minzoom: 10,
         maxzoom: 16,
         scheme: "xyz",
       },
     },
-    layers: [{ id: "background", type: "background", paint: { "background-color": "#F5F5DC" } }, ...BASE_LAYERS],
+    layers: [{ id: "background", type: "background", paint: { "background-color": "#F5F5DC" } }, ...buildBaseLayers(city.sourceLayer)],
   };
 };
 
 const MapLibreMap = forwardRef<MapHandle, MapLibreMapProps>(function MapLibreMap(
-  { onBusinessClick, selectedBusiness, landmarks = [], onMapLoaded, onBusinessesLoaded, searchFilters, neighborhoodCenter },
+  { city, onBusinessClick, selectedBusiness, landmarks = [], onMapLoaded, onBusinessesLoaded, searchFilters, neighborhoodCenter },
   ref,
 ) {
   const [mapLoaded, setMapLoaded] = useState(false);
-  const [currentZoom, setCurrentZoom] = useState<number>(MAP_DEFAULTS.ZOOM);
+  const [currentZoom, setCurrentZoom] = useState<number>(city.zoom);
   // Businesses the user has clicked this session (rendered orange). Resets on reload.
   const [clickedBusinessIds, setClickedBusinessIds] = useState<Set<string>>(new Set());
 
@@ -269,9 +275,13 @@ const MapLibreMap = forwardRef<MapHandle, MapLibreMapProps>(function MapLibreMap
   const viewportUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasInitialLoadRef = useRef(false);
   const isUserInteractingRef = useRef(false);
-  const lastProcessedZoomRef = useRef<number>(MAP_DEFAULTS.ZOOM);
+  const lastProcessedZoomRef = useRef<number>(city.zoom);
   const isZoomingRef = useRef(false);
   const tileErrorCountRef = useRef(0);
+  /** A flyTo requested before the map finished loading (e.g. right after a city switch). */
+  const pendingFlyToRef = useRef<{ lat: number; lng: number } | null>(null);
+  // The city is fixed for the life of one map instance (the parent keys the component by city id).
+  const cityRef = useRef(city);
 
   // Latest callbacks without re-binding map listeners on every render.
   const callbackRefs = useRef({ onBusinessClick, onMapLoaded, onBusinessesLoaded });
@@ -281,13 +291,26 @@ const MapLibreMap = forwardRef<MapHandle, MapLibreMapProps>(function MapLibreMap
 
   const { businesses, loadBusinessesInViewport, fetchFullBusinessDetails } = useViewportBusinesses(searchFilters);
 
-  const flyTo = useCallback((lat: number, lng: number) => {
-    const map = mapRef.current;
-    if (!map) return;
-    map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 16), speed: 1.2, curve: 1.2, essential: true });
-  }, []);
+  const flyTo = useCallback(
+    (lat: number, lng: number) => {
+      const map = mapRef.current;
+      if (!map || !mapLoaded) {
+        pendingFlyToRef.current = { lat, lng };
+        return;
+      }
+      map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 16), speed: 1.2, curve: 1.2, essential: true });
+    },
+    [mapLoaded],
+  );
 
   useImperativeHandle(ref, () => ({ flyTo }), [flyTo]);
+
+  useEffect(() => {
+    const pending = pendingFlyToRef.current;
+    if (!mapLoaded || !pending) return;
+    pendingFlyToRef.current = null;
+    flyTo(pending.lat, pending.lng);
+  }, [mapLoaded, flyTo]);
 
   useEffect(() => {
     if (businesses.length > 0) callbackRefs.current.onBusinessesLoaded?.();
@@ -400,17 +423,18 @@ const MapLibreMap = forwardRef<MapHandle, MapLibreMapProps>(function MapLibreMap
 
     registerGzipTileProtocol();
 
+    const mapCity = cityRef.current;
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
-      style: buildStyle(),
-      center: MAP_DEFAULTS.CENTER,
-      zoom: MAP_DEFAULTS.ZOOM,
-      maxZoom: MAP_DEFAULTS.MAX_ZOOM,
-      minZoom: MAP_DEFAULTS.MIN_ZOOM,
+      style: buildStyle(mapCity),
+      center: mapCity.center,
+      zoom: mapCity.zoom,
+      maxZoom: MAX_ZOOM,
+      minZoom: MIN_ZOOM,
       renderWorldCopies: false,
       attributionControl: false,
     });
-    map.setMaxBounds(MAP_DEFAULTS.BOUNDS);
+    map.setMaxBounds(maxBoundsOf(mapCity));
     mapRef.current = map;
 
     const markLoaded = () => {

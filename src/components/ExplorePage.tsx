@@ -7,6 +7,7 @@ import { TranslatedText } from "./TranslatedText";
 import { CommenterBadge } from "./CommenterBadge";
 import { getCommenterIdentity } from "@/utils/commenterIdentity";
 import { SYSTEM_USER_ID, type Post } from "@/services/posts";
+import { getCurrentCityId } from "@/utils/cities";
 
 interface ExplorePageProps {
   filteredBusinessId?: string;
@@ -73,6 +74,7 @@ const ExplorePage: React.FC<ExplorePageProps> = memo(
           author: "System",
           text: "Share a thought about this business 💭",
           businessId: filteredBusinessId,
+          city: getCurrentCityId(),
           isStory: true,
           votesTotal: 0,
           userVote: null,

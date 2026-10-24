@@ -1,14 +1,15 @@
 import { supabase } from "@/integrations/supabase/client";
+import { cityTables, getCurrentCityId, type CityId } from "@/utils/cities";
 
 /**
- * Look up a business ID by name (case-insensitive exact match)
+ * Look up a business ID by name (case-insensitive exact match) in one city's table.
  * Returns null if no matching business found
  */
-export async function findBusinessIdByName(businessName: string): Promise<string | null> {
+export async function findBusinessIdByName(businessName: string, city: CityId = getCurrentCityId()): Promise<string | null> {
   if (!businessName || !businessName.trim()) return null;
 
   const { data, error } = await supabase
-    .from("businesses")
+    .from(cityTables(city).businesses)
     .select("id")
     .ilike("name", businessName.trim())
     .limit(1)

@@ -17,18 +17,21 @@ import { useReconnectionHandler } from "./useReconnectionHandler";
 import { applyOptimisticVote } from "./useOptimisticVote";
 import { persistVote } from "@/services/voting";
 import { describeDbError } from "@/services/errors";
+import { useCity } from "@/contexts/CityContext";
 
 const POSTS_PER_PAGE = 30;
 
 /**
  * Feed state: top-level posts and their comments live in one array so filters
  * can slice it either way. Comments are fetched for every loaded page, so a
- * thread is always complete once its parent post is on screen.
+ * thread is always complete once its parent post is on screen. The feed is
+ * scoped to the current city and reloads when it changes.
  */
 export const usePosts = () => {
+  const { cityId } = useCity();
   const { cachedData: initialCachedPosts, saveToCache } = useSessionCache<Post[]>({
-    key: "posts_cache",
-    version: "2.0",
+    key: `posts_cache_${cityId}`,
+    version: "3.0",
     deserialize: (data) => (data as Array<Post & { createdAt: string }>).map((p) => ({ ...p, createdAt: new Date(p.createdAt) })),
   });
 
@@ -42,6 +45,8 @@ export const usePosts = () => {
   const loadingRef = useRef(false);
   const postsRef = useRef<Post[]>(posts);
   postsRef.current = posts;
+  const cityIdRef = useRef(cityId);
+  cityIdRef.current = cityId;
 
   const commitPosts = useCallback(
     (updater: (prev: Post[]) => Post[]) => {
@@ -216,6 +221,19 @@ export const usePosts = () => {
     fetchPosts(false);
   }, [fetchPosts]);
 
+  // A city switch is a different feed: drop what is loaded and start over.
+  const mountedCityRef = useRef(cityId);
+  useEffect(() => {
+    if (mountedCityRef.current === cityId) return;
+    mountedCityRef.current = cityId;
+    myPostsLoadedRef.current = false;
+    offsetRef.current = 0;
+    loadingRef.current = false;
+    setHasMore(true);
+    commitPosts(() => []);
+    fetchPosts(false);
+  }, [cityId, commitPosts, fetchPosts]);
+
   // Initial load + realtime subscription.
   useEffect(() => {
     if (initialCachedPosts && initialCachedPosts.length > 0) setLoading(false);
@@ -226,6 +244,7 @@ export const usePosts = () => {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "posts" }, async (payload) => {
         const inserted = payload.new as PostData;
         if (postsRef.current.some((p) => p.id === inserted.id)) return;
+        if (inserted.city && inserted.city !== cityIdRef.current) return; // other city's feed
         // Our own inserts are already in state; for anyone else's we need the business join.
         const full = await getPostById(inserted.id);
         if (!full || full.is_deleted) return;

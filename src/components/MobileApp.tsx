@@ -6,8 +6,10 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import InitiationPage from "./InitiationPage";
 import { supabase } from "@/integrations/supabase/client";
 import { useDevice } from "@/contexts/DeviceContext";
+import { useCity } from "@/contexts/CityContext";
 import { parseSalaryInput } from "@/utils/salaryFormat";
 import { getCurrentJob, saveCurrentJob } from "@/services/currentJobs";
+import { findBusinessIdByName } from "@/services/businessLookup";
 import { createOrUpdateBusinessRole, getFullBusinessDetailsCached, setCachedBusiness } from "@/services/businesses";
 import { createPost, type Post } from "@/services/posts";
 import { applyOptimisticVote } from "@/hooks/useOptimisticVote";
@@ -38,13 +40,14 @@ const readSkipped = () => {
   }
 };
 
-/** A business whose roles came from the full-details query (roles carry ids). */
+/** A business that came from the full-details query (flagged, or roles carry ids). */
 const hasFullDetails = (business: Business | null | undefined) =>
-  !!business?.atmosphere?.length && !!business?.roles?.length && !!business.roles[0]?.id;
+  !!business?.detailsLoaded || (!!business?.atmosphere?.length && !!business?.roles?.length && !!business.roles[0]?.id);
 
 const MobileApp: React.FC = () => {
   const isMobile = useIsMobile();
   const { deviceId, isFirstSession } = useDevice();
+  const { cityId, setCityId } = useCity();
   const { posts } = usePostsContext();
 
   const [currentView, setCurrentView] = useState<"initiation" | "main" | "loading">("loading");
@@ -123,9 +126,9 @@ const MobileApp: React.FC = () => {
 
       let businessId: string | undefined;
       try {
-        const { data: existing } = await supabase.from("businesses").select("id").ilike("name", data.location).maybeSingle();
+        const existing = await findBusinessIdByName(data.location);
         if (existing) {
-          businessId = existing.id;
+          businessId = existing;
           await createOrUpdateBusinessRole(data.location, data.role, data.salary, timePeriod);
         }
       } catch (roleError) {
@@ -203,29 +206,35 @@ const MobileApp: React.FC = () => {
     setFilteredUserStories(false);
   }, []);
 
-  /** Jump from a post to its business on the map. */
-  const handleFlyToBusiness = useCallback(async (businessId: string, post?: Post) => {
-    setCurrentSlide(1);
+  /** Jump from a post to its business on the map, switching city if the post is from the other one. */
+  const handleFlyToBusiness = useCallback(
+    async (businessId: string, post?: Post) => {
+      setCurrentSlide(1);
+      const city = post?.city ?? cityId;
+      if (city !== cityId) setCityId(city); // the map remounts; its flyTo waits for load
 
-    // Show something immediately if the post carries coordinates, then upgrade to full details.
-    if (post?.businessLat && post?.businessLng) {
-      setSelectedBusiness({
-        id: businessId,
-        name: post.businessName ?? "",
-        position: { lat: post.businessLat, lng: post.businessLng },
-        atmosphere: [],
-        roles: [],
-      });
+      // Show something immediately if the post carries coordinates, then upgrade to full details.
+      if (post?.businessLat && post?.businessLng) {
+        setSelectedBusiness({
+          id: businessId,
+          name: post.businessName ?? "",
+          position: { lat: post.businessLat, lng: post.businessLng },
+          atmosphere: [],
+          roles: [],
+          city,
+        });
+        setShowBusinessDetails(true);
+        mapRef.current?.flyTo(post.businessLat, post.businessLng);
+      }
+
+      const full = await getFullBusinessDetailsCached(businessId, city);
+      if (!full) return;
+      setSelectedBusiness(full);
       setShowBusinessDetails(true);
-      mapRef.current?.flyTo(post.businessLat, post.businessLng);
-    }
-
-    const full = await getFullBusinessDetailsCached(businessId);
-    if (!full) return;
-    setSelectedBusiness(full);
-    setShowBusinessDetails(true);
-    if (full.position?.lat && full.position?.lng) mapRef.current?.flyTo(full.position.lat, full.position.lng);
-  }, []);
+      if (full.position?.lat && full.position?.lng) mapRef.current?.flyTo(full.position.lat, full.position.lng);
+    },
+    [cityId, setCityId],
+  );
 
   // ------------------------------------------------------------- role votes
   const handleRoleVote = useCallback(
@@ -281,6 +290,17 @@ const MobileApp: React.FC = () => {
     const full = await getFullBusinessDetailsCached(businessId);
     if (full) setSelectedBusiness((current) => (current?.id === businessId ? full : current));
   }, []);
+
+  // A city switch invalidates any selected business (its id belongs to the other city's table).
+  const mountedCityRef = useRef(cityId);
+  useEffect(() => {
+    if (mountedCityRef.current === cityId) return;
+    mountedCityRef.current = cityId;
+    setSelectedBusiness(null);
+    setPreviouslySelectedBusiness(null);
+    setShowBusinessDetails(false);
+    setFilteredBusinessId(null);
+  }, [cityId]);
 
   // ------------------------------------------------------------ slide state
   useEffect(() => {

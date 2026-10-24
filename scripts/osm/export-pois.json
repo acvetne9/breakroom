@@ -1,0 +1,50 @@
+{
+  "attributes": {
+    "type": "@type",
+    "id": "@id",
+    "version": false,
+    "changeset": false,
+    "timestamp": false,
+    "uid": false,
+    "user": false,
+    "way_nodes": false
+  },
+  "exclude_tags": [],
+  "include_tags": [
+    "name",
+    "shop",
+    "amenity",
+    "office",
+    "craft",
+    "healthcare",
+    "tourism",
+    "leisure",
+    "club",
+    "cuisine",
+    "website",
+    "contact:website",
+    "brand",
+    "addr:housenumber",
+    "addr:street",
+    "addr:city",
+    "addr:state",
+    "addr:postcode"
+  ],
+  "linear_tags": [
+    "highway",
+    "barrier",
+    "leisure=track",
+    "leisure=slipway",
+    "natural=coastline"
+  ],
+  "area_tags": [
+    "shop",
+    "amenity",
+    "office",
+    "craft",
+    "healthcare",
+    "tourism",
+    "leisure",
+    "club"
+  ]
+}

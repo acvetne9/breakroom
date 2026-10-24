@@ -11,7 +11,7 @@
   ],
   "headers": [
     {
-      "source": "/data/tiles/(.*)\\.pbf",
+      "source": "/data/tiles(-[a-z]+)?/(.*)\\.pbf",
       "headers": [
         {
           "key": "Content-Type",

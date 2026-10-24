@@ -1,0 +1,39 @@
+{
+  "attributes": {
+    "type": false,
+    "id": false,
+    "version": false,
+    "changeset": false,
+    "timestamp": false,
+    "uid": false,
+    "user": false,
+    "way_nodes": false
+  },
+  "exclude_tags": [],
+  "include_tags": [
+    "highway",
+    "name",
+    "leisure",
+    "natural",
+    "water",
+    "landuse"
+  ],
+  "linear_tags": [
+    "highway",
+    "natural=coastline",
+    "natural=cliff",
+    "natural=tree_row",
+    "natural=ridge",
+    "natural=arete",
+    "natural=valley",
+    "natural=strait",
+    "leisure=track",
+    "leisure=slipway"
+  ],
+  "area_tags": [
+    "leisure",
+    "natural",
+    "water",
+    "landuse"
+  ]
+}

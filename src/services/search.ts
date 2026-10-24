@@ -8,7 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Business } from "@/types/business";
 import { mapBusinessRow } from "@/utils/businessMapper";
 import { retryWithBackoff, isRetryableError } from "@/utils/retryWithBackoff";
-import { findNeighborhoodBoundaryByName, getAllNeighborhoodNames, type NeighborhoodBounds } from "@/utils/nyc_neighborhoods";
+import type { NeighborhoodBounds } from "@/utils/nyc_neighborhoods";
+import { findNeighborhoodBoundaryByName, getAllNeighborhoodNames, getCurrentCity, type CityConfig } from "@/utils/cities";
 
 export interface SalaryRange {
   /** Hourly, inclusive. */
@@ -42,23 +43,12 @@ export const HOURS_PER_YEAR = 2080;
 
 // ---------------------------------------------------------------- parsing
 
+// City names and aliases are added per city from its config (see utils/cities.ts).
 const STOP_WORDS = new Set([
   "a", "an", "the", "in", "at", "on", "near", "around", "of", "for", "to", "with", "and", "or",
   "job", "jobs", "work", "working", "hiring", "gig", "gigs", "position", "positions",
-  "nyc", "ny", "me", "my", "find", "show", "all", "any", "that", "this", "is", "are",
+  "me", "my", "find", "show", "all", "any", "that", "this", "is", "are",
 ]);
-
-// Short forms people actually type. Only used when the full name exists in the list.
-const NEIGHBORHOOD_ALIASES: Record<string, string> = {
-  ues: "Upper East Side",
-  uws: "Upper West Side",
-  les: "Lower East Side",
-  fidi: "Financial District",
-  "bed-stuy": "Bed Stuy",
-  bedstuy: "Bed Stuy",
-  "hells kitchen": "Hell's Kitchen",
-  dtbk: "Downtown Brooklyn",
-};
 
 export const normalizeText = (text: string): string =>
   text
@@ -122,18 +112,18 @@ export function parseSalary(query: string): { salary?: SalaryRange; rest: string
   return { salary, rest };
 }
 
-/** Find a neighborhood mentioned anywhere in the query. Returns it and the query without it. */
-export function parseNeighborhood(query: string): { neighborhood?: NeighborhoodMatch; rest: string } {
+/** Find a neighborhood of `city` mentioned anywhere in the query. Returns it and the query without it. */
+export function parseNeighborhood(query: string, city: CityConfig = getCurrentCity()): { neighborhood?: NeighborhoodMatch; rest: string } {
   const normalized = ` ${stripSymbols(normalizeText(query))} `;
 
   const candidates: Array<{ key: string; name: string }> = [
-    ...getAllNeighborhoodNames().map((name) => ({ key: stripSymbols(normalizeText(name)), name })),
-    ...Object.entries(NEIGHBORHOOD_ALIASES).map(([alias, name]) => ({ key: stripSymbols(normalizeText(alias)), name })),
+    ...getAllNeighborhoodNames(city).map((name) => ({ key: stripSymbols(normalizeText(name)), name })),
+    ...Object.entries(city.neighborhoodAliases).map(([alias, name]) => ({ key: stripSymbols(normalizeText(alias)), name })),
   ].sort((a, b) => b.key.length - a.key.length); // longest first so "upper east side" beats "east"
 
   for (const { key, name } of candidates) {
     if (!key || !normalized.includes(` ${key} `)) continue;
-    const bounds = findNeighborhoodBoundaryByName(name);
+    const bounds = findNeighborhoodBoundaryByName(name, city);
     if (!bounds?.boundary?.length) continue;
 
     const lats = bounds.boundary.map((p) => p.lat);
@@ -150,18 +140,19 @@ export function parseNeighborhood(query: string): { neighborhood?: NeighborhoodM
 }
 
 /** Turn a raw query into filters. Returns null when there is nothing to search for. */
-export function parseSearchQuery(raw: string): SearchFilters | null {
+export function parseSearchQuery(raw: string, city: CityConfig = getCurrentCity()): SearchFilters | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
 
   const { salary, rest: afterSalary } = parseSalary(trimmed);
-  const { neighborhood, rest: afterNeighborhood } = parseNeighborhood(afterSalary);
+  const { neighborhood, rest: afterNeighborhood } = parseNeighborhood(afterSalary, city);
 
-  const terms = afterNeighborhood
-    .replace(/\bnew york( city)?\b/g, " ")
+  const cityStopWords = new Set(city.stopWords);
+  const terms = city.stripPatterns
+    .reduce((text, pattern) => text.replace(pattern, " "), afterNeighborhood)
     .split(/\s+/)
     .map((t) => t.trim())
-    .filter((t) => t.length > 0 && !STOP_WORDS.has(t));
+    .filter((t) => t.length > 0 && !STOP_WORDS.has(t) && !cityStopWords.has(t));
 
   if (terms.length === 0 && !salary && !neighborhood) return null;
 
@@ -196,7 +187,8 @@ export interface SearchOptions {
 
 export async function searchBusinesses(filters: SearchFilters, options: SearchOptions = {}): Promise<SearchResult[]> {
   const limit = Math.min(Math.max(options.limit ?? 100, 1), 5000);
-  const cacheKey = JSON.stringify({ k: searchFiltersKey(filters), b: options.bounds ?? null, limit });
+  const city = getCurrentCity().id;
+  const cacheKey = JSON.stringify({ c: city, k: searchFiltersKey(filters), b: options.bounds ?? null, limit });
 
   const cached = searchCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) return cached.results;
@@ -214,6 +206,7 @@ export async function searchBusinesses(filters: SearchFilters, options: SearchOp
         min_lng: options.bounds?.west,
         max_lng: options.bounds?.east,
         result_limit: limit,
+        city,
       }),
     { shouldRetry: isRetryableError },
   );

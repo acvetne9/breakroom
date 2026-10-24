@@ -10,8 +10,9 @@ import path from "path";
 const pbfHeaders = (): Plugin => ({
   name: "pbf-headers",
   configureServer(server) {
-    server.middlewares.use("/data/tiles", (req, res, next) => {
-      if (req.url?.endsWith(".pbf")) {
+    // Matches every tile directory under /data (tiles, tiles-chicago, ...) but not the glyphs.
+    server.middlewares.use("/data", (req, res, next) => {
+      if (req.url?.startsWith("/tiles") && req.url.endsWith(".pbf")) {
         res.setHeader("Content-Type", "application/x-protobuf");
         res.setHeader("Content-Encoding", "gzip");
         res.setHeader("Cache-Control", "public, max-age=3600");

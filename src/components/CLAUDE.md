@@ -7,9 +7,9 @@
 
 ## Home (map)
 
-- `HomePage.tsx` — search bar, welcome toast, `BusinessPreview` / `BusinessDetails` cards. Forwards `mapRef` to the map.
+- `HomePage.tsx` — search bar, welcome toast, `BusinessPreview` / `BusinessDetails` cards. Forwards `mapRef` to the map. Mounts one `MapLibreMap` per city (`key={city.id}`) and resets the ready flags on a switch.
 - `BusinessDetails.tsx` — roles with votes, recent stories, and the "Is this business accurate?" panel: add a role + pay (writes `business_roles`, parent refetches) or report a problem (writes `business_reports`).
-- `MapLibreMap.tsx` — creates the MapLibre map + deck.gl overlay, throttles viewport loads, thins dots by zoom with a deterministic (id-hash) grid sample so the picked subset is stable across rebuilds, exposes `flyTo` via `forwardRef`. Tile URLs use the `gzpbf://` protocol from `utils/tileProtocol.ts`.
+- `MapLibreMap.tsx` — creates the MapLibre map + deck.gl overlay for one `city` (style, bounds and tile directory come from the config; the base style is shared, only the vector layer name differs), throttles viewport loads, thins dots by zoom with a deterministic (id-hash) grid sample so the picked subset is stable across rebuilds, exposes `flyTo` via `forwardRef` (queued until the map has loaded). Tile URLs use the `gzpbf://` protocol from `utils/tileProtocol.ts`.
 - `UnifiedBusinessSearch.tsx` — typeahead over `services/search`: a neighborhood row first when one is mentioned, then businesses with a small "has this role" / "similar name" hint. Minimum 3 characters. Enter or picking a neighborhood calls `onSubmit` so the map applies the query immediately.
 - `WorkaroundLoading.tsx` — loading overlay until map tiles and businesses arrive.
 
@@ -20,7 +20,7 @@
 
 ## Settings
 
-- `SettingsPage.tsx` — current job (editable, "Move to past jobs" retires it atomically via the `move_current_job_to_past` RPC, and switching business offers to keep the old one), past jobs (add / hide; hiding sets `deleted_at`, incomplete drafts are wiped), and "My Stories". Both job kinds use the same `JobFormState`; incomplete jobs show a badge and are not saved.
+- `SettingsPage.tsx` — the NYC / Chicago map toggle (`role="radiogroup"`, writes through `CityContext`), current job (editable, "Move to past jobs" retires it atomically via the `move_current_job_to_past` RPC, and switching business offers to keep the old one), past jobs (add / hide; hiding sets `deleted_at`, incomplete drafts are wiped), and "My Stories". Both job kinds use the same `JobFormState`; incomplete jobs show a badge and are not saved.
 - `MyStories.tsx` — every post the device wrote, paged straight from the database (`getMyPosts`), with delete.
 - `JobEditor.tsx` — the three fields for one job; state transitions come from `utils/jobForm.ts`.
 - `JobEntryForm.tsx` — low-level presentational fields shared with `InitiationPage`.

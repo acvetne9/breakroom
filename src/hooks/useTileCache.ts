@@ -47,6 +47,12 @@ function evictOldest(count: number): void {
     });
 }
 
+/** Drop every cached tile (used when the city changes). */
+export function clearTileCache(): void {
+  cache.clear();
+  accessTimes.clear();
+}
+
 const inTile = (b: Business, t: TileBounds) =>
   b.position.lat >= t.south && b.position.lat <= t.north && b.position.lng >= t.west && b.position.lng <= t.east;
 
@@ -110,10 +116,7 @@ export const useTileCache = () => {
     [],
   );
 
-  const clearCache = useCallback(() => {
-    cache.clear();
-    accessTimes.clear();
-  }, []);
+  const clearCache = useCallback(() => clearTileCache(), []);
 
   return { getCachedBusinesses, setCachedBusinesses, getCachedTile, setCachedTile, isTileCached, clearCache };
 };

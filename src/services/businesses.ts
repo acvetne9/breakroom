@@ -3,6 +3,7 @@ import type { Business, BusinessRole } from "@/types/business";
 import { retryWithBackoff, isRetryableError } from "@/utils/retryWithBackoff";
 import { mapBusinessRow, mapRoleRow } from "@/utils/businessMapper";
 import { getDeviceId } from "@/utils/deviceId";
+import { cityTables, getCurrentCityId, type CityId } from "@/utils/cities";
 
 type MapBounds = { north: number; south: number; east: number; west: number };
 
@@ -12,7 +13,11 @@ type MapBounds = { north: number; south: number; east: number; west: number };
  * caps a response at 5,000 rows; a single zoom-14 tile never reaches that, so
  * per-tile fetches are complete while whole-viewport fetches are a sample.
  */
-export const getBusinessesInViewport = async (bounds: MapBounds, limit: number = 2000): Promise<Business[]> => {
+export const getBusinessesInViewport = async (
+  bounds: MapBounds,
+  limit: number = 2000,
+  city: CityId = getCurrentCityId(),
+): Promise<Business[]> => {
   try {
     const { data, error } = await retryWithBackoff(
       () =>
@@ -22,6 +27,7 @@ export const getBusinessesInViewport = async (bounds: MapBounds, limit: number =
           min_lng: bounds.west,
           max_lng: bounds.east,
           result_limit: limit,
+          city,
         }),
       { shouldRetry: isRetryableError },
     );
@@ -37,13 +43,14 @@ export const getBusinessesInViewport = async (bounds: MapBounds, limit: number =
 };
 
 /** Business row, its roles, and the current device's votes on those roles. */
-export async function getFullBusinessDetails(businessId: string): Promise<Business | null> {
+export async function getFullBusinessDetails(businessId: string, city: CityId = getCurrentCityId()): Promise<Business | null> {
+  const tables = cityTables(city);
   const [businessResult, rolesResult] = await retryWithBackoff(
     () =>
       Promise.all([
-        supabase.from("businesses").select("*").eq("id", businessId).maybeSingle(),
+        supabase.from(tables.businesses).select("*").eq("id", businessId).maybeSingle(),
         supabase
-          .from("business_roles")
+          .from(tables.roles)
           .select("*")
           .eq("business_id", businessId)
           .order("votes_total", { ascending: false })
@@ -63,6 +70,7 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
       .from("role_votes")
       .select("business_role_id, vote_type")
       .eq("user_id", getDeviceId())
+      .eq("city", city)
       .in(
         "business_role_id",
         rolesData.map((r) => r.id),
@@ -76,12 +84,14 @@ export async function getFullBusinessDetails(businessId: string): Promise<Busine
     return mapRoleRow(role, vote === "upvote" ? "up" : vote === "downvote" ? "down" : null);
   });
 
-  return mapBusinessRow(businessResult.data, roles);
+  return { ...mapBusinessRow(businessResult.data, roles), detailsLoaded: true };
 }
 
 // ---------------------------------------------------------------------------
 // Details cache. One app-wide store so the map, the shell, and the details
-// card all agree on a business's roles and votes.
+// card all agree on a business's roles and votes. Ids are UUIDs, so entries
+// from different cities never collide; the cache is still cleared on a city
+// switch to keep memory honest.
 // ---------------------------------------------------------------------------
 
 const MAX_CACHED_DETAILS = 500;
@@ -100,15 +110,20 @@ export function setCachedBusiness(business: Business): void {
   detailsCache.set(business.id, business);
 }
 
+export function clearDetailsCache(): void {
+  detailsCache.clear();
+  inflightDetails.clear();
+}
+
 /** Cached, de-duplicated fetch of full business details. Returns null on error or miss. */
-export async function getFullBusinessDetailsCached(businessId: string): Promise<Business | null> {
+export async function getFullBusinessDetailsCached(businessId: string, city: CityId = getCurrentCityId()): Promise<Business | null> {
   const cached = detailsCache.get(businessId);
   if (cached) return cached;
 
   const inflight = inflightDetails.get(businessId);
   if (inflight) return inflight;
 
-  const request = getFullBusinessDetails(businessId)
+  const request = getFullBusinessDetails(businessId, city)
     .then((business) => {
       if (business) setCachedBusiness(business);
       return business;
@@ -123,10 +138,11 @@ export async function getFullBusinessDetailsCached(businessId: string): Promise<
   return request;
 }
 
-/** Add a role/salary pair to a business by id if it isn't already listed. */
-export async function addBusinessRole(businessId: string, role: string, salary: string, payPeriod: string = "HR"): Promise<void> {
+/** Insert a role/salary pair for a business in the current city unless it is already listed. */
+async function insertRoleIfMissing(businessId: string, role: string, salary: string, payPeriod: string): Promise<void> {
+  const tables = cityTables();
   const { data: existingRole, error: roleCheckError } = await supabase
-    .from("business_roles")
+    .from(tables.roles)
     .select("id")
     .eq("business_id", businessId)
     .eq("role", role)
@@ -136,10 +152,15 @@ export async function addBusinessRole(businessId: string, role: string, salary: 
   if (existingRole) return;
 
   const { error } = await supabase
-    .from("business_roles")
+    .from(tables.roles)
     .insert({ business_id: businessId, role, salary, pay_period: payPeriod, votes_total: 0, created_by: getDeviceId() });
   if (error) throw error;
   detailsCache.delete(businessId);
+}
+
+/** Add a role/salary pair to a business by id if it isn't already listed. */
+export async function addBusinessRole(businessId: string, role: string, salary: string, payPeriod: string = "HR"): Promise<void> {
+  await insertRoleIfMissing(businessId, role, salary, payPeriod);
 }
 
 /** Add a role/salary pair to an existing business (looked up by name) if it isn't already listed. */
@@ -150,7 +171,7 @@ export async function createOrUpdateBusinessRole(
   payPeriod: string = "HR",
 ): Promise<void> {
   const { data: existingBusiness, error: findError } = await supabase
-    .from("businesses")
+    .from(cityTables().businesses)
     .select("id")
     .ilike("name", businessLocation)
     .maybeSingle();
@@ -158,22 +179,5 @@ export async function createOrUpdateBusinessRole(
   if (findError) throw findError;
   if (!existingBusiness) throw new Error(`Business "${businessLocation}" not found`);
 
-  const { data: existingRole, error: roleCheckError } = await supabase
-    .from("business_roles")
-    .select("id")
-    .eq("business_id", existingBusiness.id)
-    .eq("role", role)
-    .eq("salary", salary)
-    .maybeSingle();
-
-  if (roleCheckError) throw roleCheckError;
-  if (existingRole) return;
-
-  const { error: createRoleError } = await supabase
-    .from("business_roles")
-    .insert({ business_id: existingBusiness.id, role, salary, pay_period: payPeriod, votes_total: 0, created_by: getDeviceId() });
-  if (createRoleError) throw createRoleError;
-
-  // The cached copy is now stale.
-  detailsCache.delete(existingBusiness.id);
+  await insertRoleIfMissing(existingBusiness.id, role, salary, payPeriod);
 }

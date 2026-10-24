@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { findBusinessIdByName } from "./businessLookup";
+import { getCurrentCityId } from "@/utils/cities";
 
 export interface PastJobData {
   id?: string;
@@ -39,7 +40,9 @@ export const getPastJobs = async (deviceId: string): Promise<PastJobData[]> => {
 };
 
 export const savePastJob = async (deviceId: string, jobData: PastJobData): Promise<string> => {
-  const businessId = jobData.business_id ?? (jobData.business_name ? await findBusinessIdByName(jobData.business_name) : null);
+  // The business is looked up by name in the current city, so the row is tagged with it.
+  const city = getCurrentCityId();
+  const businessId = jobData.business_id ?? (jobData.business_name ? await findBusinessIdByName(jobData.business_name, city) : null);
 
   const record = {
     role: jobData.role,
@@ -47,6 +50,7 @@ export const savePastJob = async (deviceId: string, jobData: PastJobData): Promi
     location: jobData.location,
     business_name: jobData.business_name,
     business_id: businessId,
+    city,
     time_period: jobData.time_period,
   };
 

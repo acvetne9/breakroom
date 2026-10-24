@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { retryWithBackoff, isRetryableError } from "@/utils/retryWithBackoff";
 import { getDeviceId } from "@/utils/deviceId";
+import { getCurrentCityId, isCityId, type CityId } from "@/utils/cities";
 
 /** The profile row for the system-authored seed posts. Never deletable. */
 export const SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000000";
@@ -17,6 +18,8 @@ export interface PostData {
   time_period?: string | null;
   salary?: number | null;
   business_id?: string | null;
+  /** Which city's business table `business_id` points into; also scopes the feed. */
+  city?: string | null;
   user_id: string;
   votes_total: number;
   created_at: string;
@@ -37,6 +40,8 @@ export interface Post {
   businessName?: string;
   businessLat?: number;
   businessLng?: number;
+  /** City the post (and its business) belongs to. */
+  city: CityId;
   images?: string[];
   isStory?: boolean;
   isJobUpdate?: boolean;
@@ -60,20 +65,23 @@ const POST_SELECT = `
   created_at,
   is_comment,
   is_deleted,
-  businesses(id, name, lat, lng)
+  city,
+  post_business(id, name, lat, lng)
 `;
 
+// `post_business` is a PostgREST computed relationship (a Postgres function
+// over the posts row) that reads the business from the table named by `city`.
 type RawPostRow = Omit<PostData, "business_name" | "business_lat" | "business_lng"> & {
-  businesses?: { id: string; name: string; lat: number; lng: number } | null;
+  post_business?: { id: string; name: string; lat: number; lng: number } | null;
 };
 
 const flattenBusiness = (row: RawPostRow): PostData => {
-  const { businesses, ...rest } = row;
+  const { post_business, ...rest } = row;
   return {
     ...rest,
-    business_lat: businesses?.lat ?? null,
-    business_lng: businesses?.lng ?? null,
-    business_name: businesses?.name ?? null,
+    business_lat: post_business?.lat ?? null,
+    business_lng: post_business?.lng ?? null,
+    business_name: post_business?.name ?? null,
   };
 };
 
@@ -85,6 +93,7 @@ export const transformPost = (dbPost: PostData, currentUserId: string = getDevic
   businessName: dbPost.business_name ?? undefined,
   businessLat: dbPost.business_lat ?? undefined,
   businessLng: dbPost.business_lng ?? undefined,
+  city: isCityId(dbPost.city) ? dbPost.city : "nyc",
   isStory: dbPost.post_type === "story",
   isJobUpdate: dbPost.post_type === "job_update",
   linkedLocation: dbPost.business_name ?? undefined,
@@ -97,13 +106,14 @@ export const transformPost = (dbPost: PostData, currentUserId: string = getDevic
 });
 
 /**
- * One page of top-level posts (comments excluded), newest first.
+ * One page of top-level posts (comments excluded) for one city, newest first.
  * Comments are loaded separately with `getCommentsForPosts` so a post's thread
  * is complete regardless of how old the comments are.
  */
 export const getPosts = async (
   limit: number,
   offset: number = 0,
+  city: CityId = getCurrentCityId(),
 ): Promise<{ data: PostData[] | null; error: unknown }> => {
   const { data, error } = await retryWithBackoff(
     () =>
@@ -111,6 +121,7 @@ export const getPosts = async (
         .from("posts")
         .select(POST_SELECT)
         .eq("is_deleted", false)
+        .eq("city", city)
         .is("is_comment", null)
         .order("created_at", { ascending: false })
         .range(offset, offset + limit - 1),
@@ -182,6 +193,7 @@ export const createPost = async (
       post_type: postType,
       user_id: getDeviceId(),
       business_id: businessId,
+      city: getCurrentCityId(),
       job_role: jobRole,
       time_period: timePeriod,
       salary,

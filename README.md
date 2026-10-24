@@ -1,6 +1,6 @@
 # Workaround
 
-A location-based community platform for sharing real workplace info — salaries, roles, and stories — pinned to businesses on an interactive map of New York City. Users explore businesses on a map, contribute salary and role data, post stories, vote on contributions, and discover neighborhood-level insights about where people actually work.
+A location-based community platform for sharing real workplace info — salaries, roles, and stories — pinned to businesses on an interactive map of New York City or Chicago (switch in Settings). Users explore businesses on a map, contribute salary and role data, post stories, vote on contributions, and discover neighborhood-level insights about where people actually work.
 
 > The product is branded **Workaround**. The repository, package id (`com.acvetne.breakroom`), and Supabase project are still named `breakroom` from the original build.
 

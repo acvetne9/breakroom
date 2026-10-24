@@ -42,3 +42,6 @@ supabase/.temp/
 # Claude skills tooling (not part of the app)
 .agents/
 skills-lock.json
+
+# OSM pipeline cache (scripts/osm/build-chicago.sh)
+.osm-cache/

@@ -2,7 +2,8 @@
 
 Static assets copied verbatim into `dist/`.
 
-- `data/tiles/{z}/{x}/{y}.pbf` — self-hosted NYC vector tiles (~47 MB, ~11k files). They are **gzip-compressed on disk** despite the `.pbf` name. `vercel.json` and the Vite dev plugin serve them with `Content-Encoding: gzip`; the `gzpbf://` MapLibre protocol in `src/utils/tileProtocol.ts` inflates them wherever a host doesn't. Regenerate with tippecanoe from OSM data if the base map needs changes.
+- `data/tiles/{z}/{x}/{y}.pbf` — self-hosted NYC vector tiles (~47 MB, ~11k files, layer `examplepoints`). They are **gzip-compressed on disk** despite the `.pbf` name. `vercel.json` and the Vite dev plugin serve every `data/tiles*/` directory with `Content-Encoding: gzip`; the `gzpbf://` MapLibre protocol in `src/utils/tileProtocol.ts` inflates them wherever a host doesn't.
+- `data/tiles-chicago/{z}/{x}/{y}.pbf` — the same for Chicago (layer `osm`, fields highway/name/leisure/natural/water/landuse). Built from OpenStreetMap by `scripts/osm/build-chicago.sh`; rebuild there rather than editing files here. The native shells reference `assets/<tilesDir>/`, so copy this directory alongside `assets/tiles` when shipping Chicago on Android.
 - `data/OpenSansArialUnicode/` — glyph PBFs for road labels (not compressed).
 - `favicon.*`, `robots.txt`, `placeholder.svg`.
 

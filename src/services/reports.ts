@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getDeviceId } from "@/utils/deviceId";
+import { getCurrentCityId } from "@/utils/cities";
 import { describeDbError } from "./errors";
 
 export type BusinessIssueType = "closed" | "wrong_details" | "duplicate" | "other";
@@ -23,6 +24,7 @@ export interface BusinessReportInput {
 export async function submitBusinessReport(input: BusinessReportInput): Promise<{ ok: true } | { ok: false; reason: string }> {
   const { error } = await supabase.from("business_reports").insert({
     business_id: input.businessId,
+    city: getCurrentCityId(),
     profile_id: getDeviceId(),
     issue_type: input.issueType,
     details: input.details?.trim() || null,

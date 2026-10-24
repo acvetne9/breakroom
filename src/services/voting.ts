@@ -5,6 +5,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { getDeviceId } from "@/utils/deviceId";
+import { getCurrentCityId } from "@/utils/cities";
 
 export type VoteTable = "votes" | "role_votes";
 export type VoteItemField = "post_id" | "business_role_id";
@@ -22,12 +23,13 @@ async function writeVote(tableName: VoteTable, itemId: string, voteType: DbVoteT
       .upsert({ post_id: itemId, user_id: userId, vote_type: voteType }, { onConflict: "user_id,post_id" });
   }
 
+  // Role ids are only meaningful within a city's role table; the row records which one.
   if (voteType === null) {
     return supabase.from("role_votes").delete().eq("business_role_id", itemId).eq("user_id", userId);
   }
   return supabase
     .from("role_votes")
-    .upsert({ business_role_id: itemId, user_id: userId, vote_type: voteType }, { onConflict: "user_id,business_role_id" });
+    .upsert({ business_role_id: itemId, user_id: userId, vote_type: voteType, city: getCurrentCityId() }, { onConflict: "user_id,business_role_id" });
 }
 
 export async function persistVote(

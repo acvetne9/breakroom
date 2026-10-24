@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.12 (cd3cf9e)"
+    PostgrestVersion: "12.2.12"
   }
   graphql_public: {
     Tables: {
@@ -42,6 +42,7 @@ export type Database = {
       business_reports: {
         Row: {
           business_id: string
+          city: string
           created_at: string
           details: string | null
           id: string
@@ -54,6 +55,7 @@ export type Database = {
         }
         Insert: {
           business_id: string
+          city?: string
           created_at?: string
           details?: string | null
           id?: string
@@ -66,6 +68,7 @@ export type Database = {
         }
         Update: {
           business_id?: string
+          city?: string
           created_at?: string
           details?: string | null
           id?: string
@@ -77,13 +80,6 @@ export type Database = {
           suggested_name?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "business_reports_business_id_fkey"
-            columns: ["business_id"]
-            isOneToOne: false
-            referencedRelation: "businesses"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "business_reports_profile_id_fkey"
             columns: ["profile_id"]
@@ -147,6 +143,60 @@ export type Database = {
           },
         ]
       }
+      business_roles_chicago: {
+        Row: {
+          business_id: string
+          created_at: string
+          created_by: string | null
+          hourly_rate: number | null
+          id: string
+          pay_period: string | null
+          role: string
+          salary: string
+          updated_at: string
+          votes_total: number | null
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          created_by?: string | null
+          hourly_rate?: number | null
+          id?: string
+          pay_period?: string | null
+          role: string
+          salary: string
+          updated_at?: string
+          votes_total?: number | null
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          created_by?: string | null
+          hourly_rate?: number | null
+          id?: string
+          pay_period?: string | null
+          role?: string
+          salary?: string
+          updated_at?: string
+          votes_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_roles_chicago_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses_chicago"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_roles_chicago_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       businesses: {
         Row: {
           address: string | null
@@ -192,10 +242,59 @@ export type Database = {
         }
         Relationships: []
       }
+      businesses_chicago: {
+        Row: {
+          address: string | null
+          atmosphere: string[] | null
+          business_type: string | null
+          created_at: string
+          geom: unknown
+          id: string
+          lat: number
+          lng: number
+          name: string
+          name_norm: string | null
+          source_id: string | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          atmosphere?: string[] | null
+          business_type?: string | null
+          created_at?: string
+          geom?: unknown
+          id?: string
+          lat: number
+          lng: number
+          name: string
+          name_norm?: string | null
+          source_id?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          atmosphere?: string[] | null
+          business_type?: string | null
+          created_at?: string
+          geom?: unknown
+          id?: string
+          lat?: number
+          lng?: number
+          name?: string
+          name_norm?: string | null
+          source_id?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
       current_jobs: {
         Row: {
           business_id: string | null
           business_name: string | null
+          city: string
           created_at: string | null
           id: string
           location: string | null
@@ -208,6 +307,7 @@ export type Database = {
         Insert: {
           business_id?: string | null
           business_name?: string | null
+          city?: string
           created_at?: string | null
           id?: string
           location?: string | null
@@ -220,6 +320,7 @@ export type Database = {
         Update: {
           business_id?: string | null
           business_name?: string | null
+          city?: string
           created_at?: string | null
           id?: string
           location?: string | null
@@ -229,20 +330,13 @@ export type Database = {
           time_period?: string | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "current_jobs_business_id_fkey"
-            columns: ["business_id"]
-            isOneToOne: false
-            referencedRelation: "businesses"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       past_jobs: {
         Row: {
           business_id: string | null
           business_name: string | null
+          city: string
           created_at: string | null
           deleted_at: string | null
           id: string
@@ -257,6 +351,7 @@ export type Database = {
         Insert: {
           business_id?: string | null
           business_name?: string | null
+          city?: string
           created_at?: string | null
           deleted_at?: string | null
           id?: string
@@ -271,6 +366,7 @@ export type Database = {
         Update: {
           business_id?: string | null
           business_name?: string | null
+          city?: string
           created_at?: string | null
           deleted_at?: string | null
           id?: string
@@ -282,19 +378,12 @@ export type Database = {
           time_period?: string | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "past_jobs_business_id_fkey"
-            columns: ["business_id"]
-            isOneToOne: false
-            referencedRelation: "businesses"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       posts: {
         Row: {
           business_id: string | null
+          city: string
           content: string
           created_at: string
           id: string
@@ -308,6 +397,7 @@ export type Database = {
         }
         Insert: {
           business_id?: string | null
+          city?: string
           content: string
           created_at?: string
           id?: string
@@ -321,6 +411,7 @@ export type Database = {
         }
         Update: {
           business_id?: string | null
+          city?: string
           content?: string
           created_at?: string
           id?: string
@@ -333,13 +424,6 @@ export type Database = {
           votes_total?: number
         }
         Relationships: [
-          {
-            foreignKeyName: "posts_business_id_fkey"
-            columns: ["business_id"]
-            isOneToOne: false
-            referencedRelation: "businesses"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "posts_user_id_fkey"
             columns: ["user_id"]
@@ -376,6 +460,7 @@ export type Database = {
       role_votes: {
         Row: {
           business_role_id: string
+          city: string
           created_at: string
           id: string
           user_id: string
@@ -383,6 +468,7 @@ export type Database = {
         }
         Insert: {
           business_role_id: string
+          city?: string
           created_at?: string
           id?: string
           user_id: string
@@ -390,20 +476,13 @@ export type Database = {
         }
         Update: {
           business_role_id?: string
+          city?: string
           created_at?: string
           id?: string
           user_id?: string
           vote_type?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "role_votes_business_role_id_fkey"
-            columns: ["business_role_id"]
-            isOneToOne: false
-            referencedRelation: "business_roles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       spatial_ref_sys: {
         Row: {
@@ -463,6 +542,20 @@ export type Database = {
       }
     }
     Views: {
+      businesses_all: {
+        Row: {
+          address: string | null
+          atmosphere: string[] | null
+          business_type: string | null
+          city: string | null
+          id: string | null
+          lat: number | null
+          lng: number | null
+          name: string | null
+          website: string | null
+        }
+        Relationships: []
+      }
       geography_columns: {
         Row: {
           coord_dimension: number | null
@@ -634,6 +727,8 @@ export type Database = {
             }
             Returns: string
           }
+      city_business_table: { Args: { city: string }; Returns: string }
+      city_role_table: { Args: { city: string }; Returns: string }
       current_device_id: { Args: never; Returns: string }
       disablelongtransactions: { Args: never; Returns: string }
       dropgeometrycolumn:
@@ -779,6 +874,7 @@ export type Database = {
       geomfromewkt: { Args: { "": string }; Returns: unknown }
       get_businesses_in_viewport_slim: {
         Args: {
+          city?: string
           max_lat: number
           max_lng: number
           min_lat: number
@@ -799,6 +895,26 @@ export type Database = {
       populate_geometry_columns:
         | { Args: { tbl_oid: unknown; use_typmod?: boolean }; Returns: number }
         | { Args: { use_typmod?: boolean }; Returns: string }
+      post_business: {
+        Args: { p: Database["public"]["Tables"]["posts"]["Row"] }
+        Returns: {
+          address: string | null
+          atmosphere: string[] | null
+          business_type: string | null
+          city: string | null
+          id: string | null
+          lat: number | null
+          lng: number | null
+          name: string | null
+          website: string | null
+        }
+        SetofOptions: {
+          from: "posts"
+          to: "businesses_all"
+          isOneToOne: true
+          isSetofReturn: true
+        }
+      }
       postgis_constraint_dims: {
         Args: { geomcolumn: string; geomschema: string; geomtable: string }
         Returns: number
@@ -842,6 +958,7 @@ export type Database = {
       }
       search_businesses: {
         Args: {
+          city?: string
           max_hourly?: number
           max_lat?: number
           max_lng?: number

@@ -49,7 +49,7 @@ export function registerGzipTileProtocol(): void {
   });
 }
 
-/** Build the templated tile URL for the current platform. */
-export function getTileUrlTemplate(): string {
-  return `${GZIP_TILE_PROTOCOL}://${window.location.origin}/data/tiles/{z}/{x}/{y}.pbf`;
+/** Build the templated tile URL for one city's tile directory under /data/. */
+export function getTileUrlTemplate(tilesDir: string = "tiles"): string {
+  return `${GZIP_TILE_PROTOCOL}://${window.location.origin}/data/${tilesDir}/{z}/{x}/{y}.pbf`;
 }

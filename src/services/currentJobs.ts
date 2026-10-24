@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { findBusinessIdByName } from "./businessLookup";
+import { getCurrentCityId } from "@/utils/cities";
 
 export interface CurrentJobData {
   role: string;
@@ -8,6 +9,8 @@ export interface CurrentJobData {
   business_name: string;
   time_period: string;
   business_id?: string | null;
+  /** Which city's business table `business_id` points into. */
+  city?: string | null;
 }
 
 export const getCurrentJob = async (profileId: string): Promise<CurrentJobData | null> => {
@@ -21,12 +24,17 @@ export const getCurrentJob = async (profileId: string): Promise<CurrentJobData |
     business_name: data.business_name ?? "",
     time_period: data.time_period ?? "HR",
     business_id: data.business_id,
+    city: data.city,
   };
 };
 
-/** Insert or replace the profile's single current job. */
+/**
+ * Insert or replace the profile's single current job. The business is looked
+ * up by name in the current city, so the row is tagged with that city.
+ */
 export const saveCurrentJob = async (profileId: string, jobData: CurrentJobData): Promise<void> => {
-  const businessId = jobData.business_id ?? (jobData.business_name ? await findBusinessIdByName(jobData.business_name) : null);
+  const city = getCurrentCityId();
+  const businessId = jobData.business_id ?? (jobData.business_name ? await findBusinessIdByName(jobData.business_name, city) : null);
 
   const { error } = await supabase.from("current_jobs").upsert(
     {
@@ -37,6 +45,7 @@ export const saveCurrentJob = async (profileId: string, jobData: CurrentJobData)
       business_name: jobData.business_name,
       time_period: jobData.time_period,
       business_id: businessId,
+      city,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "profile_id" },
