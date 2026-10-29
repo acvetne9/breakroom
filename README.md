@@ -51,7 +51,7 @@ A location-based community platform for sharing real workplace info — salaries
 | **Components** | shadcn/ui (Radix primitives) | Accessible, unstyled primitives owned in-repo (`src/components/ui`) rather than a black-box library. |
 | **Styling** | Tailwind CSS + `tailwindcss-animate` + typography plugin | Utility-first styling; `next-themes` for theming. |
 | **Animation** | Framer Motion | Page transitions and the swipeable carousel shell. |
-| **Maps** | MapLibre GL + Deck.GL | Open-source (no Mapbox token); **self-hosted vector tiles** in `public/data/tiles` keep the map free and offline-capable. Fonts shipped as `.pbf` glyphs. |
+| **Maps** | MapLibre GL + Deck.GL | Open-source (no Mapbox token); **self-hosted vector tiles** in `public/data/tiles-nyc` and `public/data/tiles-chicago` (built from OpenStreetMap by `scripts/osm/build-city.sh`) keep the map free and offline-capable. Fonts shipped as `.pbf` glyphs. |
 | **Geo** | Turf.js | Client-side neighborhood boundary tests. |
 | **Search** | Postgres function `search_businesses` | Client parses pay, neighborhood and terms; the database matches name (punctuation-insensitive, fuzzy), type, address and roles with trigram indexes, filters by neighborhood polygon and hourly pay, and returns ranked results with match reasons. |
 | **Backend** | Supabase (Postgres + PostGIS) | Single managed backend: database, auth, RLS, and Deno edge functions in one place. |

@@ -5,7 +5,7 @@ Location-based community app: real salaries, roles, and stories pinned to busine
 ## Stack
 
 - React 18 + TypeScript (`strict`) + Vite 5 (SWC). Tailwind + five shadcn/ui primitives. Framer Motion for the 3-card swipe shell.
-- Map: MapLibre GL with self-hosted vector tiles (`public/data/tiles` for NYC, `public/data/tiles-chicago` for Chicago, built by `scripts/osm/`), business dots drawn by deck.gl.
+- Map: MapLibre GL with self-hosted vector tiles (`public/data/tiles-nyc` and `public/data/tiles-chicago`, both built from OpenStreetMap by `scripts/osm/build-city.sh`), business dots drawn by deck.gl.
 - Backend: Supabase (Postgres + PostGIS, RLS, one Deno edge function for geocoding). No Supabase Auth sign-in. Translation runs on-device in the browser.
 - Mobile: Capacitor 7 wraps the same web build (`android/`, `ios/`).
 - Hosting: Vercel static (`vercel.json`). Not live at the moment.
@@ -16,7 +16,7 @@ Every visitor gets an anonymous UUID from `src/utils/deviceId.ts`. It is the `pr
 
 ## City model
 
-`src/utils/cities.ts` is the single config for every city: bounds, center, tile directory and vector layer, which business tables to read, landmarks, neighborhoods, stop words. The chosen city is stored in localStorage (`map_city`) and read synchronously by services through `getCurrentCityId()`; `CityContext` exposes it to components and clears the business caches on a switch. The map remounts per city (`key={city.id}`).
+`src/utils/cities.ts` is the single config for every city: bounds, center, tile directory, minimum zoom and version, which business tables to read, landmarks, neighborhoods, stop words. The chosen city is stored in localStorage (`map_city`) and read synchronously by services through `getCurrentCityId()`; `CityContext` exposes it to components and clears the business caches on a switch. The map remounts per city (`key={city.id}`).
 
 Database: `businesses` / `business_roles` are NYC only; `businesses_chicago` / `business_roles_chicago` are the Chicago pair. User tables (`posts`, `current_jobs`, `past_jobs`, `role_votes`, `business_reports`) are shared and carry a `city` column saying which table their `business_id` / `business_role_id` points into. The map RPCs take `city`. See `supabase/CLAUDE.md`.
 
@@ -30,7 +30,7 @@ npm run lint       # eslint, 0 errors (remaining warnings are shadcn fast-refres
 npm test           # vitest
 npm run test:e2e   # Playwright smoke test against a running dev server (NYC flows, then the Chicago switch)
 node scripts/e2e-deploy.mjs <url>   # read-only Playwright check of a Vercel preview / production
-bash scripts/osm/build-chicago.sh        # rebuild Chicago tiles + businesses CSV from OpenStreetMap
+bash scripts/osm/build-city.sh <nyc|chicago>   # rebuild a city's tiles (+ Chicago businesses CSV) from OpenStreetMap
 bash scripts/osm/import-businesses.sh    # upsert that CSV into businesses_chicago
 ```
 

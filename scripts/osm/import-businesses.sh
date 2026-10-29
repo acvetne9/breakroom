@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Load the Chicago businesses CSV (built by build-chicago.sh) into
+# Load the Chicago businesses CSV (built by build-city.sh chicago) into
 # public.businesses_chicago on the linked Supabase project. Idempotent: rows
 # are matched on source_id (the OSM element id) and updated in place, and rows
 # that disappeared from OSM are removed unless they carry user data, so the
@@ -11,11 +11,11 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
-CSV="${1:-.osm-cache/chicago-businesses.csv}"
+CSV="${1:-.osm-cache/chicago-businesses.csv}"  
 PSQL="${PSQL:-/opt/homebrew/opt/libpq/bin/psql}"
 CONN="postgresql://postgres.hyygpxhwkvyxtbjnnpqk@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
 
-[ -f "$CSV" ] || { echo "CSV not found: $CSV (run scripts/osm/build-chicago.sh first)"; exit 1; }
+[ -f "$CSV" ] || { echo "CSV not found: $CSV (run scripts/osm/build-city.sh chicago first)"; exit 1; }
 command -v "$PSQL" >/dev/null || { echo "psql not found at $PSQL"; exit 1; }
 
 export PGPASSWORD="$(security find-generic-password -a workaround -s supabase-db-url -w)"

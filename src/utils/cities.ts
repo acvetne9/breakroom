@@ -43,6 +43,8 @@ export interface CityConfig {
   sourceLayer: string;
   /** Optional point layer of OSM place names (town / suburb / neighbourhood) for light area labels. */
   placesLayer?: string;
+  /** Place names not to label (the city itself; the user knows where they are). */
+  placeLabelExclude?: string[];
   tables: {
     businesses: "businesses" | "businesses_chicago";
     roles: "business_roles" | "business_roles_chicago";
@@ -73,10 +75,12 @@ export const CITIES: Record<CityId, CityConfig> = {
     bounds: NYC_BOUNDS,
     center: NYC_CENTER,
     zoom: 12.77,
-    tilesDir: "tiles",
-    tilesMinZoom: 10,
-    tilesVersion: 1,
-    sourceLayer: "examplepoints",
+    tilesDir: "tiles-nyc",
+    tilesMinZoom: 8,
+    tilesVersion: 2,
+    sourceLayer: "osm",
+    placesLayer: "places",
+    placeLabelExclude: ["New York", "New York City"],
     tables: { businesses: "businesses", roles: "business_roles" },
     landmarks: [
       { lat: 40.690331, lng: -74.045414, emoji: "🗽" },
@@ -129,6 +133,7 @@ export const CITIES: Record<CityId, CityConfig> = {
     tilesVersion: 6,
     sourceLayer: "osm",
     placesLayer: "places",
+    placeLabelExclude: ["Chicago"],
     tables: { businesses: "businesses_chicago", roles: "business_roles_chicago" },
     landmarks: [
       { lat: 41.8789, lng: -87.6359, emoji: "🏢" }, // Willis Tower

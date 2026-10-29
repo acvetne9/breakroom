@@ -1,11 +1,16 @@
 #!/usr/bin/env node
-// Build a water polygon for a lake whose OSM multipolygon relation is only
-// partially present in the extract (Lake Michigan spans four states, so any
-// city-sized extract has an incomplete relation that `osmium export` cannot
-// assemble).
+// Build water polygons from shoreline ways that do not form closed rings
+// inside the extract: a lake whose OSM multipolygon relation is only partially
+// present (Lake Michigan spans four states), or the sea, which OSM maps as
+// natural=coastline lines with no polygon at all (New York harbor).
 //
 //   node scripts/osm/lake-polygon.mjs --bbox W,S,E,N --water-point LNG,LAT \
-//        --relation <relation.osm> --ways <member-ways.geojsonseq> --out <out.geojsonseq>
+//        --ways <shoreline-ways.geojsonseq> --out <out.geojsonseq> \
+//        [--relation <relation.osm>] [--tags natural=water,name=Lake]
+//
+// With --relation the polygon takes the relation's natural/water/name tags;
+// without it, --tags (default natural=water) is used and every LineString in
+// --ways is a shoreline.
 //
 // Algorithm: chain the member ways that are in the extract into shorelines,
 // clip them to the bbox, then close the water faces along the bbox perimeter.
@@ -18,7 +23,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 const opts = {};
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i++) if (argv[i].startsWith("--")) opts[argv[i].slice(2)] = argv[++i];
-for (const k of ["bbox", "water-point", "relation", "ways", "out"]) {
+for (const k of ["bbox", "water-point", "ways", "out"]) {
   if (!opts[k]) { console.error(`missing --${k}`); process.exit(2); }
 }
 const [W, S, E, N] = opts.bbox.split(",").map(Number);
@@ -27,10 +32,12 @@ const Wd = E - W, Hd = N - S, P = 2 * (Wd + Hd);
 const EPS = 1e-9;
 
 // ---------------------------------------------------------------- inputs
-const relXml = readFileSync(opts.relation, "utf8");
+const relXml = opts.relation ? readFileSync(opts.relation, "utf8") : "";
 const roles = new Map();
 for (const m of relXml.matchAll(/<member type="way" ref="(\d+)" role="([^"]*)"/g)) roles.set(m[1], m[2]);
-const tags = Object.fromEntries([...relXml.matchAll(/<tag k="([^"]+)" v="([^"]*)"/g)].map((m) => [m[1], m[2]]));
+const tags = opts.relation
+  ? Object.fromEntries([...relXml.matchAll(/<tag k="([^"]+)" v="([^"]*)"/g)].map((m) => [m[1], m[2]]))
+  : Object.fromEntries((opts.tags ?? "natural=water").split(",").map((kv) => kv.split("=")));
 
 const ways = [];
 for (const line of readFileSync(opts.ways, "utf8").split("\n")) {
@@ -41,7 +48,7 @@ for (const line of readFileSync(opts.ways, "utf8").split("\n")) {
   const id = String(f.properties?.["@id"]);
   ways.push({ id, role: roles.get(id) ?? "outer", coords: f.geometry.coordinates });
 }
-console.log(`   relation members: ${roles.size}, member ways in extract: ${ways.length}`);
+console.log(opts.relation ? `   relation members: ${roles.size}, member ways in extract: ${ways.length}` : `   shoreline ways: ${ways.length}`);
 
 // ---------------------------------------------------------------- chain ways
 const key = (c) => `${c[0]},${c[1]}`;
@@ -233,7 +240,9 @@ for (const loop of loops) {
 }
 console.log(`   islands (holes): ${holes}, standalone loops: ${extra}`);
 
-const props = { natural: tags.natural ?? "water", water: tags.water ?? "lake" };
+const props = { natural: tags.natural ?? "water" };
+if (tags.water) props.water = tags.water;
+else if (opts.relation) props.water = "lake";
 if (tags.name) props.name = tags.name;
 const lines = polygons.map((poly) => JSON.stringify({ type: "Feature", properties: props, geometry: { type: "Polygon", coordinates: poly } }));
 writeFileSync(opts.out, lines.join("\n") + "\n");

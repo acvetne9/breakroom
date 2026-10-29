@@ -150,9 +150,9 @@ const PLACE_LABEL_LAYER_ID = "base-town-labels";
 /**
  * Light area labels from an OSM `place` point layer: towns and villages from
  * z8, suburbs and neighbourhoods from z10.5, both fading out as streets take
- * over. The city's own name is skipped (the user already knows where they are).
+ * over. Names in `exclude` (the city itself) are skipped.
  */
-const buildPlaceLabelLayers = (placesLayer: string, cityName: string): LayerSpecification[] => [
+const buildPlaceLabelLayers = (placesLayer: string, exclude: string[]): LayerSpecification[] => [
   {
     id: PLACE_LABEL_LAYER_ID,
     type: "symbol",
@@ -160,7 +160,12 @@ const buildPlaceLabelLayers = (placesLayer: string, cityName: string): LayerSpec
     "source-layer": placesLayer,
     minzoom: 8,
     maxzoom: 14.5,
-    filter: ["all", ["has", "name"], ["!=", ["get", "name"], cityName], ["match", ["get", "place"], ["city", "town", "village"], true, false]],
+    filter: [
+      "all",
+      ["has", "name"],
+      ["!", ["in", ["get", "name"], ["literal", exclude]]],
+      ["match", ["get", "place"], ["city", "borough", "town", "village"], true, false],
+    ],
     layout: {
       "text-field": ["get", "name"],
       "text-font": LABEL_FONT,
@@ -168,7 +173,7 @@ const buildPlaceLabelLayers = (placesLayer: string, cityName: string): LayerSpec
       "text-transform": "uppercase",
       "text-letter-spacing": 0.12,
       "text-padding": 10,
-      "symbol-sort-key": ["match", ["get", "place"], "city", 0, "town", 1, 2],
+      "symbol-sort-key": ["match", ["get", "place"], "city", 0, "borough", 1, "town", 2, 3],
     },
     paint: {
       "text-color": "#5a5a5a",
@@ -203,7 +208,7 @@ const buildPlaceLabelLayers = (placesLayer: string, cityName: string): LayerSpec
   },
 ];
 
-/** The same style for every city; only the vector layer name differs between tile sets. */
+/** The same style for every city (both tile sets are built by scripts/osm/build-city.sh). */
 const buildBaseLayers = (sourceLayer: string): LayerSpecification[] => [
   {
     id: "base-land",
@@ -316,7 +321,7 @@ const buildStyle = (city: CityConfig): StyleSpecification => {
     layers: [
       { id: "background", type: "background", paint: { "background-color": "#F5F5DC" } },
       ...buildBaseLayers(city.sourceLayer),
-      ...(city.placesLayer ? buildPlaceLabelLayers(city.placesLayer, city.name) : []),
+      ...(city.placesLayer ? buildPlaceLabelLayers(city.placesLayer, city.placeLabelExclude ?? [city.name]) : []),
     ],
   };
 };

@@ -31,7 +31,7 @@ page.on("response", (res) => {
   if (u.includes("/data/tiles-chicago/")) {
     tiles.chicago[res.ok() ? "ok" : "bad"]++;
     if (!chicagoTileUrl) chicagoTileUrl = u;
-  } else if (u.includes("/data/tiles/")) tiles.nyc[res.ok() ? "ok" : "bad"]++;
+  } else if (u.includes("/data/tiles-nyc/")) tiles.nyc[res.ok() ? "ok" : "bad"]++;
   if (u.includes("/rpc/get_businesses_in_viewport_slim") && res.ok()) {
     try {
       const c = JSON.parse(res.request().postData() ?? "{}").city;

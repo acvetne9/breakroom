@@ -46,7 +46,7 @@ page.on("console", (msg) => {
 page.on("pageerror", (err) => pageErrors.push(String(err).slice(0, 300)));
 page.on("requestfailed", (req) => failedRequests.push(`${req.method()} ${req.url().slice(0, 120)} ${req.failure()?.errorText ?? ""}`));
 page.on("response", async (res) => {
-  if (res.url().includes("/data/tiles/")) (res.ok() ? tileResponses.ok++ : tileResponses.bad++);
+  if (res.url().includes("/data/tiles-nyc/")) (res.ok() ? tileResponses.ok++ : tileResponses.bad++);
   if (res.url().includes("/data/tiles-chicago/")) (res.ok() ? chicagoTileResponses.ok++ : chicagoTileResponses.bad++);
   if (res.url().includes("/rpc/get_businesses_in_viewport_slim") && res.ok()) {
     viewportCalls++;
