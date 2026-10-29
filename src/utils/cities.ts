@@ -118,7 +118,7 @@ export const CITIES: Record<CityId, CityConfig> = {
     center: CHICAGO_CENTER,
     zoom: 12.5,
     tilesDir: "tiles-chicago",
-    tilesVersion: 3,
+    tilesVersion: 5,
     sourceLayer: "osm",
     placesLayer: "places",
     tables: { businesses: "businesses_chicago", roles: "business_roles_chicago" },

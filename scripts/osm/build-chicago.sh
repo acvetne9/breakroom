@@ -20,12 +20,20 @@ SCRIPTS="scripts/osm"
 TILES_OUT="public/data/tiles-chicago"
 NEIGHBORHOODS_TS="src/utils/chicago_neighborhoods.ts"
 
-PBF_URL="https://download.bbbike.org/osm/bbbike/Chicago/Chicago.osm.pbf"
-PBF="$CACHE/Chicago.osm.pbf"
+# Two sources. Geofabrik's Illinois extract covers the whole box on the Illinois
+# side (the BBBike city extract stops at latitude 41.63, cutting off Harvey and
+# Calumet City). The BBBike extract is still used for Lake Michigan because it
+# carries the Indiana shoreline, which the Illinois extract does not; the lake
+# polygon must reach the box's east edge to close.
+PBF_URL="https://download.geofabrik.de/north-america/us/illinois-latest.osm.pbf"
+PBF="$CACHE/illinois-latest.osm.pbf"
 BBOX_PBF="$CACHE/chicago-bbox.osm.pbf"
+LAKE_SRC_URL="https://download.bbbike.org/osm/bbbike/Chicago/Chicago.osm.pbf"
+LAKE_SRC_PBF="$CACHE/Chicago.osm.pbf"
+LAKE_BBOX_PBF="$CACHE/chicago-lake-bbox.osm.pbf"
 
 # Tile bbox (W,S,E,N) — generous so Lake Michigan and the suburbs render at the edges.
-TILE_BBOX="-88.04,41.54,-87.45,42.11"  # N must stay below 42.12: the extract's shoreline ways end there
+TILE_BBOX="-88.04,41.54,-87.45,42.11"  # N must stay below 42.12: the BBBike shoreline ways end there
 # Map bbox for businesses — tighter, matches what the app actually shows.
 MAP_BBOX="-88.00,41.58,-87.50,42.10"
 
@@ -68,16 +76,22 @@ fresh() {
 mkdir -p "$CACHE"
 
 # ---------------------------------------------------------------- a. download
+download() {
+  local url="$1" out="$2"
+  if [[ $SKIP_DOWNLOAD -eq 1 && -s "$out" ]]; then
+    echo "   --skip-download: using existing $out"
+  elif [[ -s "$out" && $FORCE -eq 0 ]]; then
+    echo "   exists: $out ($(du -h "$out" | cut -f1)) — skipping"
+  else
+    curl -fL --retry 3 --progress-bar -o "$out.part" "$url"
+    mv "$out.part" "$out"
+    echo "   downloaded $(du -h "$out" | cut -f1)"
+  fi
+}
 log "a. Download $PBF_URL"
-if [[ $SKIP_DOWNLOAD -eq 1 && -s "$PBF" ]]; then
-  echo "   --skip-download: using existing $PBF"
-elif [[ -s "$PBF" && $FORCE -eq 0 ]]; then
-  echo "   exists: $PBF ($(du -h "$PBF" | cut -f1)) — skipping"
-else
-  curl -fL --retry 3 --progress-bar -o "$PBF.part" "$PBF_URL"
-  mv "$PBF.part" "$PBF"
-  echo "   downloaded $(du -h "$PBF" | cut -f1)"
-fi
+download "$PBF_URL" "$PBF"
+log "a2. Download $LAKE_SRC_URL (shoreline source)"
+download "$LAKE_SRC_URL" "$LAKE_SRC_PBF"
 
 # ---------------------------------------------------------------- b. clip
 log "b. Clip to tile bbox $TILE_BBOX (smart strategy keeps multipolygons whole)"
@@ -86,6 +100,13 @@ if fresh "$BBOX_PBF" "$PBF"; then
   echo "   wrote $BBOX_PBF ($(du -h "$BBOX_PBF" | cut -f1))"
 else
   echo "   exists: $BBOX_PBF — skipping"
+fi
+log "b2. Clip the shoreline source to the same bbox"
+if fresh "$LAKE_BBOX_PBF" "$LAKE_SRC_PBF"; then
+  osmium extract --overwrite -s smart -b "$TILE_BBOX" -o "$LAKE_BBOX_PBF" "$LAKE_SRC_PBF"
+  echo "   wrote $LAKE_BBOX_PBF ($(du -h "$LAKE_BBOX_PBF" | cut -f1))"
+else
+  echo "   exists: $LAKE_BBOX_PBF — skipping"
 fi
 
 # ---------------------------------------------------------------- c. basemap tiles
@@ -123,11 +144,11 @@ LAKE_WAYS="$CACHE/chicago-lake-ways.geojsonseq"
 LAKE_GEOJSON="$CACHE/chicago-lake.geojsonseq"
 
 log "c2b. Lake Michigan polygon from relation $LAKE_RELATION (closed along the bbox)"
-if fresh "$LAKE_GEOJSON" "$BBOX_PBF" "$SCRIPTS/lake-polygon.mjs" "$SCRIPTS/export-lake.json"; then
-  osmium getid "$BBOX_PBF" "r$LAKE_RELATION" -f osm > "$LAKE_REL_OSM"
+if fresh "$LAKE_GEOJSON" "$LAKE_BBOX_PBF" "$SCRIPTS/lake-polygon.mjs" "$SCRIPTS/export-lake.json"; then
+  osmium getid "$LAKE_BBOX_PBF" "r$LAKE_RELATION" -f osm > "$LAKE_REL_OSM"
   # getid -r exits 1 when some members are missing — expected, the relation is
   # incomplete by construction. Any other failure still aborts.
-  osmium getid -r "$BBOX_PBF" "r$LAKE_RELATION" -o "$CACHE/chicago-lake-members.osm.pbf" --overwrite || [[ $? -eq 1 ]]
+  osmium getid -r "$LAKE_BBOX_PBF" "r$LAKE_RELATION" -o "$CACHE/chicago-lake-members.osm.pbf" --overwrite || [[ $? -eq 1 ]]
   osmium export --overwrite --keep-untagged -c "$SCRIPTS/export-lake.json" --geometry-types=linestring \
     -f geojsonseq -o "$LAKE_WAYS" "$CACHE/chicago-lake-members.osm.pbf"
   node "$SCRIPTS/lake-polygon.mjs" --bbox "$TILE_BBOX" --water-point "$LAKE_WATER_POINT" \
@@ -141,6 +162,7 @@ if fresh "$MBTILES" "$BASEMAP_GEOJSON" "$LAKE_GEOJSON"; then
   tippecanoe -o "$MBTILES" -l osm \
     --minimum-zoom=10 --maximum-zoom=16 \
     --drop-densest-as-needed --simplify-only-low-zooms \
+    --maximum-tile-bytes=450000 \
     --clip-bounding-box="$TILE_BBOX" \
     --force --quiet "$BASEMAP_GEOJSON" "$LAKE_GEOJSON"
   echo "   wrote $MBTILES ($(du -h "$MBTILES" | cut -f1))"
@@ -172,7 +194,10 @@ fi
 log "c4. tile-join → $TILES_OUT"
 if fresh "$TILES_OUT/metadata.json" "$MBTILES" "$PLACES_MBTILES"; then
   rm -rf "$TILES_OUT"
-  tile-join -e "$TILES_OUT" --force "$MBTILES" "$PLACES_MBTILES"
+  # -pk: never skip a merged tile for size (the base layer is capped at 450 KB
+  # above; the places layer adds a few KB, which once pushed a z10 tile past
+  # tile-join's 500 KB default and left a hole in the map).
+  tile-join -e "$TILES_OUT" --force -pk "$MBTILES" "$PLACES_MBTILES"
   find "$TILES_OUT" -name .DS_Store -delete
   echo "   wrote $TILES_OUT"
 else

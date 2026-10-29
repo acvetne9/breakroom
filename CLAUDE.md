@@ -29,6 +29,7 @@ npm run typecheck  # tsc, must stay clean
 npm run lint       # eslint, 0 errors (remaining warnings are shadcn fast-refresh notes and a few effect deps)
 npm test           # vitest
 npm run test:e2e   # Playwright smoke test against a running dev server (NYC flows, then the Chicago switch)
+node scripts/e2e-deploy.mjs <url>   # read-only Playwright check of a Vercel preview / production
 bash scripts/osm/build-chicago.sh        # rebuild Chicago tiles + businesses CSV from OpenStreetMap
 bash scripts/osm/import-businesses.sh    # upsert that CSV into businesses_chicago
 ```
