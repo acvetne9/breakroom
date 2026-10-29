@@ -28,6 +28,11 @@ export interface CityConfig {
   zoom: number;
   /** Directory under /data/ holding {z}/{x}/{y}.pbf. */
   tilesDir: string;
+  /**
+   * Cache-buster appended to tile URLs (`?v=N`). Tiles are served as immutable
+   * for a year, so bump this every time the directory is regenerated.
+   */
+  tilesVersion: number;
   /** Vector layer name inside those tiles. */
   sourceLayer: string;
   /** Optional point layer of OSM place names (town / suburb / neighbourhood) for light area labels. */
@@ -63,6 +68,7 @@ export const CITIES: Record<CityId, CityConfig> = {
     center: NYC_CENTER,
     zoom: 12.77,
     tilesDir: "tiles",
+    tilesVersion: 1,
     sourceLayer: "examplepoints",
     tables: { businesses: "businesses", roles: "business_roles" },
     landmarks: [
@@ -112,6 +118,7 @@ export const CITIES: Record<CityId, CityConfig> = {
     center: CHICAGO_CENTER,
     zoom: 12.5,
     tilesDir: "tiles-chicago",
+    tilesVersion: 3,
     sourceLayer: "osm",
     placesLayer: "places",
     tables: { businesses: "businesses_chicago", roles: "business_roles_chicago" },

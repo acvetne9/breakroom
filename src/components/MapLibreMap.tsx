@@ -308,7 +308,7 @@ const buildStyle = (city: CityConfig): StyleSpecification => {
     sources: {
       [SOURCE_ID]: {
         type: "vector",
-        tiles: [android ? `gzpbf://assets/${city.tilesDir}/{z}/{x}/{y}.pbf` : getTileUrlTemplate(city.tilesDir)],
+        tiles: [android ? `gzpbf://assets/${city.tilesDir}/{z}/{x}/{y}.pbf` : getTileUrlTemplate(city.tilesDir, city.tilesVersion)],
         minzoom: 10,
         maxzoom: 16,
         scheme: "xyz",

@@ -46,3 +46,7 @@ Takes a few minutes on first run; the ~103 MB extract is cached.
 - Tile size: if `public/data/tiles-chicago` grows far beyond NYC's 47 MB, add `--maximum-tile-bytes` or raise the minimum zoom for `highway=footway/path/steps/service` in step 3.
 - Harbors (Monroe, Belmont, DuSable, …) are separate `natural=water` polygons in OSM and come through the normal basemap export; they are not part of the lake relation.
 - Categories / exclusions live in `RULES` and `EXCLUDE` at the top of `pois-to-csv.mjs`; first matching rule wins.
+
+## After a rebuild
+
+Bump `tilesVersion` for Chicago in `src/utils/cities.ts`. Tile URLs end in `?v=N`; without the bump, browsers (and the Vercel CDN, which marks tiles immutable for a year) keep serving the previous tiles from cache. Then run `import-businesses.sh` if the CSV changed.

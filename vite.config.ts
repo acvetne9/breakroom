@@ -12,7 +12,8 @@ const pbfHeaders = (): Plugin => ({
   configureServer(server) {
     // Matches every tile directory under /data (tiles, tiles-chicago, ...) but not the glyphs.
     server.middlewares.use("/data", (req, res, next) => {
-      if (req.url?.startsWith("/tiles") && req.url.endsWith(".pbf")) {
+      const path = req.url?.split("?")[0] ?? "";
+      if (path.startsWith("/tiles") && path.endsWith(".pbf")) {
         res.setHeader("Content-Type", "application/x-protobuf");
         res.setHeader("Content-Encoding", "gzip");
         res.setHeader("Cache-Control", "public, max-age=3600");

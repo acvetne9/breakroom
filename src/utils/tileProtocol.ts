@@ -49,7 +49,11 @@ export function registerGzipTileProtocol(): void {
   });
 }
 
-/** Build the templated tile URL for one city's tile directory under /data/. */
-export function getTileUrlTemplate(tilesDir: string = "tiles"): string {
-  return `${GZIP_TILE_PROTOCOL}://${window.location.origin}/data/${tilesDir}/{z}/{x}/{y}.pbf`;
+/**
+ * Build the templated tile URL for one city's tile directory under /data/.
+ * `version` becomes a query string so a regenerated directory is fetched fresh
+ * even though the hosts mark tile files immutable.
+ */
+export function getTileUrlTemplate(tilesDir: string = "tiles", version: number = 1): string {
+  return `${GZIP_TILE_PROTOCOL}://${window.location.origin}/data/${tilesDir}/{z}/{x}/{y}.pbf?v=${version}`;
 }
