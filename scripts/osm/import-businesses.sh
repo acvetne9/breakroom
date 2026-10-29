@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Load the Chicago businesses CSV (built by build-chicago.sh) into
 # public.businesses_chicago on the linked Supabase project. Idempotent: rows
-# are matched on source_id (the OSM element id) and updated in place, so the
-# script can be re-run after a fresh OSM build without duplicating anything.
+# are matched on source_id (the OSM element id) and updated in place, and rows
+# that disappeared from OSM are removed unless they carry user data, so the
+# table always mirrors the current build.
 #
 # Usage: bash scripts/osm/import-businesses.sh [path/to/chicago-businesses.csv]
 # Needs: psql (brew install libpq), the migration 20261024000000_chicago_city.sql
@@ -43,6 +44,16 @@ on conflict (source_id) do update
       lng = excluded.lng,
       address = excluded.address,
       website = excluded.website;
+
+-- Rows that vanished from OSM since the last import. Keep any that already
+-- carry roles, posts or jobs so user contributions never disappear.
+delete from public.businesses_chicago b
+where b.source_id is not null
+  and not exists (select 1 from staging s where s.source_id = b.source_id)
+  and not exists (select 1 from public.business_roles_chicago r where r.business_id = b.id)
+  and not exists (select 1 from public.posts p where p.city = 'chicago' and p.business_id = b.id)
+  and not exists (select 1 from public.current_jobs j where j.city = 'chicago' and j.business_id = b.id)
+  and not exists (select 1 from public.past_jobs j where j.city = 'chicago' and j.business_id = b.id);
 
 analyze public.businesses_chicago;
 SQL
