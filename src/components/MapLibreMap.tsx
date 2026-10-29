@@ -42,7 +42,6 @@ const BUSINESS_LIMITS = {
 const DISPLAY_LIMITS_BY_ZOOM = { ZOOM_10: 1000, ZOOM_11: 2000, ZOOM_12: 4000, ZOOM_13: 8000, ZOOM_14: 15000, ZOOM_15: 30000 } as const;
 
 const MAX_ZOOM = 18;
-const MIN_ZOOM = 8;
 
 const maxBoundsOf = (city: CityConfig): [[number, number], [number, number]] => [
   [city.bounds.west, city.bounds.south],
@@ -150,7 +149,7 @@ const PLACE_LABEL_LAYER_ID = "base-town-labels";
 
 /**
  * Light area labels from an OSM `place` point layer: towns and villages from
- * z10, suburbs and neighbourhoods from z10.5, both fading out as streets take
+ * z8, suburbs and neighbourhoods from z10.5, both fading out as streets take
  * over. The city's own name is skipped (the user already knows where they are).
  */
 const buildPlaceLabelLayers = (placesLayer: string, cityName: string): LayerSpecification[] => [
@@ -159,13 +158,13 @@ const buildPlaceLabelLayers = (placesLayer: string, cityName: string): LayerSpec
     type: "symbol",
     source: SOURCE_ID,
     "source-layer": placesLayer,
-    minzoom: 10,
+    minzoom: 8,
     maxzoom: 14.5,
     filter: ["all", ["has", "name"], ["!=", ["get", "name"], cityName], ["match", ["get", "place"], ["city", "town", "village"], true, false]],
     layout: {
       "text-field": ["get", "name"],
       "text-font": LABEL_FONT,
-      "text-size": ["interpolate", ["linear"], ["zoom"], 10, 11, 14, 14],
+      "text-size": ["interpolate", ["linear"], ["zoom"], 8, 10, 10, 11, 14, 14],
       "text-transform": "uppercase",
       "text-letter-spacing": 0.12,
       "text-padding": 10,
@@ -309,7 +308,7 @@ const buildStyle = (city: CityConfig): StyleSpecification => {
       [SOURCE_ID]: {
         type: "vector",
         tiles: [android ? `gzpbf://assets/${city.tilesDir}/{z}/{x}/{y}.pbf` : getTileUrlTemplate(city.tilesDir, city.tilesVersion)],
-        minzoom: 10,
+        minzoom: city.tilesMinZoom,
         maxzoom: 16,
         scheme: "xyz",
       },
@@ -498,7 +497,7 @@ const MapLibreMap = forwardRef<MapHandle, MapLibreMapProps>(function MapLibreMap
       center: mapCity.center,
       zoom: mapCity.zoom,
       maxZoom: MAX_ZOOM,
-      minZoom: MIN_ZOOM,
+      minZoom: mapCity.tilesMinZoom,
       renderWorldCopies: false,
       attributionControl: false,
     });

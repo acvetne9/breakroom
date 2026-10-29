@@ -157,10 +157,10 @@ else
   echo "   exists: $LAKE_GEOJSON — skipping"
 fi
 
-log "c3. tippecanoe → $MBTILES (layer: osm, z10–z16)"
+log "c3. tippecanoe → $MBTILES (layer: osm, z8–z16)"
 if fresh "$MBTILES" "$BASEMAP_GEOJSON" "$LAKE_GEOJSON"; then
   tippecanoe -o "$MBTILES" -l osm \
-    --minimum-zoom=10 --maximum-zoom=16 \
+    --minimum-zoom=8 --maximum-zoom=16 \
     --drop-densest-as-needed --simplify-only-low-zooms \
     --maximum-tile-bytes=450000 \
     --clip-bounding-box="$TILE_BBOX" \
@@ -183,7 +183,7 @@ if fresh "$PLACES_MBTILES" "$BBOX_PBF" "$SCRIPTS/export-places.json"; then
   osmium export --overwrite -f geojsonseq -c "$SCRIPTS/export-places.json" \
     --geometry-types=point -o "$PLACES_GEOJSON" "$PLACES_PBF"
   tippecanoe -o "$PLACES_MBTILES" -l places \
-    --minimum-zoom=10 --maximum-zoom=16 -r1 \
+    --minimum-zoom=8 --maximum-zoom=16 -r1 \
     --clip-bounding-box="$TILE_BBOX" \
     --force --quiet "$PLACES_GEOJSON"
   echo "   $(grep -c '"place"' "$PLACES_GEOJSON") place nodes → $PLACES_MBTILES"
@@ -251,7 +251,7 @@ check_tile "Lincoln Park " -87.635 41.925 14
 check_tile "Open lake z12" -87.50 41.80 12
 check_tile "Open lake z16" -87.50 41.80 16
 # Hard requirement: the open-lake tiles must contain a natural=water polygon.
-for z in 10 12 14 16; do
+for z in 8 10 12 14 16; do
   read -r x y < <(tile_xy -87.50 41.80 "$z")
   f="$TILES_OUT/$z/$x/$y.pbf"
   if [[ ! -f "$f" ]] || [[ "$(tippecanoe-decode "$f" "$z" "$x" "$y" | jq '[.features[] | select(.properties.layer=="osm") | .features[] | select(.properties.natural=="water")] | length')" -eq 0 ]]; then
@@ -259,7 +259,7 @@ for z in 10 12 14 16; do
     exit 1
   fi
 done
-echo "   Lake Michigan: natural=water polygon present in open-lake tiles at z10/12/14/16"
+echo "   Lake Michigan: natural=water polygon present in open-lake tiles at z8/10/12/14/16"
 
 # ---------------------------------------------------------------- d. businesses
 POI_PBF="$CACHE/chicago-pois.osm.pbf"
