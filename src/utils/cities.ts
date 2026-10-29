@@ -47,7 +47,9 @@ export interface CityConfig {
   businessCountLabel: string;
 }
 
-export const CHICAGO_BOUNDS: MapBounds = { north: 42.07, south: 41.64, east: -87.5, west: -87.94 };
+// City plus the inner ring of suburbs: Evanston and Skokie north, Des Plaines, Elmhurst and
+// Oak Park west, Oak Lawn, Blue Island, Calumet City and Harvey south.
+export const CHICAGO_BOUNDS: MapBounds = { north: 42.1, south: 41.58, east: -87.5, west: -88.0 };
 export const CHICAGO_CENTER: [number, number] = [-87.6298, 41.8781];
 
 export const CITIES: Record<CityId, CityConfig> = {

@@ -239,3 +239,10 @@ const lines = polygons.map((poly) => JSON.stringify({ type: "Feature", propertie
 writeFileSync(opts.out, lines.join("\n") + "\n");
 const areaKm2 = polygons.reduce((s, poly) => s + Math.abs(ringArea(poly[0])), 0) * 111.32 * 111.32 * Math.cos((((S + N) / 2) * Math.PI) / 180);
 console.log(`   wrote ${polygons.length} polygon(s), ≈ ${areaKm2.toFixed(0)} km² → ${opts.out}`);
+// If the shoreline never reaches the bbox edge (e.g. the bbox extends past the
+// extract's shoreline ways), the "water" face is the whole box. Fail loudly.
+const bboxKm2 = (E - W) * (N - S) * 111.32 * 111.32 * Math.cos((((S + N) / 2) * Math.PI) / 180);
+if (areaKm2 > 0.7 * bboxKm2) {
+  console.error(`   ERROR: water covers ${((areaKm2 / bboxKm2) * 100).toFixed(0)}% of the bbox; the shoreline probably does not reach every edge it crosses. Shrink the bbox to where the shoreline ways end.`);
+  process.exit(1);
+}

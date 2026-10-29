@@ -25,9 +25,9 @@ PBF="$CACHE/Chicago.osm.pbf"
 BBOX_PBF="$CACHE/chicago-bbox.osm.pbf"
 
 # Tile bbox (W,S,E,N) — generous so Lake Michigan and the suburbs render at the edges.
-TILE_BBOX="-87.98,41.60,-87.45,42.10"
+TILE_BBOX="-88.04,41.54,-87.45,42.11"  # N must stay below 42.12: the extract's shoreline ways end there
 # Map bbox for businesses — tighter, matches what the app actually shows.
-MAP_BBOX="-87.94,41.64,-87.50,42.07"
+MAP_BBOX="-88.00,41.58,-87.50,42.10"
 
 # Lake Michigan. Its multipolygon relation spans four states, so the city extract
 # only has the shoreline ways; lake-polygon.mjs closes them along the tile bbox.
