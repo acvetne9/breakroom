@@ -144,6 +144,66 @@ const sampleAcrossViewport = (bounds: MapBounds, businesses: Business[], maxBusi
 
 const SOURCE_ID = "city-tiles";
 
+const LABEL_FONT = ["OpenSansArialUnicode"];
+/** First place-label layer; deck.gl layers are inserted beneath it. */
+const PLACE_LABEL_LAYER_ID = "base-town-labels";
+
+/**
+ * Light area labels from an OSM `place` point layer: towns and villages from
+ * z10, suburbs and neighbourhoods from z10.5, both fading out as streets take
+ * over. The city's own name is skipped (the user already knows where they are).
+ */
+const buildPlaceLabelLayers = (placesLayer: string, cityName: string): LayerSpecification[] => [
+  {
+    id: PLACE_LABEL_LAYER_ID,
+    type: "symbol",
+    source: SOURCE_ID,
+    "source-layer": placesLayer,
+    minzoom: 10,
+    maxzoom: 14.5,
+    filter: ["all", ["has", "name"], ["!=", ["get", "name"], cityName], ["match", ["get", "place"], ["city", "town", "village"], true, false]],
+    layout: {
+      "text-field": ["get", "name"],
+      "text-font": LABEL_FONT,
+      "text-size": ["interpolate", ["linear"], ["zoom"], 10, 11, 14, 14],
+      "text-transform": "uppercase",
+      "text-letter-spacing": 0.12,
+      "text-padding": 10,
+      "symbol-sort-key": ["match", ["get", "place"], "city", 0, "town", 1, 2],
+    },
+    paint: {
+      "text-color": "#5a5a5a",
+      "text-halo-color": "rgba(255,255,255,0.9)",
+      "text-halo-width": 1.6,
+      "text-opacity": ["interpolate", ["linear"], ["zoom"], 13.5, 0.9, 14.5, 0],
+    },
+  },
+  {
+    id: "base-neighbourhood-labels",
+    type: "symbol",
+    source: SOURCE_ID,
+    "source-layer": placesLayer,
+    minzoom: 10.5,
+    maxzoom: 15.5,
+    filter: ["all", ["has", "name"], ["match", ["get", "place"], ["suburb", "neighbourhood", "quarter"], true, false]],
+    layout: {
+      "text-field": ["get", "name"],
+      "text-font": LABEL_FONT,
+      "text-size": ["interpolate", ["linear"], ["zoom"], 10.5, 9.5, 15, 12],
+      "text-transform": "uppercase",
+      "text-letter-spacing": 0.1,
+      "text-padding": 12,
+      "symbol-sort-key": ["match", ["get", "place"], "suburb", 0, "neighbourhood", 1, 2],
+    },
+    paint: {
+      "text-color": "#737373",
+      "text-halo-color": "rgba(255,255,255,0.9)",
+      "text-halo-width": 1.4,
+      "text-opacity": ["interpolate", ["linear"], ["zoom"], 10.5, 0, 11.2, 0.85, 14.5, 0.85, 15.5, 0],
+    },
+  },
+];
+
 /** The same style for every city; only the vector layer name differs between tile sets. */
 const buildBaseLayers = (sourceLayer: string): LayerSpecification[] => [
   {
@@ -254,7 +314,11 @@ const buildStyle = (city: CityConfig): StyleSpecification => {
         scheme: "xyz",
       },
     },
-    layers: [{ id: "background", type: "background", paint: { "background-color": "#F5F5DC" } }, ...buildBaseLayers(city.sourceLayer)],
+    layers: [
+      { id: "background", type: "background", paint: { "background-color": "#F5F5DC" } },
+      ...buildBaseLayers(city.sourceLayer),
+      ...(city.placesLayer ? buildPlaceLabelLayers(city.placesLayer, city.name) : []),
+    ],
   };
 };
 
@@ -343,8 +407,11 @@ const MapLibreMap = forwardRef<MapHandle, MapLibreMapProps>(function MapLibreMap
   const deckGLLayers = useMemo(() => {
     const layers: Layer[] = [];
 
+    // With a place-label layer present, dots and emoji sit under the labels so names stay readable.
+    const beforeId = cityRef.current.placesLayer ? PLACE_LABEL_LAYER_ID : undefined;
+
     if (landmarks.length > 0) {
-      const emojiLayer = createEmojiLandmarkLayer({ landmarks, zoom: currentZoom });
+      const emojiLayer = createEmojiLandmarkLayer({ landmarks, zoom: currentZoom, beforeId });
       if (emojiLayer) layers.push(emojiLayer);
     }
 
@@ -365,6 +432,7 @@ const MapLibreMap = forwardRef<MapHandle, MapLibreMapProps>(function MapLibreMap
         neighborhoodBoundary: searchFilters?.neighborhood?.boundary ?? null,
         zoom: currentZoom,
         clickedBusinessIds,
+        beforeId,
       });
       if (scatter) layers.push(scatter);
     }

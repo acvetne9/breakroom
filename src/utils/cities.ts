@@ -30,6 +30,8 @@ export interface CityConfig {
   tilesDir: string;
   /** Vector layer name inside those tiles. */
   sourceLayer: string;
+  /** Optional point layer of OSM place names (town / suburb / neighbourhood) for light area labels. */
+  placesLayer?: string;
   tables: {
     businesses: "businesses" | "businesses_chicago";
     roles: "business_roles" | "business_roles_chicago";
@@ -111,6 +113,7 @@ export const CITIES: Record<CityId, CityConfig> = {
     zoom: 12.5,
     tilesDir: "tiles-chicago",
     sourceLayer: "osm",
+    placesLayer: "places",
     tables: { businesses: "businesses_chicago", roles: "business_roles_chicago" },
     landmarks: [
       { lat: 41.8789, lng: -87.6359, emoji: "🏢" }, // Willis Tower

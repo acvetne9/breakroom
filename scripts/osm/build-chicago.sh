@@ -148,10 +148,31 @@ else
   echo "   exists: $MBTILES — skipping"
 fi
 
+# Place names (towns, villages, suburbs, neighbourhoods) as a second vector
+# layer so the map can label areas lightly when zoomed out. Points only;
+# -r1 keeps every point at every zoom (the default thins points below maxzoom).
+PLACES_PBF="$CACHE/chicago-places.osm.pbf"
+PLACES_GEOJSON="$CACHE/chicago-places.geojsonseq"
+PLACES_MBTILES="$CACHE/chicago-places.mbtiles"
+log "c3b. Place names → $PLACES_MBTILES (layer: places)"
+if fresh "$PLACES_MBTILES" "$BBOX_PBF" "$SCRIPTS/export-places.json"; then
+  osmium tags-filter --overwrite -o "$PLACES_PBF" "$BBOX_PBF" \
+    n/place=city,town,village,suburb,neighbourhood,quarter
+  osmium export --overwrite -f geojsonseq -c "$SCRIPTS/export-places.json" \
+    --geometry-types=point -o "$PLACES_GEOJSON" "$PLACES_PBF"
+  tippecanoe -o "$PLACES_MBTILES" -l places \
+    --minimum-zoom=10 --maximum-zoom=16 -r1 \
+    --clip-bounding-box="$TILE_BBOX" \
+    --force --quiet "$PLACES_GEOJSON"
+  echo "   $(grep -c '"place"' "$PLACES_GEOJSON") place nodes → $PLACES_MBTILES"
+else
+  echo "   exists: $PLACES_MBTILES — skipping"
+fi
+
 log "c4. tile-join → $TILES_OUT"
-if fresh "$TILES_OUT/metadata.json" "$MBTILES"; then
+if fresh "$TILES_OUT/metadata.json" "$MBTILES" "$PLACES_MBTILES"; then
   rm -rf "$TILES_OUT"
-  tile-join -e "$TILES_OUT" --force "$MBTILES"
+  tile-join -e "$TILES_OUT" --force "$MBTILES" "$PLACES_MBTILES"
   find "$TILES_OUT" -name .DS_Store -delete
   echo "   wrote $TILES_OUT"
 else
@@ -190,12 +211,14 @@ check_tile() {
   local f="$TILES_OUT/$z/$x/$y.pbf"
   if [[ ! -f "$f" ]]; then echo "   $label: tile $z/$x/$y MISSING" >&2; return; fi
   local json; json="$(tippecanoe-decode "$f" "$z" "$x" "$y")"
-  local n_hw n_water n_park fields
-  n_hw="$(jq '[.features[0].features[] | select(.geometry.type=="LineString" and .properties.highway!=null)] | length' <<<"$json")"
-  n_water="$(jq '[.features[0].features[] | select((.geometry.type=="Polygon" or .geometry.type=="MultiPolygon") and .properties.natural=="water")] | length' <<<"$json")"
-  n_park="$(jq '[.features[0].features[] | select((.geometry.type=="Polygon" or .geometry.type=="MultiPolygon") and .properties.leisure=="park")] | length' <<<"$json")"
-  fields="$(jq -r '[.features[0].features[].properties | keys[]] | unique | join(",")' <<<"$json")"
-  echo "   $label (z$z/$x/$y): layer=$(jq -r '.features[0].properties.layer' <<<"$json") highway_lines=$n_hw water_polygons=$n_water park_polygons=$n_park fields=[$fields]"
+  local osm='.features[] | select(.properties.layer=="osm") | .features[]'
+  local n_hw n_water n_park n_places fields
+  n_hw="$(jq "[$osm | select(.geometry.type==\"LineString\" and .properties.highway!=null)] | length" <<<"$json")"
+  n_water="$(jq "[$osm | select((.geometry.type==\"Polygon\" or .geometry.type==\"MultiPolygon\") and .properties.natural==\"water\")] | length" <<<"$json")"
+  n_park="$(jq "[$osm | select((.geometry.type==\"Polygon\" or .geometry.type==\"MultiPolygon\") and .properties.leisure==\"park\")] | length" <<<"$json")"
+  n_places="$(jq '[.features[] | select(.properties.layer=="places") | .features[]] | length' <<<"$json")"
+  fields="$(jq -r "[$osm | .properties | keys[]] | unique | join(\",\")" <<<"$json")"
+  echo "   $label (z$z/$x/$y): layers=$(jq -r '[.features[].properties.layer] | join("+")' <<<"$json") highway_lines=$n_hw water_polygons=$n_water park_polygons=$n_park place_names=$n_places fields=[$fields]"
 }
 check_tile "Loop         " -87.63 41.88 12
 check_tile "Lake shore   " -87.55 41.90 12
@@ -206,7 +229,7 @@ check_tile "Open lake z16" -87.50 41.80 16
 for z in 10 12 14 16; do
   read -r x y < <(tile_xy -87.50 41.80 "$z")
   f="$TILES_OUT/$z/$x/$y.pbf"
-  if [[ ! -f "$f" ]] || [[ "$(tippecanoe-decode "$f" "$z" "$x" "$y" | jq '[.features[0].features[] | select(.properties.natural=="water")] | length')" -eq 0 ]]; then
+  if [[ ! -f "$f" ]] || [[ "$(tippecanoe-decode "$f" "$z" "$x" "$y" | jq '[.features[] | select(.properties.layer=="osm") | .features[] | select(.properties.natural=="water")] | length')" -eq 0 ]]; then
     echo "   ERROR: no natural=water polygon in open-lake tile $z/$x/$y — Lake Michigan did not come through" >&2
     exit 1
   fi

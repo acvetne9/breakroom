@@ -14,11 +14,14 @@ export interface DeckGLBusinessLayerProps {
   neighborhoodBoundary?: { lat: number; lon: number }[] | null;
   zoom?: number;
   clickedBusinessIds?: Set<string>;
+  /** MapLibre layer id to draw beneath (interleaved overlay); e.g. the place labels. */
+  beforeId?: string;
 }
 
 export interface LandmarkEmojiLayerProps {
   landmarks: { lat: number; lng: number; emoji: string }[];
   zoom?: number;
+  beforeId?: string;
 }
 
 const GOLD: [number, number, number, number] = [250, 204, 21, 255];
@@ -53,6 +56,7 @@ export const createBusinessScatterplotLayer = ({
   neighborhoodBoundary,
   zoom = 12,
   clickedBusinessIds,
+  beforeId,
 }: DeckGLBusinessLayerProps) => {
   const filteredBusinesses = filterBusinessesInPolygon(
     businesses.filter((b) => b != null),
@@ -63,7 +67,11 @@ export const createBusinessScatterplotLayer = ({
   const radiusMin = zoom < 12 ? 6 : zoom < 14 ? 8 : 10;
   const radiusMax = zoom < 12 ? 10 : zoom < 14 ? 12 : 15;
 
+  // `beforeId` is read by MapboxOverlay (interleaved) but is not part of the layer's own prop types.
+  const overlayProps = { beforeId } as Record<string, unknown>;
+
   return new ScatterplotLayer<Business>({
+    ...overlayProps,
     id: "businesses-scatter",
     data: filteredBusinesses,
     pickable: true,
@@ -88,13 +96,16 @@ export const createBusinessScatterplotLayer = ({
 };
 
 /** Emoji markers for landmarks; drawn under the business dots. */
-export const createEmojiLandmarkLayer = ({ landmarks, zoom = 12 }: LandmarkEmojiLayerProps) => {
+export const createEmojiLandmarkLayer = ({ landmarks, zoom = 12, beforeId }: LandmarkEmojiLayerProps) => {
   const validLandmarks = landmarks.filter((l) => l != null && l.lat != null && l.lng != null && l.emoji != null);
   if (validLandmarks.length === 0) return null;
 
   const emojiSize = zoom < 12 ? 20 : zoom < 14 ? 24 : 28;
 
+  const overlayProps = { beforeId } as Record<string, unknown>;
+
   return new TextLayer<{ lat: number; lng: number; emoji: string }>({
+    ...overlayProps,
     id: "emoji-landmarks",
     data: validLandmarks,
     pickable: false,
