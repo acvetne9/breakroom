@@ -284,30 +284,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onStoriesClick, onPostClick
             <span className="font-light opacity-70">Use the search bar on the map to search businesses by keyword, roles, and pay.</span>
           </p>
 
-          <div className="mb-8">
-            <h2 className="text-lg font-medium text-app-black mb-2">Map city</h2>
-            <div role="radiogroup" aria-label="Map city" className="inline-flex rounded-full bg-app-gray-light p-1">
-              {CITY_LIST.map((option) => {
-                const active = option.id === cityId;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    onClick={() => setCityId(option.id)}
-                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                      active ? "bg-app-yellow text-app-black shadow-sm" : "text-app-gray-dark hover:text-app-black"
-                    }`}
-                  >
-                    {option.shortName}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-xs text-app-gray-medium mt-2">The map, search and stories show {city.name}.</p>
-          </div>
-
           {currentJob && (
             <div className="mb-8">
               <div className="flex items-center justify-between mb-4">
@@ -405,7 +381,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onStoriesClick, onPostClick
             )}
           </div>
 
-          <div className="mt-8 flex justify-start relative">
+          <div className="mt-8 flex items-center gap-3 relative">
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -417,6 +393,30 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onStoriesClick, onPostClick
             >
               ?
             </button>
+            <div
+              role="radiogroup"
+              aria-label="Map city"
+              title={`The map, search and stories show ${city.name}`}
+              className="inline-flex h-6 items-center rounded-full bg-app-gray-light p-0.5"
+            >
+              {CITY_LIST.map((option) => {
+                const active = option.id === cityId;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setCityId(option.id)}
+                    className={`h-5 px-2.5 rounded-full text-xs font-medium leading-none transition-colors ${
+                      active ? "bg-app-yellow text-app-black shadow-sm" : "text-app-gray-dark hover:text-app-black"
+                    }`}
+                  >
+                    {option.shortName}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {showHelpPopup && (

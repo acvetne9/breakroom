@@ -20,7 +20,7 @@
 
 ## Settings
 
-- `SettingsPage.tsx` — the NYC / Chicago map toggle (`role="radiogroup"`, writes through `CityContext`), current job (editable, "Move to past jobs" retires it atomically via the `move_current_job_to_past` RPC, and switching business offers to keep the old one), past jobs (add / hide; hiding sets `deleted_at`, incomplete drafts are wiped), and "My Stories". Both job kinds use the same `JobFormState`; incomplete jobs show a badge and are not saved.
+- `SettingsPage.tsx` — current job (editable, "Move to past jobs" retires it atomically via the `move_current_job_to_past` RPC, and switching business offers to keep the old one), past jobs (add / hide; hiding sets `deleted_at`, incomplete drafts are wiped), and "My Stories", plus the small NYC / Chicago map toggle next to the "?" at the bottom (`role="radiogroup"`, writes through `CityContext`). Both job kinds use the same `JobFormState`; incomplete jobs show a badge and are not saved.
 - `MyStories.tsx` — every post the device wrote, paged straight from the database (`getMyPosts`), with delete.
 - `JobEditor.tsx` — the three fields for one job; state transitions come from `utils/jobForm.ts`.
 - `JobEntryForm.tsx` — low-level presentational fields shared with `InitiationPage`.
